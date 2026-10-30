@@ -11,6 +11,10 @@ weight. Lean, squash and head lag added on top are decorations, not causes. The 
 physics. Procedural creatures that feel alive (Rain World, Overgrowth, procedural spider robots) use the same idea:
 a physical body, and legs that serve it.
 
+**Status (2026-10-30):** for humanoids this is now the physical layer under motion-capture playback
+([motion data plan](2026-10-30-motion-data.md)); bodies without real-world data keep the procedural stepping here.
+A first draft is in `src/motion/walker.ts` (on flat ground the feet overreach and the body does not bob yet).
+
 **What stays:** the IK (two-bone and FABRIK with poles and limits), terrain support (plants on the surface under the
 whole foot, tread nudges, swing clearance), spring chains, cloth, the joint hierarchy, `poseAt` (a physical frame
 produces the same `GaitFrame` the planner did), every renderer, and the offline planner, which keeps all existing

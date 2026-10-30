@@ -24,11 +24,12 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
-### 0. Physical walking (user decision, 2026-10-30)
+### 0. Natural motion: mocap + physics (user decision, 2026-10-30)
 
-[Physical walking plan](plans/2026-10-30-physical-walking.md): bodies with mass and momentum, legs that step when the
-body needs catching; replaces the scripted root track in the live world. Batches A (body and stepping, flat), B
-(terrain, many legs, upper body), C (world integration, judge panel).
+[Motion data plan](plans/2026-10-30-motion-data.md): humanoids driven by retargeted CMU motion capture (motion
+matching, IK on terrain), the [physical body](plans/2026-10-30-physical-walking.md) leading the root for everyone,
+procedural stepping for bodies without data. Batch A next: fetch and convert clips, retarget, early judge panel.
+`src/motion/walker.ts` is the physical body's first draft (feet overreach and the body does not bob yet).
 
 ### 0b. World showcase (user request, 2026-10-30)
 

@@ -17,8 +17,9 @@ export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): S
   const shaded = createImage(g.width, g.height)
   shade(shaded, g, m, style)
   drawInnerLines(shaded, g, m, style)
-  const image = removeStrays(shaded, g, m)
-  const decalMask = drawDecals(image, g, m, cam, style)
+  const cleaned = removeStrays(shaded, g, m)
+  const decalMask = drawDecals(cleaned, g, m, cam, style)
+  const image = removeStrays(cleaned, g, m, decalMask)
   const outlineMask = drawOutline(image, g, m, style)
   return { image, decalMask, outlineMask }
 }
@@ -71,20 +72,21 @@ function mostCommon (values: number[]): number {
   return best
 }
 
-function removeStrays (image: Image, g: GBuffer, m: Mannequin): Image {
+function removeStrays (image: Image, g: GBuffer, m: Mannequin, frozen?: Uint8Array): Image {
+  const fixed = frozen ?? new Uint8Array(g.width * g.height)
   const out: Image = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.data) }
   for (let pass = 0; pass < MAX_STRAY_PASSES; pass++) {
-    if (!strayPass(out, g, m)) break
+    if (!strayPass(out, g, m, fixed)) break
   }
   return out
 }
 
-function strayPass (image: Image, g: GBuffer, m: Mannequin): boolean {
+function strayPass (image: Image, g: GBuffer, m: Mannequin, frozen: Uint8Array): boolean {
   let changed = false
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
       const part = g.part[y * g.width + x]
-      if (part === EMPTY) continue
+      if (part === EMPTY || frozen[y * g.width + x] === 1) continue
       const c = getPixel(image, x, y)
       const same: number[] = []
       const other: number[] = []
@@ -94,7 +96,7 @@ function strayPass (image: Image, g: GBuffer, m: Mannequin): boolean {
           const ny = y + dy
           if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= g.width || ny >= g.height) continue
           const neighbour = g.part[ny * g.width + nx]
-          if (neighbour === EMPTY) continue
+          if (neighbour === EMPTY || frozen[ny * g.width + nx] === 1) continue
           const list = neighbour === part ? same : other
           list.push(getPixel(image, nx, ny))
         }

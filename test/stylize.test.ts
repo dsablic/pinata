@@ -166,6 +166,18 @@ test('skips a decal covered by a surface more than one pixel depth in front of i
   assert.equal(getPixel(decalScene([0, 0, 1], 3.5).image, 2, 3), RED)
 })
 
+test('cleans up a pixel a decal leaves isolated, without touching the decal', () => {
+  const g = block([0, 0, 1])
+  g.depth.fill(4)
+  g.normal.set([0, 0, -1], (2 * 5 + 1) * 3)
+  g.normal.set([0, 0, -1], (3 * 5 + 1) * 3)
+  const m: Mannequin = { ...mannequin, decals: [{ ...eye, pattern: ['x..'] }] }
+  const { image, decalMask } = stylize(g, m, camera, style)
+  assert.equal(decalMask[3 * 5 + 1], 1)
+  assert.equal(getPixel(image, 1, 3), RED)
+  assert.equal(getPixel(image, 1, 2), LIGHT)
+})
+
 const selective: Style = {
   ...style,
   outlineMode: 'selective',

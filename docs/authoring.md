@@ -298,10 +298,10 @@ than four legs. Arms are `left arm`, or `left arm 1` .. `n` front to back when a
 
 ### Many legs
 
-- **Landing spots.** Each foot lands under its own hip along the body. Sideways, it lands at `footSpacing` / 2 from
-  the centre line, or, with `"lateral": "rest"` in the gait (the hexapod and octopod default), at its rest ankle's
-  sideways offset: splay the feet out in the rest pose and they plant there. Put the pelvis joint (the root) between
-  the front and hind hips.
+- **Landing spots.** By default each foot lands under its own hip along the body and at `footSpacing` / 2 from the
+  centre line. With `"lateral": "rest"` in the gait (the hexapod and octopod default) it lands where its ankle is in
+  the rest pose, relative to the body: fan the feet out in the rest pose and they plant there. Put the pelvis joint
+  (the root) between the front and hind hips.
 - **Stance.** One foot is always in the air unless `stanceFraction` is at least 1 minus the largest gap between
   consecutive leg phases (0.75 for a quarter-cycle walk, 0.5 for a tripod). A smaller value is a load error.
 - **Proportions.** Each foot swings up to `strideLength` / 2 either side of its hip, so keep `strideLength` under
@@ -333,7 +333,7 @@ stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm 
 | `bobAmplitude` | 0 to 1 | Metres of pelvis bob. 0.015 to 0.025 typical. |
 | `armSwingDegrees` | 0 to 90 | Arm swing, against the nearest leg on the same side, so left and right arms swing opposite ways. Optional with a template. |
 | `footSpacing` | 0 to 2 | Metres between left and right foot plants. Use the distance between the hip joints. Unused by legs that plant at rest (`lateral`). |
-| `lateral` | `"spacing"` or `"rest"`, optional | Where feet land sideways: at `footSpacing` / 2 from the centre line (default), or at each rest ankle's sideways offset (default for the hexapod and octopod templates). |
+| `lateral` | `"spacing"` or `"rest"`, optional | Where feet land: under the hip at `footSpacing` / 2 from the centre line (default), or at each ankle's rest position relative to the body (default for the hexapod and octopod templates). |
 | `strideExponent` | 0.2 to 1, optional, default 0.5 | How fast stride grows with speed. Stride is `strideLength * clamp((speed / referenceSpeed)^strideExponent, 0.5, 1.5)`. |
 
 Leg length is hip y minus ankle y in the rest pose. Starting values: `strideLength` 1.4 x leg length, `footSpacing`

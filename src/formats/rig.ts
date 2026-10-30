@@ -201,7 +201,7 @@ function validateGait (gait: unknown, hasTemplate: boolean, errors: ValidationEr
   if (gait.lateral !== undefined && gait.lateral !== 'rest' && gait.lateral !== 'spacing') {
     errors.push({
       path: 'gait.lateral',
-      message: "expected 'rest' or 'spacing': 'rest' plants each foot at its rest ankle's sideways offset, " +
+      message: "expected 'rest' or 'spacing': 'rest' plants each foot at its rest ankle's position, " +
         "'spacing' at footSpacing / 2 from the centre line"
     })
   }

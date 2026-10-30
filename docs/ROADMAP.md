@@ -39,7 +39,7 @@ for previews, collision geometry and checks.
 
 ## Body plans and rigid-body behaviours (in progress)
 
-- **General limbs** ([`docs/plans/2026-10-30-general-limbs.md`](plans/2026-10-30-general-limbs.md)): any number of legs with any segment count, arms,
+- **General limbs** (done; [`docs/plans/2026-10-30-general-limbs.md`](plans/2026-10-30-general-limbs.md)): any number of legs with any segment count, arms,
   and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
   octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under
   the front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.

@@ -40,6 +40,7 @@ npm run p1          # P1: render the knight in 8 directions, evaluate gates, wri
 npm run p3          # P3: simulate cape and plume in three scenarios per material, write reports/p3/
 npm run p2          # P2, p4, p6 and skins likewise; see package.json
 npm run check -- examples/knight   # check a character package (see docs/authoring.md)
+npm run new -- --template hexapod my-bug   # write a starter package (biped, quadruped, hexapod or octopod)
 npm run demo        # render the walking piñata demo (animated PNG and frames) to reports/demo/
 npm run skins -- pocs/skins-spike/artist-skin.json   # render the knight with AI-drawn part sprites
 npm run p1:verify   # same as p1 plus the determinism re-run; likewise p2:verify, p3:verify, p4:verify, p6:verify
@@ -56,9 +57,11 @@ gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a pla
 
 - [`src/`](src): the library, one directory per component (formats, raster, style, sim, motion, diagnostics).
 - [`pocs/`](pocs): one directory per proof of concept, with its assets, gates and runner.
-- [`examples/`](examples): character packages: the knight, a four-legged dog, the piñata, and three characters authored by AI
-  agents in P5 (rogue, dwarf, wizard).
-- [`docs/assets/`](docs/assets): the provisional logo (a hanging unicorn piñata, rendered with the engine).
+- [`examples/`](examples): character packages: the knight, a four-legged dog, the piñata, three characters authored by AI
+  agents in P5 (rogue, dwarf, wizard), and creatures with general limbs: a six-legged beetle, an eight-legged spider and
+  a horse with five-joint legs, a swishing tail and ears.
+- [`docs/assets/`](docs/assets): the provisional logo (a hanging unicorn piñata, rendered with the engine) and a lineup
+  of the general-limbs examples at 48 px.
 - [`test/`](test): unit tests.
 - [`refs/`](refs): CC0 reference sprites used in the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
 - [`docs/plans/`](docs/plans): the viability design, the plan for each proof, findings logs and the judge panel artefacts.

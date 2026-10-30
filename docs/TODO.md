@@ -7,8 +7,13 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 ## Current state
 
 - All proofs are done (P1-P6 and the skins spike); results in [`docs/FINDINGS.md`](FINDINGS.md).
-- General limbs ([plan](plans/2026-10-30-general-limbs.md)): batches A (format, templates) and B (N-segment IK,
-  gait and pose for any limbs) are done and reviewed, with all review fixes in. Existing outputs are byte-identical.
+- General limbs ([plan](plans/2026-10-30-general-limbs.md)): batches A-D are done and reviewed. Format, templates,
+  N-segment IK, gait and pose for any limbs, appendage dynamics (spring and oscillator), balance and appendage gates,
+  `npm run new`, the beetle, spider and horse examples (lineup in [`docs/assets/lineup.png`](assets/lineup.png)) and
+  the authoring guide. Existing outputs are byte-identical (only wall-clock timing in `metrics.json` differs).
+- **Waiting on you:** (1) confirm the balance gate applies only to rigs with more than four legs (the plan said 3+,
+  but the dog example fails it; see "Decisions during batch C" in the plan); (2) the unicorn piñata package is not on
+  this machine, so moving it into `examples/` is still open.
 - Specs written, not started: live runtime spike P8 ([spec](plans/2026-10-30-runtime-spike.md)) and composable
   behaviours ([spec](plans/2026-10-30-composable-behaviours.md)).
 - Provisional logo: a hanging unicorn piñata, seamless loop, in [`docs/assets/`](assets). It was rendered by a
@@ -17,35 +22,16 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
-### 1. General limbs batch C: dynamics and gates
+### 1. Leftovers from general limbs
 
-From the [general limbs plan](plans/2026-10-30-general-limbs.md), section "Batches", item C:
-- [ ] Appendage dynamics: rigid segments with a damped angular spring toward the rest direction (relative to the parent
-      segment), plus the optional oscillator (`oscillate: { axis, degrees, period }`, `period` required when
-      `degrees > 0`), integrated at the cloth substep rate, deterministic.
-- [ ] Balance gate `unbalancedFrames == 0` for 3+ legs: pelvis-group centroid projected on the ground must stay inside
-      the convex hull of planted feet (2 cm tolerance). Check a hexapod tripod at stanceFraction 0.6 is not marginal.
-- [ ] Appendage gates: `appendageBoneLengthError <= 0.01`, `appendageNonFinite == 0`.
-- [ ] Unique arm labels when a side has several arms (today they read `left arm` for every left arm).
-- [ ] Every metric and hint per limb; keep existing outputs byte-identical (hash `reports/` and `examples/*/report/`
-      after `npm run p1`, `p3`, `p4`, `p6` and `npm run check` on every example, before and after).
-- [ ] Review the batch (independent reviewer, "assume the code is wrong"), fix, push.
+- [ ] Move the unicorn piñata package into `examples/` (shorter-stride version; see "Logo" below), using appendages
+      for its tail and mane where they fit.
+- [ ] Several new examples sit exactly on `maxStrayPixels` (2) and `maxThinFraction` (0.25); see "Stray-pixel
+      cleanup" below.
+- [ ] Appendages: a very soft appendage on a very fast spin flails (swing frames are singular near 180 degrees); no
+      script does that today.
 
-### 2. General limbs batch D: starter command, examples, guide
-
-- [ ] `pinata new --template <biped|quadruped|hexapod|octopod> <dir>` writing a starter package that passes `check`
-      (use `listTemplates()` and its `gaitPerLegLength` ratios).
-- [ ] New examples that pass `check`: `examples/beetle` (hexapod, 5-joint legs, `gait.lateral: 'rest'`),
-      `examples/spider` (octopod, `bend: 'up'`), `examples/horse` (quadruped, 5-joint digitigrade legs with bend
-      arrays, tail and ears as appendages).
-- [ ] Move the unicorn piñata package into `examples/` (shorter-stride version; see "Logo" below).
-- [ ] Rewrite the limbs part of [`docs/authoring.md`](authoring.md): `limbs`, kinds, templates, the corrected bend
-      count (`joints.length - 3`), `bend: 'up'`, `gait.lateral`, leg labels, appendages, the balance gate, the
-      proportion rule (stride under about 0.6x front-to-back hip spacing). Several statements there are now wrong
-      for the new format (listed in the batch A/B review: "2 or 4 legs", phase rules, arm swing, knee-only limits).
-- [ ] Render a lineup of the new creatures; final review; push.
-
-### 3. Live runtime spike P8, with composable behaviours phase 1
+### 2. Live runtime spike P8, with composable behaviours phase 1
 
 [Runtime spec](plans/2026-10-30-runtime-spike.md) and [behaviours spec](plans/2026-10-30-composable-behaviours.md):
 - [ ] Browser bundle of the engine (esbuild, no Node built-ins), compact single-file character artifact.
@@ -60,7 +46,7 @@ From the [general limbs plan](plans/2026-10-30-general-limbs.md), section "Batch
       errors, saved stills.
 - [ ] Decision: procedural renderer good enough for the runtime, or skins first.
 
-### 4. P7, in parallel with P8: skins to a game-art bar
+### 3. P7, in parallel with P8: skins to a game-art bar
 
 [ROADMAP.md, "P7"](ROADMAP.md): 8-direction AI-drawn skins, clean limb rotation (angle variants or RotSprite-style),
 a first readability layer (exaggerated contact and passing poses, holds), consistency at 32/48/64 px; judged against
@@ -75,7 +61,6 @@ before building.
       controls).
 - [ ] Stray-pixel cleanup for mostly hidden parts (every four-legged piñata failed `maxStrayPixels` at 32 px).
 - [ ] Quadruped gait tuning for short legs (knee speed) and turning (the dragon only passed at 0.1 m/s, no turn).
-- [ ] `DEMO_FRAMES` below 13 crashes `npm run demo` (the first 12 frames are skipped).
 - [ ] P2 gate `partAreaJump` counts occlusion as instability; redefine on unoccluded footprints in a future version.
 - [ ] Remaining renderer speedups that keep pixels: PNG compression and sheet assembly.
 

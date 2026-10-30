@@ -66,7 +66,7 @@ function placeChain (
   base: Vec3,
   body: Matrix,
   time: number,
-  options: { step?: number, velocity?: (tip: Vec3) => Vec3 }
+  options: { step?: number, velocity?: (tip: Vec3) => Vec3, force?: Force }
 ): void {
   const { limb, segments } = chain
   let frame = rootFrame(limb, body, time)
@@ -95,8 +95,15 @@ export function startChain (
   placeChain(chain, base, body, time, { velocity })
 }
 
-export function stepChain (chain: SpringChain, base: Vec3, body: Matrix, time: number, dt: number): void {
-  placeChain(chain, base, body, time, { step: dt })
+export function stepChain (
+  chain: SpringChain,
+  base: Vec3,
+  body: Matrix,
+  time: number,
+  dt: number,
+  force?: Force
+): void {
+  placeChain(chain, base, body, time, { step: dt, ...(force === undefined ? {} : { force }) })
 }
 
 function parentRotation (from: Matrix | undefined, to: Matrix | undefined, u: number): Matrix | undefined {
@@ -104,7 +111,10 @@ function parentRotation (from: Matrix | undefined, to: Matrix | undefined, u: nu
   return interpolate(from ?? IDENTITY, to ?? IDENTITY, u)
 }
 
-function springStep (segment: Segment, base: Vec3, goal: Vec3, limb: AppendageLimb, dt: number): void {
+/** An outside acceleration on a segment's tip (m/s^2) given its velocity, such as gravity or wind drag. */
+export type Force = (velocity: Vec3) => Vec3
+
+function springStep (segment: Segment, base: Vec3, goal: Vec3, limb: AppendageLimb, dt: number, force?: Force): void {
   const targetVelocity = scale(sub(goal, segment.target), 1 / dt)
   segment.target = goal
   if (limb.stiffness >= 1) {
@@ -114,7 +124,8 @@ function springStep (segment: Segment, base: Vec3, goal: Vec3, limb: AppendageLi
   }
   const omega = 2 * Math.PI * springFrequency(limb.stiffness)
   const damping = 2 * limb.damping * omega
-  const pull = add(scale(sub(goal, segment.tip), omega * omega * dt), scale(targetVelocity, damping * dt))
+  const spring = add(scale(sub(goal, segment.tip), omega * omega * dt), scale(targetVelocity, damping * dt))
+  const pull = force === undefined ? spring : add(spring, scale(force(segment.velocity), dt))
   const velocity = scale(add(segment.velocity, pull), 1 / (1 + damping * dt + omega * omega * dt * dt))
   const moved = add(segment.tip, scale(velocity, dt))
   const reach = sub(moved, base)

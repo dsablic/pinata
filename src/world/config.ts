@@ -43,15 +43,28 @@ export type WorldConfig = {
    * turning, at most max), breathing raises the chest, and a slow sway shifts the weight while standing.
    */
   life: {
-    lean: { frequency: number, damping: number, perAcceleration: number, perTurn: number, max: number }
+    lean: { frequency: number, damping: number, perAcceleration: number, perTurn: number, perWind: number, max: number }
     breathe: { amplitude: number, period: number }
     sway: { degrees: number, period: number }
+    /** Footfalls compress the upper body by amount (a fraction of its height), recovering over seconds. */
+    squash: { amount: number, seconds: number }
+    /** How strongly the lean looks ahead in the plan and leans back before a start (0: not at all). */
+    anticipation: number
+    /**
+     * The head (upper-body joints above this fraction of the height) lags on its own spring: frequency in Hz, damping
+     * ratio, and gain (degrees per rad/s^2 of the torso's lean acceleration plus per m/s^2 of the pelvis bouncing).
+     */
+    head: { above: number, frequency: number, damping: number, gain: number }
+    /** Multipliers for the walk's pelvis bob and arm swing. */
+    exaggerate: { bob: number, armSwing: number }
   }
   /** Gravity (m/s^2, downward) and wind for cloth, and cloth substeps per frame; the page can change them live. */
   environment: {
     gravity: number
     wind: { direction: [number, number, number], speed: number, gust: number }
     clothSubsteps: number
+    /** How the weather reaches spring chains (tails, ears, manes): a share of gravity, and wind drag per second. */
+    springs: { gravity: number, windDrag: number }
   }
   motion: { settleSeconds: number, turnSecondsPerRadian: number, minTurnSeconds: number, springSubsteps: number }
   /** How far walks go: a wander and a dash in seconds at the walk's speed, a visit's gap, a startled run in metres. */
@@ -134,6 +147,7 @@ export const WORLD_SCHEMA: Schema = {
             damping: positive(2, 'damping ratio, 1 settles without overshoot'),
             perAcceleration: positive(45, 'degrees per m/s^2'),
             perTurn: positive(45, 'degrees per rad/s'),
+            perWind: positive(20, 'degrees of lean into the wind per m/s'),
             max: positive(60, 'degrees')
           }
         },
@@ -141,7 +155,19 @@ export const WORLD_SCHEMA: Schema = {
           kind: 'object',
           fields: { amplitude: positive(0.1, 'metres'), period: { kind: 'number', min: 0.5, max: 30 } }
         },
-        sway: { kind: 'object', fields: { degrees: positive(20), period: { kind: 'number', min: 0.5, max: 60 } } }
+        sway: { kind: 'object', fields: { degrees: positive(20), period: { kind: 'number', min: 0.5, max: 60 } } },
+        squash: { kind: 'object', fields: { amount: positive(0.4), seconds: { kind: 'number', min: 0.02, max: 2 } } },
+        anticipation: positive(5),
+        head: {
+          kind: 'object',
+          fields: {
+            above: { kind: 'number', min: 0.3, max: 1, note: 'fraction of the height' },
+            frequency: { kind: 'number', min: 0.1, max: 20 },
+            damping: positive(2),
+            gain: positive(100)
+          }
+        },
+        exaggerate: { kind: 'object', fields: { bob: positive(5), armSwing: positive(5) } }
       }
     },
     environment: {
@@ -152,7 +178,11 @@ export const WORLD_SCHEMA: Schema = {
           kind: 'object',
           fields: { direction: { kind: 'vec3' }, speed: positive(30, 'm/s'), gust: positive(1, '0 steady to 1 gusty') }
         },
-        clothSubsteps: { kind: 'number', min: 1, max: 64, integer: true }
+        clothSubsteps: { kind: 'number', min: 1, max: 64, integer: true },
+        springs: {
+          kind: 'object',
+          fields: { gravity: positive(1, 'share of gravity on spring chains'), windDrag: positive(50, 'per second') }
+        }
       }
     },
     motion: {

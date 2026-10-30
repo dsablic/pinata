@@ -2,7 +2,7 @@ import type { Mannequin } from '../formats/mannequin.ts'
 import type { Scenario, SimMaterial } from '../formats/sim.ts'
 import { legsOf } from '../formats/rig.ts'
 import type { AppendageLimb, Rig } from '../formats/rig.ts'
-import { add, scale, sub } from '../math/vec.ts'
+import { add, dot, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { bodyFrame, createSpringChain, startChain, stepChain } from '../motion/appendages.ts'
 import type { SpringChain } from '../motion/appendages.ts'
@@ -14,10 +14,11 @@ import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { parentsOf, transformTo } from '../motion/skeleton.ts'
 import { apply, axisAngle, multiply } from '../math/matrix.ts'
+import type { Matrix } from '../math/matrix.ts'
 import { toWorld } from '../sim/body.ts'
 import { buildClothSystem } from '../sim/cloth.ts'
 import type { System } from '../sim/cloth.ts'
-import { step as stepCloth } from '../sim/solver.ts'
+import { step as stepCloth, windAt } from '../sim/solver.ts'
 import { pickActivity } from './config.ts'
 import type { Step, WorldConfig } from './config.ts'
 import { generateTerrain, random } from './terrain.ts'
@@ -76,6 +77,20 @@ type Actor = {
   lean: { forward: number, side: number, forwardRate: number, sideRate: number, speed: number, phase: number }
   /** Joints the lean moves: everything above the legs except the pelvis, which it pivots about. */
   upper: string[]
+  /** The lagging head's angle and rate, the torso's last lean rate, and the pelvis's last height and rate. */
+  head: { angle: number, rate: number, leanRate: number, lift: number, liftRate: number }
+  headJoints: string[]
+  /** When a foot last landed (for squash), and which feet were planted in the previous frame. */
+  squashed: number
+  wasPlanted: boolean[]
+}
+
+/** The upper-body and attached joints whose rest height is above the given fraction of the character's height. */
+function headOf (member: CastMember, upper: string[], above: number): string[] {
+  const rest = restPose(member.mannequin)
+  const chains = new Set(member.rig.limbs.flatMap(limb => limb.joints))
+  const top = Math.max(...Object.values(rest).map(p => p[1]))
+  return upper.filter(joint => !chains.has(joint) && rest[joint][1] >= above * top)
 }
 
 /** Turns smaller than this (radians) are skipped; characters keep this far (metres) from the world's ends. */
@@ -122,7 +137,13 @@ export function createWorld (options: WorldOptions): World {
   const span: [number, number] = [terrain.from + EDGE, Math.min(terrain.to, config.terrain.length) - EDGE]
   let frameIndex = 0
 
-  const actors: Actor[] = cast.map((member, i) => {
+  const { exaggerate } = config.life
+  const actors: Actor[] = cast.map((original, i) => {
+    const { gait } = original.rig
+    const bobAmplitude = gait.bobAmplitude * exaggerate.bob
+    const armSwingDegrees = gait.armSwingDegrees * exaggerate.armSwing
+    const rig = { ...original.rig, gait: { ...gait, bobAmplitude, armSwingDegrees } }
+    const member: CastMember = { ...original, rig }
     const lane = (i - (cast.length - 1) / 2) * config.lanes.spacing
     const x = span[0] + (span[1] - span[0]) * (i + 0.5) / cast.length
     const parents = parentsOf(member.rig)
@@ -144,6 +165,10 @@ export function createWorld (options: WorldOptions): World {
       lane,
       upper,
       lean: { forward: 0, side: 0, forwardRate: 0, sideRate: 0, speed: 0, phase: next() },
+      head: { angle: 0, rate: 0, leanRate: 0, lift: 0, liftRate: 0 },
+      squashed: -Infinity,
+      wasPlanted: [],
+      headJoints: headOf(member, upper, config.life.head.above),
       ...(cloth === undefined ? {} : { cloth }),
       root: {
         position: [x, 0, lane], yaw: next() < 0.5 ? Math.PI / 2 : -Math.PI / 2, velocity: [0, 0, 0], angularVelocity: 0
@@ -265,7 +290,13 @@ export function createWorld (options: WorldOptions): World {
           const u = s / substeps
           const at = add(entry.base, scale(sub(base, entry.base), u))
           const yaw = entry.yaw + turnBetween(entry.yaw, frame.root.yaw) * u
-          stepChain(entry.chain, at, bodyFrame(yaw, rotation), (frameIndex - 1 + u) / fps, dt)
+          const t = (frameIndex - 1 + u) / fps
+          const wind = windAt(environment.wind, t)
+          const { gravity, windDrag } = environment.springs
+          const force = (velocity: Vec3): Vec3 => {
+            return add([0, -environment.gravity * gravity, 0], scale(sub(wind, velocity), windDrag))
+          }
+          stepChain(entry.chain, at, bodyFrame(yaw, rotation), t, dt, force)
         }
       }
       entry.base = base
@@ -276,46 +307,88 @@ export function createWorld (options: WorldOptions): World {
 
   const environment = structuredClone(config.environment)
 
+  /** The forward speed of a root along its facing. */
+  const forwardSpeed = (root: RootState): number => {
+    return root.velocity[0] * Math.sin(root.yaw) + root.velocity[2] * Math.cos(root.yaw)
+  }
+
+  /** One semi-implicit step of a damped spring toward a target; returns the new value and rate. */
+  const spring = (value: number, rate: number, target: number, hz: number, damping: number, push = 0) => {
+    const omega = 2 * Math.PI * hz
+    const next = rate + (omega * omega * (target - value) - 2 * damping * omega * rate + push) / fps
+    return { value: value + next / fps, rate: next }
+  }
+
   /**
-   * Leans the upper body about the pelvis with a damped spring toward a target from the body's forward acceleration
-   * and turning (plus a slow sway while standing), and adds breathing; updates the pose and transforms in place.
+   * Gives the upper body life, updating the pose and transforms in place: a lean spring toward the body's forward
+   * acceleration (looking ahead in the plan for anticipation), its turning, the wind, and a slow sway while standing;
+   * squash at footfalls; breathing; and a head that lags on its own spring. The legs and pelvis are not moved.
    */
   const live = (actor: Actor, frame: GaitFrame, pose: Pose, transforms: Turns, time: number): void => {
-    const { lean, sway, breathe } = config.life
+    const { lean, sway, breathe, squash, head, anticipation } = config.life
     const state = actor.lean
-    const yaw = frame.root.yaw
-    const speed = frame.root.velocity[0] * Math.sin(yaw) + frame.root.velocity[2] * Math.cos(yaw)
+    const degrees = Math.PI / 180
+    const speed = forwardSpeed(frame.root)
     const acceleration = (speed - state.speed) * fps
     state.speed = speed
-    const degrees = Math.PI / 180
+    const ahead = actor.frames.slice(actor.next + 2, actor.next + 4)
+    const upcoming = ahead.length === 2 ? (forwardSpeed(ahead[1].root) - forwardSpeed(ahead[0].root)) * fps : 0
+    const wind = windAt(environment.wind, time)
+    const yaw = frame.root.yaw
+    const facing: Vec3 = [Math.sin(yaw), 0, Math.cos(yaw)]
+    const right: Vec3 = [Math.cos(yaw), 0, -Math.sin(yaw)]
     const limit = lean.max * degrees
     const clamp = (v: number): number => Math.min(limit, Math.max(-limit, v))
     const idle = Math.abs(speed) < 0.05 && Math.abs(frame.root.angularVelocity) < 0.05
     const wave = (period: number): number => Math.sin(2 * Math.PI * (time / period + state.phase))
     const target = {
-      forward: clamp(acceleration * lean.perAcceleration * degrees),
-      side: clamp(
-        frame.root.angularVelocity * lean.perTurn * degrees + (idle ? sway.degrees * degrees * wave(sway.period) : 0)
-      )
+      forward: clamp((acceleration - anticipation * upcoming) * lean.perAcceleration * degrees -
+        dot(wind, facing) * lean.perWind * degrees),
+      side: clamp(frame.root.angularVelocity * lean.perTurn * degrees - dot(wind, right) * lean.perWind * degrees +
+        (idle ? sway.degrees * degrees * wave(sway.period) : 0))
     }
-    const omega = 2 * Math.PI * lean.frequency
-    const dt = 1 / fps
-    for (const axis of ['forward', 'side'] as const) {
-      const rate = axis === 'forward' ? 'forwardRate' : 'sideRate'
-      const pull = omega * omega * (target[axis] - state[axis]) - 2 * lean.damping * omega * state[rate]
-      state[rate] += pull * dt
-      state[axis] += state[rate] * dt
-    }
+    const forward = spring(state.forward, state.forwardRate, target.forward, lean.frequency, lean.damping)
+    const side = spring(state.side, state.sideRate, target.side, lean.frequency, lean.damping)
+    const leanAcceleration = (forward.rate - state.forwardRate) * fps
+    state.forward = forward.value
+    state.forwardRate = forward.rate
+    state.side = side.value
+    state.sideRate = side.rate
+    const landed = frame.feet.some((foot, k) => foot.planted && actor.wasPlanted[k] === false)
+    actor.wasPlanted = frame.feet.map(foot => foot.planted)
+    if (landed) actor.squashed = time
+    const since = (time - actor.squashed) / squash.seconds
+    const squeeze = since >= 0 && since < 1 ? squash.amount * (1 - since) * (1 - since) : 0
+    const lift = frame.pelvisOffset[1]
+    const liftAcceleration = ((lift - actor.head.lift) * fps - actor.head.liftRate) * fps
+    actor.head.liftRate = (lift - actor.head.lift) * fps
+    actor.head.lift = lift
+    const push = -head.gain * degrees * (leanAcceleration + liftAcceleration)
+    const nod = spring(actor.head.angle, actor.head.rate, 0, head.frequency, head.damping, push)
+    actor.head.angle = Math.min(limit, Math.max(-limit, nod.value))
+    actor.head.rate = nod.rate
     const turn = multiply(axisAngle([0, 0, 1], -state.side), axisAngle([1, 0, 0], state.forward))
     const pivot = pose[actor.member.rig.pelvis]
     const rise = breathe.amplitude * wave(breathe.period)
-    for (const joint of actor.upper) {
+    const place = (joint: string, rotation: Matrix, about: Vec3, extra: Vec3): void => {
       const at = pose[joint]
-      if (at === undefined) continue
-      const moved = add(add(pivot, apply(turn, sub(at, pivot))), [0, rise, 0])
+      if (at === undefined) return
+      const moved = add(add(about, apply(rotation, sub(at, about))), extra)
       pose[joint] = moved
       const before = transforms[joint]?.rotation
-      transforms[joint] = transformTo(before === undefined ? turn : multiply(turn, before), actor.rest[joint], moved)
+      const turned = before === undefined ? rotation : multiply(rotation, before)
+      transforms[joint] = transformTo(turned, actor.rest[joint], moved)
+    }
+    for (const joint of actor.upper) {
+      const above = sub(pose[joint] ?? pivot, pivot)
+      const squashed: Vec3 = [above[0] * squeeze * 0.5, -above[1] * squeeze + rise, above[2] * squeeze * 0.5]
+      place(joint, turn, pivot, squashed)
+    }
+    if (actor.headJoints.length > 0) {
+      const neck = actor.headJoints.reduce((low, j) => pose[j][1] < pose[low][1] ? j : low)
+      const nodding = axisAngle([1, 0, 0], actor.head.angle)
+      const base = pose[neck]
+      for (const joint of actor.headJoints) place(joint, nodding, base, [0, 0, 0])
     }
   }
 

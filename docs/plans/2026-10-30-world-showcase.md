@@ -158,3 +158,16 @@ agent wiring stays out of it.
   world runs at about 24 ms per frame for 8 characters in headless Chrome.
 - A wander that would leave the world is reflected instead of clamped: a character at the edge kept choosing the wall
   and stood still for a minute.
+- **Animation principles (user, 2026-10-30: "more dynamic instead of stick figure like"; chose motion now, skins
+  next):** `life` gains squash at footfalls (the upper body compresses and spreads, recovering over a fraction of a
+  second), anticipation (the lean spring looks two frames ahead in the plan, so characters lean back before setting
+  off), a lagging head (upper-body joints above a height fraction nod on their own spring, pushed by the torso's lean
+  and the pelvis's bounce), and exaggeration multipliers for bob and arm swing. The capsule-mannequin look itself is
+  the larger cause of the stick-figure impression; skins (batch G) address it next.
+- **Weather that everyone feels (user: "wind and gust and gravity don't do much"):** wind and gravity only moved cloth,
+  which only four characters have (and a cape is edge-on from the side). Spring chains (tails, manes, ears, antennae)
+  now take an outside force (a share of gravity and wind drag, `environment.springs`), and bodies lean into the wind
+  (`life.lean.perWind`), all from the same gusting wind the cloth uses. Offline renders pass no force, so their output
+  is unchanged.
+- `dress` in the config draws the simulated capes and chains in the world (material and radius) and hides the fixed
+  mannequin parts they replace (the knight's rigid cape boxes).

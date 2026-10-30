@@ -34,9 +34,10 @@
     "lean": {
       "frequency": 2.2,
       "damping": 0.4,
-      "perAcceleration": 7,
+      "perAcceleration": 10,
       "perTurn": 6,
-      "max": 18
+      "max": 22,
+      "perWind": 2.5
     },
     "breathe": {
       "amplitude": 0.006,
@@ -45,6 +46,21 @@
     "sway": {
       "degrees": 1.6,
       "period": 5
+    },
+    "squash": {
+      "amount": 0.08,
+      "seconds": 0.16
+    },
+    "anticipation": 1.2,
+    "head": {
+      "above": 0.72,
+      "frequency": 1.8,
+      "damping": 0.3,
+      "gain": 6
+    },
+    "exaggerate": {
+      "bob": 2.2,
+      "armSwing": 1.8
     }
   },
   "environment": {
@@ -54,7 +70,11 @@
       "speed": 1.2,
       "gust": 0.4
     },
-    "clothSubsteps": 8
+    "clothSubsteps": 8,
+    "springs": {
+      "gravity": 0.12,
+      "windDrag": 4
+    }
   },
   "motion": {
     "settleSeconds": 0.7,

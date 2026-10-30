@@ -139,3 +139,18 @@ test('malformed capture data is reported at its path, not thrown', () => {
   assert.deepEqual(paths({ clips: {}, base: {}, members: null }), ['capture.clips', 'capture.members'])
   assert.deepEqual(paths({ clips: [], base: {}, members: { ghost: {} } }), ['capture.members.ghost'])
 })
+
+test('a bundle carries each member\'s skin, checked against its whole mannequin', () => {
+  const bundle = JSON.parse(readFileSync('site/world.json', 'utf8'))
+  const members = config.cast.map(name => {
+    const dir = join('examples', name)
+    const read = (file: string): unknown => JSON.parse(readFileSync(join(dir, file), 'utf8'))
+    const skin = existsSync(join(dir, 'skin.json')) ? { skin: read('skin.json') } : {}
+    return { name, mannequin: read('mannequin.json'), style: read('style.json'), rig: read('rig.json'), ...skin }
+  })
+  const read = readWorldBundle({ config: bundle, cast: members })
+  assert.deepEqual(read.errors, [])
+  assert.deepEqual(read.value!.looks.filter(l => l.skin !== undefined).length, 4)
+  const broken = members.map(m => m.name === 'rogue' ? { ...m, skin: { name: 'x', palette: {}, views: {} } } : m)
+  assert.ok(readWorldBundle({ config: bundle, cast: broken }).errors.some(e => e.path.startsWith('cast[2].skin')))
+})

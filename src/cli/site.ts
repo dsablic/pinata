@@ -29,7 +29,8 @@ function worldBundle (examples: string): unknown {
       style: read(join(dir, 'style.json')),
       rig: read(join(dir, 'rig.json')),
       materials: read(join(dir, 'materials.json')),
-      motion: read(join(dir, 'motion.json'))
+      motion: read(join(dir, 'motion.json')),
+      ...(existsSync(join(dir, 'skin.json')) ? { skin: read(join(dir, 'skin.json')) } : {})
     }
   })
   const clipDir = join(ROOT, 'motion', 'clips')

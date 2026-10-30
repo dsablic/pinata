@@ -19,6 +19,7 @@ function byId<T extends HTMLElement> (id: string): T {
 type Running = {
   world: World
   setPalette: (palette: Palette) => void
+  setSkins: (on: boolean) => void
   render: (frame: WorldFrame) => ImageData
   screen: (p: [number, number, number]) => [number, number]
 }
@@ -53,7 +54,8 @@ function build (): void {
     depth: 2 * world.lanes + 0.8,
     extent: world.extent,
     glyphs: config.glyphs,
-    palette: config.scenes[scene]
+    palette: config.scenes[scene],
+    skins: byId<HTMLInputElement>('skins').checked
   })
   const { width, height } = view.camera
   canvas.width = width
@@ -64,6 +66,7 @@ function build (): void {
   running = {
     world,
     setPalette: view.setPalette,
+    setSkins: view.setSkins,
     screen: view.screen,
     render: frame => {
       const image = view.render(frame)
@@ -139,6 +142,9 @@ byId<HTMLSelectElement>('scene').addEventListener('change', event => {
   const palette = data?.config.scenes[name]
   if (palette !== undefined) running?.setPalette(palette)
   document.body.style.background = palette?.sky ?? ''
+})
+byId<HTMLInputElement>('skins').addEventListener('change', event => {
+  running?.setSkins((event.target as HTMLInputElement).checked)
 })
 byId<HTMLButtonElement>('new').addEventListener('click', () => {
   byId<HTMLInputElement>('seed').value = String(1 + Math.floor(Math.random() * 9999))

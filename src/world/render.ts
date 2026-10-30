@@ -9,6 +9,8 @@ import type { Camera } from '../raster/camera.ts'
 import { rasterize } from '../raster/gbuffer.ts'
 import type { GBuffer } from '../raster/gbuffer.ts'
 import { stylize } from '../style/stylize.ts'
+import { renderSkinned } from '../style/skins.ts'
+import type { Skin } from '../formats/skin.ts'
 import type { Scenario } from '../formats/sim.ts'
 import { clothParts, withClothParts } from '../sim/render.ts'
 import type { Palette, WorldConfig } from './config.ts'
@@ -21,15 +23,25 @@ import type { WorldFrame } from './world.ts'
  * uses, the bubble glyphs and the palette; the canvas size follows from them.
  */
 export type WorldViewOptions = WorldConfig['view'] & {
+  /** Draw cast members that have a skin with it (the default), or all of them procedurally. */
+  skins?: boolean
   depth: number
   extent: [number, number]
   glyphs: WorldConfig['glyphs']
   palette: Palette
 }
-/** How a cast member is drawn: its mannequin and style, and its cloth scenario when it has a cape or chains. */
-export type Look = { mannequin: Mannequin, style: Style, cloth?: Scenario }
+/**
+ * How a cast member is drawn: its mannequin and style, and its cloth scenario when it has a cape or chains; with a
+ * skin, its sprites drawn on its whole mannequin (the skin draws its own cape).
+ */
+export type Look = {
+  mannequin: Mannequin
+  style: Style
+  cloth?: Scenario
+  skin?: { skin: Skin, mannequin: Mannequin }
+}
 
-type Sprite = { camera: Camera, previous?: GBuffer, size: number }
+type Sprite = { camera: Camera, previous?: GBuffer, size: number, view: { sector?: number } }
 
 const SPRITE_MARGIN = 1.15
 const MARGIN_PX = 8
@@ -86,8 +98,9 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
   const sprites: Sprite[] = looks.map(look => {
     const size = Math.ceil(2 * reachOf(look) * ppu * SPRITE_MARGIN) + 6
     const camera: Camera = { ...base, width: size, height: size, baseline: size }
-    return { camera, size }
+    return { camera, size, view: {} }
   })
+  let skinned = options.skins !== false
   let backdrop = drawTerrain(terrain, options, options.palette, screen, [width, height])
 
   /** Where an actor's render box sits on the canvas: centred on its root's screen point. */
@@ -118,6 +131,17 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
         joints[name] = add([p[0] - root[0], p[1] - root[1], p[2] - root[2]], shift)
       }
       const yaw = actor.root.yaw
+      if (skinned && look.skin !== undefined) {
+        const pose = { ...look.skin.mannequin.joints, ...joints }
+        const { skin, mannequin } = look.skin
+        const image = renderSkinned({ mannequin, pose, skin, camera: sprite.camera, yaw, view: sprite.view })
+        blit(out, image, left, top)
+        if (actor.say !== undefined) {
+          bubble(out, options.glyphs[actor.say] ?? Object.values(options.glyphs)[0], Math.round(anchor[0]),
+            top + Math.round(sprite.size * 0.1))
+        }
+        continue
+      }
       const decals = look.mannequin.decals.map(d => ({ ...d, normal: turnY(d.normal, yaw) }))
       let posed: Mannequin = { ...look.mannequin, joints, decals }
       if (look.cloth !== undefined && actor.cloth !== undefined) {
@@ -142,7 +166,9 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     backdrop = drawTerrain(terrain, options, palette, screen, [width, height])
   }
   const boxes = (frame: WorldFrame) => frame.actors.map((actor, i) => boxOf(i, actor.root.position))
-  return { render, screen, setPalette, boxes, camera: world }
+  /** Draws skinned cast members with their skins, or procedurally. */
+  const setSkins = (on: boolean): void => { skinned = on }
+  return { render, screen, setPalette, setSkins, boxes, camera: world }
 }
 
 function turnY (v: Vec3, yaw: number): Vec3 {

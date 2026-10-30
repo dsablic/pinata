@@ -3,6 +3,7 @@ import type { Mannequin } from '../formats/mannequin.ts'
 import { checkRig, resolveRig, validateRig } from '../formats/rig.ts'
 import { checkRenderMaterials, checkScenario, validateScenario, validateSimMaterials } from '../formats/sim.ts'
 import { validateStyle } from '../formats/style.ts'
+import { checkSkin, validateSkin } from '../formats/skin.ts'
 import { isRecord } from '../formats/validate.ts'
 import type { ValidationError } from '../formats/validate.ts'
 import type { Look } from './render.ts'
@@ -16,7 +17,15 @@ import type { CaptureData } from '../mocap/capture.ts'
 /** A world in one file for the browser: its config and every cast member's mannequin, style and rig as written. */
 export type WorldBundle = {
   config: unknown
-  cast: Array<{ name: string, mannequin: unknown, style: unknown, rig: unknown, materials?: unknown, motion?: unknown }>
+  cast: Array<{
+    name: string
+    mannequin: unknown
+    style: unknown
+    rig: unknown
+    materials?: unknown
+    motion?: unknown
+    skin?: unknown
+  }>
   /** Motion capture for the cast members it names. */
   capture?: CaptureData
 }
@@ -74,7 +83,11 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     const captured = database === undefined ? {} : { capture: database }
     cast.push({ name: member.name, mannequin: look, rig: resolved, ...clothed, ...captured })
     const drape = cloth === undefined ? {} : { cloth: cloth.scenario }
-    looks.push({ mannequin: look, style: style.value, ...drape })
+    const skin = member.skin === undefined ? undefined : validateSkin(member.skin)
+    errors.push(...(skin?.errors ?? []).map(e => at('skin', e)))
+    if (skin?.value !== undefined) errors.push(...checkSkin(skin.value, mannequin.value).map(e => at('skin', e)))
+    const skinned = skin?.value === undefined ? {} : { skin: { skin: skin.value, mannequin: mannequin.value } }
+    looks.push({ mannequin: look, style: style.value, ...drape, ...skinned })
   })
   const named = new Set(input.cast.map(member => isRecord(member) ? member.name : undefined))
   for (const name of Object.keys(capture?.members ?? {})) {

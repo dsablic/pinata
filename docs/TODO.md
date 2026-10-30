@@ -7,37 +7,26 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 ## Current state
 
 - All proofs are done (P1-P6 and the skins spike); results in [`docs/FINDINGS.md`](FINDINGS.md).
-- General limbs ([plan](plans/2026-10-30-general-limbs.md)): batches A-D are done and reviewed. Format, templates,
-  N-segment IK, gait and pose for any limbs, appendage dynamics (spring and oscillator), balance and appendage gates,
-  `npm run new`, the beetle, spider and horse examples (lineup in [`docs/assets/lineup.png`](assets/lineup.png)) and
-  the authoring guide. Existing outputs are byte-identical (only wall-clock timing in `metrics.json` differs).
-- The balance gate applies to rigs with more than four legs (confirmed; even leg counts for now).
-- Direction (user, 2026-10-30): a character is an image plus any number of points; the engine animates the points and
-  the image follows by a 2D mesh warp; templates are starting points to refine, never limits. Draft plan:
-  [image and points](plans/2026-10-30-image-points.md), approved. Batch A (joint hierarchy: transforms, `attached`
-  joints, appendages on any joint, rotating pins) is done and reviewed; next is P8 on top of it, then batch B.
-- Specs written, not started: live runtime spike P8 ([spec](plans/2026-10-30-runtime-spike.md)) and composable
-  behaviours ([spec](plans/2026-10-30-composable-behaviours.md)).
-- Provisional logo: a hanging unicorn piñata, seamless loop, in [`docs/assets/`](assets). It was rendered by a
-  throwaway prototype script (not in the repo); the engine cannot yet do hanging or hits natively (see "Rigid-body
-  behaviours" below).
+- General limbs, the joint hierarchy (image-and-points batch A), the live runtime (P8: `<pinata-character>`, the
+  hanging piñata, the Claude Code mod) and the world showcase are done and reviewed.
+- Natural motion ([plan](plans/2026-10-30-motion-data.md)): humanoids move by retargeted CMU motion capture with
+  motion matching, feet held on terrain and a light physical body; batches A-C done and reviewed; released as v0.2.0
+  (the Pages site shows it). Cross-engine determinism was dropped (user): Node and Chrome compute Math functions
+  differently. `src/motion/walker.ts` is a first draft of a physical body for creatures without capture data.
+- Direction (user, 2026-10-30): reach game-worthy pixel-art animation, working through this list autonomously.
 
 ## Next, in order
 
-### 0. Natural motion: mocap + physics (user decision, 2026-10-30)
+### 0. P7: skins to a game-art bar
 
-[Motion data plan](plans/2026-10-30-motion-data.md): humanoids driven by retargeted CMU motion capture (motion
-matching, IK on terrain), the [physical body](plans/2026-10-30-physical-walking.md) leading the root for everyone,
-procedural stepping for bodies without data. Batches A and B are built (clips, retargeting, style, motion matching, the player with feet
-held on terrain; reviewed). Open: the knight loses the judge panel (75% mocap overall, gate 80%) because its sword
-arm swings like an empty hand; the transitions gate needs the user's ruling (see the plan's log). Then batch C, the
-world. `src/motion/walker.ts` is the physical body's first draft (feet overreach and the body does not bob yet).
+[P7 plan](plans/2026-10-31-p7-skins.md): clean rotation (RotSprite), eight directions, AI-drawn skins for the four
+humanoids, a readability layer, judged against strong references, then skins in the world. Batch A (clean rotation)
+first.
 
-### 0b. World showcase (user request, 2026-10-30)
+### 0b. World showcase, remaining batches
 
-[World showcase plan](plans/2026-10-30-world-showcase.md): several characters living on procedural platforms in the
-browser (little computer people). Batches A (terrain and terrain-aware gait), B (windows and activities), C (world
-rendering and page).
+[World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
+into P7 batch D), physics engine spike (D), page-as-world (E).
 
 ### 1. Leftovers from general limbs
 

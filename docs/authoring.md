@@ -46,7 +46,7 @@ The `report/` directory is ignored by version control.
 | Quantity | Convention |
 |---|---|
 | Axes | Y is up, Z is forward, X is across. Y = 0 is the floor. |
-| Facing | The character faces +Z. Toes point toward +Z, knees bend toward +Z (toward -Z for a leg with `bend: "backward"`). |
+| Facing | The character faces +Z. Toes point toward +Z, knees bend toward +Z (toward -Z for a leg with `bend: "backward"`, up with `"up"`). |
 | Sides | The character's left is +X, its right is -X. Left limbs have positive x. |
 | Length | Metres. Joint positions are `[x, y, z]` in metres in the rest pose. |
 | Rest pose | Standing, feet flat on the floor, arms hanging, centred near x = 0, z = 0. |
@@ -68,7 +68,7 @@ mychar/
   character.json   manifest
   mannequin.json   joints, body parts, decals
   style.json       lighting, palette, outline
-  rig.json         which joints form legs, arms, upper body; gait
+  rig.json         which joints form legs, arms, appendages, upper body; gait
   materials.json   cloth and chain physics materials
   motion.json      walk script, cape, chains, wind, simulation settings
 ```
@@ -215,70 +215,112 @@ draws inner lines. These are the material names that parts refer to; they are se
 
 ## rig.json
 
-The rig says how the mannequin moves when it walks.
+The rig says how the mannequin moves when it walks: which joints form legs, arms and appendages (tails, ears,
+antennae, wings), which move rigidly with the body, and the gait.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `legs` | array of 2 or 4 | Two legs: one `left`, one `right`. Four legs: two `left`, two `right`, each with a `phase` (see Four-legged rigs). |
-| `arms` | array | Normally one `left` and one `right`; `[]` is allowed. |
+| `template` | `"biped"`, `"quadruped"`, `"hexapod"` or `"octopod"`, optional | Fills in leg phases, bends and some gait values (see Templates). Explicit fields always win. |
+| `limbs` | array | Every leg, arm and appendage (see Limbs). At least one leg; as many left as right legs. |
 | `pelvis` | joint name | The root joint; the body bobs with it. |
 | `upperBody` | array of joint names | Joints that move rigidly with the pelvis: chest, head, decal anchors, cape and chain anchors. |
 | `gait` | object | Walk parameters. |
 
-All five fields are required.
+`limbs`, `pelvis`, `upperBody` and `gait` are required. Start a new package with
+`npm run new -- --template <name> <dir>`: it writes a minimal package for the template that passes `check`.
 
-Leg fields: `side` (`"left"` or `"right"`), `hip`, `knee`, `ankle`, `toe` (joint names), and the optional `phase`
-and `bend`. Legs use two-bone IK, so the thigh and shin lengths come from the rest pose and never change, and the knee
-bends toward the side `bend` names.
+The older format, with `legs` and `arms` lists of `{ side, hip, knee, ankle, toe, phase, bend }` and
+`{ side, shoulder, elbow, wrist, hand, carried }`, still loads (the complete example below and most examples use it);
+it is translated to `limbs`. A rig uses one format or the other, not both.
+
+**Rig coverage.** Every joint in the mannequin must appear in exactly one place among: `pelvis`, `upperBody`, a
+limb's `joints`, an arm's `carried`. A joint listed twice, a joint that does not exist, or a joint that is listed
+nowhere is an error. Decal anchors, cape anchors and chain anchors are joints too, so list them in `upperBody` (or
+`carried`).
+
+### Limbs
+
+Each limb has a `kind`, a `joints` list and an optional `name` (default `leg1`, `arm1`, `appendage1`, ...; names
+must be unique and appear in hints).
+
+| Kind | Joints | Fields |
+|---|---|---|
+| `leg` | 4 or more, from the hip to the toe: hip, one or more bending joints, ankle, toe | `side`; `phase`, `bend`, `limits` |
+| `arm` | 2 or more, from the shoulder outward | `side`; `carried` |
+| `appendage` | 2 or more, from the root outward | optional `side`; `stiffness`, `damping`, `oscillate` |
+
+**Legs.** The last two joints are the foot (a capsule part must span the ankle and the toe). The gait plans where
+the foot goes and inverse kinematics places the chain, so every leg bone keeps its rest length. A 4-joint leg (hip,
+knee, ankle, toe) uses exact two-bone IK; a longer leg (say hip, stifle, hock, fetlock, hoof) uses FABRIK with a pole.
 
 | Leg field | Type | Meaning |
 |---|---|---|
-| `phase` | number, 0 up to (not including) 1 | The leg's offset in the gait cycle: the leg lands when the cycle reaches this fraction. Default with two legs: left 0, right 0.5. Required on every leg when there are four. |
-| `bend` | `"forward"` or `"backward"`, default `"forward"` | The side the knee points: toward the body's front (+Z) or its back (-Z). The rest position of the knee joint does not choose it. |
+| `side` | `"left"` or `"right"` | The side of the body (+X is the character's left). |
+| `phase` | number, 0 up to (not including) 1 | The leg's offset in the gait cycle: the leg lands when the cycle reaches this fraction. Default for two legs: left 0, right 0.5. Without a template, required on every leg when there are more than two. |
+| `bend` | `"forward"`, `"backward"` or `"up"`, or an array | The side each bending joint points to: toward the body's front (+Z), its back (-Z), or up (splayed legs, like a spider's, whose knees rise above the hip). An array gives one value per bending joint, the joints strictly between the hip and the ankle (`joints.length - 3` of them); `"up"` cannot be mixed with the others. Default `"forward"`. The rest position of a joint does not choose its side. |
+| `limits` | `{ "min": degrees, "max": degrees }` | Flexion range of every bending joint, -180 to 180. Default 0 to 150 degrees for legs of 5 or more joints; none for 4-joint legs. |
 
-Arm fields: `side`, `shoulder`, `elbow`, `wrist`, `hand` (joint names), and optional `carried`: joint names that swing
-rigidly with the arm, such as the tip of a held sword.
+**Arms** swing about their first joint, in counter-phase to the nearest leg on the same side, by
+`gait.armSwingDegrees`. `carried` lists joints that move rigidly with the arm, such as the tip of a held sword.
 
-**Rig coverage.** Every joint in the mannequin must appear in exactly one place among: `pelvis`, `upperBody`, a leg's
-four joints, an arm's four joints, an arm's `carried`. A joint listed twice, a joint that does not exist, or a joint
-that is listed nowhere is an error. Decal anchors, cape anchors and chain anchors are joints too, so list them in
-`upperBody` (or `carried`).
+**Appendages** hang off the body and swing with its motion. Each segment is a rigid bone pulled by a damped spring
+toward its rest direction relative to its parent segment (the first segment's parent is the body), so the tail lags
+when the body speeds up, turns or bobs, and settles back. There is no gravity: the rest pose is the shape it returns
+to.
 
-### Four-legged rigs
+| Appendage field | Range | Meaning |
+|---|---|---|
+| `stiffness` | 0 to 1, default 0.6 | How hard it springs back: natural frequency 0.3 Hz at 0 up to 3 Hz just below 1; exactly 1 is rigid. |
+| `damping` | 0 to 1, default 0.4 | Damping ratio: 0 swings on, 1 settles without overshoot. |
+| `oscillate` | `{ "axis": [x, y, z], "degrees": number, "period": seconds, "phase": 0..1 }` | Optional rhythmic swing of the first segment about `axis` (body space; `[0, 1, 0]` wags side to side), `degrees` (0 to 180) either way, one full swing every `period` seconds (required when `degrees` > 0). The rest of the chain follows. |
 
-Piñata walks a rig with four legs too (a dog, a horse, a cat). It has two `left` and two `right` legs and a `phase` on
-each. Which leg is the hind one and which the front one follows from the rest pose: on each side the leg whose hip has
-the smaller z is the hind leg. Hints and gates call the legs `left hind`, `left front`, `right hind` and `right
-front`.
+A soft appendage on a very fast spin (a half turn in a fraction of a second) trails nearly 180 degrees behind and
+flails; keep stiffness up or turns slower.
 
-The usual walk order, one leg after the other a quarter cycle apart, is: left hind 0, left front 0.25, right hind 0.5,
-right front 0.75. Leave the order alone unless you want another gait. During steady walking each plant must belong to
-the leg whose phase comes next after the previous plant's leg (see `alternationViolations`).
+### Templates
 
-- **Landing spots.** Each foot lands on its own lateral line (`footSpacing` / 2 from the centre) and under its own hip
-  along the body: a front foot lands ahead of a hind foot by the distance between their hips in the rest pose. Put the
-  pelvis joint (the root) between the hind and front hips; the feet are placed relative to it.
-- **Stopping.** After the last step the character takes the steps it needs so that every foot is planted and each
-  left-right pair stands side by side.
-- **Stance.** With four legs one foot is always in the air unless `stanceFraction` is at least 1 minus the largest gap
-  between consecutive leg phases (0.75 for a quarter-cycle walk). A smaller value is a load error, because the
-  character could never stand still. The usual four-legged walk is `stanceFraction` 0.75.
-- **Bend.** Animals have knees that point both ways. Give the legs whose joint should point backward (the hock of a
-  hind leg) `"bend": "backward"`; `kneeLimitViolations` then judges that knee against the body's back instead of its
-  front.
-- **Proportions.** Each foot swings up to `strideLength` / 2 either side of its hip, so keep `strideLength` well under
-  the front-to-back distance between the hind and front hips (about 0.6 times it). A longer stride makes a hind foot
-  reach past the front foot on the same side, which reads as crossed legs in 3/4 views, especially on short, round
-  bodies. Shortening the stride raises the step rate, so lower the script speed with it.
-- **Start.** The walk starts from the rest pose with all feet planted, so a leg that has just landed stays planted
-  for `stanceFraction` of a cycle. Keep `strideLength` x `stanceFraction` / 2 well below the leg length, and give the
-  script an `accelSeconds` at least as long as the first stance (about a second for a dog), or the rest-pose plants
-  fall inside the steady window and distort `rootSpeedError`.
+A template is a preset, never a limit: any number of legs works with or without one. It fills in what a limb or the
+gait leaves out.
 
-Starting values for a dog 0.6 m tall at the shoulder ([`examples/dog`](../examples/dog)): `strideLength` 0.4, `referenceSpeed` 0.35
-(also the script speed), `stanceFraction` 0.75, `stepHeight` 0.07, `bobAmplitude` 0.008, `footSpacing` 0.18 (the
-hip distance), `armSwingDegrees` 0, `accelSeconds` 1, `arms` `[]`. A quadruped's knee flexes quickly, so a low
-reference speed is what keeps `kneeSpeedDegPerSec` down: the peak grows with speed and barely changes with stride.
+| Template | Legs | Phases | `stanceFraction` | Bends | `lateral` | `armSwingDegrees` |
+|---|---|---|---|---|---|---|
+| `biped` | 2 | left 0, right 0.5 | 0.6 | forward | `spacing` | 20 |
+| `quadruped` | 4 | walk: left hind 0, left front 0.25, right hind 0.5, right front 0.75 | 0.75 | hind backward, front forward | `spacing` | 0 |
+| `hexapod` | 6 | alternating tripod: each side 0, 0.5, 0 from the hind leg, the other side half a cycle later | 0.6 | forward | `rest` | 0 |
+| `octopod` | 8 | alternating tetrapod, as the hexapod | 0.6 | forward | `rest` | 0 |
+
+Phases and bends are assigned per side, from the hind leg forward, by the rest hip position (larger z is further
+forward), so the order of the file does not matter. `npm run new` also scales starting gait values by leg length.
+
+**Labels.** Hints and gate names call the legs `left` and `right` for two legs, `left front`, `left hind`, ... for
+two per side, and `left 1` .. `left n` (front to back) for three or more per side, followed by the limb name with more
+than four legs. Arms are `left arm`, or `left arm 1` .. `n` front to back when a side has several.
+
+### Many legs
+
+- **Landing spots.** Each foot lands under its own hip along the body. Sideways, it lands at `footSpacing` / 2 from
+  the centre line, or, with `"lateral": "rest"` in the gait (the hexapod and octopod default), at its rest ankle's
+  sideways offset: splay the feet out in the rest pose and they plant there. Put the pelvis joint (the root) between
+  the front and hind hips.
+- **Stance.** One foot is always in the air unless `stanceFraction` is at least 1 minus the largest gap between
+  consecutive leg phases (0.75 for a quarter-cycle walk, 0.5 for a tripod). A smaller value is a load error.
+- **Proportions.** Each foot swings up to `strideLength` / 2 either side of its hip, so keep `strideLength` under
+  about 0.6 times the front-to-back distance between neighbouring hips (or neighbouring feet, for splayed legs). A
+  longer stride makes a foot reach past its neighbour, which reads as crossed legs. Shortening the stride raises the
+  step rate, so lower the script speed with it.
+- **Balance.** With more than four legs the walk must be statically stable: the body centre (the volume-weighted
+  centre of the pelvis and upperBody parts) has to stay over the area enclosed by the feet on the ground
+  (`unbalancedFrames`). Keep the heavy body parts centred over the legs, and keep neighbouring legs half a cycle
+  apart. Two- and four-legged walks balance dynamically and are not gated.
+- **Start.** The walk starts from the rest pose with all feet planted. Give the script an `accelSeconds` at least as
+  long as the first stance (about a second for a dog), or the rest-pose plants fall inside the steady window and
+  distort `rootSpeedError`.
+
+Starting values for a dog 0.6 m tall at the shoulder ([`examples/dog`](../examples/dog)): `strideLength` 0.4,
+`referenceSpeed` 0.35 (also the script speed), `stanceFraction` 0.75, `stepHeight` 0.07, `bobAmplitude` 0.008,
+`footSpacing` 0.18 (the hip distance), `armSwingDegrees` 0, `accelSeconds` 1. A quadruped's joints flex quickly, so
+a low reference speed is what keeps `kneeSpeedDegPerSec` down: the peak grows with speed and barely changes with
+stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm plant height cleanly.
 
 ### Gait
 
@@ -286,11 +328,12 @@ reference speed is what keeps `kneeSpeedDegPerSec` down: the peak grows with spe
 |---|---|---|
 | `strideLength` | above 0, at most 10 | Metres travelled per full cycle (two steps) at `referenceSpeed`. About 1.4 x leg length. |
 | `referenceSpeed` | above 0, at most 20 | m/s at which stride equals `strideLength`. Use the speed in the walk script. |
-| `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. Start at 0.55; keep below 0.7. A lower value lowers knee speed. |
+| `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. Two legs: start at 0.55, keep below 0.7; four legs: 0.75; many legs: 0.6 or more. A lower value lowers knee speed. Optional with a template. |
 | `stepHeight` | 0 to 2 | Metres of swing-foot lift. Must clearly exceed 0.02. Start at about 0.15 x leg length. A higher value raises knee speed. |
 | `bobAmplitude` | 0 to 1 | Metres of pelvis bob. 0.015 to 0.025 typical. |
-| `armSwingDegrees` | 0 to 90 | Arm swing. Left and right arms swing opposite ways. |
-| `footSpacing` | 0 to 2 | Metres between left and right foot plants. Use the distance between the hip joints. |
+| `armSwingDegrees` | 0 to 90 | Arm swing, against the nearest leg on the same side, so left and right arms swing opposite ways. Optional with a template. |
+| `footSpacing` | 0 to 2 | Metres between left and right foot plants. Use the distance between the hip joints. Unused by legs that plant at rest (`lateral`). |
+| `lateral` | `"spacing"` or `"rest"`, optional | Where feet land sideways: at `footSpacing` / 2 from the centre line (default), or at each rest ankle's sideways offset (default for the hexapod and octopod templates). |
 | `strideExponent` | 0.2 to 1, optional, default 0.5 | How fast stride grows with speed. Stride is `strideLength * clamp((speed / referenceSpeed)^strideExponent, 0.5, 1.5)`. |
 
 Leg length is hip y minus ankle y in the rest pose. Starting values: `strideLength` 1.4 x leg length, `footSpacing`
@@ -455,13 +498,16 @@ The walk is simulated with your rig, then measured at 48 px (one pixel is `heigh
 | `groundPenetrationPx` | <= 0.5 | Deepest the sole goes below y = 0. |
 | `partGroundPenetrationPx` | <= 0.5 | Deepest any non-foot part goes below y = 0. |
 | `reachViolations` | = 0 | Frames where a foot target was beyond the leg's reach and the leg was clamped straight. |
-| `kneeLimitViolations` | = 0 | Knee-frames, counted over all legs, with flexion outside 0 to 150 degrees. |
-| `kneeSpeedDegPerSec` | <= 600 | Peak knee bending speed. |
-| `boneLengthError` | <= 0.01 | Relative change of limb bone lengths. |
+| `kneeLimitViolations` | = 0 | Joint-frames, counted over every bending joint of every leg, with flexion outside the leg's limits (default 0 to 150 degrees) or the joint pointing away from its `bend` side. |
+| `kneeSpeedDegPerSec` | <= 600 | Peak bending speed of any bending joint of any leg. |
+| `boneLengthError` | <= 0.01 | Relative change of leg and arm bone lengths. |
 | `rootSpeedError` | <= 0.05 | Relative difference between foot-measured speed and the script speed in steady windows. |
 | `unsupportedFrames` | = 0 | Frames where no foot is within 2 cm of the floor. |
 | `alternationViolations` | = 0 | Plants in steady windows by a leg other than the one whose phase comes next after the previous plant's leg. With two legs: the same foot planting twice in a row. |
-| `plantedFrames.left`, `.right` | >= 1 | Each foot is planted at least once. With four legs the gates are `plantedFrames.left hind`, `.left front`, `.right hind` and `.right front`. |
+| `plantedFrames.left`, `.right` | >= 1 | Each foot is planted at least once. One gate per leg, named by its label: `plantedFrames.left hind`, `plantedFrames.left 2`, ... |
+| `unbalancedFrames` | = 0 | More than four legs only: frames where the body centre is more than 2 cm outside the area enclosed by the feet within 2 cm of the floor. |
+| `appendageBoneLengthError` | <= 0.01 | With appendages only: relative change of appendage bone lengths. A construction check. |
+| `appendageNonFinite` | = 0 | With appendages only: appendage joint positions that are not finite numbers. A construction check. |
 
 Usual fixes:
 
@@ -475,8 +521,9 @@ Usual fixes:
   the mannequin, or reduce `bobAmplitude` and `armSwingDegrees`.
 - **reachViolations.** The stride asks the legs to reach too far. Shorten `strideLength`, `footSpacing` or
   `bobAmplitude`, or lengthen the legs.
-- **kneeLimitViolations.** The value counts knee-frames over all legs. Each knee bends toward its leg's `bend` side, so
-  this is an overbent knee: lower `stepHeight` or lengthen the legs.
+- **kneeLimitViolations.** The value counts joint-frames over all legs. The hint names the joint: if it bends the
+  wrong way, its `bend` does not match the rest pose; otherwise it is overbent: lower `stepHeight` or lengthen the
+  legs.
 - **kneeSpeedDegPerSec.** Lower `stanceFraction` (longer, slower swing; 0.5 is the minimum) or lengthen the stride a
   little. A higher `stepHeight` raises knee speed; lower it only if the slide and alternation gates still pass.
   Walking slower does not reliably help. Short legs with a high step height are the usual cause.
@@ -485,6 +532,11 @@ Usual fixes:
 - **rootSpeedError.** Feet must plant at least twice inside a steady window. If the window is shorter than 2.5
   cycles, lengthen the `move` segment (or shorten `strideLength`). If the window is already long enough and the value
   is `Infinity`, the feet never rise above 2 cm, so raise `stepHeight`.
+- **unbalancedFrames.** The hint names the worst frame and the feet on the ground. Raise `stanceFraction` so more
+  feet are down at once, keep neighbouring legs half a cycle apart, spread the feet wider (`lateral: "rest"` with
+  splayed feet), or move heavy parts toward the middle of the legs.
+- **appendageBoneLengthError, appendageNonFinite.** These cannot fail for a rig that loads; report a failure with
+  the package.
 - **alternationViolations.** The swing foot does not rise enough to count as a step: raise `stepHeight` well above
   0.02 m and keep `stanceFraction` below 0.7 (with four legs, check the `phase` values against the walk order
   instead; they need `stanceFraction` 0.75 or more).
@@ -693,7 +745,8 @@ the arms hang away from the torso so they are not hidden in side views.
 
 ## Working loop
 
-1. Write the six files. Start from the example and change shapes, colours and proportions.
+1. Write the six files: run `npm run new -- --template <biped|quadruped|hexapod|octopod> <dir>` for a starter that
+   passes, or start from an example, and change shapes, colours and proportions.
 2. Run `npm run check -- <dir>`. Exit code 2 means a load error: fix the lines in `summary.txt`.
 3. On exit code 1, work through the `FAIL` lines and their hints from top to bottom. Static gates first: they change
    the mannequin that the walk gates measure.

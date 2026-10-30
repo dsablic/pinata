@@ -156,3 +156,25 @@ test('strideExponent is optional and must be within 0.2 to 1', () => {
     assert.deepEqual(paths(input), [])
   }
 })
+
+test('arm carried joints are validated and count as covered by checkRig', () => {
+  const input: Record<string, any> = rig()
+  input.arms[0].carried = ['sword']
+  assert.deepEqual(paths(input), [])
+  const m = mannequin()
+  m.joints.sword = [20, 0, 0]
+  assert.deepEqual(checkRig(validateRig(input).value!, m), [])
+  input.arms[0].carried = 'sword'
+  assert.deepEqual(paths(input), ['arms[0].carried'])
+  input.arms[0].carried = ['sword', 3]
+  assert.deepEqual(paths(input), ['arms[0].carried'])
+})
+
+test('checkRig puts each carried joint in exactly one group', () => {
+  const input = rig()
+  Object.assign(input.arms[0], { carried: ['chest', 'ghost'] })
+  const errors = checkRig(validateRig(input).value!, mannequin())
+  assert.deepEqual(errors.map(e => e.path), ['arms[0].carried[1]', 'upperBody[0]'])
+  assert.match(errors[0].message, /unknown joint 'ghost'/)
+  assert.match(errors[1].message, /already used by arms\[0\]\.carried\[0\]/)
+})

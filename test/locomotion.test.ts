@@ -1,5 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Mannequin } from '../src/formats/mannequin.ts'
+import type { Rig } from '../src/formats/rig.ts'
 import { kneeBendsBackward } from '../src/motion/ik.ts'
 import { planGait } from '../src/motion/gait.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
@@ -88,4 +90,16 @@ test('a straight-legged rig at rest stays within 1 cm of its rest pose', () => {
   const { pose, clamped } = poseAt({ frame, rig, rest: straight, mannequin: straightMannequin })
   assert.equal(clamped, 0)
   assert.ok(Math.abs(pose.pelvis[1] - straight.pelvis[1]) < 0.01, `pelvis moved ${pose.pelvis[1] - straight.pelvis[1]}`)
+})
+
+test('a carried joint keeps its distance to the hand during an arm swing', () => {
+  const sword: Mannequin = { ...mannequin, joints: { ...mannequin.joints, tip: [-0.27, 0.82, 0.5] } }
+  const carrying: Rig = { ...rig, arms: rig.arms.map(a => (a.side === 'right' ? { ...a, carried: ['tip'] } : a)) }
+  const swordRest = restPose(sword)
+  const track = walkTrack(1.2, 4)
+  const walk = planGait({ track, rig: carrying, rest: swordRest, mannequin: sword, duration: 7, fps: 24 })
+  const frame = walk.reduce((best, f) => (Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best))
+  const { pose } = poseAt({ frame, rig: carrying, rest: swordRest, mannequin: sword })
+  assertClose(distance(pose, 'tip', 'handR'), distance(swordRest, 'tip', 'handR'), 1e-9)
+  assert.ok(Math.abs(pose.tip[1] - swordRest.tip[1] - frame.pelvisOffset[1]) > 0.05)
 })

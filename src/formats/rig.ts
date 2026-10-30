@@ -3,7 +3,14 @@ import { checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isReco
 import type { Validated, ValidationError } from './validate.ts'
 
 export type Leg = { side: 'left' | 'right', hip: string, knee: string, ankle: string, toe: string }
-export type Arm = { side: 'left' | 'right', shoulder: string, elbow: string, wrist: string, hand: string }
+export type Arm = {
+  side: 'left' | 'right'
+  shoulder: string
+  elbow: string
+  wrist: string
+  hand: string
+  carried?: string[]
+}
 export type Gait = {
   strideLength: number
   referenceSpeed: number
@@ -18,7 +25,7 @@ export type Rig = { legs: Leg[], arms: Arm[], pelvis: string, upperBody: string[
 
 const RIG_FIELDS = ['legs', 'arms', 'pelvis', 'upperBody', 'gait'] as const
 const LEG_FIELDS = ['side', 'hip', 'knee', 'ankle', 'toe'] as const
-const ARM_FIELDS = ['side', 'shoulder', 'elbow', 'wrist', 'hand'] as const
+const ARM_FIELDS = ['side', 'shoulder', 'elbow', 'wrist', 'hand', 'carried'] as const
 const GAIT_FIELDS = [
   'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing',
   'strideExponent'
@@ -77,8 +84,12 @@ function validateLimbs (
     if (limb.side !== 'left' && limb.side !== 'right') {
       errors.push({ path: `${here}.side`, message: "expected 'left' or 'right'" })
     }
-    for (const field of fields.filter(f => f !== 'side')) {
+    for (const field of fields.filter(f => f !== 'side' && f !== 'carried')) {
       if (!isNonEmptyString(limb[field])) errors.push({ path: `${here}.${field}`, message: 'expected a joint name' })
+    }
+    if (fields.includes('carried') && limb.carried !== undefined) {
+      const ok = Array.isArray(limb.carried) && limb.carried.every(isNonEmptyString)
+      if (!ok) errors.push({ path: `${here}.carried`, message: 'expected an array of joint names' })
     }
   })
   if (path === 'legs' && value.length !== 2) {
@@ -121,7 +132,8 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     for (const f of LEG_FIELDS.filter(f => f !== 'side')) use(leg[f as 'hip'], `legs[${i}].${f}`)
   })
   rig.arms.forEach((arm, i) => {
-    for (const f of ARM_FIELDS.filter(f => f !== 'side')) use(arm[f as 'hand'], `arms[${i}].${f}`)
+    for (const f of ARM_FIELDS.filter(f => f !== 'side' && f !== 'carried')) use(arm[f as 'hand'], `arms[${i}].${f}`)
+    arm.carried?.forEach((joint, k) => { use(joint, `arms[${i}].carried[${k}]`) })
   })
   use(rig.pelvis, 'pelvis')
   rig.upperBody.forEach((joint, i) => { use(joint, `upperBody[${i}]`) })

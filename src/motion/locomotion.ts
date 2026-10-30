@@ -65,7 +65,7 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
     const shoulder = shift(arm.shoulder)
     const angle = (arm.side === 'left' ? 1 : -1) * frame.armSwing * Math.PI / 180
     pose[arm.shoulder] = shoulder
-    for (const name of [arm.elbow, arm.wrist, arm.hand]) {
+    for (const name of [arm.elbow, arm.wrist, arm.hand, ...(arm.carried ?? [])]) {
       pose[name] = add(shoulder, rotateX(sub(rest[name], rest[arm.shoulder]), angle))
     }
   }

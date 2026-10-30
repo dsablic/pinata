@@ -17,7 +17,7 @@ export type GBuffer = {
   coverage: Float32Array
 }
 
-type Primitive = { sdf: (p: Vec3) => number, center: Vec3, radius: number }
+export type Primitive = { sdf: (p: Vec3) => number, center: Vec3, radius: number }
 
 type Accumulator = { hits: Float64Array, depth: Float64Array, normal: Float64Array, total: number }
 
@@ -25,7 +25,7 @@ const HIT_EPSILON = 1e-4
 const MAX_STEPS = 256
 const NORMAL_STEP = 1e-4
 
-function compile (m: Mannequin, part: Part): Primitive {
+export function compile (m: Mannequin, part: Part): Primitive {
   const a = m.joints[part.a]
   const b = m.joints[part.b]
   const { center, radius } = boundingSphere(m, part)

@@ -109,6 +109,13 @@ export function legsOf ({ limbs }: Source): Leg[] {
   return legs
 }
 
+/** Rank of each value from the largest (0); equal values rank the later one first. */
+export function rankFromFront (values: readonly number[]): number[] {
+  return values.map((value, i) => {
+    return values.filter((other, k) => other > value || (other === value && k > i)).length
+  })
+}
+
 function bendsOf (limb: LegLimb): Bend[] {
   const { bend } = limb
   if (Array.isArray(bend)) return bend

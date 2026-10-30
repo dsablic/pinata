@@ -1,4 +1,4 @@
-import { armsOf, legsOf } from '../formats/rig.ts'
+import { armsOf, legsOf, rankFromFront } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import { length, sub } from '../math/vec.ts'
@@ -51,15 +51,21 @@ export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number 
   return Math.min(rest[leg.ankle][1] - radii.ankle, rest[leg.toe][1] - radii.toe)
 }
 
-/** Leg names for messages and keys: the side for two legs, side and front or hind (by hip z) for more. */
+/**
+ * Leg names for messages and keys, with front the larger rest hip z: the side for two legs, side and front or hind
+ * for two per side, and side and a number from the front for three or more per side.
+ */
 export function legLabels (rig: Rig, rest: Pose): string[] {
-  if (legsOf(rig).length <= 2) return legsOf(rig).map(leg => leg.side)
-  return legsOf(rig).map((leg, i) => {
-    const z = rest[leg.hip][2]
-    const behind = legsOf(rig).filter((other, k) => {
-      const otherZ = rest[other.hip][2]
-      return other.side === leg.side && (otherZ < z || (otherZ === z && k < i))
+  const legs = legsOf(rig)
+  if (legs.length <= 2) return legs.map(leg => leg.side)
+  const labels: string[] = []
+  for (const side of ['left', 'right']) {
+    const mine = legs.filter(leg => leg.side === side)
+    const ranks = rankFromFront(mine.map(leg => rest[leg.hip][2]))
+    mine.forEach((leg, k) => {
+      const name = mine.length === 2 ? ['front', 'hind'][ranks[k]] : `${ranks[k] + 1}`
+      labels[leg.index] = `${side} ${name}`
     })
-    return `${leg.side} ${behind.length === 0 ? 'hind' : 'front'}`
-  })
+  }
+  return legs.map(leg => labels[leg.index])
 }

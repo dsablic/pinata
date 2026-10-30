@@ -12,6 +12,7 @@ import { legLabels, restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
 import { assertClose } from './helpers.ts'
+import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
 import { mannequin, quadMannequin, quadRig, rig, walkTrack } from './locomotion-fixtures.ts'
 
 const geometry = { rig, mannequin }
@@ -252,6 +253,26 @@ test('legLabels name two legs by side and four legs by side and front or hind', 
   const [lh, lf, rh, rf] = quadRig.limbs
   const shuffled = { ...quadRig, limbs: [rf, lh, lf, rh] }
   assert.deepEqual(legLabels(shuffled, quadRest), ['right front', 'left hind', 'left front', 'right hind'])
+})
+
+test('legLabels number three or more legs per side from front to back, whatever the file order', () => {
+  const hexRest = restPose(hexMannequin)
+  assert.deepEqual(legLabels(hexRig, hexRest), ['left 1', 'left 2', 'left 3', 'right 1', 'right 2', 'right 3'])
+  const [lf, lm, lh, rf, rm, rh] = hexRig.limbs
+  const shuffled = { ...hexRig, limbs: [rh, lf, rf, lh, lm, rm] }
+  assert.deepEqual(legLabels(shuffled, hexRest), ['right 3', 'left 1', 'right 1', 'left 3', 'left 2', 'right 2'])
+})
+
+test('plantedFrames keys and gate names use the leg labels of a hexapod', () => {
+  const hexFrames = planGait({
+    track: walkTrack(0.5, 3), rig: hexRig, rest: restPose(hexMannequin), mannequin: hexMannequin, duration: 4, fps: 24
+  })
+  const walked = recordLocomotion(hexFrames, {
+    rig: hexRig, rest: restPose(hexMannequin), mannequin: hexMannequin, fps: 24
+  })
+  const expected = ['left 1', 'left 2', 'left 3', 'right 1', 'right 2', 'right 3']
+  assert.deepEqual(Object.keys(plantedFrames(walked, { rig: hexRig, mannequin: hexMannequin })), expected)
+  assert.deepEqual(Object.keys(walked.frames[10].planted), expected)
 })
 
 test('plantedFrames counts per leg label for four legs', () => {

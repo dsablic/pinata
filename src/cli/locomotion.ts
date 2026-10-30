@@ -16,6 +16,7 @@ const PLANT_METRES = 0.02
 const STEP_HEIGHT_FACTOR = 0.15
 const MIN_STEP_FACTOR = 0.1
 const TILT_METRES = 0.01
+const MAX_UNNAMED_LEGS = 4
 
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
@@ -59,13 +60,19 @@ function legGeometry (character: Character, leg: Leg): Geometry {
   return { rig: withLimbs(rig, rig.limbs.filter(l => l.kind !== 'leg' || l === leg.limb)), mannequin }
 }
 
+function legTitle (ctx: Context, index: number, noun = ''): string {
+  const legs = legsOf(ctx.character.rig)
+  const title = noun === '' ? ctx.labels[index] : `${ctx.labels[index]} ${noun}`
+  return legs.length > MAX_UNNAMED_LEGS ? `${title} (limb '${legs[index].name}')` : title
+}
+
 function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {
   const found = legsOf(ctx.character.rig).map((leg, index) => {
     const geometry = legGeometry(ctx.character, leg)
     return { leg, index, geometry, value: measure(geometry, ctx.recording) }
   }).reduce((a, b) => b.value > a.value ? b : a)
   const frame = firstWorstFrame(ctx.recording, r => measure(found.geometry, r))
-  return { leg: found.leg, label: `${ctx.labels[found.index]} ${limb}`, frame, value: found.value }
+  return { leg: found.leg, label: legTitle(ctx, found.index, limb), frame, value: found.value }
 }
 
 function at (ctx: Context, frame: number): string {
@@ -189,7 +196,7 @@ function reachHint (ctx: Context): string {
   const { gait } = ctx.character.rig
   const legs = legsOf(ctx.character.rig).map((leg, index) => {
     const rest = restPose(ctx.character.mannequin)
-    return `${ctx.labels[index]} ${chainLength(leg.chain, rest).toFixed(2)} m`
+    return `${legTitle(ctx, index)} ${chainLength(leg.chain, rest).toFixed(2)} m`
   }).join(', ')
   return `a foot target was out of the leg's reach in frames ${frames[0]} to ${frames[frames.length - 1]} (first at ` +
     `${at(ctx, frames[0])}), so the leg was straightened and clamped. Leg length hip to ankle: ${legs}. Shorten ` +
@@ -207,8 +214,7 @@ function jointProblem (ctx: Context, leg: Leg, frame: number): string {
   const triples = bendingJoints(leg)
   const flexionOf = ([a, b, c]: JointTriple): number => kneeFlexionDegrees(f.joints[a], f.joints[b], f.joints[c])
   const wrongWay = (triple: JointTriple, i: number): boolean => {
-    const sign = leg.bends[i] === 'backward' ? -1 : 1
-    const direction: [number, number, number] = [sign * Math.sin(f.root.yaw), 0, sign * Math.cos(f.root.yaw)]
+    const direction = metrics.bendDirection(f.root, leg.bends[i])
     return min >= 0 && kneeBendsBackward(f.joints[triple[0]], f.joints[triple[1]], f.joints[triple[2]], direction)
   }
   const outside = (triple: JointTriple): boolean => flexionOf(triple) > max || flexionOf(triple) < min
@@ -250,7 +256,7 @@ function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometr
   const { rig, mannequin } = character
   return [
     ...legsOf(rig).map((leg, index) => {
-      return { label: `${ctx.labels[index]} leg`, geometry: { rig: withLimbs(rig, [leg.limb]), mannequin } }
+      return { label: legTitle(ctx, index, 'leg'), geometry: { rig: withLimbs(rig, [leg.limb]), mannequin } }
     }),
     ...armsOf(rig).map(arm => {
       return { label: `${arm.side} arm`, geometry: { rig: withLimbs(rig, [arm.limb]), mannequin } }
@@ -303,7 +309,7 @@ function alternationHint (ctx: Context): string {
   const bad = ctx.windows.map(w => ({ w, value: metrics.alternationViolations(ctx.recording, g, [w]) }))
     .reduce((a, b) => b.value > a.value ? b : a)
   const phases = legPhases(ctx.character.rig)
-  const order = phases.map((_, i) => i).sort((a, b) => phases[a] - phases[b] || a - b).map(i => ctx.labels[i])
+  const order = phases.map((_, i) => i).sort((a, b) => phases[a] - phases[b] || a - b).map(i => legTitle(ctx, i))
   return `${bad.value} plant(s) in steady window ${windowText(bad.w)} did not belong to the leg whose phase comes ` +
     `next after the previous plant's leg (phase order: ${order.join(', ')}); with two legs, the same foot planted ` +
     'twice in a row. A swing foot that rises less than ' +
@@ -325,13 +331,15 @@ function unsupportedHint (ctx: Context): string {
 }
 
 function plantedHint (ctx: Context, label: string): string {
-  const leg = legsOf(ctx.character.rig)[ctx.labels.indexOf(label)]
+  const index = ctx.labels.indexOf(label)
+  const leg = legsOf(ctx.character.rig)[index]
   const lowest = Math.min(...ctx.recording.frames.flatMap(f => {
     return metrics.solePoints(f.joints, leg, ctx.character.mannequin).map(p => p[1])
   }))
-  return `the ${label} foot never has a sole point within ${PLANT_METRES * 100} cm of the floor for two frames in a ` +
-    `row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ${groundCause(ctx, leg)}Otherwise ` +
-    `lower rig.gait.bobAmplitude (now ${ctx.character.rig.gait.bobAmplitude}) or stepHeight.`
+  return `the ${legTitle(ctx, index, 'foot')} never has a sole point within ${PLANT_METRES * 100} cm of the floor ` +
+    `for two frames in a row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ` +
+    `${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ${ctx.character.rig.gait.bobAmplitude}) ` +
+    'or stepHeight.'
 }
 
 export function locomotionChecks (character: Character, recording: LocomotionRecording): Check[] {

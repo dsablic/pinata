@@ -9,7 +9,7 @@ import { checkKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './va
 import type { Validated, ValidationError } from './validate.ts'
 
 export type { Arm, ArmLimb, AppendageLimb, Bend, Leg, LegLimb, Limb, Limits, Oscillator, Side } from './limbs.ts'
-export { armsOf, legsOf } from './limbs.ts'
+export { armsOf, legsOf, rankFromFront } from './limbs.ts'
 export type { TemplateName } from './templates.ts'
 
 export type Gait = {

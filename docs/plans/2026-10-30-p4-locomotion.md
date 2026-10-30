@@ -230,3 +230,18 @@ The review predicted gate failures on the knight; these are planner and rig fixe
 - Pelvis drop keeps feet within 0.99 of leg length (was 0.95), so straight-legged rigs don't walk crouched.
 - `Arm` gains optional `carried: string[]`: joints that move rigidly with the arm's swing (the knight's `swordTip`).
 - The foot's side comes from `leg.side`, not the sign of the rest ankle's x.
+
+## Amendment after the knee-speed investigation (before batch C)
+
+Supersedes two lines of the previous amendment:
+- Swing edges: horizontal swing motion starts once the foot is 1 cm above its plant and ends when it is back within
+  1 cm (about 4% of the swing at step height 0.08), instead of a fixed 10%. The fixed 10% compressed horizontal
+  travel and raised knee speed.
+- Pelvis drop: the reach fraction blends from 0.99 at rest to 0.96 at reference speed (turning in place counts as
+  walking), keeping about 32 degrees of knee bend while walking; the drop smoothing window is one frame. A 0.99
+  reach let the knee straighten to 16 degrees, where flexion changes fastest, and the wide window merged dips into a
+  permanent crouch.
+
+Scenario timings for Task C4 (known limits, logged in the findings): `accelSeconds` 0.5 (0.3 gives a 594 deg/s
+knee peak, a thin pass); the 180 degree pivot takes 1.5 s (1.0 s gives 659 deg/s, a fail). Starting gait as in the
+previous amendment with `strideExponent` 0.75 and `stepHeight` 0.08 (keep it at or below 0.1).

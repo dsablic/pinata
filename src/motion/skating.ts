@@ -9,8 +9,8 @@ type Options = Parameters<typeof planGait>[0]
 
 /**
  * Control: the planned gait with the feet placed relative to the root every frame. Each ankle swings forward and
- * back by stride / 4 * sin(2 pi phase) under its hip and lifts during the back half of its cycle, so nothing is
- * planted in world space. Root, pelvis, arms and phase come from the planner unchanged.
+ * back by stride / 4 * sin(2 pi phase) under its hip and lifts while it moves forward relative to the body, so
+ * nothing is planted in world space. Root, pelvis, arms and phase come from the planner unchanged.
  */
 export function planSkating (options: Options): GaitFrame[] {
   const { rig, rest, mannequin } = options
@@ -21,7 +21,7 @@ export function planSkating (options: Options): GaitFrame[] {
     const feet = rig.legs.map((leg): FootState => {
       const phase = frame.phase + (leg.side === 'left' ? 0 : 0.5)
       const wave = Math.sin(2 * Math.PI * phase)
-      const lift = Math.max(0, -wave)
+      const lift = Math.max(0, Math.cos(2 * Math.PI * phase))
       const home = rest[leg.ankle]
       const height = home[1] - soleHeight(leg, rest, mannequin) + gait.stepHeight * lift
       const local: Vec3 = [home[0], height, home[2] + amplitude * wave]

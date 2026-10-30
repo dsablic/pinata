@@ -32,6 +32,18 @@ test('the skating control swings each ankle about its rest position under the hi
   assert.ok(second.feet.every(f => !f.planted))
 })
 
+test('the skating control lifts a foot only while it moves forward relative to the body', () => {
+  const frames = planSkating(options)
+  frames.forEach(frame => {
+    for (const foot of frame.feet) {
+      const phase = frame.phase + (foot.side === 'left' ? 0 : 0.5)
+      assertClose(foot.lift, Math.max(0, Math.cos(2 * Math.PI * phase)), 1e-12)
+    }
+  })
+  assert.ok(frames.some(f => f.feet.some(foot => foot.lift === 0)))
+  assert.ok(frames.some(f => f.feet.some(foot => foot.lift > 0.9)))
+})
+
 test('the skating control slides more than 1 px per frame on a steady walk, ours does not', () => {
   const steady = (frames: ReturnType<typeof planGait>) => {
     return recordLocomotion(frames.slice(24, 120), { rig, rest, mannequin, fps: 24 })

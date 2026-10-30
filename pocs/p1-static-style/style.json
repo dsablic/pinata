@@ -3,6 +3,7 @@
   "light": [-0.5, 0.7, 0.5],
   "bands": [0.05, 0.6],
   "outline": "#1b1421",
+  "outlineMode": "selective",
   "innerLineDepth": 0.12,
   "decalMinFacing": 0.3,
   "materials": {
@@ -12,5 +13,5 @@
     "cloth-red": ["#3e1030", "#9a2a36", "#e0704a"],
     "blade": ["#5a6580", "#aebccc", "#fffbe8"]
   },
-  "decalColors": { "x": "#1b1421" }
+  "decalColors": { "x": "#221f36" }
 }

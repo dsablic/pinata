@@ -95,3 +95,11 @@ If A/B still fails, move to the skins fallback.
 - Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 1).
 - Observed: warmer palette with clearer light/shadow contrast; the cape's lit panel now reads orange against
   wine-red shadow.
+
+## Run 6 (P1b)
+
+- Change: `outlineMode: selective` (outline takes the bordering part's darkest shade); visor decal uses the
+  steel-dark shadow instead of the old outline black.
+- Gates: all pass (maxThinFraction 0.250, paletteSize 14, maxStrayPixels 2 at the limit).
+- Observed: softer, coloured edges instead of a uniform black cut-out line. The sword's outline is now its own
+  blue-grey shadow, so it is a little less prominent.

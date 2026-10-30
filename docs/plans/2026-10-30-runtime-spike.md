@@ -59,8 +59,8 @@ walking characters, skins, multiple characters, a public API commitment.
    computer people": one or more live characters in a small scene, reacting to behaviour buttons, fake agent events
    and pokes, with panels to tweak the environment (wind, gravity, rope length, background) and motion (swing and
    twist damping, twist stiffness, limb stiffness, render sub-samples, reduced motion), and a live frame-time readout.
-   It is built by a GitHub Actions workflow from the same bundle and character artifact on every push to `main`, so
-   it never drifts from the source; the Playwright tests run against the built page before it deploys.
+   It is built by a GitHub Actions workflow from the same bundle and character artifact for every release tag (`v*`) or a manual run, so
+   it never drifts from a release; the Playwright tests run against the built page before it deploys.
 
 ## Tests (Playwright, headless Chromium)
 
@@ -107,5 +107,6 @@ Headless Chromium timings are an estimate of a real browser tab; the report says
   pixel determinism, continuity at zero-blend switches, additive bounds, events firing once, reduced motion below
   half, drag and release, masks. Found while testing: each behaviour restarted its waves at phase 0, so a switch
   jumped; periodic primitives now run on the shared clock, and offsets fade over at least 0.2 s even on a zero blend.
-- **Delivery targets added by the user:** a GitHub Pages showcase (item 8), CI (done: typecheck and tests on every
-  push), and a Claude Code mod showing the piñata in a pane beside the chat, reacting to the agent's work.
+- **Delivery targets added by the user:** a GitHub Pages showcase (item 8, live at https://dsablic.github.io/pinata/),
+  CI (typecheck, web build and tests; it runs on `v*` tags and by hand, per the user, and the Pages deploy follows a
+  passing run), and a Claude Code mod showing the piñata in a pane beside the chat, reacting to the agent's work.

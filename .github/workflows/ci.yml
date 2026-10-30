@@ -2,8 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
-  pull_request:
+    tags: ['v*']
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -26,7 +26,7 @@ jobs:
 
   site:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

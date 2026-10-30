@@ -110,7 +110,7 @@ const countFilled = (g: { part: Int16Array }): number => g.part.filter(p => p !=
 
 test('a previous buffer keeps edge pixels that were in and are marginally out', () => {
   const big = rasterize(ball(0.5), camera)
-  const small = ball(0.46)
+  const small = ball(0.43)
   const plain = countFilled(rasterize(small, camera))
   const held = countFilled(rasterize(small, camera, 4, big))
   assert.ok(held > plain, `expected more than ${plain} pixels, got ${held}`)
@@ -118,8 +118,8 @@ test('a previous buffer keeps edge pixels that were in and are marginally out', 
 })
 
 test('a previous buffer keeps edge pixels that were out and are marginally in', () => {
-  const small = rasterize(ball(0.46), camera)
-  const big = ball(0.5)
+  const small = rasterize(ball(0.5), camera)
+  const big = ball(0.55)
   const plain = countFilled(rasterize(big, camera))
   const held = countFilled(rasterize(big, camera, 4, small))
   assert.ok(held < plain, `expected fewer than ${plain} pixels, got ${held}`)

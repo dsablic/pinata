@@ -218,9 +218,13 @@ export function planGait (options: Options): GaitFrame[] {
   const feet = buildFeet(options, phase)
   const roots = phase.map((_, i) => track(i / fps))
   const stances = phase.map(p => feet.map(foot => footAt(foot, p, options)))
+  const referenceCadence = gait.referenceSpeed / gait.strideLength
   const eases = roots.map(root => Math.min(1, horizontalSpeed(root) / gait.referenceSpeed))
+  const steps = roots.map((root, i) => {
+    return Math.max(eases[i], Math.min(1, Math.abs(root.angularVelocity) * TURN_CYCLES_PER_RADIAN / referenceCadence))
+  })
   const needed = stances.map((states, i) => {
-    const fraction = REST_REACH_FRACTION + (WALK_REACH_FRACTION - REST_REACH_FRACTION) * eases[i]
+    const fraction = REST_REACH_FRACTION + (WALK_REACH_FRACTION - REST_REACH_FRACTION) * steps[i]
     return Math.min(0, ...feet.map((foot, k) => neededOffset(foot, states[k], roots[i], fraction)))
   })
   const drops = smoothDrops(needed, Math.round(DROP_SMOOTHING_SECONDS * fps))

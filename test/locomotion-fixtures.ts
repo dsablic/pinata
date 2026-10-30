@@ -67,3 +67,15 @@ export const straightMannequin: Mannequin = {
   ...mannequin,
   joints: { ...mannequin.joints, kneeL: [0.1, 0.5, 0.02], kneeR: [-0.1, 0.5, 0.02] }
 }
+
+export function turnTrack (rate: number, turnSeconds: number): (t: number) => RootState {
+  return (t: number): RootState => {
+    const turning = t < turnSeconds
+    return {
+      position: [0, 0, 0],
+      yaw: rate * Math.min(t, turnSeconds),
+      velocity: [0, 0, 0],
+      angularVelocity: turning ? rate : 0
+    }
+  }
+}

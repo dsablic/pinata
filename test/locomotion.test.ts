@@ -10,7 +10,7 @@ import { toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
-import { mannequin, rig, straightMannequin, walkTrack } from './locomotion-fixtures.ts'
+import { mannequin, rig, straightMannequin, turnTrack, walkTrack } from './locomotion-fixtures.ts'
 
 const rest = restPose(mannequin)
 
@@ -123,4 +123,16 @@ test('knee flexion speed stays under 600 degrees per second at 24 fps in a brisk
     for (let k = 0; k < 2; k++) peak = Math.max(peak, Math.abs(flexions[i][k] - flexions[i - 1][k]) * 24)
   }
   assert.ok(peak <= 600, `knee peaked at ${peak.toFixed(0)} degrees per second`)
+})
+
+test('knees stay at least 25 degrees bent while stepping around in place', () => {
+  const straight = restPose(straightMannequin)
+  const turning = planGait({
+    track: turnTrack(Math.PI, 2), rig, rest: straight, mannequin: straightMannequin, duration: 3, fps: 24
+  })
+  const flexions = turning.slice(0, 48).flatMap(frame => {
+    const { pose } = poseAt({ frame, rig, rest: straight, mannequin: straightMannequin })
+    return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
+  })
+  assert.ok(Math.min(...flexions) >= 25, `knee reached ${Math.min(...flexions)} degrees`)
 })

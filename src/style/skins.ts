@@ -34,6 +34,10 @@ export type SkinnedOptions = {
 type Screen = { x: number, y: number, depth: number }
 type Placement = {
   name: string
+  /** The part's joints, to tell parts that join (no line between them) from parts that only overlap. */
+  joints: [string, string]
+  /** The farther of a left and right pair, drawn a shade darker. */
+  far?: boolean
   /** For a mirrored two-joint part, the sprite before mirroring: clean rotation turns it and flips the result. */
   unmirrored?: { rows: string[], pivot: [number, number] }
   rows: string[]
@@ -106,6 +110,7 @@ function placements (o: SkinnedOptions): Placement[] {
     if (!single && o.rotation === 'clean') o.angles?.set(part.name, angle)
     found.push({
       name: part.name,
+      joints: [part.a, part.b],
       ...(unmirrored?.rows === undefined || unmirrored.pivotA === undefined
         ? {}
         : { unmirrored: { rows: unmirrored.rows, pivot: unmirrored.pivotA } }),
@@ -116,7 +121,41 @@ function placements (o: SkinnedOptions): Placement[] {
       depth: (a.depth + b.depth) / 2
     })
   }
+  if (choice !== undefined) {
+    // the farther of each left and right pair, where one is clearly behind the other
+    const byName = new Map(found.map(p => [p.name, p]))
+    for (const p of found) {
+      const other = byName.get(counterpart(p.name))
+      if (other !== undefined && other !== p && p.depth - other.depth > FAR_DEPTH) p.far = true
+    }
+  }
   return found.sort((p, q) => q.depth - p.depth)
+}
+
+/** How much deeper (metres) a limb must be than its counterpart to count as the far one. */
+const FAR_DEPTH = 0.05
+
+/**
+ * Each palette colour's next shade down: the darker palette colour nearest in hue and saturation (its colour less
+ * its grey), the step closest in brightness breaking ties; the colour itself when none is darker.
+ */
+export function darkerShades (colours: Map<string, number>): Map<number, number> {
+  const rgb = (c: number): [number, number, number] => [(c >> 16) & 255, (c >> 8) & 255, c & 255]
+  const tint = (c: number): [number, number, number] => {
+    const [r, g, b] = rgb(c)
+    const grey = (r + g + b) / 3
+    return [r - grey, g - grey, b - grey]
+  }
+  const all = [...new Set(colours.values())]
+  return new Map(all.map(c => {
+    const darker = all.filter(d => luminance(d) < luminance(c) - 1)
+    if (darker.length === 0) return [c, c]
+    const cost = (d: number): number => {
+      const [a, b] = [tint(c), tint(d)]
+      return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]) + 0.35 * (luminance(c) - luminance(d))
+    }
+    return [c, darker.reduce((best, d) => cost(d) < cost(best) ? d : best)]
+  }))
 }
 
 /** The 11.25-degree step nearest the angle, keeping the previous step until the angle is well past their middle. */
@@ -157,15 +196,24 @@ function rotated (p: Placement): Rotated {
   return { grid: turned.grid.map(row => [...row].reverse()), pivot: [width - 1 - turned.pivot[0], turned.pivot[1]] }
 }
 
-function paintClean (img: Image, p: Placement, colours: Map<string, number>): void {
+/** Where an eight-direction skin's parts were painted, by placement index, and how to darken a colour. */
+type Ink = { owner: Int16Array, index: number, shade: Map<number, number> }
+
+function put (img: Image, x: number, y: number, colour: number, p: Placement, ink?: Ink): void {
+  if (x < 0 || y < 0 || x >= img.width || y >= img.height) return
+  setPixel(img, x, y, ink !== undefined && p.far === true ? ink.shade.get(colour) ?? colour : colour)
+  if (ink !== undefined) ink.owner[y * img.width + x] = ink.index
+}
+
+function paintClean (img: Image, p: Placement, colours: Map<string, number>, ink?: Ink): void {
   const { grid, pivot } = rotated(p)
   grid.forEach((row, y) => row.forEach((c, x) => {
     const colour = colours.get(c)
-    if (colour !== undefined) setPixel(img, p.anchor[0] + x - pivot[0], p.anchor[1] + y - pivot[1], colour)
+    if (colour !== undefined) put(img, p.anchor[0] + x - pivot[0], p.anchor[1] + y - pivot[1], colour, p, ink)
   }))
 }
 
-function paint (img: Image, p: Placement, colours: Map<string, number>): void {
+function paint (img: Image, p: Placement, colours: Map<string, number>, ink?: Ink): void {
   const lines = p.rows.map(row => [...row])
   const { cos, sin } = exactTrig(p.angle)
   const w = lines[0].length
@@ -177,8 +225,40 @@ function paint (img: Image, p: Placement, colours: Map<string, number>): void {
       const sy = Math.floor(p.pivot[1] + 0.5 - dx * sin + dy * cos)
       if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue
       const colour = colours.get(lines[sy][sx])
-      if (colour !== undefined) setPixel(img, p.anchor[0] + dx, p.anchor[1] + dy, colour)
+      if (colour === undefined) continue
+      if (ink === undefined) setPixel(img, p.anchor[0] + dx, p.anchor[1] + dy, colour)
+      else put(img, p.anchor[0] + dx, p.anchor[1] + dy, colour, p, ink)
     }
+  }
+}
+
+/**
+ * Inner lines, as a pixel artist draws them where one part overlaps another: wherever a part's pixel borders an
+ * earlier (farther) part it does not join at a joint, that farther pixel takes its next shade down.
+ */
+function innerLines (img: Image, placed: Placement[], ink: Ink): void {
+  const { owner, shade } = ink
+  const joins = (p: Placement, q: Placement): boolean => p.joints.some(j => q.joints.includes(j))
+  const marked: number[] = []
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const near = owner[y * img.width + x]
+      if (near < 0) continue
+      for (const [dx, dy] of NEIGHBOURS) {
+        const nx = x + dx
+        const ny = y + dy
+        if (nx < 0 || ny < 0 || nx >= img.width || ny >= img.height) continue
+        const far = owner[ny * img.width + nx]
+        if (far < 0 || far >= near || joins(placed[near], placed[far])) continue
+        marked.push(ny * img.width + nx)
+      }
+    }
+  }
+  for (const i of new Set(marked)) {
+    const x = i % img.width
+    const y = Math.floor(i / img.width)
+    const colour = getPixel(img, x, y)
+    setPixel(img, x, y, shade.get(colour) ?? colour)
   }
 }
 
@@ -200,10 +280,17 @@ function drawOutline (img: Image, colour: number): void {
 export function renderSkinned (options: SkinnedOptions): Image {
   const img = createImage(options.camera.width, options.camera.height)
   const colours = new Map(Object.entries(options.skin.palette).map(([key, hex]) => [key, parseHex(hex)]))
-  for (const p of placements(options)) {
-    if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours)
-    else paint(img, p, colours)
-  }
+  const placed = placements(options)
+  // eight-direction skins also get inner lines and darker far limbs; one-view skins render as they always have
+  const ink: Ink | undefined = options.skin.views === undefined
+    ? undefined
+    : { owner: new Int16Array(img.width * img.height).fill(-1), index: 0, shade: darkerShades(colours) }
+  placed.forEach((p, index) => {
+    if (ink !== undefined) ink.index = index
+    if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours, ink)
+    else paint(img, p, colours, ink)
+  })
+  if (ink !== undefined) innerLines(img, placed, ink)
   drawOutline(img, [...colours.values()].reduce((a, b) => luminance(b) < luminance(a) ? b : a))
   return img
 }

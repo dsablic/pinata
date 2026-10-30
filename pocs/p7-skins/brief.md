@@ -48,7 +48,10 @@ right side is on screen-left.
 - A part whose bone points almost straight at the viewer (its bone under a pixel or two on screen) still shows its
   sprite turned by the bone's angle, which is unsteady: draw such parts as compact blobs that look right at any angle.
 - The renderer draws a 1 px outline around the whole silhouette in the darkest palette colour; do not outline the
-  outer edges yourself. Inner dark lines are fine.
+  outer edges yourself. Where one part overlaps another that it does not join at a joint (an arm over the torso, the
+  near leg over the far one), it also draws a line in the next darker shade of the part behind, and it draws the far
+  limb of each left and right pair one shade darker. So give overlapping parts different values (not only different
+  hues) and include a darker shade for each main colour.
 
 ## Pivots
 

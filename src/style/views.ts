@@ -72,17 +72,20 @@ export function mirrored (sprite: SkinPart, twoJoint: boolean): SkinPart {
   }
 }
 
+/** The shortest a limb is drawn, as a share of its drawn length: shorter, a foreshortened limb reads as a spike. */
+const MIN_FIT = 0.6
+
 /**
  * A two-joint sprite fitted to a bone of a given on-screen length: the end caps past each pivot are kept, and the
  * columns between the pivots are resampled (repeated or dropped evenly) so the pivots end that length apart. Within
- * a pixel of the drawn length the sprite is returned as it is.
+ * a pixel of the drawn length the sprite is returned as it is; it is never shortened past MIN_FIT of its drawn length.
  */
 export function fitted (sprite: SkinPart, length: number): SkinPart {
   const { rows, pivotA, pivotB } = sprite
   if (rows === undefined || pivotA === undefined || pivotB === undefined) return sprite
   const drawn = pivotB[0] - pivotA[0]
-  const target = Math.max(1, Math.round(length))
-  if (Math.abs(length - drawn) < 1 || drawn < 1) return sprite
+  const target = Math.max(1, Math.round(Math.max(length, MIN_FIT * drawn)))
+  if (Math.abs(Math.max(length, MIN_FIT * drawn) - drawn) < 1 || drawn < 1) return sprite
   const fit = rows.map(row => {
     const cells = [...row]
     const before = cells.slice(0, pivotA[0])

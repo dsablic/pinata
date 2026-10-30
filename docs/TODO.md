@@ -28,8 +28,10 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 [Motion data plan](plans/2026-10-30-motion-data.md): humanoids driven by retargeted CMU motion capture (motion
 matching, IK on terrain), the [physical body](plans/2026-10-30-physical-walking.md) leading the root for everyone,
-procedural stepping for bodies without data. Batch A next: fetch and convert clips, retarget, early judge panel.
-`src/motion/walker.ts` is the physical body's first draft (feet overreach and the body does not bob yet).
+procedural stepping for bodies without data. Batches A and B are built (clips, retargeting, style, motion matching, the player with feet
+held on terrain; reviewed). Open: the knight loses the judge panel (75% mocap overall, gate 80%) because its sword
+arm swings like an empty hand; the transitions gate needs the user's ruling (see the plan's log). Then batch C, the
+world. `src/motion/walker.ts` is the physical body's first draft (feet overreach and the body does not bob yet).
 
 ### 0b. World showcase (user request, 2026-10-30)
 

@@ -127,3 +127,9 @@ characters on the same clip never move in lockstep.
   pairs (gate 80%): the wizard, rogue and dwarf 6 of 6 each, the knight 0 of 6 (its mocap strip carries the sword
   arm stiffly out in front; the procedural one swings it). Controls left unseparated by 75% of judges, left picks
   56%. Two of the three judges gave identical answers, so the panel is less independent than three judges suggest.
+- **Fail, recorded: the judge panel, round 2** (after the review fixes, new strips, new seed). Mocap again picked in
+  75% of the answers on real pairs (gate 80%): the wizard, rogue and dwarf 6 of 6 each, every judge in both orders;
+  the knight 0 of 6. Controls left unseparated by 92% of judges, left picks 56%. The knight's arm carrying the sword
+  copies the empty-handed capture, so the sword sticks out in front and does not read as carried. Next: a style for
+  arms that carry something (stiffer, held lower), declared per character, then one more round; batch B is otherwise
+  done, and batch C (the world) can start once the user has ruled on the transitions gate.

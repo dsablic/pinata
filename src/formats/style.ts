@@ -4,11 +4,14 @@ import {
 } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
+export type OutlineMode = 'uniform' | 'selective'
+
 export type Style = {
   name: string
   light: Vec3
   bands: number[]
   outline: string
+  outlineMode?: OutlineMode
   innerLineDepth: number
   decalMinFacing: number
   materials: Record<string, string[]>
@@ -16,7 +19,7 @@ export type Style = {
 }
 
 const KNOWN_FIELDS = [
-  'name', 'light', 'bands', 'outline', 'innerLineDepth', 'decalMinFacing', 'materials', 'decalColors'
+  'name', 'light', 'bands', 'outline', 'outlineMode', 'innerLineDepth', 'decalMinFacing', 'materials', 'decalColors'
 ] as const
 
 const HEX = /^#[0-9a-fA-F]{6}$/
@@ -38,6 +41,9 @@ export function validateStyle (input: unknown): Validated<Style> {
     errors.push({ path: 'bands', message: 'expected strictly ascending numbers between -1 and 1' })
   }
   if (!isHex(input.outline)) errors.push({ path: 'outline', message: 'expected a colour like #1b1421' })
+  if (input.outlineMode !== undefined && input.outlineMode !== 'uniform' && input.outlineMode !== 'selective') {
+    errors.push({ path: 'outlineMode', message: "expected 'uniform' or 'selective'; omit it for 'uniform'" })
+  }
   if (!isPositive(input.innerLineDepth)) {
     errors.push({ path: 'innerLineDepth', message: 'expected a positive depth jump in model units' })
   }

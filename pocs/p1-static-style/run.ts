@@ -12,7 +12,7 @@ import type { Camera } from '../../src/raster/camera.ts'
 import { rasterize } from '../../src/raster/gbuffer.ts'
 import type { GBuffer } from '../../src/raster/gbuffer.ts'
 import { stylize } from '../../src/style/stylize.ts'
-import { imageHash, parseHex } from '../../src/image.ts'
+import { imageHash } from '../../src/image.ts'
 import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
@@ -60,6 +60,7 @@ type Frame = {
   gbuffer: GBuffer
   image: Image
   decalMask: Uint8Array
+  outlineMask: Uint8Array
 }
 
 function requireValid<T> (file: string, result: Validated<T>): T {
@@ -117,8 +118,9 @@ if (referenceErrors.length > 0) {
 function renderFrame (size: number, elevation: number, direction: number): Frame {
   const camera = frameCamera(size, elevation, direction)
   const gbuffer = rasterize(mannequin, camera)
-  const { image, decalMask } = stylize(gbuffer, mannequin, camera, style)
-  return { id: `${size}px-el${elevation}-d${direction}`, size, elevation, direction, camera, gbuffer, image, decalMask }
+  const { image, decalMask, outlineMask } = stylize(gbuffer, mannequin, camera, style)
+  const id = `${size}px-el${elevation}-d${direction}`
+  return { id, size, elevation, direction, camera, gbuffer, image, decalMask, outlineMask }
 }
 
 const frames = SIZES.flatMap(size => ELEVATIONS.flatMap(elevation => {
@@ -134,12 +136,11 @@ const rows = SIZES.flatMap(size => ELEVATIONS.map(elevation => {
   return frames.filter(f => f.size === size && f.elevation === elevation)
 }))
 
-const outline = parseHex(style.outline)
 const frameMetrics = frames.map(f => {
   const thin = thinParts(f.gbuffer, mannequin).filter(p => p.pixels >= MIN_PIXELS_FOR_THIN)
   return {
     id: f.id,
-    outlineGaps: outlineGaps(f.image, outline),
+    outlineGaps: outlineGaps(f.image, f.outlineMask),
     strayPixels: strayPixels(f.image, f.decalMask),
     maxThinFraction: Math.max(0, ...thin.map(p => p.thinFraction)),
     thinParts: thin

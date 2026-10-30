@@ -6,12 +6,12 @@ import type { GBuffer } from '../raster/gbuffer.ts'
 
 export type ThinPart = { part: string, pixels: number, thinFraction: number }
 
-export function outlineGaps (img: Image, outline: number): number {
+export function outlineGaps (img: Image, outlineMask: Uint8Array): number {
   let gaps = 0
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       const c = getPixel(img, x, y)
-      if (c === TRANSPARENT || c === outline) continue
+      if (c === TRANSPARENT || outlineMask[y * img.width + x] === 1) continue
       if (neighbours4(img, x, y).includes(TRANSPARENT)) gaps++
     }
   }

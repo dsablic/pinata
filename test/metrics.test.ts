@@ -8,13 +8,33 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 
 const OUTLINE = 0x101010
 
-test('outline gaps count fill pixels touching transparency or the edge', () => {
+test('outline gaps count fill pixels touching transparency or the edge, ignoring outline pixels', () => {
   const img = createImage(3, 3)
-  for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) setPixel(img, x, y, OUTLINE)
+  const mask = new Uint8Array(9)
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 3; x++) {
+      setPixel(img, x, y, OUTLINE)
+      mask[y * 3 + x] = 1
+    }
+  }
   setPixel(img, 1, 1, 0xff0000)
-  assert.equal(outlineGaps(img, OUTLINE), 0)
+  mask[4] = 0
+  assert.equal(outlineGaps(img, mask), 0)
   setPixel(img, 1, 0, 0xff0000)
-  assert.equal(outlineGaps(img, OUTLINE), 1)
+  mask[1] = 0
+  assert.equal(outlineGaps(img, mask), 1)
+})
+
+test('outline gaps do not depend on the outline colour', () => {
+  const img = createImage(3, 3)
+  const mask = new Uint8Array(9)
+  for (let y = 0; y < 3; y++) {
+    for (let x = 0; x < 3; x++) {
+      setPixel(img, x, y, x === 1 && y === 1 ? 0xff0000 : 0x202020 + x + y)
+      mask[y * 3 + x] = x === 1 && y === 1 ? 0 : 1
+    }
+  }
+  assert.equal(outlineGaps(img, mask), 0)
 })
 
 test('stray pixels have no same-coloured neighbour, unless masked', () => {

@@ -165,3 +165,56 @@ test('skips a decal covered by a surface more than one pixel depth in front of i
   assert.equal(covered.decalMask.reduce((a, b) => a + b, 0), 0)
   assert.equal(getPixel(decalScene([0, 0, 1], 3.5).image, 2, 3), RED)
 })
+
+const selective: Style = {
+  ...style,
+  outlineMode: 'selective',
+  materials: { m: ['#000010', '#0000ff'], n: ['#100000', '#ff0000'] }
+}
+const twoParts: Mannequin = {
+  ...mannequin,
+  parts: [...mannequin.parts, { ...mannequin.parts[0], name: 'q', material: 'n' }]
+}
+
+test('uniform mode marks the outline pixels in the mask and keeps one colour', () => {
+  const { image, outlineMask } = stylize(block([0, 0, 1]), mannequin, camera, { ...style, outlineMode: 'uniform' })
+  assert.equal(getPixel(image, 0, 2), OUTLINE)
+  assert.equal(outlineMask[2 * 5 + 0], 1)
+  assert.equal(outlineMask[2 * 5 + 2], 0)
+  assert.equal(outlineMask.reduce((a, b) => a + b, 0), 12)
+})
+
+test('selective mode paints the outline with the darkest shade of the bordering part', () => {
+  const g = block([0, 0, 1])
+  for (let y = 1; y <= 3; y++) g.part[y * 5 + 3] = 1
+  const { image } = stylize(g, twoParts, camera, selective)
+  assert.equal(getPixel(image, 0, 2), DARK)
+  assert.equal(getPixel(image, 4, 2), 0x100000)
+  assert.equal(getPixel(image, 2, 2), LIGHT)
+})
+
+test('selective mode takes the nearest bordering part, then the lower index on a tie', () => {
+  const g = block([0, 0, 1])
+  g.part.fill(EMPTY)
+  g.part[1 * 5 + 1] = 0
+  g.part[2 * 5 + 2] = 1
+  g.depth[1 * 5 + 1] = 3
+  g.depth[2 * 5 + 2] = 2
+  g.normal.set([0, 0, 1], (1 * 5 + 1) * 3)
+  g.normal.set([0, 0, 1], (2 * 5 + 2) * 3)
+  const nearer = stylize(g, twoParts, camera, selective).image
+  assert.equal(getPixel(nearer, 2, 1), 0x100000)
+  assert.equal(getPixel(nearer, 1, 2), 0x100000)
+  g.depth[2 * 5 + 2] = 3
+  const tied = stylize(g, twoParts, camera, selective).image
+  assert.equal(getPixel(tied, 2, 1), DARK)
+})
+
+test('selective mode ignores decal colours when choosing the outline colour', () => {
+  const g = block([0, 0, 1])
+  g.depth.fill(4)
+  const m: Mannequin = { ...mannequin, decals: [{ ...eye, normal: [0, 0, 1] }] }
+  const { image, decalMask } = stylize(g, m, camera, selective)
+  assert.equal(decalMask[3 * 5 + 2], 1)
+  assert.equal(getPixel(image, 0, 2), DARK)
+})

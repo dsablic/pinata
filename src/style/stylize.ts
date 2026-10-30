@@ -11,7 +11,7 @@ import type { GBuffer } from '../raster/gbuffer.ts'
 
 const MAX_STRAY_PASSES = 5
 
-export type StylizeResult = { image: Image, decalMask: Uint8Array }
+export type StylizeResult = { image: Image, decalMask: Uint8Array, outlineMask: Uint8Array }
 
 export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): StylizeResult {
   const shaded = createImage(g.width, g.height)
@@ -19,8 +19,8 @@ export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): S
   drawInnerLines(shaded, g, m, style)
   const image = removeStrays(shaded, g, m)
   const decalMask = drawDecals(image, g, m, cam, style)
-  drawOutline(image, parseHex(style.outline))
-  return { image, decalMask }
+  const outlineMask = drawOutline(image, g, m, style)
+  return { image, decalMask, outlineMask }
 }
 
 function rampOf (g: GBuffer, m: Mannequin, style: Style, i: number): string[] {
@@ -136,7 +136,28 @@ function drawDecals (image: Image, g: GBuffer, m: Mannequin, cam: Camera, style:
   return mask
 }
 
-function drawOutline (image: Image, colour: number): void {
+const OFFSETS_4 = [[0, -1], [-1, 0], [1, 0], [0, 1]]
+
+function borderingPart (g: GBuffer, x: number, y: number): number {
+  let best = EMPTY
+  let bestDepth = Infinity
+  for (const [dx, dy] of OFFSETS_4) {
+    const nx = x + dx
+    const ny = y + dy
+    if (nx < 0 || ny < 0 || nx >= g.width || ny >= g.height) continue
+    const j = ny * g.width + nx
+    if (g.part[j] === EMPTY) continue
+    if (g.depth[j] < bestDepth || (g.depth[j] === bestDepth && g.part[j] < best)) {
+      best = g.part[j]
+      bestDepth = g.depth[j]
+    }
+  }
+  return best
+}
+
+function drawOutline (image: Image, g: GBuffer, m: Mannequin, style: Style): Uint8Array {
+  const uniform = parseHex(style.outline)
+  const mask = new Uint8Array(image.width * image.height)
   const edge: Array<[number, number]> = []
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
@@ -144,5 +165,11 @@ function drawOutline (image: Image, colour: number): void {
       if (neighbours4(image, x, y).some(n => n !== TRANSPARENT)) edge.push([x, y])
     }
   }
-  for (const [x, y] of edge) setPixel(image, x, y, colour)
+  for (const [x, y] of edge) {
+    const part = style.outlineMode === 'selective' ? borderingPart(g, x, y) : EMPTY
+    const colour = part === EMPTY ? uniform : parseHex(style.materials[m.parts[part].material][0])
+    setPixel(image, x, y, colour)
+    mask[y * image.width + x] = 1
+  }
+  return mask
 }

@@ -30,6 +30,20 @@ test('rejects a ramp whose length does not match the bands', () => {
   assert.match(error.message, /2 colours but bands define 3 shades/)
 })
 
+test('accepts both outline modes and keeps the field', () => {
+  for (const outlineMode of ['uniform', 'selective']) {
+    const result = validateStyle({ ...valid(), outlineMode })
+    assert.deepEqual(result.errors, [])
+    assert.equal(result.value?.outlineMode, outlineMode)
+  }
+})
+
+test('rejects an unknown outline mode with the allowed values', () => {
+  const [error] = validateStyle({ ...valid(), outlineMode: 'rainbow' }).errors
+  assert.equal(error.path, 'outlineMode')
+  assert.match(error.message, /'uniform' or 'selective'/)
+})
+
 test('rejects bands that are not ascending', () => {
   const input = valid()
   input.bands = [0.6, 0]

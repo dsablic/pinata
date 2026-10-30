@@ -133,3 +133,9 @@ characters on the same clip never move in lockstep.
   copies the empty-handed capture, so the sword sticks out in front and does not read as carried. Next: a style for
   arms that carry something (stiffer, held lower), declared per character, then one more round; batch B is otherwise
   done, and batch C (the world) can start once the user has ruled on the transitions gate.
+- **Pass, round 3 of the judge panel** (after the knight's carrying-arm style: its sword arm swings at 35% and the
+  blade is held low, in `examples/knight/retarget.json`; new strips, new seed). Mocap picked in 82% of the answers on
+  real pairs (gate 80%): the wizard and dwarf 6 of 6, the rogue 5 of 6, the knight 1 of 6 (procedural 4, can't tell
+  1). Controls left unseparated by 83% of judges, left picks 46%. Caveats: this is the third round, the pass is
+  narrow, and the knight still reads better procedurally; the judges are three instances of one model and often
+  answer alike. Rounds 1 and 2 stay recorded as fails.

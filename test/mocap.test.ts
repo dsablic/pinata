@@ -8,6 +8,7 @@ import { eulerXyz, fromQuaternion, toQuaternion } from '../src/math/matrix.ts'
 import { parseAmc, parseAsf, posed } from '../src/mocap/asf.ts'
 import { validateClip } from '../src/mocap/clip.ts'
 import type { Clip } from '../src/mocap/clip.ts'
+import { validateStyle } from '../src/mocap/style.ts'
 import { mergeRetargeting, retargetClip, retargetedRecording, validateRetargeting } from '../src/mocap/retarget.ts'
 import { boneLengthError, solePoints } from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
@@ -103,7 +104,11 @@ for (const name of HUMANOIDS) {
   const rest = restPose(mannequin)
   const own = JSON.parse(readFileSync(join('examples', name, 'retarget.json'), 'utf8'))
   const map = mergeRetargeting(JSON.parse(readFileSync('motion/humanoid.json', 'utf8')), own)
-  const options = { rig, rest, mannequin, map, fps: 24 }
+  const options = { rig, rest, mannequin, map, style: own.style, fps: 24 }
+
+  test(`${name}: its retarget.json style, if any, is valid`, () => {
+    if (own.style !== undefined) assert.deepEqual(validateStyle(own.style).errors, [])
+  })
 
   test(`${name}: the retargeting is valid and keeps bone lengths`, () => {
     const walk = clip('walk')

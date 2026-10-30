@@ -17,3 +17,6 @@ npm run mocap -- convert motion/takes.json <source-dir> motion/clips
 
 `humanoid.json` maps the clips' source skeleton onto the example humanoids' joints; each example's `retarget.json`
 adds which of its joints hang from the chest and head.
+
+A `retarget.json` may also carry a `style` (see `src/mocap/style.ts`): the knight's keeps its sword arm stiff and the
+blade held low, as an arm carrying something does, instead of the capture's empty-handed swing.

@@ -18,5 +18,19 @@
       "plumeBack",
       "plumeBase"
     ]
+  },
+  "style": {
+    "amplitude": {
+      "shoulderR": 0.35,
+      "elbowR": 0.4,
+      "wristR": 0.3
+    },
+    "offset": {
+      "wristR": [
+        40,
+        0,
+        0
+      ]
+    }
   }
 }

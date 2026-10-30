@@ -36,7 +36,7 @@ const base = JSON.parse(readFileSync('motion/humanoid.json', 'utf8'))
 function options (name: string, style?: MotionStyle): RetargetOptions {
   const { rig, mannequin } = characters.get(name) as Character
   const own = JSON.parse(readFileSync(join('examples', name, 'retarget.json'), 'utf8'))
-  return { rig, rest: restPose(mannequin), mannequin, map: mergeRetargeting(base, own), style }
+  return { rig, rest: restPose(mannequin), mannequin, map: mergeRetargeting(base, own), style: style ?? own.style }
 }
 
 function legLength (character: Character): number {
@@ -159,7 +159,7 @@ test('a 4 m/s headwind slows the walk by at least 10%, and a shove moves the bod
 
 test('style: the neutral style changes nothing; two styles on one clip differ by at least 5 degrees RMS', () => {
   const walk = clips.find(c => c.name === 'walk') as Clip
-  const plain = retargetRotations(walk, options('rogue'))
+  const plain = retargetRotations(walk, { ...options('rogue'), style: undefined })
   const neutral = retargetRotations(walk, options('rogue', {}))
   assert.deepEqual(neutral, plain)
   const swagger: MotionStyle = {

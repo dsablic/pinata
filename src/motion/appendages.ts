@@ -6,36 +6,55 @@ import type { GaitFrame } from './gait.ts'
 import type { Pose } from './pose.ts'
 
 type Options = { rig: Rig, rest: Pose, fps: number, substeps: number }
-type Segment = { length: number, rest: Vec3, tip: Vec3, velocity: Vec3, target: Vec3 }
+type Matrix = [Vec3, Vec3, Vec3]
+type Segment = { length: number, rest: Vec3, tip: Vec3, velocity: Vec3, target: Vec3, frame: Matrix }
 
 export const DEFAULT_APPENDAGE_SUBSTEPS = 8
 const MIN_FREQUENCY = 0.3
 const FREQUENCY_RANGE = 2.7
 const PARALLEL_EPSILON = 1e-12
+const IDENTITY: Matrix = [[1, 0, 0], [0, 1, 0], [0, 0, 1]]
 
 /** Natural frequency in Hz of an appendage spring: 0.3 Hz at stiffness 0 up to 3 Hz at stiffness 1. */
 export function springFrequency (stiffness: number): number {
   return MIN_FREQUENCY + FREQUENCY_RANGE * stiffness
 }
 
-function yawed (v: Vec3, yaw: number): Vec3 {
-  return toWorld(v, { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 })
+function apply (m: Matrix, v: Vec3): Vec3 {
+  return [dot(m[0], v), dot(m[1], v), dot(m[2], v)]
 }
 
-/** Rotates v about the unit axis by angle radians (Rodrigues). */
-function rotateAbout (v: Vec3, axis: Vec3, angle: number): Vec3 {
+function multiply (a: Matrix, b: Matrix): Matrix {
+  const columns: Matrix = [[b[0][0], b[1][0], b[2][0]], [b[0][1], b[1][1], b[2][1]], [b[0][2], b[1][2], b[2][2]]]
+  return a.map(row => columns.map(column => dot(row, column))) as Matrix
+}
+
+/** Rotation about the y axis by yaw, matching toWorld. */
+function yawMatrix (yaw: number): Matrix {
+  const c = Math.cos(yaw)
+  const s = Math.sin(yaw)
+  return [[c, 0, s], [0, 1, 0], [-s, 0, c]]
+}
+
+/** Rotation about the unit axis by angle radians (Rodrigues). */
+function axisAngle (axis: Vec3, angle: number): Matrix {
   const c = Math.cos(angle)
   const s = Math.sin(angle)
-  return add(add(scale(v, c), scale(cross(axis, v), s)), scale(axis, dot(axis, v) * (1 - c)))
+  const t = 1 - c
+  const [x, y, z] = axis
+  return [
+    [c + x * x * t, x * y * t - z * s, x * z * t + y * s],
+    [y * x * t + z * s, c + y * y * t, y * z * t - x * s],
+    [z * x * t - y * s, z * y * t + x * s, c + z * z * t]
+  ]
 }
 
-/** Applies to v the smallest rotation that takes unit vector from onto unit vector to. */
-function rotateBetween (from: Vec3, to: Vec3, v: Vec3): Vec3 {
+/** The smallest rotation that takes unit vector from onto unit vector to. */
+function between (from: Vec3, to: Vec3): Matrix {
   const axis = cross(from, to)
   const sin = length(axis)
-  const cos = dot(from, to)
-  if (sin < PARALLEL_EPSILON) return cos > 0 ? v : scale(v, -1)
-  return rotateAbout(v, scale(axis, 1 / sin), Math.atan2(sin, cos))
+  if (sin < PARALLEL_EPSILON) return IDENTITY
+  return axisAngle(scale(axis, 1 / sin), Math.atan2(sin, dot(from, to)))
 }
 
 function lerp (a: Vec3, b: Vec3, u: number): Vec3 {
@@ -48,14 +67,11 @@ function oscillation (limb: AppendageLimb, time: number): number {
   return oscillate.degrees * Math.PI / 180 * Math.sin(2 * Math.PI * (time / oscillate.period + oscillate.phase))
 }
 
-/**
- * Rest direction of the first segment, in body space, turned by the oscillator at the given time. Later segments keep
- * their rest direction relative to their parent's current direction.
- */
-function firstDirection (limb: AppendageLimb, segment: Segment, time: number): Vec3 {
+/** Rotation from body rest space to world for the first segment's target: the oscillator, then the body's yaw. */
+function rootFrame (limb: AppendageLimb, yaw: number, time: number): Matrix {
   const angle = oscillation(limb, time)
-  if (angle === 0 || limb.oscillate === undefined) return segment.rest
-  return rotateAbout(segment.rest, normalize(limb.oscillate.axis), angle)
+  if (angle === 0 || limb.oscillate === undefined) return yawMatrix(yaw)
+  return multiply(yawMatrix(yaw), axisAngle(normalize(limb.oscillate.axis), angle))
 }
 
 function springStep (segment: Segment, base: Vec3, goal: Vec3, limb: AppendageLimb, dt: number): void {
@@ -82,25 +98,30 @@ function animate (limb: AppendageLimb, frames: GaitFrame[], poses: Pose[], optio
   const root = limb.joints[0]
   const segments: Segment[] = limb.joints.slice(1).map((joint, i) => {
     const bone = sub(rest[joint], rest[limb.joints[i]])
-    return { length: length(bone), rest: normalize(bone), tip: [0, 0, 0], velocity: [0, 0, 0], target: [0, 0, 0] }
+    const zero: Vec3 = [0, 0, 0]
+    return { length: length(bone), rest: normalize(bone), tip: zero, velocity: zero, target: zero, frame: IDENTITY }
   })
+  const start = frames[0].root
+  const startVelocity = (p: Vec3): Vec3 => {
+    const r = sub(p, start.position)
+    return add(start.velocity, scale([r[2], 0, -r[0]], start.angularVelocity))
+  }
   const baseAt = (f: number): Vec3 => toWorld(add(rest[root], frames[f].pelvisOffset), frames[f].root)
   const place = (base: Vec3, yaw: number, time: number, step?: number): void => {
-    let parentBase = base
+    let parent = rootFrame(limb, yaw, time)
     let from = base
-    segments.forEach((segment, i) => {
-      const direction = i === 0
-        ? yawed(firstDirection(limb, segment, time), yaw)
-        : rotateBetween(yawed(segments[i - 1].rest, yaw), normalize(sub(from, parentBase)), yawed(segment.rest, yaw))
+    for (const segment of segments) {
+      const direction = apply(parent, segment.rest)
       const goal = add(from, scale(direction, segment.length))
       if (step === undefined) {
         segment.tip = goal
         segment.target = goal
-        segment.velocity = [...frames[0].root.velocity]
+        segment.velocity = startVelocity(goal)
       } else springStep(segment, from, goal, limb, step)
-      parentBase = from
+      segment.frame = multiply(between(direction, normalize(sub(segment.tip, from))), parent)
+      parent = segment.frame
       from = segment.tip
-    })
+    }
   }
   const record = (f: number): void => {
     for (const [i, segment] of segments.entries()) poses[f][limb.joints[i + 1]] = toLocal(segment.tip, frames[f].root)
@@ -121,7 +142,9 @@ function animate (limb: AppendageLimb, frames: GaitFrame[], poses: Pose[], optio
 
 /**
  * Moves the joints of every appendage in the body-local poses (one per frame, from poseAt) with a damped angular
- * spring toward each segment's rest direction relative to its parent, plus the optional oscillator. The tips are
+ * spring toward each segment's rest direction relative to its parent, plus the optional oscillator on the first
+ * segment. Each segment carries the rotation from rest to its current direction (its target's rotation followed by
+ * the smallest swing to where the spring put it), and its children aim through that rotation. The tips are
  * integrated in world space at `substeps` steps per frame, with the root joint, pelvis offset and yaw interpolated
  * between frames, and each tip is projected back to its bone length. Deterministic; returns the poses it changed.
  */

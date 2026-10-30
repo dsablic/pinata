@@ -3,9 +3,12 @@ import assert from 'node:assert/strict'
 import type { Scenario, SimMaterial } from '../src/formats/sim.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { simulateCharacter } from '../src/motion/character.ts'
+import { recordLocomotion } from '../src/motion/metrics.ts'
+import { restPose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
 import { frameHashes } from '../src/sim/metrics.ts'
 import { assertClose } from './helpers.ts'
+import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
 import { mannequin, rig } from './locomotion-fixtures.ts'
 
 const silk: SimMaterial = {
@@ -67,4 +70,28 @@ test('a walking simulation has no non-finite coordinates and reports timing', ()
 
 test('an unknown cape material is reported', () => {
   assert.throws(() => simulateCharacter({ ...options, materials: [] }), /unknown material 'silk'/)
+})
+
+test('appendages swing in the simulated poses, and recordLocomotion with the same substeps matches them', () => {
+  const turning: Scenario = {
+    ...scenario,
+    cape: undefined,
+    chains: [],
+    script: {
+      accelSeconds: 0.3,
+      segments: [{ action: 'move', speed: 0.4, duration: 1 }, { action: 'turn', degrees: 90, duration: 1 }]
+    },
+    durationSeconds: 2
+  }
+  const run = simulateCharacter({ mannequin: hexMannequin, rig: hexRig, scenario: turning, materials: [silk] })
+  const rest = restPose(hexMannequin)
+  const swing = Math.max(...run.poses.map(pose => Math.hypot(...pose.tail3.map((v, i) => v - rest.tail3[i]))))
+  assert.ok(swing > 0.01, `largest tail tip swing: ${swing} m`)
+  const recording = recordLocomotion(run.frames, {
+    rig: hexRig, rest, mannequin: hexMannequin, fps: turning.fps, substeps: turning.substeps
+  })
+  run.poses.forEach((pose, i) => {
+    const world = toWorld(pose.tail3, run.frames[i].root)
+    world.forEach((v, k) => { assertClose(recording.frames[i].joints.tail3[k], v, 1e-12) })
+  })
 })

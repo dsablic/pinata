@@ -54,7 +54,7 @@ rig, style, materials, motion) that passes `check`.
 | Starter packages pass `check` | all four templates | new test per template |
 | New examples pass `check` | `examples/beetle` (hexapod, 3-segment legs), `examples/spider` (octopod), `examples/horse` (quadruped, 3-segment digitigrade legs, tail and ears as appendages) | examples |
 | N-segment IK | segment lengths preserved within 1e-9; end reaches reachable targets within 1e-4 m; joint limits respected | unit tests |
-| `unbalancedFrames` | 0 for characters with 3+ legs: frames where the centre of the body (pelvis-group centroid projected on the ground) lies outside the convex hull of the planted feet by more than 2 cm | new locomotion gate |
+| `unbalancedFrames` | 0 for characters with more than four legs (was 3+; see "Decisions during batch C"): frames where the centre of the body (pelvis-group centroid projected on the ground) lies outside the convex hull of the planted feet by more than 2 cm | new locomotion gate |
 | `appendageBoneLengthError` | <= 0.01 | new gate |
 | `appendageNonFinite` | 0 | new gate |
 | Existing locomotion gates | pass on every new example (slide, knee speed generalised to every bending joint, ground, reach, alternation in phase order, support) | examples |
@@ -103,6 +103,16 @@ rig, style, materials, motion) that passes `check`.
   yaw are interpolated linearly between frames; `check` and the cloth run use the scenario's `substeps`, other
   recordings 8. The oscillator rotates the first segment's rest direction about `axis` (body space) by
   `degrees * sin(2 pi (t / period + phase))`; later segments follow relative to it.
+- Each segment carries a rotation from rest to its current direction: its target rotation (the parent's rotation;
+  for the first segment the body yaw after the oscillator) followed by the smallest swing to where the spring put
+  it. Children aim through it, so a wag about any axis turns the whole chain (the batch C review found that building
+  child targets from directions alone lost the oscillator's twist and flipped near 180 degrees). Known limit: a very
+  soft appendage on a very fast spin (a half turn in a quarter second) still trails nearly 180 degrees behind, where
+  the swing is ill-defined, and flails; a half turn in a second at stiffness 0.2 stays smooth. A 120-degree swing
+  cap was tried and made it worse (the tail snapped along with the target).
+- The appendage gates cannot fail for a rig that passes validation (checkRig rejects shared and coincident joints,
+  and the implicit spring is stable at any step), so their hints say so and ask for a report instead of giving
+  advice.
 - Balance gate changed before it was ever applied: the plan said 3+ legs, but the `examples/dog` walk (stance 0.75)
   has the body centre up to 5 cm outside the support triangle in 25 frames even with a volume-weighted centre (88 mm
   and 107 frames with a plain joint mean, which the head and ears pull forward). A four-legged walk balances
@@ -114,4 +124,7 @@ rig, style, materials, motion) that passes `check`.
 - The hexapod fixture's tripod at stanceFraction 0.6 passes, but its worst frame puts the centre on the hull edge
   (0 m, the 2 cm tolerance unused; its chest sits forward of the middle legs); at 0.7 it stays more than 2 cm inside,
   at 0.5 it is 1.2 cm outside. Starter hexapods should use a centred body or stanceFraction 0.65 or more.
+- The batch C reviewer agreed with the more-than-four-legs rule and suggested, if quadrupeds should be covered, gating
+  them only at stanceFraction 0.75 or more (the statically stable walk); not done, since the dog example (0.75)
+  fails it.
 - Arms are labelled `left arm` for one per side and `left arm 1` .. `n` front to back for several.

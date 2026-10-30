@@ -283,15 +283,6 @@ function windowText (w: SteadySegment): string {
   return `${w.start.toFixed(2)}-${w.end.toFixed(2)} s at ${w.speed} m/s`
 }
 
-function fewestPlants (ctx: Context, window: SteadySegment): number {
-  const runs = metrics.plantedRuns(ctx.recording, geometryOf(ctx)).filter(run => {
-    const time = ctx.recording.frames[run.start].time
-    return time >= window.start && time <= window.end
-  })
-  const counts = legsOf(ctx.character.rig).map((_, leg) => runs.filter(run => run.leg === leg).length)
-  return counts.indexOf(Math.min(...counts))
-}
-
 function rootSpeedHint (ctx: Context): string {
   const { gait } = ctx.character.rig
   const bad = ctx.windows.map(w => ({ w, value: metrics.rootSpeedError(ctx.recording, geometryOf(ctx), [w]) }))
@@ -301,10 +292,9 @@ function rootSpeedHint (ctx: Context): string {
   const accel = ctx.character.scenario.script.accelSeconds
   const head = `steady walking window ${windowText(bad.w)} (${seconds.toFixed(2)} s long)`
   if (!Number.isFinite(bad.value) && seconds >= 2.5 * cycle) {
-    const leg = fewestPlants(ctx, bad.w)
-    return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but the ` +
-      `${legTitle(ctx, leg, 'foot')} has fewer than two plants in it: it never rises above 2 cm, so it counts as ` +
-      `planted the whole time. ${capitalise(stepAdvice(ctx, legsOf(ctx.character.rig)[leg]))}.`
+    return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but a foot has fewer ` +
+      'than two plants in it: the feet never rise above 2 cm, so each counts as planted the whole time. ' +
+      `${capitalise(stepAdvice(ctx, legsOf(ctx.character.rig)[0]))}.`
   }
   const why = Number.isFinite(bad.value)
     ? `the feet advance ${(bad.value * 100).toFixed(1)}% differently from the script speed`
@@ -369,8 +359,8 @@ function balanceHint (ctx: Context): string {
   }).map(({ i }) => legTitle(ctx, i))
   const { gait } = ctx.character.rig
   const total = metrics.unbalancedFrames(ctx.recording, g)
-  return `in ${total} frames the body centre is more than 2 cm outside the area the planted feet enclose on the ` +
-    `ground; worst ${(distances[frame] ?? 0).toFixed(3)} m outside in ${at(ctx, frame)}, standing on: ` +
+  return `in ${total} frames the body centre is more than 2 cm outside the area enclosed by the feet within 2 cm ` +
+    `of the floor; worst ${(distances[frame] ?? 0).toFixed(3)} m outside in ${at(ctx, frame)}, standing on: ` +
     `${planted.join(', ')}. A many-legged walk keeps the body over its feet. Raise rig.gait.stanceFraction (now ` +
     `${gait.stanceFraction}) so more feet are down at once; check that neighbouring legs on a side and opposite ` +
     'legs at the same position are half a cycle apart (a tripod alternates 0 and 0.5); spread the feet wider ' +
@@ -387,18 +377,14 @@ function worstAppendage (ctx: Context, measure: AppendageMeasure): { name: strin
   }).reduce((a, b) => b.value > a.value ? b : a)
 }
 
-function substepAdvice (ctx: Context): string {
-  return `raise motion.json substeps (now ${ctx.character.scenario.substeps}), or lower the appendage's oscillate ` +
-    'degrees'
-}
+const SOLVER_NOTE = 'A rig that passes validation cannot cause this (checkRig rejects shared and coincident joints), ' +
+  'so it points to a solver bug: please report it with this character package.'
 
 function appendageBoneHint (ctx: Context): string {
   const rest = restPose(ctx.character.mannequin)
   const worst = worstAppendage(ctx, g => metrics.appendageBoneLengthError(ctx.recording, g, rest))
-  return `the bones of appendage '${worst.name}' change length by ${(worst.value * 100).toFixed(1)}%. The spring ` +
-    'keeps every segment at its rest length, so a joint of this appendage is also moved by something else ' +
-    '(listed again in upperBody, another limb or carried), two of its joints coincide in the mannequin, or the ' +
-    `motion blew up (see appendageNonFinite): ${substepAdvice(ctx)}.`
+  return `the bones of appendage '${worst.name}' change length by ${(worst.value * 100).toFixed(1)}%, but the ` +
+    `spring keeps every segment at its rest length. ${SOLVER_NOTE}`
 }
 
 function appendageNonFiniteHint (ctx: Context): string {
@@ -406,8 +392,7 @@ function appendageNonFiniteHint (ctx: Context): string {
   const limb = ctx.character.rig.limbs.find(l => l.name === worst.name)!
   const frame = ctx.recording.frames.findIndex(f => limb.joints.some(j => !f.joints[j].every(Number.isFinite)))
   return `appendage '${worst.name}' has ${worst.value} joint positions that are not finite numbers, first in ` +
-    `${at(ctx, frame)}: its spring blew up. ${capitalise(substepAdvice(ctx))}; also check that no two of its ` +
-    'joints coincide in the mannequin.'
+    `${at(ctx, frame)}. ${SOLVER_NOTE}`
 }
 
 export function locomotionChecks (character: Character, recording: LocomotionRecording): Check[] {

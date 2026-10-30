@@ -187,8 +187,7 @@ test('a low stepHeight makes the slide and root-speed hints say to raise it', ()
   const summary = summaryOf(run)
   assert.match(summary, /stepHeight is below 0\.1 x the leg length: raise rig\.gait\.stepHeight/)
   assert.match(summary, /Raising it raises knee speed, which a lower stanceFraction offsets/)
-  const noPlants = /window is long enough.*the (left|right) foot has fewer than two plants.*never rises above 2 cm/
-  assert.match(summary, new RegExp(`${noPlants.source}.*Raise rig\\.gait\\.stepHeight`))
+  assert.match(summary, /window is long enough.*the feet never rise above 2 cm.*Raise rig\.gait\.stepHeight/)
 })
 
 test('a tilted foot is diagnosed by the difference of its sole points, not their height', () => {

@@ -72,7 +72,6 @@ test('appendage metrics catch a stretched bone and a non-finite joint', () => {
   assert.equal(metrics.appendageNonFinite(recording, geometry), 0)
   recording.frames[5].joints.tail3 = [0, 0, 0]
   recording.frames[6].joints.tail2 = [NaN, 0, 0]
-  assert.ok(metrics.appendageBoneLengthError(recording, geometry, rest) > 0.5)
   assert.equal(metrics.appendageBoneLengthError(recording, geometry, rest), Infinity)
   assert.equal(metrics.appendageNonFinite(recording, geometry), 1)
 })

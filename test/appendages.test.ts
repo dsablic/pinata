@@ -25,8 +25,9 @@ function frames (seconds: number, position: (t: number) => Vec3, yaw: (t: number
   return Array.from({ length: Math.round(seconds * FPS) + 1 }, (_, i) => {
     const t = i / FPS
     const velocity: Vec3 = sub(position(t + 1e-3), position(t)).map(v => v / 1e-3) as Vec3
+    const angularVelocity = (yaw(t + 1e-3) - yaw(t)) / 1e-3
     return {
-      root: { position: position(t), yaw: yaw(t), velocity, angularVelocity: 0 },
+      root: { position: position(t), yaw: yaw(t), velocity, angularVelocity },
       pelvisOffset: [0, 0, 0],
       feet: [],
       armSwings: [],
@@ -35,9 +36,14 @@ function frames (seconds: number, position: (t: number) => Vec3, yaw: (t: number
   })
 }
 
-function animate (rig: Rig, gait: GaitFrame[]): Pose[] {
-  const poses = gait.map(() => ({ ...rest }))
-  return animateAppendages(gait, poses, { rig, rest, fps: FPS, substeps: SUBSTEPS })
+function animate (rig: Rig, gait: GaitFrame[], from: Pose = rest): Pose[] {
+  const poses = gait.map(() => ({ ...from }))
+  return animateAppendages(gait, poses, { rig, rest: from, fps: FPS, substeps: SUBSTEPS })
+}
+
+function angleBetween (a: Vec3, b: Vec3): number {
+  const cos = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (length(a) * length(b))
+  return Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI
 }
 
 function deviation (pose: Pose): number {
@@ -101,4 +107,35 @@ test('a rig without appendages returns the poses untouched', () => {
   assert.equal(animateAppendages(frames(0, () => [0, 0, 0]), poses, {
     rig: { ...hexRig, limbs: [] }, rest, fps: FPS, substeps: SUBSTEPS
   }), poses)
+})
+
+test('a rigid drooping tail wagged about the vertical turns as one piece', () => {
+  const drooping: Pose = { ...rest, tail1: [0, 0.5, -0.2], tail2: [0, 0.4, -0.28], tail3: [0, 0.4, -0.4] }
+  const rig = rigWith({ stiffness: 1, oscillate: { axis: [0, 1, 0], degrees: 60, period: 1, phase: 0 } })
+  const poses = animate(rig, frames(1, () => [0, 0, 0]), drooping)
+  const angle = Math.PI / 3
+  const turned = (p: Vec3): Vec3 => {
+    const [x, y, z] = sub(p, drooping.tail1)
+    const c = Math.cos(angle)
+    const s = Math.sin(angle)
+    return [drooping.tail1[0] + x * c + z * s, drooping.tail1[1] + y, drooping.tail1[2] - x * s + z * c]
+  }
+  for (const name of TAIL) {
+    const expected = turned(drooping[name])
+    assert.ok(length(sub(poses[6][name], expected)) < 1e-9, `${name}: ${poses[6][name]} vs ${expected}`)
+  }
+})
+
+test('a soft tail through a half turn in one second keeps its bend changing smoothly', () => {
+  const poses = animate(rigWith({ stiffness: 0.2, damping: 0.4 }), frames(3, () => [0, 0, 0], t => {
+    return Math.PI * Math.min(1, t)
+  }))
+  const bends = poses.map(p => angleBetween(sub(p.tail2, p.tail1), sub(p.tail3, p.tail2)))
+  const jumps = bends.slice(1).map((b, i) => Math.abs(b - bends[i]))
+  assert.ok(Math.max(...jumps) < 25, `largest bend change per frame: ${Math.max(...jumps)}`)
+})
+
+test('a body that starts mid-turn starts the tail moving with it', () => {
+  const poses = animate(rigWith({}), frames(0.5, () => [0, 0, 0], t => 2 * t))
+  assert.ok(Math.max(...poses.slice(0, 8).map(deviation)) < 0.01)
 })

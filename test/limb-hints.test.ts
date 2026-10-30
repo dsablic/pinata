@@ -44,7 +44,7 @@ test('appendage hints name the appendage and the first bad frame', () => {
   recording.frames[9].joints.tail3 = [NaN, 0, 0]
   const nonFinite = result(character, recording, 'appendageNonFinite')
   assert.match(nonFinite?.hint ?? '', /appendage 'tail' has 1 joint positions .* first in frame 9 /)
-  assert.match(nonFinite?.hint ?? '', /Raise motion\.json substeps/)
+  assert.match(nonFinite?.hint ?? '', /solver bug: please report it/)
   const bone = result(character, recording, 'appendageBoneLengthError')
   assert.match(bone?.hint ?? '', /^the metric is not finite.*bones of appendage 'tail' change length/)
 })

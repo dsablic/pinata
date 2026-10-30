@@ -111,3 +111,13 @@ If A/B still fails, move to the skins fallback.
 - Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 2).
 - Observed: the cross and buckle read clearly in front and 3/4 views and separate front from back. The side
   visor slits barely register at 32px.
+
+## Run 8 (P1b)
+
+- Change: pose: weight on the left leg, right leg stepped slightly forward, free arm bent forward; hips widened
+  0.44 -> 0.48 (thickness 0.28 -> 0.3) after the new pose exposed a 7-pixel hips sliver at 48px back-left.
+  Renderer fix: stray cleanup now runs again after decals (decal pixels frozen), because decals were leaving
+  single pixels isolated next to the visor, chest cross and buckle.
+- Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 2).
+- Observed: the silhouette is no longer symmetric; the forward arm and stepped leg read as a stance rather than a
+  T-pose. Ready for the P1b judge panel.

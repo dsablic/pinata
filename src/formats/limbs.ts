@@ -3,7 +3,7 @@ import { checkKnownKeys, copyKnownKeys, isDirection, isFiniteNumber, isNonEmptyS
 import type { ValidationError } from './validate.ts'
 
 export type Side = 'left' | 'right'
-export type Bend = 'forward' | 'backward'
+export type Bend = 'forward' | 'backward' | 'up'
 export type Limits = { min: number, max: number }
 export type LegLimb = {
   kind: 'leg'
@@ -112,7 +112,7 @@ export function legsOf ({ limbs }: Source): Leg[] {
 function bendsOf (limb: LegLimb): Bend[] {
   const { bend } = limb
   if (Array.isArray(bend)) return bend
-  return Array.from({ length: limb.joints.length - 2 }, () => bend ?? 'forward')
+  return Array.from({ length: limb.joints.length - 3 }, () => bend ?? 'forward')
 }
 
 export function armsOf ({ limbs }: Source): Arm[] {
@@ -268,20 +268,27 @@ export function validateLegPhase (phase: unknown, here: string, context: Context
 function validateBend (limb: Record<string, unknown>, here: string, errors: ValidationError[]): void {
   const { bend, joints } = limb
   if (bend === undefined) return
-  const isBend = (v: unknown): boolean => v === 'forward' || v === 'backward'
-  const expected = Array.isArray(joints) ? joints.length - 2 : 1
+  const isBend = (v: unknown): boolean => v === 'forward' || v === 'backward' || v === 'up'
+  const expected = Array.isArray(joints) ? Math.max(1, joints.length - 3) : 1
+  const path = `${here}.bend`
   if (Array.isArray(bend)) {
-    if (bend.length === expected && bend.every(isBend)) return
-    errors.push({
-      path: `${here}.bend`,
-      message: `expected ${expected} values of 'forward' or 'backward', one for each joint between the first and ` +
-        `the last (found ${bend.length})`
-    })
+    if (bend.length !== expected || !bend.every(isBend)) {
+      errors.push({
+        path,
+        message: `expected ${expected} values of 'forward', 'backward' or 'up', one for each bending joint ` +
+          `(the joints between the hip and the ankle; found ${bend.length})`
+      })
+    } else if (bend.includes('up') && bend.some(v => v !== 'up')) {
+      errors.push({
+        path,
+        message: "'up' cannot be mixed with 'forward' or 'backward' in one leg: use 'up' for every joint"
+      })
+    }
   } else if (!isBend(bend)) {
     errors.push({
-      path: `${here}.bend`,
-      message: "expected 'forward' or 'backward' for every bending joint, or an array with one value per joint " +
-        'between the first and the last'
+      path,
+      message: "expected 'forward', 'backward' or 'up' for every bending joint, or an array with one value per " +
+        'joint between the hip and the ankle'
     })
   }
 }

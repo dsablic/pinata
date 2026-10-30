@@ -124,20 +124,29 @@ test('phase must be from 0 up to 1 and is required with more than two legs and n
   assert.deepEqual(pathsOf(limbsRig([leg('left', 'L'), leg('right', 'R')])), [])
 })
 
-test('bend is one value or one value per joint between the first and the last', () => {
-  const three = ['forward', 'backward', 'forward']
-  const ok = limbsRig([leg('left', 'L', 5, { bend: 'backward' }), leg('right', 'R', 5, { bend: three })])
+test('bend is one value or one value per bending joint, those strictly between the hip and the ankle', () => {
+  const two = ['forward', 'backward']
+  const ok = limbsRig([leg('left', 'L', 5, { bend: 'backward' }), leg('right', 'R', 5, { bend: two })])
   assert.deepEqual(errorsOf(ok), [])
   const bends = validateRig(ok).value!.limbs.map(l => l.kind === 'leg' && l.bend)
-  assert.deepEqual(bends, ['backward', three])
+  assert.deepEqual(bends, ['backward', two])
   const bad = limbsRig([
-    leg('left', 'L', 5, { bend: ['forward', 'backward'], phase: 0.1 }),
-    leg('right', 'R', 5, { bend: 'up', phase: 0.6 }),
+    leg('left', 'L', 5, { bend: ['forward', 'backward', 'forward'], phase: 0.1 }),
+    leg('right', 'R', 5, { bend: 'sideways', phase: 0.6 }),
     leg('left', 'S', 4, { bend: ['forward', 'sideways'], phase: 0 }),
     leg('right', 'T', 4, { bend: 3, phase: 0.5 })
   ])
   assert.deepEqual(pathsOf(bad), ['limbs[0].bend', 'limbs[1].bend', 'limbs[2].bend', 'limbs[3].bend'])
-  assert.match(errorsOf(bad)[0][1], /expected 3 values of 'forward' or 'backward'.*found 2/)
+  assert.match(errorsOf(bad)[0][1], /expected 2 values of 'forward', 'backward' or 'up'.*found 3/)
+  assert.equal(validateRig(limbsRig([leg('left', 'S', 4, { bend: ['forward'], phase: 0 })])).errors.length, 0)
+})
+
+test('bend up is valid on its own or for every joint, and cannot be mixed with forward or backward', () => {
+  const ok = limbsRig([leg('left', 'L', 5, { bend: 'up' }), leg('right', 'R', 5, { bend: ['up', 'up'] })])
+  assert.deepEqual(errorsOf(ok), [])
+  const mixed = limbsRig([leg('left', 'L', 5, { bend: ['up', 'forward'] }), leg('right', 'R', 5)])
+  assert.deepEqual(pathsOf(mixed), ['limbs[0].bend'])
+  assert.match(errorsOf(mixed)[0][1], /'up' cannot be mixed/)
 })
 
 test('limits need a min below a max within 180 degrees', () => {
@@ -247,21 +256,21 @@ test('armsOf lists arms of any joint count', () => {
 test('legsOf exposes the chain from the hip to the ankle, the bends and the limits', () => {
   const rig = validateRig(limbsRig([
     leg('left', 'L', 6, {
-      phase: 0, bend: ['forward', 'backward', 'forward', 'backward'], limits: { min: 0, max: 90 }
+      phase: 0, bend: ['forward', 'backward', 'forward'], limits: { min: 0, max: 90 }
     }),
     leg('right', 'R', 5, { phase: 0.5, bend: 'backward' })
   ])).value!
   const [first, second] = legsOf(rig)
   assert.deepEqual(first.chain, ['hipL', 'kneeL', 'hockL', 'fetlockL', 'pasternL'])
-  assert.deepEqual(first.bends, ['forward', 'backward', 'forward', 'backward'])
+  assert.deepEqual(first.bends, ['forward', 'backward', 'forward'])
   assert.deepEqual(first.limits, { min: 0, max: 90 })
-  assert.deepEqual(second.bends, ['backward', 'backward', 'backward'])
+  assert.deepEqual(second.bends, ['backward', 'backward'])
   assert.equal(second.limits, undefined)
 })
 
 test('legsOf bends default to forward for every intermediate joint', () => {
   const rig = validateRig(limbsRig([leg('left', 'L', 5, { phase: 0 }), leg('right', 'R', 5, { phase: 0.5 })])).value!
-  assert.deepEqual(legsOf(rig)[0].bends, ['forward', 'forward', 'forward'])
+  assert.deepEqual(legsOf(rig)[0].bends, ['forward', 'forward'])
 })
 
 test('legsOf takes the foot from the last two joints of a longer leg', () => {

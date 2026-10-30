@@ -160,6 +160,7 @@ export function reachViolations (recording: LocomotionRecording): number {
 }
 
 function bendDirection (root: RootState, bend: Bend): Vec3 {
+  if (bend === 'up') return [0, 1, 0]
   const sign = bend === 'backward' ? -1 : 1
   return [sign * Math.sin(root.yaw), 0, sign * Math.cos(root.yaw)]
 }

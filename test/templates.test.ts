@@ -80,10 +80,10 @@ test('explicit phase, bend, stance and arm swing win over the template', () => {
   const legs = QUAD()
   legs[1].phase = 0.3
   legs[2].bend = 'forward'
-  legs[3].bend = ['forward', 'backward']
+  legs[3].bend = ['backward']
   const rig = expand(templated('quadruped', legs, { ...GAIT, stanceFraction: 0.7, armSwingDegrees: 5 }))
   assert.deepEqual(legPhases(rig), [0, 0.3, 0.5, 0.75])
-  assert.deepEqual(legsOf(rig).map(l => l.limb.bend), ['backward', 'forward', 'forward', ['forward', 'backward']])
+  assert.deepEqual(legsOf(rig).map(l => l.limb.bend), ['backward', 'forward', 'forward', ['backward']])
   assert.equal(rig.gait.stanceFraction, 0.7)
   assert.equal(rig.gait.armSwingDegrees, 5)
 })

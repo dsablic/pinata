@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { legsOf } from '../src/formats/rig.ts'
+import { checkRig, legsOf, validateRig } from '../src/formats/rig.ts'
 import { planGait } from '../src/motion/gait.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
 import { kneeFlexionDegrees } from '../src/motion/ik.ts'
@@ -24,6 +24,12 @@ function walk (): GaitFrame[] {
 function bone (pose: Record<string, Vec3>, a: string, b: string): number {
   return length(sub(pose[a], pose[b]))
 }
+
+test('the hexapod fixture rig passes validateRig and checkRig', () => {
+  assert.deepEqual(validateRig(structuredClone(rig)).errors, [])
+  assert.deepEqual(checkRig(rig, mannequin), [])
+  assert.deepEqual(legsOf(rig)[0].bends, ['forward', 'backward'])
+})
 
 test('hexapod legs keep every segment length, reach the planned feet and never clamp', () => {
   for (const frame of walk()) {
@@ -144,5 +150,41 @@ test('leg limits given on a limb bound every intermediate joint', () => {
       const [a, b, c] = leg.chain.slice(0, 3)
       assert.ok(kneeFlexionDegrees(joints[a], joints[b], joints[c]) <= 70 + 1e-6)
     }
+  }
+})
+
+function splayed (): typeof mannequin {
+  const joints = structuredClone(mannequin.joints)
+  for (const { tag, x, z } of [
+    { tag: 'LF', x: 0.1, z: 0.3 }, { tag: 'LM', x: 0.1, z: 0 }, { tag: 'LH', x: 0.1, z: -0.3 },
+    { tag: 'RF', x: -0.1, z: 0.3 }, { tag: 'RM', x: -0.1, z: 0 }, { tag: 'RH', x: -0.1, z: -0.3 }
+  ]) {
+    joints[`knee${tag}`] = [x * 1.5, 0.75, z]
+    joints[`hock${tag}`] = [x * 2.2, 0.4, z]
+    joints[`ankle${tag}`] = [x * 2.8, 0.03, z]
+    joints[`toe${tag}`] = [x * 2.8, 0.03, z + 0.08]
+  }
+  return { ...mannequin, joints }
+}
+
+test('bend up puts every knee above its hip on a splayed leg', () => {
+  const wide = splayed()
+  const wideRest = restPose(wide)
+  const spider = { ...rig, limbs: rig.limbs.map(l => l.kind === 'leg' ? { ...l, bend: 'up' as const } : l) }
+  const frame: GaitFrame = {
+    root: { position: [0, 0, 0], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 },
+    pelvisOffset: [0, 0, 0],
+    feet: legsOf(spider).map(leg => ({
+      side: leg.side, ankle: wideRest[leg.ankle], toeYaw: 0, planted: true, lift: 0, toePitch: 0
+    })),
+    armSwing: 0,
+    armSwings: legsOf(spider).map(() => 0),
+    phase: 0
+  }
+  const { pose, clamped } = poseAt({ frame, rig: spider, rest: wideRest, mannequin: wide })
+  assert.equal(clamped, 0)
+  for (const leg of legsOf(spider)) {
+    assert.ok(pose[leg.knee][1] > pose[leg.hip][1] + 0.1, `${leg.name} knee ${pose[leg.knee][1]}`)
+    assertClose(bone(pose, leg.hip, leg.knee), bone(wideRest, leg.hip, leg.knee), 1e-9)
   }
 })

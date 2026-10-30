@@ -1,0 +1,270 @@
+{
+  "name": "blue-wizard",
+  "palette": {
+    "o": "#120d1c", "b": "#1e2a6b", "m": "#3b55c4", "l": "#7f9bf0",
+    "g": "#e8c050", "G": "#a07428",
+    "k": "#9a6a50", "s": "#e0a886", "S": "#ffd9bd",
+    "B": "#2a1a14", "n": "#5a3a28", "N": "#8a5e42",
+    "w": "#f2f0e8", "e": "#c2c0cc", "E": "#85839a"
+  },
+  "views": {
+    "front": {
+      "parts": {
+        "robe": { "rows": [
+          ".......................bbbbbG.",
+          "................bbbbbbbbbbbbGb",
+          ".bbbbbbbbbbbbbbGbbbbbbbmmmmmGb",
+          "bbbbbbbbbbbbbbbGmmmmmmmmmmmmgb",
+          "bmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "eeEEEEmmmmmmmmmgmmmmmmmmmmmmgb",
+          "eweweeEEmmmmmmmgmmmmmmmmmmmmgb",
+          "wwweewwwwggggggggggggggggggggb",
+          "wwwwwwwmmmmmmmmgmmmmmmmmmmmmgb",
+          "wwwwwmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "lllllllllllllllgmmmmmmmmmmmmgb",
+          ".llllllllllllllgllllllllllllgb",
+          "................llllllllllllgb",
+          ".......................lllllg."
+        ], "pivotA": [3, 7], "pivotB": [26, 7] },
+        "head": { "rows": [
+          "wsSssew",
+          "wsoSoew",
+          "wsSkskE",
+          "wwwwweE",
+          "wwwEweE",
+          ".wwwwe.",
+          ".wwweE."
+        ], "pivotA": [3, 1] },
+        "hatCone": { "rows": [
+          "ll..........",
+          "mlllll......",
+          "mmglllllll..",
+          "mmgmmmmmmmll",
+          "mmgmmmmbbbb.",
+          "bbGbbbb.....",
+          "bb.........."
+        ], "pivotA": [1, 3], "pivotB": [7, 3] },
+        "brim": { "rows": [".l.", "bll", "bll", "bml", "bmm", "bmm", "bmm", "bmm", "bbb", "bbb", ".b."], "pivotA": [0, 5], "pivotB": [2, 5] },
+        "thighL": { "hidden": true },
+        "thighR": { "hidden": true },
+        "shinL": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "shinR": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "footL": { "rows": [".BB.", "BnnB", "nNNn", ".nn."], "pivotA": [1, 1], "pivotB": [2, 1] },
+        "footR": { "rows": [".BB.", "BnnB", "nNNn", ".nn."], "pivotA": [1, 1], "pivotB": [2, 1] },
+        "upperArmL": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "upperArmR": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "forearmL": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "forearmR": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "handL": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] },
+        "handR": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] }
+      }
+    },
+    "frontSide": {
+      "parts": {
+        "robe": { "rows": [
+          ".......................bbbbbG.",
+          "................bbbbbbbbbbbbGb",
+          ".bbbbbbbbbbbbbbGbbbbbbbmmmmmGb",
+          "eeEEEEbbbbbbbbbGmmmmmmmmmmmmgb",
+          "eweweeEEmmmmmmmgmmbbbbbbbbbbgb",
+          "wwweewwwwggggggggggggggggggggb",
+          "wwwwwwwmmmmmmmmgmmmmmmmmmmmmgb",
+          "wwwwwmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "lllllllllllllllgmmmmmmmmmmmmgb",
+          ".llllllllllllllgllllllllllllgb",
+          "................llllllllllllgb",
+          ".......................lllllg."
+        ], "pivotA": [3, 7], "pivotB": [26, 7] },
+        "head": { "rows": [
+          "wwsSss.",
+          "wwsoSo.",
+          "wwssSsk",
+          "ewwwwwe",
+          ".ewwEwe",
+          "..wwwwe",
+          "..wwwe."
+        ], "pivotA": [3, 1] },
+        "hatCone": { "rows": [
+          "ll.........l",
+          "mllll.....lb",
+          "mmglllllllb.",
+          "mmgmmmmmbb..",
+          "mmgmmmmb....",
+          "bbGbbbb.....",
+          "bb.........."
+        ], "pivotA": [1, 3], "pivotB": [7, 3] },
+        "brim": { "rows": [".l.", "bll", "bll", "bll", "bml", "bmm", "bmm", "bmm", "bmm", "bmm", "bbb", "bbb", ".b."], "pivotA": [0, 6], "pivotB": [2, 6] },
+        "thighL": { "hidden": true },
+        "thighR": { "hidden": true },
+        "shinL": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "shinR": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "footL": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "footR": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "upperArmL": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "upperArmR": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "forearmL": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "forearmR": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "handL": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] },
+        "handR": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] }
+      }
+    },
+    "side": {
+      "parts": {
+        "robe": { "rows": [
+          ".......................bbbbbG.",
+          ".eEEE...........bbbbbbbbbbbbGb",
+          "eeeEEEEbbbbbbbbGbbbbbbbmmmmmGb",
+          "wwweewEbbbbbbbbGmmmmmmmmmmmmgb",
+          "wwwwwwmmmmmmmmmgmmbbbbbbbbbbgb",
+          "wwwwmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "lllllllllllllllgmmmmmmmmmmmmgb",
+          ".llllllllllllllgllllllllllllgb",
+          "................llllllllllllgb",
+          ".......................lllllg."
+        ], "pivotA": [3, 7], "pivotB": [26, 7] },
+        "head": { "rows": [
+          "wwwsSs..",
+          "wwwssoS.",
+          "ewwsssSs",
+          ".ewwwww.",
+          "..ewwwEw",
+          "...wwwww",
+          "...ewwe."
+        ], "pivotA": [3, 1] },
+        "hatCone": { "rows": [
+          "ll.........l",
+          "mllll.....lb",
+          "mmglllllllb.",
+          "mmgmmmmmbb..",
+          "mmgmmmmb....",
+          "bbGbbbb.....",
+          "bb.........."
+        ], "pivotA": [1, 3], "pivotB": [7, 3] },
+        "brim": { "rows": [".l.", "bll", "bll", "bml", "bmm", "bmm", "bmm", "bmm", "bbb", "bbb", ".b."], "pivotA": [0, 5], "pivotB": [2, 5] },
+        "thighL": { "hidden": true },
+        "thighR": { "hidden": true },
+        "shinL": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "shinR": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "footL": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "footR": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "upperArmL": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "upperArmR": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "forearmL": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "forearmR": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "handL": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] },
+        "handR": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] }
+      }
+    },
+    "backSide": {
+      "parts": {
+        "robe": { "rows": [
+          ".......................bbbbbG.",
+          "................bbbbbbbbbbbbGb",
+          ".bbbbbbbbbbbbbbGbbbbbbbmmmmmGb",
+          "bbbbbbbbbbbbbbbGmmmmmmmmmmmmgb",
+          "bmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "lllllllllllllllgmmmmmmmmmmmmgb",
+          ".llllllllllllllgllllllllllllgb",
+          "................llllllllllllgb",
+          ".......................lllllg."
+        ], "pivotA": [3, 7], "pivotB": [26, 7] },
+        "head": { "rows": [
+          "wwwwwws",
+          "wwwwwsk",
+          "ewwwwek",
+          "eewwwew",
+          ".eewwe.",
+          "..eee.."
+        ], "pivotA": [3, 1] },
+        "hatCone": { "rows": [
+          "ll.........l",
+          "mllll.....lb",
+          "mmglllllllb.",
+          "mmgmmmmmbb..",
+          "mmgmmmmb....",
+          "bbGbbbb.....",
+          "bb.........."
+        ], "pivotA": [1, 3], "pivotB": [7, 3] },
+        "brim": { "rows": [".l.", "bll", "bll", "bll", "bml", "bmm", "bmm", "bmm", "bmm", "bmm", "bbb", "bbb", ".b."], "pivotA": [0, 6], "pivotB": [2, 6] },
+        "thighL": { "hidden": true },
+        "thighR": { "hidden": true },
+        "shinL": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "shinR": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "footL": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "footR": { "rows": ["Nnn...n", "NnnnnnB", "BBBBBB."], "pivotA": [1, 1], "pivotB": [5, 1] },
+        "upperArmL": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "upperArmR": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "forearmL": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "forearmR": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "handL": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] },
+        "handR": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] }
+      }
+    },
+    "back": {
+      "parts": {
+        "robe": { "rows": [
+          ".......................bbbbbG.",
+          "................bbbbbbbbbbbbGb",
+          ".bbbbbbbbbbbbbbGbbbbbbbmmmmmGb",
+          "bbbbbbbbbbbbbbbGmmmmmmmmmmmmgb",
+          "bmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmmmmmmmmmmmgb",
+          "mmmmmmmmmmmmmmmgmmbbbbbbbbbbgb",
+          "lllllllllllllllgmmmmmmmmmmmmgb",
+          ".llllllllllllllgllllllllllllgb",
+          "................llllllllllllgb",
+          ".......................lllllg."
+        ], "pivotA": [3, 7], "pivotB": [26, 7] },
+        "head": { "rows": [
+          "wwwwwwe",
+          "wwwwwee",
+          "ewwwwee",
+          "eewweeE",
+          ".eeeeE.",
+          "..EEE.."
+        ], "pivotA": [3, 1] },
+        "hatCone": { "rows": [
+          "ll..........",
+          "mlllll......",
+          "mmglllllll..",
+          "mmgmmmmmmmll",
+          "mmgmmmmbbbb.",
+          "bbGbbbb.....",
+          "bb.........."
+        ], "pivotA": [1, 3], "pivotB": [7, 3] },
+        "brim": { "rows": [".l.", "bll", "bll", "bml", "bmm", "bmm", "bmm", "bmm", "bbb", "bbb", ".b."], "pivotA": [0, 5], "pivotB": [2, 5] },
+        "thighL": { "hidden": true },
+        "thighR": { "hidden": true },
+        "shinL": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "shinR": { "rows": [".BBBBBBBBBBB.", "nnnnnnnnnnnnB", ".NNNNNNNNNNn."], "pivotA": [1, 1], "pivotB": [10, 1] },
+        "footL": { "rows": [".BB.", "BnnB", "nnnn", ".BB."], "pivotA": [1, 1], "pivotB": [2, 1] },
+        "footR": { "rows": [".BB.", "BnnB", "nnnn", ".BB."], "pivotA": [1, 1], "pivotB": [2, 1] },
+        "upperArmL": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "upperArmR": { "rows": [".bbbbbbbbbb.", "bmmmmmmmmmmb", "mmmmmmmmmmmm", "lmmmmmmmmmmm", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },
+        "forearmL": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "forearmR": { "rows": [".......bbg.", "..bbbbbbbgG", "bmmmmmmmmgG", "mmmmmmmmmgG", "lmmmmmmmmgG", "..lllllllgg", ".......llg."], "pivotA": [2, 3], "pivotB": [8, 3] },
+        "handL": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] },
+        "handR": { "rows": ["Ss.", "Ssk", ".sk"], "pivotA": [1, 1] }
+      }
+    }
+  }
+}

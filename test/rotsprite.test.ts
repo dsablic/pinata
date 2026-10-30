@@ -13,7 +13,7 @@ test('Scale2x rounds a diagonal step and the outer corners, and keeps flat areas
   const grid = toGrid(['#.', '##'])
   assert.deepEqual(scale2x(grid).map(r => r.join('')), ['##..', '###.', '####', '.###'])
   assert.deepEqual(scale2x(toGrid(['aa', 'aa'])).map(r => r.join('')), ['.aa.', 'aaaa', 'aaaa', '.aa.'])
-  assert.deepEqual(scale2x(toGrid(['ab', 'ba'])).map(r => r.join('')).length, 4)
+  assert.deepEqual(scale2x(toGrid(['ab', 'ba'])).map(r => r.join('')), ['.ab.', 'abab', 'baba', '.ba.'])
 })
 
 test('clean rotation keeps each sprite\'s palette, and every colour\'s area within 15% where any offset can', () => {

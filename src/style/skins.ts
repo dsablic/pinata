@@ -1,7 +1,7 @@
 import { createImage, getPixel, parseHex, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
-import type { Skin } from '../formats/skin.ts'
+import type { Skin, SkinPart } from '../formats/skin.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
@@ -34,6 +34,8 @@ export type SkinnedOptions = {
 type Screen = { x: number, y: number, depth: number }
 type Placement = {
   name: string
+  /** For a mirrored two-joint part, the sprite before mirroring: clean rotation turns it and flips the result. */
+  unmirrored?: { rows: string[], pivot: [number, number] }
   rows: string[]
   pivot: [number, number]
   anchor: [number, number]
@@ -65,27 +67,37 @@ function jointOf (m: Mannequin, pose: Pose, name: string): Vec3 {
  * The sprite a part shows: for a one-view skin, its own; for an eight-direction skin, the chosen view's (the
  * counterpart's, mirrored, in a left-facing direction), fitted to the bone's length on screen.
  */
-function spriteFor (o: SkinnedOptions, name: string, single: boolean, choice: ViewChoice | undefined, length: number) {
-  if (choice === undefined || o.skin.views === undefined) return o.skin.parts[name]
+type Shown = { sprite: SkinPart | undefined, unmirrored?: SkinPart }
+
+function spriteFor (
+  o: SkinnedOptions,
+  name: string,
+  single: boolean,
+  choice: ViewChoice | undefined,
+  length: number
+): Shown {
+  if (choice === undefined || o.skin.views === undefined) return { sprite: o.skin.parts[name] }
   const parts = o.skin.views[choice.view].parts
   const drawn = parts[choice.mirror ? counterpart(name) : name] ?? parts[name]
-  if (drawn === undefined) return undefined
-  const turned = choice.mirror ? mirrored(drawn, !single) : drawn
-  return single ? turned : fitted(turned, length)
+  if (drawn === undefined) return { sprite: undefined }
+  const sized = single ? drawn : fitted(drawn, length)
+  if (!choice.mirror) return { sprite: sized }
+  return { sprite: mirrored(sized, !single), ...(single ? {} : { unmirrored: sized }) }
 }
 
 function placements (o: SkinnedOptions): Placement[] {
   const found: Placement[] = []
   let choice: ViewChoice | undefined
   if (o.skin.views !== undefined) {
-    choice = chooseView(facingAngle(o.camera, o.yaw ?? 0), o.view?.sector)
+    if (o.yaw === undefined) throw new Error(`skin '${o.skin.name}' has eight directions: pass the character's yaw`)
+    choice = chooseView(facingAngle(o.camera, o.yaw), o.view?.sector)
     if (o.view !== undefined) o.view.sector = choice.sector
   }
   for (const part of o.mannequin.parts) {
     const a: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.a))
     const b: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.b))
     const single = part.a === part.b
-    const sprite = spriteFor(o, part.name, single, choice, Math.hypot(b.x - a.x, b.y - a.y))
+    const { sprite, unmirrored } = spriteFor(o, part.name, single, choice, Math.hypot(b.x - a.x, b.y - a.y))
     if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
       continue
     }
@@ -94,6 +106,9 @@ function placements (o: SkinnedOptions): Placement[] {
     if (!single && o.rotation === 'clean') o.angles?.set(part.name, angle)
     found.push({
       name: part.name,
+      ...(unmirrored?.rows === undefined || unmirrored.pivotA === undefined
+        ? {}
+        : { unmirrored: { rows: unmirrored.rows, pivot: unmirrored.pivotA } }),
       rows: sprite.rows,
       pivot: sprite.pivotA,
       anchor: [Math.floor(a.x), Math.floor(a.y)],
@@ -113,17 +128,33 @@ export function cleanStep (radians: number, previous?: number): number {
 }
 
 const ROTATIONS = new Map<string, Rotated>()
+/** Most clean rotations kept; the oldest go first. */
+const ROTATIONS_KEPT = 4096
+const STEPS = Math.round(2 * Math.PI / CLEAN_STEP)
 
-/** A part's sprite turned cleanly, cached by sprite and step. */
-function rotated (p: Placement): Rotated {
-  const step = Math.round(p.angle / CLEAN_STEP)
-  const key = `${p.rows.join('/')}|${p.pivot.join(',')}|${step}`
+/** A sprite turned cleanly by a number of steps, cached by sprite, pivot and step. */
+function rotatedBy (rows: string[], pivot: [number, number], turns: number): Rotated {
+  const step = ((turns % STEPS) + STEPS) % STEPS
+  const key = JSON.stringify([rows, pivot, step])
   let found = ROTATIONS.get(key)
   if (found === undefined) {
-    found = cleanRotation(toGrid(p.rows), p.pivot, step * CLEAN_STEP)
+    found = cleanRotation(toGrid(rows), pivot, step * CLEAN_STEP)
+    if (ROTATIONS.size >= ROTATIONS_KEPT) ROTATIONS.delete(ROTATIONS.keys().next().value as string)
     ROTATIONS.set(key, found)
   }
   return found
+}
+
+/**
+ * A part's sprite turned cleanly. A mirrored two-joint part turns its unmirrored sprite by the mirrored angle and
+ * flips the result, so left- and right-facing directions are exact mirrors of each other.
+ */
+function rotated (p: Placement): Rotated {
+  const steps = Math.round(p.angle / CLEAN_STEP)
+  if (p.unmirrored === undefined) return rotatedBy(p.rows, p.pivot, steps)
+  const turned = rotatedBy(p.unmirrored.rows, p.unmirrored.pivot, STEPS / 2 - steps)
+  const width = turned.grid[0].length
+  return { grid: turned.grid.map(row => [...row].reverse()), pivot: [width - 1 - turned.pivot[0], turned.pivot[1]] }
 }
 
 function paintClean (img: Image, p: Placement, colours: Map<string, number>): void {

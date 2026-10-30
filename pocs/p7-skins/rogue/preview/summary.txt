@@ -1,0 +1,4 @@
+skin: rogue VALID (eight directions, nearest rotation)
+colours: 14 of 16
+turntable flicker: 9.58% (32 steps of 11.25 degrees)
+images: directions.png (facing the viewer, then turning to its left in 45-degree steps), turntable.png, walks.png (one row per direction)

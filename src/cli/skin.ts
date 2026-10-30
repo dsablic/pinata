@@ -112,7 +112,7 @@ function guide (character: Character, out: string): void {
       const dx = b.x - a.x
       const dy = b.y - a.y
       const bone = Math.hypot(dx, dy)
-      const top = bone < 0.5 ? 'toward the viewer (end-on)' : compass(dy, -dx)
+      const top = bone < 0.5 ? 'end-on (draw a compact blob)' : compass(dy, -dx)
       const cells = [part.name, `${part.a} -> ${part.b}`, at(a), at(b), bone.toFixed(1), width, top]
       lines.push(`| ${cells.join(' | ')} |`)
     }

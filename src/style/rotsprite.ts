@@ -239,7 +239,8 @@ export function cleanRotation (grid: Grid, pivot: [number, number], angle: numbe
   let bestScore: [number, number] = [Infinity, Infinity]
   for (let y = 0; y < OFFSET_STEPS; y++) {
     for (let x = 0; x < OFFSET_STEPS; x++) {
-      const offset: [number, number] = [x - OFFSET_STEPS / 2 + 1, y - OFFSET_STEPS / 2 + 1]
+      // offsets symmetric about the pivot pixel's centre, so a mirrored sprite finds the mirrored best
+      const offset: [number, number] = [x - (OFFSET_STEPS - 1) / 2, y - (OFFSET_STEPS - 1) / 2]
       const rotated = rotSprite(grid, pivot, angle, { sample: 'centre', offset })
       const counts = colourCounts(rotated.grid)
       // how far past the tolerance the worst colour's area strays (0 when all are within it), then jaggies

@@ -4,6 +4,14 @@ import { readFileSync } from 'node:fs'
 import { checkSkin, validateSkin, VIEWS } from '../src/formats/skin.ts'
 import { makeCamera } from '../src/raster/camera.ts'
 import { chooseView, counterpart, facingAngle, fitted, mirrored } from '../src/style/views.ts'
+import { renderSkinned } from '../src/style/skins.ts'
+import { loadCharacter } from '../src/formats/character.ts'
+import { restPose } from '../src/motion/pose.ts'
+import type { Pose } from '../src/motion/pose.ts'
+import { toWorld } from '../src/sim/body.ts'
+import type { Vec3 } from '../src/math/vec.ts'
+import { getPixel, TRANSPARENT } from '../src/image.ts'
+import type { Image } from '../src/image.ts'
 
 test('facing: yaw 0 faces a camera at azimuth 0, a quarter turn faces screen-right', () => {
   const camera = makeCamera({ azimuthDeg: 0, elevationDeg: 14, targetHeightPx: 48, modelHeight: 1.8, margin: 4 })
@@ -46,4 +54,65 @@ test('an eight-direction skin validates every view and refuses single-view field
   assert.deepEqual(validateSkin({ ...v2, view: 'side-right' }).errors.map(e => e.path), ['views'])
   const missing = { ...v2, views: { ...views, back: undefined } }
   assert.deepEqual(validateSkin(missing).errors.map(e => e.path), ['views.back'])
+})
+
+test('eight-direction skins render left-facing directions as mirrors of right-facing ones, in both rotations', () => {
+  const skin = validateSkin(JSON.parse(readFileSync('pocs/p7-skins/knight/skin.json', 'utf8'))).value!
+  const character = loadCharacter('examples/knight').value!
+  const rest = restPose(character.mannequin)
+  const turned = (yaw: number): Pose => {
+    const root = { position: [0, 0, 0] as Vec3, yaw, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+    return Object.fromEntries(Object.entries(rest).map(([name, p]) => [name, toWorld(p, root)]))
+  }
+  const camera = makeCamera({ azimuthDeg: 0, elevationDeg: 14, targetHeightPx: 48, modelHeight: 2, margin: 7 })
+  // the sword hangs from the right hand only, so a mirrored pose would not mirror it: leave it out
+  const symmetric = { ...character.mannequin, parts: character.mannequin.parts.filter(p => p.name !== 'sword') }
+  for (const rotation of ['nearest', 'clean'] as const) {
+    for (const degrees of [45, 90, 135]) {
+      const yaw = degrees * Math.PI / 180
+      // the mirror image of the scene: x negated, left and right joints swapped, facing the other way
+      const posed = turned(yaw)
+      const mirrorPose: Pose = Object.fromEntries(Object.entries(posed).map(([name, p]) => {
+        const [x, y, z] = posed[counterpart(name)] ?? p
+        return [name, [-x, y, z]]
+      }))
+      const draw = (pose: Pose, y: number): Image => {
+        return renderSkinned({ mannequin: symmetric, pose, skin, camera, rotation, yaw: y })
+      }
+      const right = draw(posed, yaw)
+      const left = draw(mirrorPose, -yaw)
+      // a pixel matches when its mirror image has the same colour within a pixel: sampling rounds down, so mirrored
+      // angles land parts up to a pixel apart
+      let opaque = 0
+      let differ = 0
+      for (let y = 0; y < right.height; y++) {
+        for (let x = 0; x < right.width; x++) {
+          const a = getPixel(right, x, y)
+          if (a === TRANSPARENT) continue
+          opaque++
+          let near = false
+          for (let dy = -1; dy <= 1 && !near; dy++) {
+            for (let dx = -1; dx <= 1 && !near; dx++) near = getPixel(left, right.width - 1 - x + dx, y + dy) === a
+          }
+          if (!near) differ++
+        }
+      }
+      assert.ok(differ <= 0.03 * opaque, `${rotation} at ${degrees} degrees: ${differ} of ${opaque} pixels differ`)
+    }
+  }
+})
+
+test('an eight-direction skin needs the character\'s yaw, and keeps its view between frames', () => {
+  const skin = validateSkin(JSON.parse(readFileSync('pocs/p7-skins/knight/skin.json', 'utf8'))).value!
+  const character = loadCharacter('examples/knight').value!
+  const camera = makeCamera({ azimuthDeg: 0, elevationDeg: 14, targetHeightPx: 48, modelHeight: 2, margin: 7 })
+  const options = { mannequin: character.mannequin, pose: restPose(character.mannequin), skin, camera }
+  assert.throws(() => renderSkinned(options), /yaw/)
+  const view = {}
+  renderSkinned({ ...options, yaw: 30 * Math.PI / 180, view })
+  assert.deepEqual(view, { sector: 1 })
+  renderSkinned({ ...options, yaw: 20 * Math.PI / 180, view })
+  assert.deepEqual(view, { sector: 1 })
+  renderSkinned({ ...options, yaw: 10 * Math.PI / 180, view })
+  assert.deepEqual(view, { sector: 0 })
 })

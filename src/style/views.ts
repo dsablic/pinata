@@ -18,7 +18,8 @@ const BY_SECTOR: ViewName[] = ['front', 'frontSide', 'side', 'backSide', 'back']
  */
 export function facingAngle (camera: Camera, yaw: number): number {
   const forward: Vec3 = [Math.sin(yaw), 0, Math.cos(yaw)]
-  const toCamera: Vec3 = [-camera.forward[0], -camera.forward[1], -camera.forward[2]]
+  // measured across the ground, so the camera's tilt does not move the sectors' edges
+  const toCamera: Vec3 = [-camera.forward[0], 0, -camera.forward[2]]
   return Math.atan2(dot(forward, camera.right), dot(forward, toCamera))
 }
 
@@ -81,7 +82,7 @@ export function fitted (sprite: SkinPart, length: number): SkinPart {
   if (rows === undefined || pivotA === undefined || pivotB === undefined) return sprite
   const drawn = pivotB[0] - pivotA[0]
   const target = Math.max(1, Math.round(length))
-  if (Math.abs(target - drawn) < 1 || drawn < 1) return sprite
+  if (Math.abs(length - drawn) < 1 || drawn < 1) return sprite
   const fit = rows.map(row => {
     const cells = [...row]
     const before = cells.slice(0, pivotA[0])

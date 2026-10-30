@@ -1,0 +1,741 @@
+{
+  "name": "rogue",
+  "palette": {
+    "o": "#0a0a10", "f": "#14121a", "F": "#242233", "e": "#f2d36b",
+    "c": "#1c2b2a", "m": "#2b4239", "C": "#3b5a50", "k": "#6f9486",
+    "l": "#2a1f1a", "L": "#5a4332", "t": "#8c6c4f",
+    "r": "#6b1420", "R": "#c42f3a", "s": "#ff7a6b"
+  },
+  "views": {
+    "front": { "parts": {
+      "torso": { "rows": [
+        "CCLLkkkkkkkkkC.",
+        "CCLLkkkkkkklLkC",
+        "CCLLCCCCCClLCCC",
+        "CCLLCCCCClLCCCC",
+        "CCLLCCCClLCCCCC",
+        "CCttCCClLCCCCCC",
+        "CmttCClLCCCCCCC",
+        "cmLLClLCCCCCCCC",
+        "cmLLlLCCCCCCCCm",
+        "cmllLmmmmmmmmmm",
+        "ccllmmmmmmmmmmc",
+        "ccllcccccccccc."
+      ], "pivotA": [2, 6], "pivotB": [13, 6] },
+      "head": { "rows": [
+        "....CkkkC....",
+        "..CkkkkkkCm..",
+        ".CkkkkkkkCCm.",
+        ".kkkkkCCCCCm.",
+        "CkkkCCCCCCCmc",
+        "CkCmfffffmCmc",
+        "CkCfffffffCmc",
+        "CkCffefeffCmc",
+        "CkCfFFFFFfCmc",
+        "CCmfFFFFFfmmc",
+        ".RssRRRRRRRr.",
+        ".rRRRrRRRRrr.",
+        "..rrrrrrrrr.."
+      ], "pivotA": [6, 6] },
+      "hood": { "rows": [
+        "...kkkk...",
+        "...kkkkkk.",
+        "...CCCCCC.",
+        "...mmmmm.."
+      ], "pivotA": [0, 2], "pivotB": [3, 2] },
+      "face": { "rows": [
+        ".fffff.",
+        "fffffff",
+        "ffefeff",
+        "fFFFFFf",
+        "fFFFFFf"
+      ], "pivotA": [3, 2] },
+      "scarfWrap": { "rows": [
+        ".rrrrrrrrrrrrr.",
+        "rrRRRrRRRRrRRRr",
+        "rRRRRrRRRRrRRsR",
+        "RRRRsRRRsssRsss",
+        ".RRRssRRssssss."
+      ], "pivotA": [2, 2], "pivotB": [12, 2] },
+      "scarfTail": { "rows": [
+        ".rrrrrrrrr......",
+        "RRRRrRRRRRrrr.r.",
+        "RsssRRssRRRRRrRr",
+        ".sssRssRRsR.s..."
+      ], "pivotA": [1, 2], "pivotB": [6, 2] },
+      "thighL": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinL": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footL": { "rows": [
+        ".lll",
+        "lLLl",
+        "LLLl",
+        "LtLl",
+        ".LL."
+      ], "pivotA": [1, 2], "pivotB": [3, 2] },
+      "thighR": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinR": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footR": { "rows": [
+        ".lll",
+        "lLLl",
+        "LLLl",
+        "LtLl",
+        ".LL."
+      ], "pivotA": [1, 2], "pivotB": [3, 2] },
+      "shoulderL": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmL": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmL": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handL": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] },
+      "shoulderR": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmR": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmR": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handR": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] }
+    } },
+    "frontSide": { "parts": {
+      "torso": { "rows": [
+        "CCLLkkkkkkkkkC.",
+        "CCLLkkkkkkkkkkC",
+        "CCLLkkkkkkkkkkC",
+        "CCLLkkkkkkkkkkk",
+        "CCLLCCCCCCCCCCk",
+        "CCLLCCCCCCClLCC",
+        "CCLLCCCCCClLCCC",
+        "CCttCCCCClLCCCC",
+        "CmttCCCClLCCCCC",
+        "CmLLCCClLCCCCCC",
+        "cmLLmmlLmmmmmmm",
+        "cmLLmlLmmmmmmmm",
+        "cmlllLmmmmmmmmc",
+        "ccllLccccccccc."
+      ], "pivotA": [2, 7], "pivotB": [13, 7] },
+      "head": { "rows": [
+        "....CkkkC....",
+        "..CkkkkkkCm..",
+        ".CkkkkkkkkCm.",
+        ".kkkkkkkCCCm.",
+        "CkkkkkCCCCCmc",
+        "CkkkkCmfffffm",
+        "CkkkkCffffffm",
+        "CkkkkCffefefm",
+        "CkkkCCfFFFFfm",
+        "CCkCCmfFFFFfm",
+        ".RssRRRRRRRr.",
+        ".rRRRRrRRRr..",
+        "..rrrrrrrr..."
+      ], "pivotA": [6, 6] },
+      "hood": { "rows": [
+        "...kkkk...",
+        "...kkkkkk.",
+        "...CCCCCC.",
+        "...mmmmm.."
+      ], "pivotA": [0, 2], "pivotB": [3, 2] },
+      "face": { "rows": [
+        ".fffff",
+        "ffffff",
+        "ffefef",
+        "fFFFFf",
+        "fFFFFf"
+      ], "pivotA": [2, 2] },
+      "scarfWrap": { "rows": [
+        ".rrrrrrrrrr.",
+        "rrRRRrRRRRrr",
+        "rRRRRrRRRsRR",
+        "RRRsRRRsssss",
+        ".RRssRRssss."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "scarfTail": { "rows": [
+        ".rrrrrrrrr......",
+        "RRRRrRRRRRrrr.r.",
+        "RsssRRssRRRRRrRr",
+        ".sssRssRRsR.s..."
+      ], "pivotA": [1, 2], "pivotB": [6, 2] },
+      "thighL": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinL": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footL": { "rows": [
+        ".LtL...",
+        "LLtLLl.",
+        "lLLLLLL",
+        ".llllll"
+      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      "thighR": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinR": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footR": { "rows": [
+        ".LtL...",
+        "LLtLLl.",
+        "lLLLLLL",
+        ".llllll"
+      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      "shoulderL": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmL": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmL": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handL": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] },
+      "shoulderR": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmR": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmR": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handR": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] }
+    } },
+    "side": { "parts": {
+      "torso": { "rows": [
+        "CCLLkkkkkkkkkC.",
+        "CCLLkkkkkkkkkkC",
+        "CCLLCCCCCCCCkkC",
+        "CCLLCCCCCCCCCCC",
+        "CmLLCCCCCCCCCCC",
+        "cmLLCCCCCCCCCCm",
+        "cmllmmCCCCCCCmm",
+        "cmllmmmmmmmmmmc",
+        "ccllcccccccccc."
+      ], "pivotA": [2, 4], "pivotB": [13, 4] },
+      "head": { "rows": [
+        "....CkkkC....",
+        "..CkkkkkkCC..",
+        ".CkkkkkkkkCm.",
+        ".kkkkkkkkCCCm",
+        "CkkkkkkkCCmmc",
+        "CkkkkkkCCmfff",
+        "CkkkkkkCCffff",
+        "CkkkkkCCmffef",
+        "CkkkkCCCmfFFf",
+        "CCkkCCCmmfFFm",
+        ".CCCRRsRRRRr.",
+        ".CCrRRRRRrr..",
+        "..crrrrrrc..."
+      ], "pivotA": [6, 6] },
+      "hood": { "rows": [
+        "...kkkk...",
+        "...kkkkkk.",
+        "...CCCCCC.",
+        "...mmmmm.."
+      ], "pivotA": [0, 2], "pivotB": [3, 2] },
+      "face": { "rows": [
+        ".fff",
+        "ffff",
+        "ffef",
+        "fFFf",
+        "fFF."
+      ], "pivotA": [1, 1] },
+      "scarfWrap": { "rows": [
+        ".rrrr.",
+        "rRRRRr",
+        "RRRRRr",
+        "RsRRRr",
+        "ssRRRr",
+        ".sssR."
+      ], "pivotA": [2, 3], "pivotB": [4, 3] },
+      "scarfTail": { "rows": [
+        ".rrrrrrrrr......",
+        "RRRRrRRRRRrrr.r.",
+        "RsssRRssRRRRRrRr",
+        ".sssRssRRsR.s..."
+      ], "pivotA": [1, 2], "pivotB": [7, 2] },
+      "thighL": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinL": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footL": { "rows": [
+        ".LtL.....",
+        ".LtLLl...",
+        "lLLLLLLL.",
+        "lLLLLLLLL",
+        ".llllllll"
+      ], "pivotA": [2, 1], "pivotB": [7, 1] },
+      "thighR": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinR": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footR": { "rows": [
+        ".LtL.....",
+        ".LtLLl...",
+        "lLLLLLLL.",
+        "lLLLLLLLL",
+        ".llllllll"
+      ], "pivotA": [2, 1], "pivotB": [7, 1] },
+      "shoulderL": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmL": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmL": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handL": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] },
+      "shoulderR": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmR": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmR": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handR": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] }
+    } },
+    "backSide": { "parts": {
+      "torso": { "rows": [
+        "CCLLkkkkkkkkkC.",
+        "CCLLkkkkkkkkkkC",
+        "CCLlLkkkkkkkkkC",
+        "CCLLlLCCCCCCCCC",
+        "CCLLClLCCCCCCCC",
+        "CCLLCClLCCCCCCC",
+        "CmLLCCClLCCCCCC",
+        "cmLLCCCClLCCCCC",
+        "cmLLCCCCClLCCCC",
+        "cmLLmmmmmmlLmmm",
+        "cmllmmmmmmmlLmm",
+        "ccllcccccccclLc",
+        "ccllccccccccccc",
+        "ccllcccccccccc."
+      ], "pivotA": [2, 7], "pivotB": [13, 7] },
+      "head": { "rows": [
+        "....CkkkC....",
+        "..CkkkkkkCm..",
+        ".CkkkkkkkCCm.",
+        ".kkkkkkCCCCm.",
+        "CkkkkkCCCCCmc",
+        "CkkkkCCCCCmmc",
+        "CkkkCCCCCCmmc",
+        "CkkCCCCCCmmmc",
+        "CkCCCCCCmmmmc",
+        "CCCCCCCmmmmcc",
+        ".CCCCCmmmmcc.",
+        ".CCmmmmmmccc.",
+        "..ccmmmmccc.."
+      ], "pivotA": [6, 6] },
+      "hood": { "rows": [
+        "...kkkk...",
+        "...kkkkkk.",
+        "...CCCCCC.",
+        "...mmmmm.."
+      ], "pivotA": [0, 2], "pivotB": [3, 2] },
+      "face": { "hidden": true },
+      "scarfWrap": { "rows": [
+        ".sssRRsssRR.",
+        "ssRrRRRrRRRr",
+        "RRRrRRRrRRRr",
+        "rRRrRRRrRRrr",
+        ".rrrrrrrrrr."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "scarfTail": { "rows": [
+        ".rrrrrrrrr......",
+        "RRRRrRRRRRrrr.r.",
+        "RsssRRssRRRRRrRr",
+        ".sssRssRRsR.s..."
+      ], "pivotA": [1, 2], "pivotB": [7, 2] },
+      "thighL": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinL": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footL": { "rows": [
+        ".LtL...",
+        "LLtLLl.",
+        "lLLLLLL",
+        ".llllll"
+      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      "thighR": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinR": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footR": { "rows": [
+        ".LtL...",
+        "LLtLLl.",
+        "lLLLLLL",
+        ".llllll"
+      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      "shoulderL": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmL": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmL": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handL": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] },
+      "shoulderR": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmR": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmR": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handR": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] }
+    } },
+    "back": { "parts": {
+      "torso": { "rows": [
+        "CCLLkkkkkkkkkC.",
+        "CCLLkkkkkkkkkkC",
+        "CCLlLCCCCCCCCCC",
+        "CCLLlLCCCCCCCCC",
+        "CCLLClLCCCCCCCC",
+        "CCLLCClLCCCCCCC",
+        "CmLLCCClLCCCCCC",
+        "cmLLCCCClLCCCCC",
+        "cmLLCCCCClLCCCm",
+        "cmllmmmmmmlLmmm",
+        "ccllmmmmmmmlLmc",
+        "ccllcccccccclL."
+      ], "pivotA": [2, 6], "pivotB": [13, 6] },
+      "head": { "rows": [
+        "....CkkkC....",
+        "..CkkkCkkCm..",
+        ".CkkkkCkkCCm.",
+        ".kkkkkmCCCCm.",
+        "CkkkkCmCCCCmc",
+        "CkkkCCmCCCmmc",
+        "CkkCCCCCCCmmc",
+        "CkCCCCCCCmmmc",
+        "CkCCCCCCCmmmc",
+        "CCCCCCCCmmmcc",
+        ".CCCCCCmmmcc.",
+        ".CCmmmmmmccc.",
+        "..ccmmmmccc.."
+      ], "pivotA": [6, 6] },
+      "hood": { "rows": [
+        "..Ck.",
+        ".kkkk",
+        ".kkkC",
+        ".CCCm",
+        "..mc."
+      ], "pivotA": [0, 2], "pivotB": [2, 2] },
+      "face": { "hidden": true },
+      "scarfWrap": { "rows": [
+        ".ssssRRsssRRRR.",
+        "sssRrRRRRrRRRRr",
+        "RRRRrRRRRrRRRRr",
+        "rRRRrRRRRrRRRrr",
+        ".rrrrrrrrrrrrr."
+      ], "pivotA": [2, 2], "pivotB": [12, 2] },
+      "scarfTail": { "rows": [
+        ".rrrrrrrrr......",
+        "RRRRrRRRRRrrr.r.",
+        "RsssRRssRRRRRrRr",
+        ".sssRssRRsR.s..."
+      ], "pivotA": [1, 2], "pivotB": [7, 2] },
+      "thighL": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinL": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footL": { "rows": [
+        ".ll.",
+        "lLLl",
+        "lLLl",
+        ".ll."
+      ], "pivotA": [1, 2], "pivotB": [2, 2] },
+      "thighR": { "rows": [
+        ".lllllllllll..",
+        "lLLLLLLLLLLll.",
+        "LLLLLLLLLLLLLl",
+        "LttttttLLLLLL.",
+        ".LLLLLLLLLL..."
+      ], "pivotA": [2, 2], "pivotB": [11, 2] },
+      "shinR": { "rows": [
+        ".lllllLllllll",
+        "LLLLLLtllllll",
+        "LtttLLtLLLLLl",
+        ".LLLLLtLLLLl."
+      ], "pivotA": [2, 2], "pivotB": [10, 2] },
+      "footR": { "rows": [
+        ".ll.",
+        "lLLl",
+        "lLLl",
+        ".ll."
+      ], "pivotA": [1, 2], "pivotB": [2, 2] },
+      "shoulderL": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmL": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmL": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handL": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] },
+      "shoulderR": { "rows": [
+        ".CkkC.",
+        "CkkCCm",
+        "CCCCmc",
+        "mCCmmc",
+        ".cccc."
+      ], "pivotA": [3, 2] },
+      "upperArmR": { "rows": [
+        ".cccccccccc.",
+        "cmmmmmmmmmmc",
+        "CCCCCCCCCCCm",
+        ".kkkkkCCCCC."
+      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+      "forearmR": { "rows": [
+        ".lllllllll.",
+        "lLLlLLLlLLl",
+        "LLLlLtLlLLl",
+        ".ttLttLLLL."
+      ], "pivotA": [2, 2], "pivotB": [8, 2] },
+      "handR": { "rows": [
+        ".LtL.",
+        "LttLl",
+        "LLLLl",
+        "lLLll",
+        ".lll."
+      ], "pivotA": [2, 2] }
+    } }
+  }
+}

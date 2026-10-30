@@ -31,7 +31,7 @@ intent, pixel-grid stability, agent-first formats) does not.
 | Views | 3D mannequin, side + top-down + 3/4, 4 or 8 directions | Turns and inertia are 3D; one character serves all views |
 | Size bar | 32-64px tall | Covers most indie pixel art; hard enough to be meaningful |
 | Character input | Text only; image input later | Image-to-mannequin is a separate research problem |
-| Quality judgment | Metric gates + layperson A/B checklists + external reviewers at P1 and end-to-end | Neither the user nor Claude is a pixel art expert |
+| Quality judgment | Metric gates + a blind AI judge panel for the checklists; one human pixel artist only at the end-to-end gate | Neither the user nor Claude is a pixel art expert, and the user has no time for manual review |
 | PoC stack | TypeScript (Node), custom CPU rasterizer, own or Rapier physics | Iteration speed; tiny frames make performance irrelevant; production stack decided after PoCs |
 
 ## Requirements
@@ -79,7 +79,6 @@ Hand-written mannequin, standing pose, 8 directions, 32px and 48px.
 
 - Metrics: outline fully closed; body parts at least 2px thick at 32px; at most 16 colours per character, identical across directions; fewer than 3 stray single pixels per frame.
 - A/B checklist: which way does it face (all 8 identifiable); can you point to head, torso, arms, legs, cape; which looks more hand-made, ours or the reference sprite (target: "can't tell" or close).
-- External review: 3-5 people, at least one pixel artist.
 - Fallback: passes at 48px only, raise the bar to 48px; fails both, try per-part skins before declaring the concept dead.
 
 ### P2 Pixel stability
@@ -119,7 +118,7 @@ Same character and animation, 2-3 styles.
 
 ### End-to-end viability
 
-Full pipeline. Blind review: 3-5 reviewers rate 4 of our animations and 4
+Full pipeline. Blind review: the AI judge panel, plus one human pixel artist if one can be found, rates 4 of our animations and 4
 hand-made CC0 references (mixed, unlabelled) on a 1-5 scale. Pass if our mean
 is within 0.75 of the reference mean.
 
@@ -127,7 +126,21 @@ is within 0.75 of the reference mean.
 
 1. Numeric diagnostics drive most fixes.
 2. Claude reviews still images: 8x nearest-neighbour contact sheets, frame-difference maps (crawl shows as noise, motion as coherent edges), onion skins, trajectory traces, value plots, debug passes.
-3. Human reviews of feel use the looping preview page and A/B questions.
+3. Checklist questions go to the AI judge panel (below). The looping preview page stays for anyone who wants to look.
+
+## AI judge panel
+
+Replaces human checklist review wherever a judge can plausibly answer.
+
+- Three independent judges, each a fresh agent with no project context, seeing only neutrally named images.
+- The answer key lives outside the judges' folder.
+- Ground-truth items (such as facing direction) score the judges as well as the sprites.
+- Every A/B pair appears in both left/right orders; a judge "detects" our render only if it picks consistently.
+- Control pairs of two hand-made sprites measure each judge's bias; a judge that confidently picks sides on
+  controls has its A/B answers discounted.
+- Motion checklists (P2-P4) give judges motion-as-stills images (contact sheets, difference maps, traces), since
+  judges cannot watch animation.
+- Caveat: a model of the same family as the author is a proxy for a typical viewer, not an expert eye.
 
 ## PoC harness
 

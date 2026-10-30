@@ -55,6 +55,13 @@ walking characters, skins, multiple characters, a public API commitment.
    respected (behaviours reduced to gentle, slower motion); the element never blocks clicks on the page outside its own
    area.
 
+8. **Public demo on GitHub Pages** (requested by the user, 2026-10-30): a showcase page in the spirit of "little
+   computer people": one or more live characters in a small scene, reacting to behaviour buttons, fake agent events
+   and pokes, with panels to tweak the environment (wind, gravity, rope length, background) and motion (swing and
+   twist damping, twist stiffness, limb stiffness, render sub-samples, reduced motion), and a live frame-time readout.
+   It is built by a GitHub Actions workflow from the same bundle and character artifact on every push to `main`, so
+   it never drifts from the source; the Playwright tests run against the built page before it deploys.
+
 ## Tests (Playwright, headless Chromium)
 
 Playwright and its Chromium are added as dev dependencies (install via the safe-install skill). A tiny Node static

@@ -15,7 +15,7 @@ npm run check -- <character dir> [--out <dir>]
 |---|---|
 | 0 | Package loaded and every gate passed. |
 | 1 | Package loaded, at least one gate failed. |
-| 2 | Package did not load (format or cross-file error), bad arguments, or an internal error. |
+| 2 | Package did not load (format or cross-file error), bad arguments (including a file instead of a directory), or an internal error. |
 
 The report is written to `<character dir>/report/` (or `--out`). A run takes a few seconds.
 
@@ -28,13 +28,15 @@ The report is written to `<character dir>/report/` (or `--out`). A run takes a f
 | `footprints.png` | Foot plant positions over the walk. |
 | `cloth.png` | Onion skin of cape and chains. Written only when the character has a cape or chains. |
 
-When the package does not load, the errors are printed and `summary.txt` contains `automated gates: ERROR` plus the
-error lines. Image files from an earlier run are not deleted in that case, so ignore stale PNGs when `summary.txt`
-says `ERROR`.
+Every run first deletes the report files of the previous run, so everything in the report directory comes from the
+current run. When the package does not load, the errors are printed and `summary.txt` contains
+`automated gates: ERROR` plus the error lines; no `metrics.json` or images are written.
 
 Load errors have the form `file: path: message`, for example
 `mannequin.json: parts[3].material: material 'steel' has no ramp in style 'bolt'; add materials['steel']`.
-All errors are listed at once. Every JSON object rejects unknown fields (`unknown field 'x'; known fields: ...`), so
+All errors found are listed at once, but cross-file errors (a name that refers to another file, rig coverage, cape
+anchors, `height` against the parts) are only checked after every file is valid on its own, so a second batch of
+errors can appear once the first is fixed. Every JSON object rejects unknown fields (`unknown field 'x'; known fields: ...`), so
 spell field names exactly as in this guide. JSON allows no comments and no trailing commas.
 
 The `report/` directory is ignored by version control.
@@ -51,9 +53,11 @@ The `report/` directory is ignored by version control.
 | Turning | A positive `degrees` in a turn turns toward +X (the character's left). |
 | Mass, time, gravity | kilograms, seconds, m/s^2 (gravity is `[0, -9.81, 0]`). |
 
-`height` in the mannequin is the standing height in metres, from the floor to the top of the highest part. It scales
-the model to pixels: the figure is `height` metres tall at 32 px and at 48 px, so one pixel is `height / 32` m in the
-small views and `height / 48` m in the large views. The walk gates measure at 48 px.
+`height` in the mannequin is the standing height in metres, from the floor to the top of the highest part. It is
+validated: it is an error when it differs by more than 10% from the span between the lowest sole point and the top of
+the highest part at rest (the message prints both numbers). It scales the model to pixels: the figure is `height`
+metres tall at 32 px and at 48 px, so one pixel is `height / 32` m in the small views and `height / 48` m in the
+large views. The walk gates measure at 48 px.
 
 For a 1.2 m character, one pixel at 32 px is 0.0375 m. Size every feature in pixels, then convert.
 
@@ -89,7 +93,7 @@ The manifest may rename any of the five other files with the keys `mannequin`, `
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `name` | non-empty string | yes | Mannequin name. |
-| `height` | number > 0 | yes | Standing height in metres (see Coordinates). |
+| `height` | number > 0 | yes | Standing height in metres: the span from the lowest sole point to the top of the highest part, within 10% (see Coordinates). |
 | `joints` | object | yes | Joint name to `[x, y, z]`, each coordinate finite with absolute value below 1e6. |
 | `parts` | array, at least one | yes | The solid shapes that make up the body. |
 | `decals` | array | no, default `[]` | Pixel details painted on the surface. |
@@ -141,11 +145,14 @@ The box length is the distance from `a` to `b`. `a` and `b` must be different jo
 
 - **Foot capsules.** For each leg in `rig.json` there must be a capsule whose `a` is the leg's `ankle` joint and whose
   `b` is its `toe` joint, in that order. It is the foot. Its radii set the sole height.
-- **Sole measurement.** The sole is the lowest point of the foot capsule. In the rest pose both must touch the floor:
-  set the ankle joint's y to the foot's `radiusA` and the toe joint's y to its `radiusB`. The toe joint must be in
-  front (larger z) of the ankle joint. A foot that does not lie flat makes the ground, slide and hover gates fail.
-- **Knees.** Place each knee joint slightly in front (larger z, 0.03 m or more) of the straight line from hip to
-  ankle, or the knee bends backwards.
+- **Sole measurement.** The two sole points of a foot are `ankle.y - radiusA` and `toe.y - radiusB`. What matters is
+  that the foot is level: these two must be equal. Their absolute height does not matter, because the gait grounds the
+  lowest sole point on the floor. The toe joint must be in front (larger z) of the ankle joint. A tilted foot rolls
+  while it is planted and makes the slide and ground gates fail.
+- **Knees.** Knees always bend forward (the IK solver decides the direction). The rest position of the knee joint
+  only sets the thigh length (hip to knee) and the shin length (knee to ankle); it does not choose which way the knee
+  bends. The two joints of each of these bones (hip and knee, knee and ankle, ankle and toe, shoulder and elbow,
+  elbow and wrist) must not be at the same position: that is a load error.
 - **Floor.** No part other than the feet may reach below y = 0: every capsule needs joint y >= its radius at that end,
   and every box corner must stay above the floor.
 - **Materials.** Each part's `material` must exist in `style.json` `materials`.
@@ -159,7 +166,7 @@ A decal paints a small pixel pattern onto the figure, for eyes, buckles, emblems
 | Field | Type | Meaning |
 |---|---|---|
 | `name` | non-empty string | Decal name. |
-| `anchor` | joint name | Where the pattern is centred. Put the joint on the visible surface of a part. |
+| `anchor` | joint name | Where the pattern is centred. Put the joint on the front surface of a part, facing `normal`. |
 | `normal` | `[x, y, z]`, non-zero | Direction the decal faces, out of the surface. |
 | `pattern` | array of equal-length strings | One string per pixel row, top row first. `.` is transparent; any other single character is a pixel whose colour comes from `style.json` `decalColors`. |
 
@@ -167,6 +174,9 @@ A decal paints a small pixel pattern onto the figure, for eyes, buckles, emblems
   48 px alike. Keep patterns tiny (1 to 5 characters wide).
 - A decal is drawn in a view only when its `normal` faces the camera by at least `decalMinFacing` (style) and its
   anchor is not hidden behind other geometry. It is skipped in the other views.
+- The anchor must sit on the front surface, within about one pixel (`height / size` m: 0.0375 m at 32 px for a 1.2 m
+  character) behind it. An anchor deeper inside a part counts as hidden and the decal never shows. For a part of
+  radius `r` centred on the axis, put the anchor `r` in front of the axis.
 - Pixels outside every part are not drawn. Decal pixels are exempt from the stray-pixel gate, so single pixels are
   allowed here.
 - Every character in a pattern except `.` needs an entry in `decalColors`.
@@ -183,13 +193,14 @@ A decal paints a small pixel pattern onto the figure, for eyes, buckles, emblems
 | `light` | `[x, y, z]`, non-zero | Direction toward the light in camera space (x right, y up, z toward the viewer). `[-0.5, 0.7, 0.5]` is a good default: light from the upper left front. |
 | `bands` | numbers in [-1, 1], strictly ascending | Brightness thresholds (dot of surface normal and light). `n` thresholds give `n + 1` shades. `[0.05, 0.6]` gives three shades. |
 | `outline` | `#rrggbb` | Silhouette colour. |
-| `outlineMode` | `"uniform"` or `"selective"`, default `"uniform"` | `uniform`: every silhouette pixel uses `outline`. `selective`: each silhouette pixel takes the darkest colour of the part it borders, which saves palette colours. |
+| `outlineMode` | `"uniform"` or `"selective"`, optional, default `"uniform"` | `uniform`: every silhouette pixel uses `outline`. `selective`: each silhouette pixel takes the darkest colour of the part it borders, which saves palette colours. |
 | `innerLineDepth` | number > 0 | Depth jump in metres between two neighbouring parts that draws a dark line between them. `0.1` to `0.12` typical. |
 | `decalMinFacing` | number in [0, 1] | Minimum facing toward the camera for a decal to show. `0.3` typical. |
 | `materials` | object, non-empty | Material name to colour ramp: an array of `#rrggbb`, **darkest first**, with exactly `bands.length + 1` colours. |
 | `decalColors` | object | Single character (not `.`) to `#rrggbb`. |
 
-Colours are six hex digits with a leading `#`. A part is shaded with its material's ramp; the darkest ramp colour also
+Every field is required except `outlineMode`; `decalColors` may be `{}` when there are no decals. Colours are six hex
+digits with a leading `#`. A part is shaded with its material's ramp; the darkest ramp colour also
 draws inner lines. These are the material names that parts refer to; they are separate from the physics materials in
 `materials.json`.
 
@@ -209,13 +220,15 @@ The rig says how the mannequin moves when it walks.
 | Field | Type | Meaning |
 |---|---|---|
 | `legs` | array of exactly 2 | One `left`, one `right`. |
-| `arms` | array | Normally one `left` and one `right`. |
+| `arms` | array | Normally one `left` and one `right`; `[]` is allowed. |
 | `pelvis` | joint name | The root joint; the body bobs with it. |
 | `upperBody` | array of joint names | Joints that move rigidly with the pelvis: chest, head, decal anchors, cape and chain anchors. |
 | `gait` | object | Walk parameters. |
 
+All five fields are required.
+
 Leg fields: `side` (`"left"` or `"right"`), `hip`, `knee`, `ankle`, `toe` (joint names). Legs use two-bone IK, so the
-thigh and shin lengths come from the rest pose and never change.
+thigh and shin lengths come from the rest pose and never change, and the knee always bends forward.
 
 Arm fields: `side`, `shoulder`, `elbow`, `wrist`, `hand` (joint names), and optional `carried`: joint names that swing
 rigidly with the arm, such as the tip of a held sword.
@@ -231,15 +244,18 @@ that is listed nowhere is an error. Decal anchors, cape anchors and chain anchor
 |---|---|---|
 | `strideLength` | above 0, at most 10 | Metres travelled per full cycle (two steps) at `referenceSpeed`. About 1.4 x leg length. |
 | `referenceSpeed` | above 0, at most 20 | m/s at which stride equals `strideLength`. Use the speed in the walk script. |
-| `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. 0.6 typical; keep below 0.7. |
-| `stepHeight` | 0 to 2 | Metres of swing-foot lift. Must clearly exceed 0.02. About 0.07 x leg length. |
+| `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. Start at 0.55; keep below 0.7. A lower value lowers knee speed. |
+| `stepHeight` | 0 to 2 | Metres of swing-foot lift. Must clearly exceed 0.02. Start at about 0.15 x leg length. A higher value raises knee speed. |
 | `bobAmplitude` | 0 to 1 | Metres of pelvis bob. 0.015 to 0.025 typical. |
 | `armSwingDegrees` | 0 to 90 | Arm swing. Left and right arms swing opposite ways. |
 | `footSpacing` | 0 to 2 | Metres between left and right foot plants. Use the distance between the hip joints. |
 | `strideExponent` | 0.2 to 1, optional, default 0.5 | How fast stride grows with speed. Stride is `strideLength * clamp((speed / referenceSpeed)^strideExponent, 0.5, 1.5)`. |
 
 Leg length is hip y minus ankle y in the rest pose. Starting values: `strideLength` 1.4 x leg length, `footSpacing`
-hip distance, `stepHeight` 0.07 x leg length, `stanceFraction` 0.6, `bobAmplitude` 0.015, `armSwingDegrees` 20.
+hip distance, `stepHeight` roughly 0.15 x leg length, `stanceFraction` 0.55, `bobAmplitude` 0.015,
+`armSwingDegrees` 20. `stepHeight` and `stanceFraction` trade off: a foot that is lifted too little slides at
+lift-off and touch-down (fix: raise `stepHeight`), and a high `stepHeight` makes the knee flex fast (fix: lower
+`stanceFraction`, or lengthen the stride a little). Walking slower does not reliably lower knee speed.
 
 ## materials.json
 
@@ -308,7 +324,7 @@ Speed changes toward each move's target over `accelSeconds`. Rules:
   "segments": [
     { "action": "move", "speed": 0.9, "duration": 3 },
     { "action": "turn", "degrees": 90, "duration": 1 },
-    { "action": "move", "speed": 0.9, "duration": 2 },
+    { "action": "move", "speed": 0.9, "duration": 2.5 },
     { "action": "hold", "duration": 1 }
   ]
 }
@@ -320,7 +336,7 @@ A grid of cloth particles hung from two joints and pulled down by gravity.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `anchorLeft`, `anchorRight` | joint names | Top corners. Must be different joints at different positions, and listed in `rig.upperBody`. Put them on the shoulders or upper back, slightly outside the body so the cloth hangs clear. |
+| `anchorLeft`, `anchorRight` | joint names | Top corners. Must be different joints at different positions. Both must be `rig.pelvis` or listed in `rig.upperBody`, because the cloth is pinned to the body as one rigid piece; an anchor on a leg or arm joint is an error. Put them on the shoulders or upper back, slightly outside the body so the cloth hangs clear. |
 | `columns`, `rows` | integers 2 to 64 | Grid size. 4 to 8 is enough at pixel-art scale. |
 | `length` | number > 0 | Cape drop in metres. |
 | `material` | string | A name in `materials.json`. |
@@ -329,7 +345,8 @@ A grid of cloth particles hung from two joints and pulled down by gravity.
 
 Each chain: `anchor` (joint name, listed in the rig), `links` (integer 1 to 64), `linkLength` (metres, above 0),
 `direction` (`[x, y, z]`, non-zero, the initial direction the chain points from the anchor), `material` (name in
-`materials.json`). Total length is `links * linkLength`.
+`materials.json`). Total length is `links * linkLength`. The first two particles are pinned to the anchor joint, so the
+first link always points along `direction` relative to the body, however the chain is meant to hang.
 
 ### wind
 
@@ -339,6 +356,8 @@ Each chain: `anchor` (joint name, listed in the rig), `links` (integer 1 to 64),
 
 - A part drawn only as a stand-in for a cape or chain (so you can see it in the views) collides with the cloth that
   represents it; list it in `exclude`.
+- The cloth collides with the body parts but has no floor collision. When the bottom rows of the cape hit the legs or
+  feet (`penetratingFrames` with the deepest point in a leg or foot), shorten the cape `length`.
 - Without `cape` and `chains`, the cloth gates are skipped and the summary header says so.
 
 ## Gates
@@ -356,17 +375,20 @@ degrees, in eight directions (32 views).
 | `paletteSize` | <= 16 | Distinct colours over all views. |
 | `maxStrayPixels` | <= 2 | Isolated single pixels (not decals) in the worst view. |
 
-- **outlineGaps.** The camera frames the extents of all parts. A part far above or below the figure, or a very large
-  outlier, makes this fail. Check that the highest point of any part is close to `height` and the lowest is at y = 0.
+- **outlineGaps.** The camera fits every part, so this gate never fails for a package that loads. If it does, report
+  it as a bug rather than changing the character.
 - **maxThinFraction.** A part that is one pixel wide flickers and vanishes. At 32 px a part must be at least 2 px
   across, which is `height / 16` metres (0.075 m for a 1.2 m character); aim for 3 px (`3 * height / 32`). For a
-  capsule use `2 * radius`; for a box use the smaller of `width` and `thickness`. Parts with fewer than 4 pixels in a
-  view are ignored. A part also counts as thin where another part in front covers its sides, so an arm that hangs
-  against the torso or a hand hidden behind a thigh fails even if it is wide enough: move limbs outward away from the
-  body, or make the end part bigger. For something meant to be a line, set `allowThin: true`.
+  capsule use `2 * radius` (of the thinner end); for a box use the smaller of `width` and `thickness`. Parts with fewer
+  than 4 visible pixels in a view are ignored. A side covered by a part in front is not an edge, so hiding a wide part
+  behind another does not make it thin. What fails is a 1-px strip of a part that is still visible past a part in front
+  of it (a foot peeking out under a shin in the back view, a hand beside a thigh). The hint names the part and the
+  one in front. Show more of the strip (move the part outward or enlarge it), hide it completely (under 4 visible
+  pixels it is ignored), or set `allowThin: true`. For something meant to be a line, set `allowThin: true`.
 - **paletteSize.** Every distinct colour counts: ramp colours that appear, decal colours, and the outline colour
-  (`selective` mode usually uses fewer). Fix by sharing materials between parts, removing unused ramp colours, using
-  two bands instead of three, or using fewer decal colours.
+  (`selective` mode usually uses fewer). Fix by sharing materials between parts, using one fewer band (this
+  removes one colour from every ramp), or using fewer decal colours. Every ramp needs exactly `bands.length + 1`
+  colours, so you cannot drop a single colour from one ramp.
 - **maxStrayPixels.** Isolated pixels come from parts smaller than a pixel or mostly hidden behind a neighbour. Make
   them larger, merge them into a neighbouring part, or draw them as a decal.
 
@@ -380,7 +402,7 @@ The walk is simulated with your rig, then measured at 48 px (one pixel is `heigh
 | `groundPenetrationPx` | <= 0.5 | Deepest the sole goes below y = 0. |
 | `partGroundPenetrationPx` | <= 0.5 | Deepest any non-foot part goes below y = 0. |
 | `reachViolations` | = 0 | Frames where a foot target was beyond the leg's reach and the leg was clamped straight. |
-| `kneeLimitViolations` | = 0 | Frames with knee flexion outside 0 to 150 degrees, or a backward-bending knee. |
+| `kneeLimitViolations` | = 0 | Knee-frames, counted over both legs, with flexion outside 0 to 150 degrees. |
 | `kneeSpeedDegPerSec` | <= 600 | Peak knee bending speed. |
 | `boneLengthError` | <= 0.01 | Relative change of limb bone lengths. |
 | `rootSpeedError` | <= 0.05 | Relative difference between foot-measured speed and the script speed in steady windows. |
@@ -390,21 +412,26 @@ The walk is simulated with your rig, then measured at 48 px (one pixel is `heigh
 
 Usual fixes:
 
-- **footSlidePx, groundPenetrationPx, plantedFrames, unsupportedFrames.** First check the sole measurement: ankle y
-  equals foot `radiusA`, toe y equals foot `radiusB`. The hint prints the actual sole heights at rest; both must be 0.
-  If the feet are flat, shorten `strideLength` or `footSpacing`, lower `stepHeight` or `bobAmplitude`.
+- **footSlidePx.** First check that the foot is level: `ankle.y - radiusA` must equal `toe.y - radiusB` (the hint
+  prints both). If it is level, the usual fix is to raise `stepHeight` (start at about 0.15 x leg length; the slide
+  happens at lift-off and touch-down when the foot barely leaves the floor). Raising `stepHeight` raises knee speed,
+  which a lower `stanceFraction` offsets. Changing `strideLength` is unreliable.
+- **groundPenetrationPx, plantedFrames, unsupportedFrames.** Check that the foot is level, then lower
+  `bobAmplitude` or `stepHeight`.
 - **partGroundPenetrationPx.** A part (a dragged sword tip, a low hand, a hem) reaches the floor. Raise its joints in
   the mannequin, or reduce `bobAmplitude` and `armSwingDegrees`.
 - **reachViolations.** The stride asks the legs to reach too far. Shorten `strideLength`, `footSpacing` or
   `bobAmplitude`, or lengthen the legs.
-- **kneeLimitViolations.** Backward knee: move the knee joint forward (larger z) of the hip-ankle line at rest.
-  Overbent knee: lower `stepHeight` or lengthen the legs.
-- **kneeSpeedDegPerSec.** Lower `stepHeight`, lower `stanceFraction` (longer, slower swing), or walk slower. Short
-  legs with a high step height are the usual cause.
+- **kneeLimitViolations.** The value counts knee-frames over both legs. Knees always bend forward, so this is an
+  overbent knee: lower `stepHeight` or lengthen the legs.
+- **kneeSpeedDegPerSec.** Lower `stanceFraction` (longer, slower swing; 0.5 is the minimum) or lengthen the stride a
+  little. A higher `stepHeight` raises knee speed; lower it only if the slide and alternation gates still pass.
+  Walking slower does not reliably help. Short legs with a high step height are the usual cause.
 - **boneLengthError.** A joint of a limb is also listed elsewhere (for example in `upperBody` or `carried`), or two
   joints of a limb are at the same position.
-- **rootSpeedError.** Feet must plant at least twice inside a steady window. Lengthen the `move` segment (at least
-  2.5 cycles after `accelSeconds`) or shorten `strideLength`.
+- **rootSpeedError.** Feet must plant at least twice inside a steady window. If the window is shorter than 2.5
+  cycles, lengthen the `move` segment (or shorten `strideLength`). If the window is already long enough and the value
+  is `Infinity`, the feet never rise above 2 cm, so raise `stepHeight`.
 - **alternationViolations.** The swing foot does not rise enough to count as a step: raise `stepHeight` well above
   0.02 m and keep `stanceFraction` below 0.7.
 
@@ -421,8 +448,11 @@ Evaluated only when there is a cape or at least one chain.
 
 - **nonFinite, maxSpeed, maxStrain.** Raise `substeps` (double it), raise material `damping`, lower
   `stretchCompliance`, lower `particleMass`, or shorten a light cape.
-- **penetratingFrames.** If the part the cloth is inside is a stand-in for the cloth, add it to `exclude`. Otherwise
-  move the cape anchors outward or lengthen the cape so it hangs clear of the body.
+- **penetratingFrames.** If the part the cloth is inside is a stand-in for the cloth, add it to `exclude`. If the
+  deepest point is in the bottom rows and inside a leg or foot, shorten the cape `length` (the cloth has no floor
+  collision). Otherwise move the cape anchors outward so the cloth starts clear of the body.
+- **maxSpeed at the start.** When frame 0 already penetrates and the fastest particle is in the first frames, the
+  cloth starts inside a part: move the cape anchors outward rather than raising `substeps`.
 
 ## Complete example
 
@@ -533,8 +563,8 @@ A 1.2 m robot with a chain antenna, written to pass every gate. Create these six
   "gait": {
     "strideLength": 0.6,
     "referenceSpeed": 0.9,
-    "stanceFraction": 0.6,
-    "stepHeight": 0.05,
+    "stanceFraction": 0.55,
+    "stepHeight": 0.055,
     "bobAmplitude": 0.015,
     "armSwingDegrees": 20,
     "footSpacing": 0.16
@@ -560,7 +590,7 @@ A 1.2 m robot with a chain antenna, written to pass every gate. Create these six
     "segments": [
       { "action": "move", "speed": 0.9, "duration": 3 },
       { "action": "turn", "degrees": 90, "duration": 1 },
-      { "action": "move", "speed": 0.9, "duration": 2 },
+      { "action": "move", "speed": 0.9, "duration": 2.5 },
       { "action": "hold", "duration": 1 }
     ]
   },
@@ -582,27 +612,27 @@ PASS  outlineGaps: 0 <= 0
 PASS  maxThinFraction: 0.200 <= 0.25
 PASS  paletteSize: 11 <= 16
 PASS  maxStrayPixels: 2 <= 2
-PASS  footSlidePx: 0.081 <= 0.25
+PASS  footSlidePx: 0.017 <= 0.25
 PASS  groundPenetrationPx: 0.000 <= 0.5
 PASS  partGroundPenetrationPx: 0 <= 0.5
 PASS  reachViolations: 0 <= 0
 PASS  kneeLimitViolations: 0 <= 0
-PASS  kneeSpeedDegPerSec: 552.803 <= 600
+PASS  kneeSpeedDegPerSec: 548.254 <= 600
 PASS  boneLengthError: 0.000 <= 0.01
-PASS  rootSpeedError: 0.015 <= 0.05
+PASS  rootSpeedError: 0.000 <= 0.05
 PASS  unsupportedFrames: 0 <= 0
 PASS  alternationViolations: 0 <= 0
-PASS  plantedFrames.left: 186 >= 1
-PASS  plantedFrames.right: 176 >= 1
+PASS  plantedFrames.left: 178 >= 1
+PASS  plantedFrames.right: 181 >= 1
 PASS  nonFinite: 0 <= 0
-PASS  maxSpeed: 2.670 <= 15
-PASS  maxStrain: 0.067 <= 0.1
+PASS  maxSpeed: 2.762 <= 15
+PASS  maxStrain: 0.065 <= 0.1
 PASS  penetratingFrames: 0 <= 0.01
 automated gates: PASS
 ```
 
 Things this example shows: the feet are capsules from ankle to toe with the ankle at the foot's `radiusA` height
-(0.06) and the toe at `radiusB` height (0.04); knees sit 0.03 m in front of the hip-ankle line; every joint
+(0.06) and the toe at `radiusB` height (0.04), so the foot is level; the knees sit 0.03 m in front of the hip-ankle line (this only sets the thigh and shin lengths; knees always bend forward); every joint
 (including eye, lamp and antenna joints) is listed exactly once in the rig; the thin `antenna` part has
 `allowThin: true` and is listed in `exclude` because the chain represents it; hands are larger than the forearms and
 the arms hang away from the torso so they are not hidden in side views.

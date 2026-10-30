@@ -16,7 +16,7 @@ import type { System } from '../../src/sim/cloth.ts'
 import { step } from '../../src/sim/solver.ts'
 import * as metrics from '../../src/sim/metrics.ts'
 import type { Recording, SwingOptions } from '../../src/sim/metrics.ts'
-import { angleChart, sideOnionSkin, topDownTrace } from '../../src/diagnostics/motion-images.ts'
+import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../../src/diagnostics/motion-images.ts'
 import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { gate, MATERIALS } from './gates.ts'
@@ -28,6 +28,9 @@ const PX_SCALE = 48
 const STILL_SIZE = 384
 const CHART = { width: 640, height: 280 }
 const MAX_ONION_FRAMES = 60
+const BODY_STEP = 4
+const STOP_STEP = 2
+const FOLLOW_SECONDS = 1.5
 const CHILD_TIMEOUT_MS = 120000
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -254,6 +257,24 @@ function rigidRecording (run: Run): Recording {
   return { constraints: system.constraints, frames }
 }
 
+function frameRange (run: Run, fromTime: number, step: number): number[] {
+  const fps = run.scenario.fps
+  const last = run.recording.frames.length - 1
+  const end = Math.min(last, Math.round((finalHold(run.scenario) + FOLLOW_SECONDS) * fps))
+  const indices: number[] = []
+  for (let i = Math.round(fromTime * fps); i <= end; i += step) indices.push(i)
+  return indices
+}
+
+function writeBodyFrameStills (run: Run, prefix: string, recording: Recording): void {
+  const body = bodies.get(run.scenario.name) as Mannequin
+  const base = { size: STILL_SIZE, body, exclude: run.scenario.bodyExcludeParts }
+  const whole = frameRange(run, turnWindow(run.scenario).turnStart, BODY_STEP)
+  const stop = frameRange(run, finalHold(run.scenario), STOP_STEP)
+  writeOutput(join(outDir, `${prefix}-body.png`), encodePng(bodyFrameOnionSkin(recording, { ...base, frames: whole })))
+  writeOutput(join(outDir, `${prefix}-stop.png`), encodePng(bodyFrameOnionSkin(recording, { ...base, frames: stop })))
+}
+
 function writeStills (run: Run): void {
   const body = bodies.get(run.scenario.name) as Mannequin
   const exclude = run.scenario.bodyExcludeParts
@@ -264,7 +285,9 @@ function writeStills (run: Run): void {
   writeOutput(join(outDir, `${run.id}-side.png`), encodePng(sideOnionSkin(run.recording, onion)))
   writeOutput(join(outDir, `${run.id}-angles.png`),
     encodePng(angleChart(run.recording, { ...CHART, swing: run.swing })))
+  if (run.scenario.name === 'turn-stop') writeBodyFrameStills(run, run.id, run.recording)
   if (run.id === 'turn-stop-silk') {
+    writeBodyFrameStills(run, 'turn-stop-rigid', rigidRecording(run))
     writeOutput(join(outDir, 'turn-stop-rigid-side.png'), encodePng(sideOnionSkin(rigidRecording(run), onion)))
   }
 }

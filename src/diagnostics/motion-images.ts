@@ -10,6 +10,7 @@ import { disc, line, plot } from './draw.ts'
 
 const BACKGROUND = 0xf7f7f7
 const BODY_NEW = 0x333333
+const BODY_LOCAL = 0x444444
 const BODY_OLD = 0xd0d0d0
 const CAPE_NEW = 0xd94801
 const CAPE_OLD = 0xfdd0a2
@@ -167,6 +168,48 @@ export function sideOnionSkin (recording: Recording, options: OnionOptions): Ima
       const [x0, y0] = pixel(view, positions[3 * a + axis], -positions[3 * a + 1])
       const [x1, y1] = pixel(view, positions[3 * b + axis], -positions[3 * b + 1])
       line(img, x0, y0, x1, y1, rgb)
+    }
+  })
+  return img
+}
+
+export type BodyFrameOptions = { size: number, frames: number[], body: Mannequin, exclude: string[] }
+
+function toLocal (positions: Float64Array, root: RootState): Array<[number, number]> {
+  const c = Math.cos(root.yaw)
+  const s = Math.sin(root.yaw)
+  const local: Array<[number, number]> = []
+  for (let p = 0; p < positions.length; p += 3) {
+    const dx = positions[p] - root.position[0]
+    const dz = positions[p + 2] - root.position[2]
+    local.push([dx * s + dz * c, -(positions[p + 1] - root.position[1])])
+  }
+  return local
+}
+
+/** Side view in the body's local frame (z right, y up): static silhouette, cape constraints of chosen frames. */
+export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOptions): Image {
+  const { frames } = recording
+  const shown = options.frames.map(i => ({ index: i, local: toLocal(frames[i].positions, frames[i].root) }))
+  const view = fit([[0, 0], [0, -options.body.height], ...shown.flatMap(f => f.local)], options.size)
+  const img = blank(options.size)
+  const identity: RootState = { position: [0, 0, 0], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 }
+  const collider = bodyCollider(options.body, options.exclude, identity)
+  fillBody(img, view, {
+    distance: collider.distance,
+    toPoint: (a, b, s) => [s, -b, a],
+    depths: steps(-BODY_MARGIN, BODY_MARGIN, 9),
+    rgb: BODY_LOCAL
+  })
+  shown.forEach(({ local }, order) => {
+    const t = shown.length === 1 ? 1 : order / (shown.length - 1)
+    const rgb = lerpColour(CAPE_OLD, CAPE_NEW, t)
+    for (const { a, b } of recording.constraints) {
+      const [x0, y0] = pixel(view, local[a][0], local[a][1])
+      const [x1, y1] = pixel(view, local[b][0], local[b][1])
+      line(img, x0, y0, x1, y1, rgb)
+      line(img, x0 + 1, y0, x1 + 1, y1, rgb)
+      line(img, x0, y0 + 1, x1, y1 + 1, rgb)
     }
   })
   return img

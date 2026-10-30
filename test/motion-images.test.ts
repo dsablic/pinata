@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import type { Recording } from '../src/sim/metrics.ts'
-import { angleChart, sideOnionSkin, topDownTrace } from '../src/diagnostics/motion-images.ts'
+import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../src/diagnostics/motion-images.ts'
 
 const body: Mannequin = {
   name: 'test',
@@ -48,6 +48,44 @@ test('sideOnionSkin draws a body silhouette and the cape', () => {
   const img = sideOnionSkin(walk(), { size: 128, every: 4, body, exclude: [], horizontal: 'x' })
   assert.equal(img.width, 128)
   assert.ok(dark(img) > 50)
+})
+
+function fixedInBody (): Recording {
+  const frames = []
+  for (let i = 0; i < 8; i++) {
+    const yaw = i * 0.3
+    const position: Vec3 = [i * 0.5, 0, i * 0.2]
+    const local = [0, 1.5, -0.4, 0, 0.6, -0.9]
+    const c = Math.cos(yaw)
+    const s = Math.sin(yaw)
+    const positions = new Float64Array(6)
+    for (let k = 0; k < 6; k += 3) {
+      positions[k] = position[0] + local[k] * c + local[k + 2] * s
+      positions[k + 1] = local[k + 1]
+      positions[k + 2] = position[2] - local[k] * s + local[k + 2] * c
+    }
+    frames.push({
+      time: i / 24,
+      root: { position, yaw, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 },
+      positions,
+      penetration: new Float64Array(2)
+    })
+  }
+  return { constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }], frames }
+}
+
+test('bodyFrameOnionSkin draws the body silhouette at the requested size', () => {
+  const img = bodyFrameOnionSkin(fixedInBody(), { size: 128, frames: [0], body, exclude: [] })
+  assert.equal(img.width, 128)
+  assert.equal(img.height, 128)
+  assert.ok(dark(img) > 50)
+})
+
+test('bodyFrameOnionSkin collapses a cape fixed in body space to one shape', () => {
+  const rigid = fixedInBody()
+  const one = bodyFrameOnionSkin(rigid, { size: 128, frames: [7], body, exclude: [] })
+  const many = bodyFrameOnionSkin(rigid, { size: 128, frames: [0, 1, 2, 3, 4, 5, 6, 7], body, exclude: [] })
+  assert.deepEqual(many.data, one.data)
 })
 
 test('angleChart plots swing and yaw into an image of the requested size', () => {

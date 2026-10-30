@@ -66,6 +66,7 @@ gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a pla
 ## Further reading
 
 - [`docs/FINDINGS.md`](docs/FINDINGS.md): everything the proofs established, in one page.
+- [`docs/TODO.md`](docs/TODO.md): current state and the next tasks, for picking the work up later.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): what the proofs showed and the plan for building the tool.
 - [`docs/authoring.md`](docs/authoring.md): how to write a character package.
 - [`docs/plans/2026-10-30-viability-design.md`](docs/plans/2026-10-30-viability-design.md): requirements, components, proofs and the AI judge panel method.

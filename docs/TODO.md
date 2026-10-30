@@ -54,9 +54,6 @@ before building.
 ## Smaller items
 
 - [ ] Rigid-body behaviours in the engine (needed by P8 anyway): root with full 3D orientation, `hang`, scripted `hit`.
-- [ ] Judge tooling in TypeScript: replace `docs/plans/p1-judge/build.mjs` and `score.mjs` and the ad hoc
-      ImageMagick packet building with a `judge` module (correct spacing between images; neutral names; keys;
-      controls).
 - [ ] Stray pixels left after the outline fix: single pixels of `allowThin` parts peeking past their neighbours
       (the unicorn's mane and ears; the author opted into thin parts, so they are left alone) and a few isolated
       outline pixels (knight, spider).

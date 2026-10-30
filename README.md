@@ -41,6 +41,7 @@ npm run p3          # P3: simulate cape and plume in three scenarios per materia
 npm run p2          # P2, p4, p6 and skins likewise; see package.json
 npm run check -- examples/knight   # check a character package (see docs/authoring.md)
 npm run new -- --template hexapod my-bug   # write a starter package (biped, quadruped, hexapod or octopod)
+npm run judge -- build panel.json packet/ key.json   # blind judge panel (see docs/judging.md)
 npm run demo        # render the walking piñata demo (animated PNG and frames) to reports/demo/
 npm run skins -- pocs/skins-spike/artist-skin.json   # render the knight with AI-drawn part sprites
 npm run p1:verify   # same as p1 plus the determinism re-run; likewise p2:verify, p3:verify, p4:verify, p6:verify

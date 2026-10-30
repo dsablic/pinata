@@ -36,7 +36,8 @@
     "skins": "node pocs/skins-spike/run.ts",
     "demo": "node pocs/demo-pinata/run.ts",
     "check": "node src/cli/check.ts",
-    "new": "node src/cli/new.ts"
+    "new": "node src/cli/new.ts",
+    "judge": "node src/cli/judge.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

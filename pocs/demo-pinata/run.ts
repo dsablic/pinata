@@ -82,7 +82,7 @@ function render (): Image[] {
   const cam = camera(character.mannequin)
   const images: Image[] = []
   let previous: GBuffer | undefined
-  const count = Math.min(run.frames.length, Number(process.env.DEMO_FRAMES ?? Infinity))
+  const count = Math.min(run.frames.length, SETTLE_FRAMES + demoFrames())
   for (let frame = SETTLE_FRAMES; frame < count; frame++) {
     const m = frameMannequin(run, joints, frame)
     const g = rasterize(m, cam, SAMPLES, previous)
@@ -93,10 +93,21 @@ function render (): Image[] {
   return images
 }
 
+/** Frames to render after the settle frames: DEMO_FRAMES, a whole number of at least 1, or all of them. */
+function demoFrames (): number {
+  const value = process.env.DEMO_FRAMES
+  if (value === undefined) return Infinity
+  const frames = Number(value)
+  if (!Number.isInteger(frames) || frames < 1) {
+    throw new Error(`DEMO_FRAMES must be a whole number of frames, 1 or more; got '${value}'`)
+  }
+  return frames
+}
+
 function contactStrip (images: Image[]): Image {
-  const step = Math.floor(images.length / STRIP.frames)
+  const step = Math.max(1, Math.floor(images.length / STRIP.frames))
   const cells = Array.from({ length: STRIP.frames }, (_, i) => ({
-    image: images[i * step], anchor: [0, 0] as [number, number]
+    image: images[Math.min(images.length - 1, i * step)], anchor: [0, 0] as [number, number]
   }))
   const columns = STRIP.frames / 2
   const rows = [cells.slice(0, columns), cells.slice(columns)]

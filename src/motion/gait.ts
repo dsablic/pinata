@@ -8,7 +8,7 @@ import { soleHeight } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState } from './script.ts'
 
-export type FootState = { side: 'left' | 'right', ankle: Vec3, toeYaw: number, planted: boolean, lift: number }
+export type FootState = { side: 'left' | 'right', ankle: Vec3, toeYaw: number, planted: boolean, lift: number, toePitch: number }
 export type GaitFrame = {
   root: RootState
   pelvisOffset: Vec3
@@ -33,9 +33,14 @@ const REST_EPSILON = 1e-9
 const PHASE_EPSILON = 1e-9
 const REACH_FRACTION = 0.95
 const DROP_SMOOTHING_SECONDS = 0.125
+const SWING_EDGE = 0.1
 
 function smoothstep (x: number): number {
   return x * x * (3 - 2 * x)
+}
+
+function swingEase (s: number): number {
+  return Math.min(1, Math.max(0, (s - SWING_EDGE) / (1 - 2 * SWING_EDGE)))
 }
 
 function lateral (yaw: number): Vec3 {
@@ -154,17 +159,25 @@ function footAt (foot: Foot, phase: number, options: Options): FootState {
   const next = foot.plants[k + 1]
   const liftOff = plant.phase + stanceFraction
   if (next === undefined || phase <= liftOff) {
-    return { side: foot.side, ankle: plant.ankle, toeYaw: plant.yaw, planted: true, lift: 0 }
+    return { side: foot.side, ankle: plant.ankle, toeYaw: plant.yaw, planted: true, lift: 0, toePitch: 0 }
   }
   const s = Math.min(1, (phase - liftOff) / (1 - stanceFraction))
-  const h = smoothstep(s)
+  const e = swingEase(s)
+  const h = smoothstep(e)
   const lift = Math.sin(Math.PI * s)
   const ankle: Vec3 = [
     plant.ankle[0] + (next.ankle[0] - plant.ankle[0]) * h,
     plant.ankle[1] + (next.ankle[1] - plant.ankle[1]) * h + stepHeight * lift,
     plant.ankle[2] + (next.ankle[2] - plant.ankle[2]) * h
   ]
-  return { side: foot.side, ankle, toeYaw: plant.yaw + (next.yaw - plant.yaw) * h, planted: false, lift }
+  return {
+    side: foot.side,
+    ankle,
+    toeYaw: plant.yaw + (next.yaw - plant.yaw) * h,
+    planted: false,
+    lift,
+    toePitch: Math.sin(Math.PI * e)
+  }
 }
 
 function neededOffset (foot: Foot, state: FootState, root: RootState): number {

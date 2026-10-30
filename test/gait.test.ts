@@ -174,3 +174,34 @@ test('planted feet put the lowest sole point on the ground', () => {
   }
   assert.ok(planted > 100)
 })
+
+test('a swing foot moves only vertically during the first and last tenth of the swing', () => {
+  const frames = plan(walkTrack(1, 4), 6)
+  const { stanceFraction } = rig.gait
+  let edges = 0
+  for (const [k, offset] of [0, 0.5].entries()) {
+    let start: Vec3 | undefined
+    let run: number[] = []
+    for (let i = 0; i < frames.length; i++) {
+      const foot = frames[i].feet[k]
+      if (!foot.planted) {
+        run.push(i)
+        continue
+      }
+      if (run.length > 0 && start !== undefined) {
+        for (const j of run) {
+          const s = (((frames[j].phase + offset) % 1) - stanceFraction) / (1 - stanceFraction)
+          const expected = s < 0.1 ? start : s > 0.9 ? foot.ankle : undefined
+          if (expected === undefined) continue
+          edges++
+          assertClose(frames[j].feet[k].ankle[0], expected[0], 1e-9)
+          assertClose(frames[j].feet[k].ankle[2], expected[2], 1e-9)
+          assertClose(frames[j].feet[k].toePitch, 0, 1e-9)
+        }
+      }
+      run = []
+      start = foot.ankle
+    }
+  }
+  assert.ok(edges >= 6, `edge frames: ${edges}`)
+})

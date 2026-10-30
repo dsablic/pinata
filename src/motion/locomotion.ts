@@ -55,7 +55,7 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
     })
     if (result.clamped) clamped++
     const flat = sub(rest[leg.toe], rest[leg.ankle])
-    const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.lift), foot.toeYaw - frame.root.yaw)
+    const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.toePitch), foot.toeYaw - frame.root.yaw)
     pose[leg.hip] = hip
     pose[leg.knee] = result.knee
     pose[leg.ankle] = result.end

@@ -3,7 +3,10 @@ import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Chain, SimMaterial, Wind } from '../src/formats/sim.ts'
 import { createRootTrack } from '../src/motion/script.ts'
+import type { Pose } from '../src/motion/pose.ts'
+import { restPose } from '../src/motion/pose.ts'
 import type { RootState, Script } from '../src/motion/script.ts'
+import type { Vec3 } from '../src/math/vec.ts'
 import { anchorWorld, bodyCollider, toWorld } from '../src/sim/body.ts'
 import { buildChain } from '../src/sim/cloth.ts'
 import type { System } from '../src/sim/cloth.ts'
@@ -186,4 +189,43 @@ test('damping acts on the velocity relative to the moving body only', () => {
   assertClose(p[2] / DT, -1, 1e-9)
   assertClose((p[3] - 2) / DT, 0.5, 1e-9)
   assertClose(p[5] / DT, -0.5, 1e-9)
+})
+
+function frozen (pose: Pose): (t: number) => Pose {
+  return () => pose
+}
+
+test('a rest pose function gives byte-identical results to no pose function', () => {
+  const wind: Wind = { direction: [1, 0, 0.5], speed: 4, gust: 0.5 }
+  const a = chain(6, [1, 0, 0], { ...rope, drag: 0.02 })
+  const b = chain(6, [1, 0, 0], { ...rope, drag: 0.02 })
+  run(a, { wind }, 1)
+  const pose = frozen(restPose(body))
+  for (let k = 1; k <= Math.round(1 / DT); k++) {
+    step(b, { env: { ...env, wind }, body, exclude: [], track: stillTrack, pose, t: k * DT, dt: DT })
+  }
+  assert.ok(Buffer.from(a.particles.position.buffer).equals(Buffer.from(b.particles.position.buffer)))
+})
+
+test('a pin on a joint that the pose moves follows it', () => {
+  const system = chain(2, [0, -1, 0], rope)
+  const moved: Pose = { ...restPose(body), top: [0.3, 2.5, -0.2] }
+  step(system, { env, body, exclude: [], track: stillTrack, pose: frozen(moved), t: DT, dt: DT })
+  const p = system.particles.position
+  assertClose(p[0], 0.3, 1e-9)
+  assertClose(p[1], 2.5, 1e-9)
+  assertClose(p[2], -0.2, 1e-9)
+})
+
+test('a particle resting on a part that the pose moves is pushed with it', () => {
+  const system = freeParticle(0.05, { damping: 1000, drag: 0 })
+  system.particles.position.set([0.55, 0, 0, 5, 5, 5])
+  system.particles.previous.set(system.particles.position)
+  const frame = (t: number): number => Math.ceil(t / (1 / 24) - 1e-9)
+  const poses = Array.from({ length: 25 }, (_, i) => ({ ...restPose(body), origin: [0.3 * i / 24, 0, 0] as Vec3 }))
+  const pose = (t: number): Pose => poses[frame(t)]
+  for (let k = 1; k <= 240; k++) {
+    step(system, { env: { ...env, gravity: [0, 0, 0] }, body, exclude: [], track: stillTrack, pose, t: k * DT, dt: DT })
+  }
+  assertClose(system.particles.position[0], 0.3 + 0.5 + env.particleRadius, 1e-3)
 })

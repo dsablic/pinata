@@ -4,6 +4,7 @@ import { compile } from '../raster/gbuffer.ts'
 import type { Primitive } from '../raster/gbuffer.ts'
 import { normalize } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
+import type { Pose } from '../motion/pose.ts'
 
 export type Collider = { distance: (p: Vec3) => number, normal: (p: Vec3) => Vec3 }
 
@@ -36,8 +37,26 @@ function localDistance (parts: Primitive[], p: Vec3): number {
   return best
 }
 
+export function compileParts (m: Mannequin, exclude: string[]): Primitive[] {
+  return m.parts.filter(part => !exclude.includes(part.name)).map(part => compile(m, part))
+}
+
+const posedCache = new WeakMap<Pose, { exclude: string[], parts: Primitive[] }>()
+
+/** Compiled parts of the mannequin in `pose`, cached by the identity of the pose object. */
+export function posedParts (m: Mannequin, exclude: string[], pose: Pose): Primitive[] {
+  const cached = posedCache.get(pose)
+  if (cached !== undefined && cached.exclude === exclude) return cached.parts
+  const parts = compileParts({ ...m, joints: pose }, exclude)
+  posedCache.set(pose, { exclude, parts })
+  return parts
+}
+
 export function bodyCollider (m: Mannequin, exclude: string[], root: RootState): Collider {
-  const parts = m.parts.filter(part => !exclude.includes(part.name)).map(part => compile(m, part))
+  return partsCollider(compileParts(m, exclude), root)
+}
+
+export function partsCollider (parts: Primitive[], root: RootState): Collider {
   const c = Math.cos(root.yaw)
   const s = Math.sin(root.yaw)
   const toLocal = (p: Vec3): Vec3 => {

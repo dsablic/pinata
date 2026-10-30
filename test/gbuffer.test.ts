@@ -43,3 +43,32 @@ test('the nearer part wins where parts overlap', () => {
   const g = rasterize(two, camera)
   assert.equal(g.part[9 * g.width + 9], 1)
 })
+
+test('a thin box seen at a grazing angle has no holes and a symmetric silhouette', () => {
+  const thin: Mannequin = {
+    name: 'thin',
+    height: 1,
+    joints: { a: [-0.4, 0.5, -0.032], b: [0.4, 0.5, 0.032] },
+    parts: [{
+      name: 'blade',
+      shape: 'box',
+      a: 'a',
+      b: 'b',
+      width: 0.6,
+      thickness: 0.06,
+      rounding: 0.01,
+      widthAxis: [0, 1, 0],
+      material: 'm'
+    }],
+    decals: []
+  }
+  const cam = makeCamera({ azimuthDeg: 90, elevationDeg: 0, targetHeightPx: 200, modelHeight: 1, margin: 2 })
+  const g = rasterize(thin, cam, 2)
+  for (let y = 0; y < g.height; y++) {
+    const row = Array.from(g.part.subarray(y * g.width, (y + 1) * g.width), p => p !== EMPTY)
+    const first = row.indexOf(true)
+    if (first === -1) continue
+    assert.ok(row.slice(first, row.lastIndexOf(true) + 1).every(Boolean), `row ${y} has a hole`)
+    assert.deepEqual(row, row.toReversed(), `row ${y} is not symmetric about the centre`)
+  }
+})

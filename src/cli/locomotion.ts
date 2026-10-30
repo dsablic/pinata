@@ -18,6 +18,7 @@ const MIN_STEP_FACTOR = 0.1
 const TILT_METRES = 0.01
 const MAX_UNNAMED_LEGS = 4
 const MIN_BALANCED_LEGS = 5
+const STRAIGHT_REST_DEGREES = 25
 
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
@@ -260,10 +261,24 @@ function kneeSpeedHint (ctx: Context): string {
   const speeds = metrics.jointSpeedsDegPerSec(ctx.recording, legGeometry(ctx.character, worst.leg))
   const fastest = speeds.reduce((a, b) => b.value > a.value ? b : a)
   return `the ${worst.label} ${jointWord(worst.leg, fastest.joint)} flexes at ${worst.value.toFixed(0)} degrees/s in ` +
-    `${at(ctx, worst.frame)}, which reads as a pop. Lower rig.gait.stanceFraction (now ${gait.stanceFraction}, ` +
-    `minimum ${stanceFloor(ctx)}; a smaller value gives a longer, slower swing) or lengthen strideLength (now ` +
-    `${gait.strideLength}). A higher stepHeight (now ${gait.stepHeight}) raises joint speed, but lowering it can ` +
-    'bring back foot slide; walking slower does not reliably help.'
+    `${at(ctx, worst.frame)}, which reads as a pop. ${restBendAdvice(ctx, worst.leg, fastest.joint)}Lower ` +
+    `rig.gait.stanceFraction (now ${gait.stanceFraction}, minimum ${stanceFloor(ctx)}; a smaller value gives a ` +
+    `longer, slower swing) or lengthen strideLength (now ${gait.strideLength}). A higher stepHeight (now ` +
+    `${gait.stepHeight}) raises joint speed, but lowering it can bring back foot slide; walking slower does not ` +
+    'reliably help.'
+}
+
+/** Advice to bend a joint more at rest when it is nearly straight there, or '' when it is bent enough. */
+function restBendAdvice (ctx: Context, leg: Leg, joint: string): string {
+  const triple = bendingJoints(leg).find(([, b]) => b === joint)
+  if (triple === undefined) return ''
+  const rest = restPose(ctx.character.mannequin)
+  const flexion = kneeFlexionDegrees(rest[triple[0]], rest[triple[1]], rest[triple[2]])
+  if (flexion >= STRAIGHT_REST_DEGREES) return ''
+  const word = jointWord(leg, joint)
+  return `The ${word} is bent only ${flexion.toFixed(0)} degrees at rest: a nearly straight leg has to fold fast to ` +
+    `lift the foot, so first bend the ${word} more in the mannequin (move '${joint}' toward its bend side until the ` +
+    `leg bends about ${STRAIGHT_REST_DEGREES}-40 degrees, keeping hip and ankle where they are). `
 }
 
 function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometry }> {

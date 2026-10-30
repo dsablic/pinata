@@ -244,3 +244,18 @@ test('an appendage adds its gates and passes; balance is not gated for two legs'
 test('the ok character has no appendage gates', () => {
   assert.doesNotMatch(summaryOf(check(ok)), /appendage/)
 })
+
+test('a knee-speed failure on a nearly straight leg says to bend it more at rest', () => {
+  const run = check(variant(d => { patch(d, 'rig.json', j => { j.gait.stepHeight = 0.12 }) }))
+  const summary = summaryOf(run)
+  assert.match(summary, /^FAIL {2}kneeSpeedDegPerSec: /m)
+  assert.match(summary, /The knee is bent only 14 degrees at rest: .* bend the knee more in the mannequin/)
+  assert.match(summary, /\(move 'knee[LR]' toward its bend side/)
+})
+
+test('a knee-speed failure on a bent leg does not ask for more bend', () => {
+  const run = check(variant(d => { patch(d, 'rig.json', j => { j.gait.stepHeight = 0.14 }) }, dog))
+  const summary = summaryOf(run)
+  assert.match(summary, /^FAIL {2}kneeSpeedDegPerSec: /m)
+  assert.doesNotMatch(summary, /bent only/)
+})

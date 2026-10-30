@@ -532,7 +532,9 @@ Usual fixes:
 - **kneeSpeedDegPerSec.** Lower `stanceFraction` (longer, slower swing; the minimum is 0.5, or 1 minus the widest
   phase gap if higher: 0.75 for a four-legged walk, so there it cannot go lower) or lengthen the stride a
   little. A higher `stepHeight` raises knee speed; lower it only if the slide and alternation gates still pass.
-  Walking slower does not reliably help. Short legs with a high step height are the usual cause.
+  Walking slower does not reliably help. Short legs with a high step height are the usual cause, and so are legs
+  nearly straight at rest: a joint bent less than about 25 degrees has to fold fast to lift the foot, so bend it
+  25-40 degrees in the mannequin first (the hint says when).
 - **boneLengthError.** A joint of a limb is also listed elsewhere (for example in `upperBody` or `carried`), or two
   joints of a limb are at the same position.
 - **rootSpeedError.** Feet must plant at least twice inside a steady window. If the window is shorter than 2.5

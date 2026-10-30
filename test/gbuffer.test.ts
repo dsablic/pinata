@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EMPTY, rasterize } from '../src/raster/gbuffer.ts'
-import { makeCamera } from '../src/raster/camera.ts'
+import { fitCamera, makeCamera } from '../src/raster/camera.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
 
@@ -70,5 +70,33 @@ test('a thin box seen at a grazing angle has no holes and a symmetric silhouette
     if (first === -1) continue
     assert.ok(row.slice(first, row.lastIndexOf(true) + 1).every(Boolean), `row ${y} has a hole`)
     assert.deepEqual(row, row.toReversed(), `row ${y} is not symmetric about the centre`)
+  }
+})
+
+test('a fitted frame leaves the margin empty for a wide pose and a part below the ground', () => {
+  const wide: Mannequin = {
+    name: 'wide',
+    height: 1,
+    joints: { l: [-1, 0.8, 0], r: [1, 0.8, 0], low: [0, -0.3, 0], top: [0, 0.9, 0] },
+    parts: [
+      { name: 'arms', shape: 'capsule', a: 'l', b: 'r', radiusA: 0.05, radiusB: 0.05, material: 'm' },
+      { name: 'spine', shape: 'capsule', a: 'low', b: 'top', radiusA: 0.05, radiusB: 0.05, material: 'm' }
+    ],
+    decals: []
+  }
+  const margin = 2
+  for (const elevationDeg of [0, 30]) {
+    const cam = fitCamera(wide, { azimuthDeg: 0, elevationDeg, targetHeightPx: 24, margin })
+    const g = rasterize(wide, cam, 2)
+    let filled = 0
+    for (let y = 0; y < g.height; y++) {
+      for (let x = 0; x < g.width; x++) {
+        if (g.part[y * g.width + x] === EMPTY) continue
+        filled++
+        const inside = x >= margin && x < g.width - margin && y >= margin && y < g.height - margin
+        assert.ok(inside, `pixel ${x},${y} is in the margin at elevation ${elevationDeg}`)
+      }
+    }
+    assert.ok(filled > 0)
   }
 })

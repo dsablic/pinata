@@ -1,6 +1,7 @@
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { add, dot, length, normalize, scale, sub } from '../math/vec.ts'
+import { add, dot, normalize, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
+import { boundingSphere } from './bounds.ts'
 import { rayOrigin, toCameraSpace } from './camera.ts'
 import type { Camera } from './camera.ts'
 import { boxFrame, sdBox, sdRoundCone } from './sdf.ts'
@@ -27,17 +28,12 @@ const NORMAL_STEP = 1e-4
 function compile (m: Mannequin, part: Part): Primitive {
   const a = m.joints[part.a]
   const b = m.joints[part.b]
-  const center = scale(add(a, b), 0.5)
-  const halfLength = length(sub(b, a)) / 2
+  const { center, radius } = boundingSphere(m, part)
   if (part.shape === 'capsule') {
-    return {
-      sdf: p => sdRoundCone(p, a, b, part.radiusA, part.radiusB),
-      center,
-      radius: halfLength + Math.max(part.radiusA, part.radiusB)
-    }
+    return { sdf: p => sdRoundCone(p, a, b, part.radiusA, part.radiusB), center, radius }
   }
   const frame = boxFrame(a, b, part)
-  return { sdf: p => sdBox(p, frame), center, radius: length(frame.half) }
+  return { sdf: p => sdBox(p, frame), center, radius }
 }
 
 function trace (prim: Primitive, origin: Vec3, dir: Vec3): number {

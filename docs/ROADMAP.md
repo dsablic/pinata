@@ -85,6 +85,15 @@ stay consistent across views and survive walking, at 48 px and 32 px. Gates to f
 - A walk strip in every direction is preferred over the procedural renderer by a majority.
 - One human pixel artist reviews the results (the only human check kept in the plan).
 
+## Next: live runtime spike (P8)
+
+Spec: [`docs/plans/2026-10-30-runtime-spike.md`](plans/2026-10-30-runtime-spike.md). Can a character be animated
+live in a browser, reacting to events in real time (for example a piñata in a chat window reacting while an AI agent
+works), from a compact character file and a small JavaScript runtime? The spike bundles the engine for the browser,
+adds online (frame-by-frame) motion for the hanging piñata with `hit()` and a few behaviours, renders at 64 px in a
+canvas, and tests real-time frame budget, reactions, behaviour transitions and Node-browser determinism headlessly
+with Playwright. Its result decides whether the runtime can use the procedural renderer or needs skins first.
+
 ## Body plans and rigid-body behaviours (in progress)
 
 - **General limbs** ([`docs/plans/2026-10-30-general-limbs.md`](plans/2026-10-30-general-limbs.md)): any number of legs with any segment count, arms,

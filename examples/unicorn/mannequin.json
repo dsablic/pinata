@@ -1,0 +1,632 @@
+{
+ "name": "unicorn",
+ "height": 1.01,
+ "joints": {
+  "pelvis": [
+   0,
+   0.42,
+   -0.04
+  ],
+  "purpleA": [
+   0,
+   0.42,
+   0.12000000000000001
+  ],
+  "purpleB": [
+   0,
+   0.42,
+   0.14
+  ],
+  "blueA": [
+   0,
+   0.42,
+   0.0
+  ],
+  "blueB": [
+   0,
+   0.42,
+   0.02
+  ],
+  "mintA": [
+   0,
+   0.42,
+   -0.12
+  ],
+  "mintB": [
+   0,
+   0.42,
+   -0.1
+  ],
+  "pinkA": [
+   0,
+   0.42,
+   -0.24000000000000002
+  ],
+  "pinkB": [
+   0,
+   0.42,
+   -0.22
+  ],
+  "neckBase": [
+   0,
+   0.55,
+   0.2
+  ],
+  "head": [
+   0,
+   0.7,
+   0.27
+  ],
+  "snoutA": [
+   0,
+   0.65,
+   0.36
+  ],
+  "snoutB": [
+   0,
+   0.63,
+   0.42
+  ],
+  "earBaseL": [
+   0.075,
+   0.8,
+   0.24
+  ],
+  "earTipL": [
+   0.1,
+   0.88,
+   0.23
+  ],
+  "earBaseR": [
+   -0.075,
+   0.8,
+   0.24
+  ],
+  "earTipR": [
+   -0.1,
+   0.88,
+   0.23
+  ],
+  "hornBase": [
+   0,
+   0.81,
+   0.3
+  ],
+  "hornTip": [
+   0,
+   1.0,
+   0.35
+  ],
+  "eyeL": [
+   0.06,
+   0.76,
+   0.368
+  ],
+  "eyeR": [
+   -0.06,
+   0.76,
+   0.368
+  ],
+  "maneA1": [
+   0,
+   0.85,
+   0.2
+  ],
+  "maneA2": [
+   0,
+   0.82,
+   0.11
+  ],
+  "maneA3": [
+   0,
+   0.76,
+   0.03
+  ],
+  "maneB1": [
+   0.1,
+   0.76,
+   0.17
+  ],
+  "maneB2": [
+   0.157,
+   0.69,
+   0.1
+  ],
+  "maneB3": [
+   0.2,
+   0.61,
+   0.05
+  ],
+  "maneC1": [
+   -0.1,
+   0.76,
+   0.17
+  ],
+  "maneC2": [
+   -0.157,
+   0.69,
+   0.1
+  ],
+  "maneC3": [
+   -0.2,
+   0.61,
+   0.05
+  ],
+  "tailA1": [
+   0,
+   0.52,
+   -0.42
+  ],
+  "tailA2": [
+   0,
+   0.48,
+   -0.51
+  ],
+  "tailA3": [
+   0,
+   0.4,
+   -0.57
+  ],
+  "tailB1": [
+   0.05,
+   0.5,
+   -0.42
+  ],
+  "tailB2": [
+   0.09,
+   0.44,
+   -0.5
+  ],
+  "tailB3": [
+   0.12,
+   0.36,
+   -0.54
+  ],
+  "tailC1": [
+   -0.05,
+   0.5,
+   -0.42
+  ],
+  "tailC2": [
+   -0.09,
+   0.44,
+   -0.5
+  ],
+  "tailC3": [
+   -0.12,
+   0.36,
+   -0.54
+  ],
+  "hipLH": [
+   0.1,
+   0.34,
+   -0.22
+  ],
+  "kneeLH": [
+   0.1,
+   0.195,
+   -0.27
+  ],
+  "ankleLH": [
+   0.1,
+   0.058,
+   -0.22
+  ],
+  "toeLH": [
+   0.1,
+   0.058,
+   -0.16
+  ],
+  "hipLF": [
+   0.1,
+   0.34,
+   0.14
+  ],
+  "kneeLF": [
+   0.1,
+   0.195,
+   0.19
+  ],
+  "ankleLF": [
+   0.1,
+   0.058,
+   0.14
+  ],
+  "toeLF": [
+   0.1,
+   0.058,
+   0.2
+  ],
+  "hipRH": [
+   -0.1,
+   0.34,
+   -0.22
+  ],
+  "kneeRH": [
+   -0.1,
+   0.195,
+   -0.27
+  ],
+  "ankleRH": [
+   -0.1,
+   0.058,
+   -0.22
+  ],
+  "toeRH": [
+   -0.1,
+   0.058,
+   -0.16
+  ],
+  "hipRF": [
+   -0.1,
+   0.34,
+   0.14
+  ],
+  "kneeRF": [
+   -0.1,
+   0.195,
+   0.19
+  ],
+  "ankleRF": [
+   -0.1,
+   0.058,
+   0.14
+  ],
+  "toeRF": [
+   -0.1,
+   0.058,
+   0.2
+  ]
+ },
+ "parts": [
+  {
+   "name": "bandPurple",
+   "shape": "capsule",
+   "a": "purpleA",
+   "b": "purpleB",
+   "radiusA": 0.2,
+   "radiusB": 0.2,
+   "material": "purple"
+  },
+  {
+   "name": "bandBlue",
+   "shape": "capsule",
+   "a": "blueA",
+   "b": "blueB",
+   "radiusA": 0.2,
+   "radiusB": 0.2,
+   "material": "blue"
+  },
+  {
+   "name": "bandMint",
+   "shape": "capsule",
+   "a": "mintA",
+   "b": "mintB",
+   "radiusA": 0.2,
+   "radiusB": 0.2,
+   "material": "mint"
+  },
+  {
+   "name": "bandPink",
+   "shape": "capsule",
+   "a": "pinkA",
+   "b": "pinkB",
+   "radiusA": 0.2,
+   "radiusB": 0.2,
+   "material": "pink"
+  },
+  {
+   "name": "neck",
+   "shape": "capsule",
+   "a": "neckBase",
+   "b": "head",
+   "radiusA": 0.11,
+   "radiusB": 0.12,
+   "material": "white"
+  },
+  {
+   "name": "headPart",
+   "shape": "capsule",
+   "a": "head",
+   "b": "head",
+   "radiusA": 0.13,
+   "radiusB": 0.13,
+   "material": "white"
+  },
+  {
+   "name": "snout",
+   "shape": "capsule",
+   "a": "snoutA",
+   "b": "snoutB",
+   "radiusA": 0.075,
+   "radiusB": 0.07,
+   "material": "pink"
+  },
+  {
+   "name": "earL",
+   "shape": "capsule",
+   "a": "earBaseL",
+   "b": "earTipL",
+   "radiusA": 0.04,
+   "radiusB": 0.028,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "earR",
+   "shape": "capsule",
+   "a": "earBaseR",
+   "b": "earTipR",
+   "radiusA": 0.04,
+   "radiusB": 0.028,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "horn",
+   "shape": "capsule",
+   "a": "hornBase",
+   "b": "hornTip",
+   "radiusA": 0.042,
+   "radiusB": 0.016,
+   "material": "gold",
+   "allowThin": true
+  },
+  {
+   "name": "maneA1",
+   "shape": "capsule",
+   "a": "maneA1",
+   "b": "maneA2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "maneA2",
+   "shape": "capsule",
+   "a": "maneA2",
+   "b": "maneA3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "maneB1",
+   "shape": "capsule",
+   "a": "maneB1",
+   "b": "maneB2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "blue",
+   "allowThin": true
+  },
+  {
+   "name": "maneB2",
+   "shape": "capsule",
+   "a": "maneB2",
+   "b": "maneB3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "blue",
+   "allowThin": true
+  },
+  {
+   "name": "maneC1",
+   "shape": "capsule",
+   "a": "maneC1",
+   "b": "maneC2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "mint",
+   "allowThin": true
+  },
+  {
+   "name": "maneC2",
+   "shape": "capsule",
+   "a": "maneC2",
+   "b": "maneC3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "mint",
+   "allowThin": true
+  },
+  {
+   "name": "tailA1",
+   "shape": "capsule",
+   "a": "tailA1",
+   "b": "tailA2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "tailA2",
+   "shape": "capsule",
+   "a": "tailA2",
+   "b": "tailA3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "pink",
+   "allowThin": true
+  },
+  {
+   "name": "tailB1",
+   "shape": "capsule",
+   "a": "tailB1",
+   "b": "tailB2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "mint",
+   "allowThin": true
+  },
+  {
+   "name": "tailB2",
+   "shape": "capsule",
+   "a": "tailB2",
+   "b": "tailB3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "mint",
+   "allowThin": true
+  },
+  {
+   "name": "tailC1",
+   "shape": "capsule",
+   "a": "tailC1",
+   "b": "tailC2",
+   "radiusA": 0.036,
+   "radiusB": 0.033,
+   "material": "gold",
+   "allowThin": true
+  },
+  {
+   "name": "tailC2",
+   "shape": "capsule",
+   "a": "tailC2",
+   "b": "tailC3",
+   "radiusA": 0.033,
+   "radiusB": 0.03,
+   "material": "gold",
+   "allowThin": true
+  },
+  {
+   "name": "thighLH",
+   "shape": "capsule",
+   "a": "hipLH",
+   "b": "kneeLH",
+   "radiusA": 0.06,
+   "radiusB": 0.05,
+   "material": "white"
+  },
+  {
+   "name": "shinLH",
+   "shape": "capsule",
+   "a": "kneeLH",
+   "b": "ankleLH",
+   "radiusA": 0.05,
+   "radiusB": 0.045,
+   "material": "white"
+  },
+  {
+   "name": "hoofLH",
+   "shape": "capsule",
+   "a": "ankleLH",
+   "b": "toeLH",
+   "radiusA": 0.058,
+   "radiusB": 0.058,
+   "material": "purple"
+  },
+  {
+   "name": "thighLF",
+   "shape": "capsule",
+   "a": "hipLF",
+   "b": "kneeLF",
+   "radiusA": 0.06,
+   "radiusB": 0.05,
+   "material": "white"
+  },
+  {
+   "name": "shinLF",
+   "shape": "capsule",
+   "a": "kneeLF",
+   "b": "ankleLF",
+   "radiusA": 0.05,
+   "radiusB": 0.045,
+   "material": "white"
+  },
+  {
+   "name": "hoofLF",
+   "shape": "capsule",
+   "a": "ankleLF",
+   "b": "toeLF",
+   "radiusA": 0.058,
+   "radiusB": 0.058,
+   "material": "purple"
+  },
+  {
+   "name": "thighRH",
+   "shape": "capsule",
+   "a": "hipRH",
+   "b": "kneeRH",
+   "radiusA": 0.06,
+   "radiusB": 0.05,
+   "material": "white"
+  },
+  {
+   "name": "shinRH",
+   "shape": "capsule",
+   "a": "kneeRH",
+   "b": "ankleRH",
+   "radiusA": 0.05,
+   "radiusB": 0.045,
+   "material": "white"
+  },
+  {
+   "name": "hoofRH",
+   "shape": "capsule",
+   "a": "ankleRH",
+   "b": "toeRH",
+   "radiusA": 0.058,
+   "radiusB": 0.058,
+   "material": "purple"
+  },
+  {
+   "name": "thighRF",
+   "shape": "capsule",
+   "a": "hipRF",
+   "b": "kneeRF",
+   "radiusA": 0.06,
+   "radiusB": 0.05,
+   "material": "white"
+  },
+  {
+   "name": "shinRF",
+   "shape": "capsule",
+   "a": "kneeRF",
+   "b": "ankleRF",
+   "radiusA": 0.05,
+   "radiusB": 0.045,
+   "material": "white"
+  },
+  {
+   "name": "hoofRF",
+   "shape": "capsule",
+   "a": "ankleRF",
+   "b": "toeRF",
+   "radiusA": 0.058,
+   "radiusB": 0.058,
+   "material": "purple"
+  }
+ ],
+ "decals": [
+  {
+   "name": "eyeL",
+   "anchor": "eyeL",
+   "normal": [
+    0.45,
+    0.15,
+    1
+   ],
+   "pattern": [
+    "e",
+    "e"
+   ]
+  },
+  {
+   "name": "eyeR",
+   "anchor": "eyeR",
+   "normal": [
+    -0.45,
+    0.15,
+    1
+   ],
+   "pattern": [
+    "e",
+    "e"
+   ]
+  }
+ ]
+}

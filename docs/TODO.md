@@ -25,8 +25,6 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ### 1. Leftovers from general limbs
 
-- [ ] Move the unicorn piñata package into `examples/` (shorter-stride version; see "Logo" below), using appendages
-      for its tail and mane where they fit.
 - [ ] Several new examples sit exactly on `maxStrayPixels` (2) and `maxThinFraction` (0.25); see "Stray-pixel
       cleanup" below.
 - [ ] Appendages: a very soft appendage on a very fast spin flails (swing frames are singular near 180 degrees); no
@@ -63,6 +61,8 @@ before building.
 - [ ] Stray-pixel cleanup for mostly hidden parts (every four-legged piñata failed `maxStrayPixels` at 32 px).
 - [ ] Quadruped gait tuning for short legs (knee speed) and turning (the dragon only passed at 0.1 m/s, no turn).
 - [ ] P2 gate `partAreaJump` counts occlusion as instability; redefine on unoccluded footprints in a future version.
+- [ ] `bobAmplitude` is hidden when the planner lowers the pelvis for reach: the unicorn drops 3.2 cm, so any bob
+      below that has no effect. Either add bob on top of the drop or say so in the guide and the hints.
 - [ ] Remaining renderer speedups that keep pixels: PNG compression and sheet assembly.
 
 ## Logo

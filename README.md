@@ -59,7 +59,7 @@ gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a pla
 - [`pocs/`](pocs): one directory per proof of concept, with its assets, gates and runner.
 - [`examples/`](examples): character packages: the knight, a four-legged dog, the piñata, three characters authored by AI
   agents in P5 (rogue, dwarf, wizard), and creatures with general limbs: a six-legged beetle, an eight-legged spider and
-  a horse with five-joint legs, a swishing tail and ears.
+  a horse with five-joint legs, a swishing tail and ears, and the walking unicorn piñata from the logo.
 - [`docs/assets/`](docs/assets): the provisional logo (a hanging unicorn piñata, rendered with the engine) and a lineup
   of the general-limbs examples at 48 px.
 - [`test/`](test): unit tests.

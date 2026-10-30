@@ -1,0 +1,51 @@
+{
+ "name": "unicorn",
+ "light": [
+  -0.5,
+  0.7,
+  0.5
+ ],
+ "bands": [
+  0.05,
+  0.6
+ ],
+ "outline": "#5a3fa8",
+ "outlineMode": "uniform",
+ "innerLineDepth": 0.1,
+ "decalMinFacing": 0.3,
+ "materials": {
+  "purple": [
+   "#5a3fa8",
+   "#8a5fd0",
+   "#c6a6f8"
+  ],
+  "white": [
+   "#c6a6f8",
+   "#e4d8f4",
+   "#fbf5ff"
+  ],
+  "blue": [
+   "#5a3fa8",
+   "#5f90e0",
+   "#a3d0ff"
+  ],
+  "mint": [
+   "#5f90e0",
+   "#4fbf9f",
+   "#a6f5d8"
+  ],
+  "gold": [
+   "#c07a10",
+   "#e0a828",
+   "#ffe066"
+  ],
+  "pink": [
+   "#b8407f",
+   "#e0609f",
+   "#ffa3cb"
+  ]
+ },
+ "decalColors": {
+  "e": "#5a3fa8"
+ }
+}

@@ -1,0 +1,190 @@
+{
+ "template": "quadruped",
+ "pelvis": "pelvis",
+ "upperBody": [
+  "purpleA",
+  "purpleB",
+  "blueA",
+  "blueB",
+  "mintA",
+  "mintB",
+  "pinkA",
+  "pinkB",
+  "neckBase",
+  "head",
+  "snoutA",
+  "snoutB",
+  "earBaseL",
+  "earTipL",
+  "earBaseR",
+  "earTipR",
+  "hornBase",
+  "hornTip",
+  "eyeL",
+  "eyeR"
+ ],
+ "limbs": [
+  {
+   "kind": "leg",
+   "name": "legLH",
+   "side": "left",
+   "joints": [
+    "hipLH",
+    "kneeLH",
+    "ankleLH",
+    "toeLH"
+   ]
+  },
+  {
+   "kind": "leg",
+   "name": "legLF",
+   "side": "left",
+   "joints": [
+    "hipLF",
+    "kneeLF",
+    "ankleLF",
+    "toeLF"
+   ]
+  },
+  {
+   "kind": "leg",
+   "name": "legRH",
+   "side": "right",
+   "joints": [
+    "hipRH",
+    "kneeRH",
+    "ankleRH",
+    "toeRH"
+   ]
+  },
+  {
+   "kind": "leg",
+   "name": "legRF",
+   "side": "right",
+   "joints": [
+    "hipRF",
+    "kneeRF",
+    "ankleRF",
+    "toeRF"
+   ]
+  },
+  {
+   "kind": "appendage",
+   "name": "manePink",
+   "joints": [
+    "maneA1",
+    "maneA2",
+    "maneA3"
+   ],
+   "stiffness": 0.45,
+   "damping": 0.35,
+   "oscillate": {
+    "axis": [
+     0,
+     0,
+     1
+    ],
+    "degrees": 6,
+    "period": 1.1,
+    "phase": 0
+   }
+  },
+  {
+   "kind": "appendage",
+   "name": "maneBlue",
+   "side": "left",
+   "joints": [
+    "maneB1",
+    "maneB2",
+    "maneB3"
+   ],
+   "stiffness": 0.4,
+   "damping": 0.35
+  },
+  {
+   "kind": "appendage",
+   "name": "maneMint",
+   "side": "right",
+   "joints": [
+    "maneC1",
+    "maneC2",
+    "maneC3"
+   ],
+   "stiffness": 0.4,
+   "damping": 0.35
+  },
+  {
+   "kind": "appendage",
+   "name": "tailPink",
+   "joints": [
+    "tailA1",
+    "tailA2",
+    "tailA3"
+   ],
+   "stiffness": 0.35,
+   "damping": 0.3,
+   "oscillate": {
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "degrees": 18,
+    "period": 1.4,
+    "phase": 0
+   }
+  },
+  {
+   "kind": "appendage",
+   "name": "tailMint",
+   "side": "left",
+   "joints": [
+    "tailB1",
+    "tailB2",
+    "tailB3"
+   ],
+   "stiffness": 0.3,
+   "damping": 0.3,
+   "oscillate": {
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "degrees": 14,
+    "period": 1.4,
+    "phase": 0.15
+   }
+  },
+  {
+   "kind": "appendage",
+   "name": "tailGold",
+   "side": "right",
+   "joints": [
+    "tailC1",
+    "tailC2",
+    "tailC3"
+   ],
+   "stiffness": 0.3,
+   "damping": 0.3,
+   "oscillate": {
+    "axis": [
+     0,
+     1,
+     0
+    ],
+    "degrees": 14,
+    "period": 1.4,
+    "phase": 0.3
+   }
+  }
+ ],
+ "gait": {
+  "strideLength": 0.22,
+  "referenceSpeed": 0.2,
+  "stanceFraction": 0.75,
+  "stepHeight": 0.05,
+  "bobAmplitude": 0.006,
+  "footSpacing": 0.2
+ }
+}

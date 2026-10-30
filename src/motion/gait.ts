@@ -1,6 +1,6 @@
 import { legPhases, legsOf, stride } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
-import type { Rig } from '../formats/rig.ts'
+import type { Leg, Rig } from '../formats/rig.ts'
 import { toWorld } from '../sim/body.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { chainLength, soleHeight } from './pose.ts'
@@ -19,7 +19,6 @@ export type GaitFrame = {
   root: RootState
   pelvisOffset: Vec3
   feet: FootState[]
-  armSwing: number
   armSwings: number[]
   phase: number
 }
@@ -53,10 +52,6 @@ const DROP_SMOOTHING_SECONDS = 0.04
 const CLEARANCE = 0.01
 const MAX_SWING_EDGE = 0.25
 
-function swingCycle (phase: number, offset: number): number {
-  return offset === 0.5 ? -Math.cos(2 * Math.PI * phase) : Math.cos(2 * Math.PI * (phase + offset))
-}
-
 function smoothstep (x: number): number {
   return x * x * (3 - 2 * x)
 }
@@ -81,15 +76,16 @@ function isAtRest (root: RootState): boolean {
   return horizontalSpeed(root) < REST_EPSILON && Math.abs(root.angularVelocity) < REST_EPSILON
 }
 
-function partnerOf (rig: Rig, rest: Pose, leg: number): number {
-  const mine = legsOf(rig)[leg]
-  const across = legsOf(rig).map((_, i) => i).filter(i => legsOf(rig)[i].side !== mine.side)
-  const gap = (i: number): number => Math.abs(rest[legsOf(rig)[i].hip][2] - rest[mine.hip][2])
+function partnerOf (legs: Leg[], rest: Pose, leg: number): number {
+  const mine = legs[leg]
+  const across = legs.map((_, i) => i).filter(i => legs[i].side !== mine.side)
+  const gap = (i: number): number => Math.abs(rest[legs[i].hip][2] - rest[mine.hip][2])
   return across.reduce((a, b) => gap(b) < gap(a) ? b : a)
 }
 
 function cycleOf (rig: Rig, rest: Pose): Cycle {
   const phases = legPhases(rig)
+  const legs = legsOf(rig)
   const { stanceFraction } = rig.gait
   const behind = (from: number, to: number): number => from === to ? 0 : (phases[from] - phases[to] + 1) % 1
   const delay = phases.map((_, f) => Math.min(...phases.map((__, g) => stanceFraction - behind(f, g))))
@@ -100,7 +96,7 @@ function cycleOf (rig: Rig, rest: Pose): Cycle {
     initial: phases.map((_, g) => phases[first] - behind(first, g)),
     delay: delay.map(d => Math.max(0, d)),
     settled,
-    partner: phases.map((_, f) => partnerOf(rig, rest, f)),
+    partner: phases.map((_, f) => partnerOf(legs, rest, f)),
     start: phases[first] + Math.max(0, delay[first])
   }
 }
@@ -299,8 +295,7 @@ export function planGait (options: Options): GaitFrame[] {
       root,
       pelvisOffset: [0, offset, 0],
       feet: states,
-      armSwing: gait.armSwingDegrees * Math.cos(2 * Math.PI * phase[i]) * ease,
-      armSwings: offsets.map(offset => gait.armSwingDegrees * swingCycle(phase[i], offset) * ease),
+      armSwings: offsets.map(leg => gait.armSwingDegrees * Math.cos(2 * Math.PI * (phase[i] - leg)) * ease),
       phase: phase[i]
     })
   }

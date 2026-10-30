@@ -102,10 +102,10 @@ test('hexapod joints bend to their sides: knees forward, hocks backward', () => 
 
 test('arms swing as a whole chain about the shoulder, counter to the nearest leg on their side', () => {
   const frames = walk()
-  const frame = frames.reduce((best, f) => Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best)
-  assert.ok(Math.abs(frame.armSwing) > 10)
+  const frame = frames.reduce((best, f) => Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best)
+  assert.ok(Math.abs(frame.armSwings[0]) > 10)
   const { pose } = poseAt({ frame, rig, rest, mannequin })
-  const angle = frame.armSwing * Math.PI / 180
+  const angle = frame.armSwings[0] * Math.PI / 180
   for (const [tag, sign] of [['L', 1], ['R', -1]] as const) {
     const turn = sign * angle
     for (const joint of ['elbow', 'claw', 'gem']) {
@@ -177,7 +177,6 @@ test('bend up puts every knee above its hip on a splayed leg', () => {
     feet: legsOf(spider).map(leg => ({
       side: leg.side, ankle: wideRest[leg.ankle], toeYaw: 0, planted: true, lift: 0, toePitch: 0
     })),
-    armSwing: 0,
     armSwings: legsOf(spider).map(() => 0),
     phase: 0
   }

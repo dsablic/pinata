@@ -77,7 +77,7 @@ test('the swing toe pitches up with lift, the planted toe stays flat', () => {
 
 test('arms swing in opposite directions and the upper body follows the pelvis', () => {
   const walk = frames(1.2, 4, 7)
-  const frame = walk.reduce((best, f) => (Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best))
+  const frame = walk.reduce((best, f) => (Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best))
   const { pose } = poseAt({ frame, rig, rest, mannequin })
   const left = pose.handL[2] - rest.handL[2]
   const right = pose.handR[2] - rest.handR[2]
@@ -105,7 +105,7 @@ test('a carried joint keeps its distance to the hand during an arm swing', () =>
   const swordRest = restPose(sword)
   const track = walkTrack(1.2, 4)
   const walk = planGait({ track, rig: carrying, rest: swordRest, mannequin: sword, duration: 7, fps: 24 })
-  const frame = walk.reduce((best, f) => (Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best))
+  const frame = walk.reduce((best, f) => (Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best))
   const { pose } = poseAt({ frame, rig: carrying, rest: swordRest, mannequin: sword })
   assertClose(distance(pose, 'tip', 'handR'), distance(swordRest, 'tip', 'handR'), 1e-9)
   assert.ok(Math.abs(pose.tip[1] - swordRest.tip[1] - frame.pelvisOffset[1]) > 0.05)

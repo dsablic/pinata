@@ -103,7 +103,7 @@ test('after a stop both feet end planted side by side and nothing moves', () => 
     assert.deepEqual(frame.feet, last.feet)
     assert.deepEqual(frame.pelvisOffset, last.pelvisOffset)
     assert.equal(frame.phase, last.phase)
-    assert.equal(frame.armSwing, 0)
+    assert.ok(frame.armSwings.every(swing => swing === 0))
   }
 })
 
@@ -148,7 +148,7 @@ test('the pelvis drops so every foot stays within reach of its hip', () => {
 test('bob is zero at rest and arm swing alternates with the legs', () => {
   const frames = plan(walkTrack(1.2, 4), 6)
   assert.equal(frames[frames.length - 1].pelvisOffset[1], 0)
-  assert.ok(frames.some(f => f.armSwing > 5) && frames.some(f => f.armSwing < -5))
+  assert.ok(frames.some(f => f.armSwings[0] > 5) && frames.some(f => f.armSwings[0] < -5))
 })
 
 test('planning is deterministic', () => {
@@ -329,22 +329,35 @@ test('explicit phases on two legs set the time between landings', () => {
   }
 })
 
-test('arm swing per leg is the swing at the leg phase: a biped swings left and right in opposition', () => {
+function easeOf (frame: GaitFrame, speed: number): number {
+  return Math.min(1, Math.hypot(frame.root.velocity[0], frame.root.velocity[2]) / speed)
+}
+
+test('arm swing per leg is cos(2 pi (phase - leg phase)): a biped swings left and right in opposition', () => {
   const frames = plan(walkTrack(1.2, 4), 6)
+  const { armSwingDegrees, referenceSpeed } = rig.gait
   for (const frame of frames) {
-    assert.equal(frame.armSwings[0], frame.armSwing)
-    assert.equal(frame.armSwings[1], -frame.armSwing)
+    const swing = armSwingDegrees * Math.cos(2 * Math.PI * frame.phase) * easeOf(frame, referenceSpeed)
+    assertClose(frame.armSwings[0], swing, 1e-12)
+    assertClose(frame.armSwings[1], -swing, 1e-12)
   }
+  assert.ok(frames.some(f => Math.abs(f.armSwings[0]) > 5))
 })
 
-test('arm swing follows each leg phase for a quadruped', () => {
+test('arm swing follows each leg phase for a quadruped, a quarter cycle apart', () => {
   const rest = restPose(quadMannequin)
+  const swinging = { ...quadRig, gait: { ...quadRig.gait, armSwingDegrees: 20 } }
   const frames = planGait({
-    track: walkTrack(0.9, 4), rig: quadRig, rest, mannequin: quadMannequin, duration: 6, fps: FPS
+    track: walkTrack(0.9, 4), rig: swinging, rest, mannequin: quadMannequin, duration: 6, fps: FPS
   })
-  const frame = frames.reduce((best, f) => Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best)
-  assert.equal(frame.armSwings.length, 4)
-  assertClose(frame.armSwings[0], frame.armSwing, 1e-12)
-  assertClose(frame.armSwings[2], -frame.armSwing, 1e-12)
-  assertClose(Math.hypot(frame.armSwings[1], frame.armSwings[3]), Math.abs(frame.armSwing), 1e-9)
+  const { armSwingDegrees, referenceSpeed } = swinging.gait
+  const phases = [0, 0.25, 0.5, 0.75]
+  for (const frame of frames) {
+    assert.equal(frame.armSwings.length, 4)
+    phases.forEach((phase, k) => {
+      const swing = armSwingDegrees * Math.cos(2 * Math.PI * (frame.phase - phase)) * easeOf(frame, referenceSpeed)
+      assertClose(frame.armSwings[k], swing, 1e-12)
+    })
+  }
+  assert.ok(frames.some(f => Math.abs(f.armSwings[1]) > 5))
 })

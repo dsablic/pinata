@@ -21,7 +21,7 @@ test('the skating control keeps the root, pelvis and arms of the planned gait', 
   skating.forEach((frame, i) => {
     assert.deepEqual(frame.root, planned[i].root)
     assert.deepEqual(frame.pelvisOffset, planned[i].pelvisOffset)
-    assert.equal(frame.armSwing, planned[i].armSwing)
+    assert.deepEqual(frame.armSwings, planned[i].armSwings)
   })
 })
 

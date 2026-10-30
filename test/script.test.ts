@@ -140,10 +140,10 @@ const mixed: Script = {
   accelSeconds: 0.4
 }
 
-test('createRootTrack matches rootAt at random times, including past the ends', () => {
+test('createRootTrack matches rootAt at fixed times, including past the ends', () => {
   const track = createRootTrack(mixed)
   const times = [-1, 0, scriptDuration(mixed), scriptDuration(mixed) + 3]
-  for (let i = 0; i < 200; i++) times.push(Math.random() * scriptDuration(mixed))
+  for (let i = 1; i <= 200; i++) times.push(scriptDuration(mixed) * i / 201)
   for (const t of times) {
     const a = track(t)
     const b = rootAt(mixed, t)

@@ -22,6 +22,7 @@ function createParticles (points: Vec3[], material: SimMaterial, pinned: Set<num
     position.set(p, 3 * i)
     inverseMass[i] = pinned.has(i) ? 0 : 1 / material.particleMass
   })
+  // materialIndex: per-particle index into System.material.
   return { position, previous: position.slice(), inverseMass, materialIndex: new Uint32Array(count), count }
 }
 
@@ -67,6 +68,7 @@ export function buildCape (cape: Cape, m: Mannequin, material: SimMaterial): Sys
   constrain(constraints, points, stretch, material.stretchCompliance)
   constrain(constraints, points, shear, material.stretchCompliance)
   constrain(constraints, points, bend, material.bendCompliance)
+  // Every pin references anchorLeft: offsets are body-local, so one joint is enough while the body is rigid.
   const pins: Pin[] = []
   for (let i = 0; i < columns; i++) {
     pins.push({ particle: index(i, 0), joint: cape.anchorLeft, offset: sub(points[index(i, 0)], left) })

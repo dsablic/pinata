@@ -101,6 +101,11 @@ test('an undamped pendulum keeps most of its energy over a second and a damped o
   assert.ok(damped < 0.5, `damped ${damped}`)
 })
 
+test('a 0.05 m pendulum with 40 substeps per 24 fps frame keeps its energy', () => {
+  const energy = pendulumEnergy(0, 0.05, 1 / 960)
+  assert.ok(energy > 0.6 && energy < 1.05, `energy ${energy}`)
+})
+
 test('wind pushes free particles toward the wind direction through drag', () => {
   const system = chain(3, [0, -1, 0], { ...rope, drag: 0.05 })
   run(system, { wind: { direction: [1, 0, 0], speed: 5, gust: 0 }, gravity: [0, -9.81, 0] }, 2)

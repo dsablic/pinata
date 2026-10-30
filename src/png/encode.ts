@@ -48,7 +48,7 @@ function compressed (img: Image): Buffer {
   for (let y = 0; y < img.height; y++) {
     raw.set(img.data.subarray(y * stride, (y + 1) * stride), y * (stride + 1) + 1)
   }
-  return deflateSync(raw, { level: 9 })
+  return deflateSync(raw, { level: 6 })
 }
 
 export function encodePng (img: Image): Buffer {

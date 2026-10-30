@@ -24,6 +24,12 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
+### 0. World showcase (user request, 2026-10-30)
+
+[World showcase plan](plans/2026-10-30-world-showcase.md): several characters living on procedural platforms in the
+browser (little computer people). Batches A (terrain and terrain-aware gait), B (windows and activities), C (world
+rendering and page).
+
 ### 1. Leftovers from general limbs
 
 - [ ] Several new examples sit exactly on `maxThinFraction` (0.25).

@@ -100,3 +100,14 @@ export function project (cam: Camera, p: Vec3): { x: number, y: number, depth: n
 export function toCameraSpace (cam: Camera, n: Vec3): Vec3 {
   return [dot(n, cam.right), dot(n, cam.up), -dot(n, cam.forward)]
 }
+
+export function unionCamera (cameras: Camera[]): Camera {
+  const baseline = Math.max(...cameras.map(c => c.baseline))
+  return {
+    ...cameras[0],
+    width: Math.max(...cameras.map(c => c.width)),
+    height: baseline + Math.max(...cameras.map(c => c.height - c.baseline)),
+    baseline,
+    rayDistance: Math.max(...cameras.map(c => c.rayDistance))
+  }
+}

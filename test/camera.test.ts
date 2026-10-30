@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fitCamera, makeCamera, project, rayOrigin } from '../src/raster/camera.ts'
+import { fitCamera, makeCamera, project, rayOrigin, unionCamera } from '../src/raster/camera.ts'
 import { boundingSphere } from '../src/raster/bounds.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import { add, scale } from '../src/math/vec.ts'
@@ -90,4 +90,15 @@ test('fitCamera needs a margin of at least one pixel for the outline', () => {
 
 test('fitCamera needs an integer margin', () => {
   assert.throws(() => fitCamera(tPose, { ...fit, margin: 1.5, azimuthDeg: 0, elevationDeg: 0 }), RangeError)
+})
+
+test('a union camera covers the extents of every camera and keeps the scale', () => {
+  const a = { ...makeCamera({ ...base, azimuthDeg: 0, elevationDeg: 0 }), width: 40, height: 30, baseline: 20 }
+  const b = { ...a, width: 50, height: 40, baseline: 22, rayDistance: a.rayDistance + 1 }
+  const u = unionCamera([a, b])
+  assert.equal(u.width, 50)
+  assert.equal(u.baseline, 22)
+  assert.equal(u.height, 22 + 18)
+  assert.equal(u.rayDistance, b.rayDistance)
+  assert.equal(u.pixelsPerUnit, a.pixelsPerUnit)
 })

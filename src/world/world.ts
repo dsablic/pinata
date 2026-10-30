@@ -23,6 +23,9 @@ import { pickActivity } from './config.ts'
 import type { Step, WorldConfig } from './config.ts'
 import { generateTerrain, random } from './terrain.ts'
 import type { Terrain } from './terrain.ts'
+import type { MotionDatabase } from '../mocap/database.ts'
+import { createPlayer } from '../mocap/player.ts'
+import type { Command, Player } from '../mocap/player.ts'
 import { trackOf, turnBetween } from './track.ts'
 import type { Move } from './track.ts'
 
@@ -32,6 +35,8 @@ export type CastMember = {
   mannequin: Mannequin
   rig: Rig
   cloth?: { scenario: Scenario, materials: SimMaterial[] }
+  /** Its motion-capture database: when present, it moves by motion matching instead of planned footsteps. */
+  capture?: MotionDatabase
 }
 export type ActorFrame = {
   name: string
@@ -59,6 +64,16 @@ export type World = {
 }
 
 type Plant = { ankle: Vec3, yaw: number, pitch?: number }
+
+/** Captured actors: how near (m) a walk's target counts as reached, how hard they slow toward it (1/s), how strongly
+ * they steer back to their lane, how long past its time a turn may take (s), the speed of a poke's shove (m/s), and
+ * how many finished moves one frame may skip past. */
+const CAPTURE_ARRIVAL = 0.08
+const CAPTURE_APPROACH = 1.5
+const CAPTURE_LANE_PULL = 2
+const CAPTURE_TURN_GRACE = 1.5
+const CAPTURE_SHOVE = 1.8
+const CAPTURE_MOVES_PER_FRAME = 8
 type Actor = {
   member: CastMember
   rest: Pose
@@ -84,6 +99,12 @@ type Actor = {
   /** When a foot last landed (for squash), and which feet were planted in the previous frame. */
   squashed: number
   wasPlanted: boolean[]
+  /** A captured actor's player, the moves it is carrying out, and when the first of them began. */
+  player?: Player
+  moves: Move[]
+  moveStart: number
+  /** The heading it last chose, which it keeps while standing. */
+  facing?: number
 }
 
 /** The upper-body and attached joints whose rest height is above the given fraction of the character's height. */
@@ -179,9 +200,16 @@ export function createWorld (options: WorldOptions): World {
       steps: [],
       activity: 'arrive',
       friend: (i + 1) % cast.length,
-      chains
+      chains,
+      moves: [],
+      moveStart: 0
     }
   })
+  for (const actor of actors) {
+    const database = actor.member.capture
+    if (database === undefined) continue
+    actor.player = createPlayer({ database, fps, ground }, { position: actor.root.position, yaw: actor.root.yaw })
+  }
 
   const facing = (actor: Actor, x: number): number => x >= actor.root.position[0] ? Math.PI / 2 : -Math.PI / 2
   const turnTo = (actor: Actor, yaw: number, moves: Move[]): void => {
@@ -276,7 +304,7 @@ export function createWorld (options: WorldOptions): World {
   }
 
   type Turns = ReturnType<typeof poseAt>['transforms']
-  const springs = (actor: Actor, frame: GaitFrame, joints: Pose, transforms: Turns): void => {
+  const springs = (actor: Actor, body: RootState, joints: Pose, transforms: Turns): void => {
     const substeps = motion.springSubsteps
     const dt = 1 / (fps * substeps)
     for (const entry of actor.chains) {
@@ -284,13 +312,13 @@ export function createWorld (options: WorldOptions): World {
       const base = joints[root]
       const rotation = transforms[entry.parent]?.rotation
       if (!entry.started) {
-        startChain(entry.chain, base, bodyFrame(frame.root.yaw, rotation), frameIndex / fps, () => [0, 0, 0])
+        startChain(entry.chain, base, bodyFrame(body.yaw, rotation), frameIndex / fps, () => [0, 0, 0])
         entry.started = true
       } else {
         for (let s = 1; s <= substeps; s++) {
           const u = s / substeps
           const at = add(entry.base, scale(sub(base, entry.base), u))
-          const yaw = entry.yaw + turnBetween(entry.yaw, frame.root.yaw) * u
+          const yaw = entry.yaw + turnBetween(entry.yaw, body.yaw) * u
           const t = (frameIndex - 1 + u) / fps
           const wind = windAt(environment.wind, t)
           const { gravity, windDrag } = environment.springs
@@ -301,7 +329,7 @@ export function createWorld (options: WorldOptions): World {
         }
       }
       entry.base = base
-      entry.yaw = frame.root.yaw
+      entry.yaw = body.yaw
       entry.chain.segments.forEach((segment, i) => { joints[entry.chain.limb.joints[i + 1]] = segment.tip })
     }
   }
@@ -394,14 +422,14 @@ export function createWorld (options: WorldOptions): World {
   }
 
   /** Steps the actor's cape and chains on its posed body; on the first frame, carries the rest cloth to the body. */
-  const weather = (actor: Actor, frame: GaitFrame, pose: Pose, transforms: Turns): Float64Array | undefined => {
+  const weather = (actor: Actor, root: RootState, pose: Pose, transforms: Turns): Float64Array | undefined => {
     const cloth = actor.cloth
     if (cloth === undefined) return undefined
     const { particles } = cloth.system
     if (cloth.previous === undefined) {
       for (let i = 0; i < particles.count; i++) {
         const at: Vec3 = [particles.position[3 * i], particles.position[3 * i + 1], particles.position[3 * i + 2]]
-        const p = toWorld(at, frame.root)
+        const p = toWorld(at, root)
         particles.position.set(p, 3 * i)
         particles.previous.set(p, 3 * i)
       }
@@ -416,10 +444,10 @@ export function createWorld (options: WorldOptions): World {
       const track = (t: number): RootState => {
         const u = Math.min(1, Math.max(0, t * fps - (frameIndex - 1)))
         return {
-          position: add(from.position, scale(sub(frame.root.position, from.position), u)),
-          yaw: from.yaw + turnBetween(from.yaw, frame.root.yaw) * u,
-          velocity: frame.root.velocity,
-          angularVelocity: frame.root.angularVelocity
+          position: add(from.position, scale(sub(root.position, from.position), u)),
+          yaw: from.yaw + turnBetween(from.yaw, root.yaw) * u,
+          velocity: root.velocity,
+          angularVelocity: root.angularVelocity
         }
       }
       for (let s = 1; s <= substeps; s++) {
@@ -432,11 +460,92 @@ export function createWorld (options: WorldOptions): World {
         })
       }
     }
-    cloth.previous = frame.root
+    cloth.previous = root
     return particles.position.slice(0, 3 * particles.count)
   }
 
+  /** The command that carries out a captured actor's current move, or undefined when the move is done. */
+  const commandFor = (actor: Actor, move: Move, time: number): Command | undefined => {
+    const { position, yaw } = actor.root
+    const elapsed = time - actor.moveStart
+    if (move.kind === 'walk') {
+      const dx = move.x - position[0]
+      if (Math.abs(dx) < CAPTURE_ARRIVAL) return undefined
+      // heads for the target along its lane, slowing as it nears it
+      const heading = Math.atan2(dx, (actor.lane - position[2]) * CAPTURE_LANE_PULL)
+      return { speed: Math.min(move.speed, CAPTURE_APPROACH * Math.abs(dx)), heading }
+    }
+    if (move.kind === 'turn') {
+      const facing = Math.abs(turnBetween(yaw, move.yaw)) < FACING_TOLERANCE
+      const done = facing || elapsed > move.seconds + CAPTURE_TURN_GRACE
+      return done ? undefined : { speed: 0, heading: move.yaw }
+    }
+    return elapsed >= move.seconds ? undefined : { speed: 0, heading: actor.facing ?? yaw }
+  }
+
+  /**
+   * Steps an actor that moves by motion capture: its next step becomes moves as for planned actors, each carried out
+   * as commands to its player, which the wind pushes; a poke shoves it away before it reacts.
+   */
+  const stepCaptured = (actor: Actor, player: Player, time: number): ActorFrame => {
+    let handover = false
+    if (actor.poked !== undefined) {
+      const away = Math.sign(actor.root.position[0] - actor.poked) || 1
+      player.push([away * CAPTURE_SHOVE, 0, 0])
+      actor.steps = [...config.reactions.poke.steps]
+      actor.activity = 'startled'
+      actor.moves = []
+      actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
+      actor.poked = undefined
+    }
+    let command: Command | undefined
+    for (let guard = 0; guard < CAPTURE_MOVES_PER_FRAME && command === undefined; guard++) {
+      if (actor.moves.length === 0) {
+        if (actor.steps.length === 0) {
+          actor.activity = pickActivity(config.activities, next())
+          actor.steps = [...config.activities[actor.activity].steps]
+          let friend = Math.floor(next() * (actors.length - 1))
+          if (friend >= actors.indexOf(actor)) friend++
+          actor.friend = actors.length > 1 ? friend : 0
+        }
+        actor.moves = movesOf(actor, actor.steps.shift() as Step, time)
+        actor.moveStart = time
+        handover = true
+      }
+      command = commandFor(actor, actor.moves[0], time)
+      if (command === undefined) {
+        actor.moves.shift()
+        actor.moveStart = time
+      }
+    }
+    const given = command ?? { speed: 0, heading: actor.facing ?? actor.root.yaw }
+    if (given.speed > 0 || command !== undefined) actor.facing = given.heading
+    player.command(given)
+    const wind = windAt(environment.wind, time)
+    player.wind[0] = wind[0]
+    player.wind[1] = wind[1]
+    player.wind[2] = wind[2]
+    const frame = player.step()
+    actor.root = frame.root
+    const body: Pose = { ...actor.rest, ...frame.pose }
+    const joints: Pose = {}
+    for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, frame.root)
+    springs(actor, frame.root, joints, frame.transforms)
+    const cloth = weather(actor, frame.root, body, frame.transforms)
+    const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
+    return {
+      name: actor.member.name,
+      joints,
+      root: frame.root,
+      activity: actor.activity,
+      ...(say === undefined ? {} : { say }),
+      ...(cloth === undefined ? {} : { cloth }),
+      ...(handover && frameIndex > 0 ? { handover: true as const } : {})
+    }
+  }
+
   const stepActor = (actor: Actor, time: number): ActorFrame => {
+    if (actor.player !== undefined) return stepCaptured(actor, actor.player, time)
     if (actor.poked !== undefined && actor.frames[actor.next]?.feet.every(foot => foot.planted) !== false) {
       const frame = actor.frames[Math.max(0, actor.next - 1)]
       if (frame !== undefined) {
@@ -463,8 +572,8 @@ export function createWorld (options: WorldOptions): World {
     const body: Pose = { ...actor.rest, ...pose }
     const joints: Pose = {}
     for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, frame.root)
-    springs(actor, frame, joints, transforms)
-    const cloth = weather(actor, frame, body, transforms)
+    springs(actor, frame.root, joints, transforms)
+    const cloth = weather(actor, frame.root, body, transforms)
     const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
     return {
       name: actor.member.name,

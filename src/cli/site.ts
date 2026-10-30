@@ -14,7 +14,10 @@ function commit (): string {
   }
 }
 
-/** The world config with every cast member's mannequin, style and rig, as one file for the browser. */
+/**
+ * The world config with every cast member's mannequin, style and rig, and the motion capture of the members that have
+ * a retarget.json, as one file for the browser.
+ */
 function worldBundle (examples: string): unknown {
   const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
   const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
@@ -29,7 +32,12 @@ function worldBundle (examples: string): unknown {
       motion: read(join(dir, 'motion.json'))
     }
   })
-  return { config, cast }
+  const clipDir = join(ROOT, 'motion', 'clips')
+  const clips = readdirSync(clipDir).filter(f => f.endsWith('.json')).sort().map(f => read(join(clipDir, f)))
+  const members = Object.fromEntries(config.cast
+    .filter(name => existsSync(join(examples, name, 'retarget.json')))
+    .map(name => [name, read(join(examples, name, 'retarget.json'))]))
+  return { config, cast, capture: { clips, base: read(join(ROOT, 'motion', 'humanoid.json')), members } }
 }
 
 /**

@@ -10,11 +10,15 @@ import { validateWorldConfig } from './config.ts'
 import type { Dress, WorldConfig } from './config.ts'
 import type { Scenario } from '../formats/sim.ts'
 import type { CastMember } from './world.ts'
+import { captureFor, readClips } from '../mocap/capture.ts'
+import type { CaptureData } from '../mocap/capture.ts'
 
 /** A world in one file for the browser: its config and every cast member's mannequin, style and rig as written. */
 export type WorldBundle = {
   config: unknown
   cast: Array<{ name: string, mannequin: unknown, style: unknown, rig: unknown, materials?: unknown, motion?: unknown }>
+  /** Motion capture for the cast members it names. */
+  capture?: CaptureData
 }
 export type ReadWorld = { config: WorldConfig, cast: CastMember[], looks: Look[] }
 
@@ -27,6 +31,9 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
   const errors: ValidationError[] = config.errors.map(e => ({ ...e, path: `config.${e.path}` }))
   const cast: CastMember[] = []
   const looks: Look[] = []
+  const capture = isRecord(input.capture) ? input.capture as CaptureData : undefined
+  const written = capture !== undefined && Array.isArray(capture.clips) ? capture.clips : []
+  const clips = readClips(written, errors, 'capture.clips')
   input.cast.forEach((member: unknown, i) => {
     const at = (file: string, e: ValidationError): ValidationError => ({ ...e, path: `cast[${i}].${file}.${e.path}` })
     if (!isRecord(member) || typeof member.name !== 'string') {
@@ -58,7 +65,13 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     }
     const look = { ...mannequin.value, parts: mannequin.value.parts.filter(part => !hidden.has(part.name)) }
     const clothed = cloth === undefined ? {} : { cloth }
-    cast.push({ name: member.name, mannequin: look, rig: resolved, ...clothed })
+    const own = capture?.members[member.name]
+    const database = own === undefined
+      ? undefined
+      : captureFor({ rig: resolved, mannequin: look }, clips, capture?.base, own, errors,
+        `capture.members.${member.name}`)
+    const captured = database === undefined ? {} : { capture: database }
+    cast.push({ name: member.name, mannequin: look, rig: resolved, ...clothed, ...captured })
     const drape = cloth === undefined ? {} : { cloth: cloth.scenario }
     looks.push({ mannequin: look, style: style.value, ...drape })
   })

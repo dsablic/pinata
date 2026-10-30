@@ -8,10 +8,7 @@ import { apply, between, multiply, transpose, yawMatrix } from '../math/matrix.t
 import type { Matrix } from '../math/matrix.ts'
 import { add, normalize, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import { toWorld } from '../sim/body.ts'
-import type { LocomotionRecording } from '../motion/metrics.ts'
-import { solePoints } from '../motion/metrics.ts'
-import { chainLength, legLabels } from '../motion/pose.ts'
+import { chainLength, footRadii } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { hierarchyOrder, parentsOf, placed, transformTo } from '../motion/skeleton.ts'
@@ -214,7 +211,8 @@ export function assemble (
   }
   const lift = legsOf(rig).map(leg => {
     const above = leg.side === 'right' ? frame.clearance.right : frame.clearance.left
-    const sole = Math.min(...solePoints(pose, leg, mannequin).map(p => p[1]))
+    const radii = footRadii(leg, mannequin)
+    const sole = Math.min(pose[leg.ankle][1] - radii.ankle, pose[leg.toe][1] - radii.toe)
     return { above, shift: above - sole }
   })
   // a soft minimum: the foot nearer its planted level counts most, and the weight moves smoothly between feet
@@ -243,23 +241,4 @@ export function retargetClip (clip: Clip, options: RetargetOptions): RetargetedF
     ...assemble(frame, options, hierarchy),
     contact: frame.contact
   }))
-}
-
-/** A retargeted clip as a locomotion recording, so the locomotion metrics and strips apply to it. */
-export function retargetedRecording (
-  frames: RetargetedFrame[],
-  options: RetargetOptions & { fps: number }
-): LocomotionRecording {
-  const labels = legLabels(options.rig, options.rest)
-  return {
-    fps: options.fps,
-    frames: frames.map((frame, i) => {
-      const joints: Pose = {}
-      for (const [name, local] of Object.entries({ ...options.rest, ...frame.pose })) {
-        joints[name] = toWorld(local, frame.root)
-      }
-      const planted = Object.fromEntries(labels.map((label, k) => [label, frame.contact[k]]))
-      return { time: i / options.fps, root: frame.root, joints, clamped: 0, planted }
-    })
-  }
 }

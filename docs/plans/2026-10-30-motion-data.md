@@ -139,3 +139,19 @@ characters on the same clip never move in lockstep.
   1). Controls left unseparated by 83% of judges, left picks 46%. Caveats: this is the third round, the pass is
   narrow, and the knight still reads better procedurally; the judges are three instances of one model and often
   answer alike. Rounds 1 and 2 stay recorded as fails.
+- **2026-10-30, batch C built.** The world bundle carries the clips once and each humanoid's `retarget.json`
+  (`src/mocap/capture.ts` builds its database); a cast member with a database gets a player, and the world's steps
+  become commands (walk to a point along its lane, slowing on arrival; turn; stand), the wind reaches its body, and a
+  poke shoves it away before the startled steps. The other characters keep planned footsteps, unchanged. Gates:
+  - Real-time: 8 characters in headless Chrome, 22.6 ms mean and 23.6 ms p95 per frame (budget 40 ms); the bundle is
+    857 KB, 232 KB gzipped (budget 2 MB).
+  - Adapts: a poke moves a captured actor more than 0.1 m and it plays the startled reaction (test); headwind as in B.
+  - Liveliness and locomotion on the showcase terrain over a minute: each captured actor starts at least 4
+    activities, covers 26% to 51% of its non-stop distance, and keeps slide and penetration 0 and knee limits 0 (test).
+  - Existing outputs byte-identical.
+  - **Fail, recorded: determinism across Node and Chrome.** Not caused by capture: the world without it differs too,
+    first at frame 4 (the procedural spider), in the last bit. Chrome 156's V8 computes sin, cos, tan, atan, atan2,
+    asin, acos, exp, expm1, log, cbrt and sinh differently from Node 24's V8 13.6 (sqrt, hypot and pow agree), so no
+    code using them can match across the two. Within one engine runs are identical. A fix, for the user to decide: a
+    deterministic math module (a port of the fdlibm functions V8 13.6 uses, so Node outputs stay byte-identical) used
+    everywhere in place of those Math functions.

@@ -16,13 +16,23 @@ import type { Terrain } from './terrain.ts'
 import type { WorldFrame } from './world.ts'
 
 /** The config's view, plus the depth of the walkable band (metres either side of z = 0) and the bubble glyphs. */
-export type WorldViewOptions = WorldConfig['view'] & { depth: number, glyphs: WorldConfig['glyphs'], palette: Palette }
+/**
+ * The config's view, plus the depth of the walkable band (metres either side of z = 0), the stretch of x the world
+ * uses, the bubble glyphs and the palette; the canvas size follows from them.
+ */
+export type WorldViewOptions = WorldConfig['view'] & {
+  depth: number
+  extent: [number, number]
+  glyphs: WorldConfig['glyphs']
+  palette: Palette
+}
 /** How a cast member is drawn: its mannequin and style, and its cloth scenario when it has a cape or chains. */
 export type Look = { mannequin: Mannequin, style: Style, cloth?: Scenario }
 
 type Sprite = { camera: Camera, previous?: GBuffer, size: number }
 
 const SPRITE_MARGIN = 1.15
+const MARGIN_PX = 8
 
 /**
  * How far a character can reach from its root in any direction, metres: its farthest joint plus the thickest part,
@@ -51,23 +61,44 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     azimuthDeg: options.azimuthDeg, elevationDeg: options.elevationDeg, targetHeightPx: ppu, modelHeight: 1,
     margin: 0
   })
-  const origin: Vec3 = [terrain.from + (options.width / 2) / ppu - 0.4, 0, 0]
-  const front: Vec3 = [0, 0, options.depth / 2]
-  const baseline = options.height - options.floorPx + dot(front, base.up) * ppu
-  const world: Camera = { ...base, width: options.width, height: options.height, baseline }
+  const heightOf = (span: Terrain['spans'][number]): number => {
+    return span.kind === 'flat' ? span.height : Math.max(span.start, span.end)
+  }
+  const top = Math.max(...terrain.spans.map(heightOf))
+  const tallest = Math.max(...looks.map(reachOf))
+  const corners: Vec3[] = []
+  for (const x of [options.extent[0], options.extent[1]]) {
+    for (const y of [0, top + tallest]) {
+      for (const z of [-options.depth / 2, options.depth / 2]) corners.push([x, y, z])
+    }
+  }
+  const across = corners.map(p => dot(p, base.right) * ppu)
+  const down = corners.map(p => -dot(p, base.up) * ppu)
+  const width = Math.ceil(Math.max(...across) - Math.min(...across)) + 2 * MARGIN_PX
+  const height = Math.ceil(Math.max(...down) - Math.min(...down)) + MARGIN_PX + options.floorPx
+  const left = Math.min(...across)
+  const shiftX = MARGIN_PX - left
+  const baseline = height - options.floorPx - Math.max(...down)
+  const world: Camera = { ...base, width, height, baseline }
   const screen = (p: Vec3): [number, number] => {
-    const q: Vec3 = [p[0] - origin[0], p[1], p[2]]
-    return [world.width / 2 + dot(q, world.right) * ppu, world.baseline - dot(q, world.up) * ppu]
+    return [shiftX + dot(p, world.right) * ppu, baseline - dot(p, world.up) * ppu]
   }
   const sprites: Sprite[] = looks.map(look => {
     const size = Math.ceil(2 * reachOf(look) * ppu * SPRITE_MARGIN) + 6
     const camera: Camera = { ...base, width: size, height: size, baseline: size }
     return { camera, size }
   })
-  let backdrop = drawTerrain(terrain, options, options.palette, screen)
+  let backdrop = drawTerrain(terrain, options, options.palette, screen, [width, height])
+
+  /** Where an actor's render box sits on the canvas: centred on its root's screen point. */
+  const boxOf = (i: number, root: Vec3): { left: number, top: number, size: number } => {
+    const anchor = screen(root)
+    const { size } = sprites[i]
+    return { left: Math.round(anchor[0] - size / 2), top: Math.round(anchor[1] - size / 2), size }
+  }
 
   const render = (frame: WorldFrame): Image => {
-    const out = createImage(options.width, options.height)
+    const out = createImage(width, height)
     out.data.set(backdrop.data)
     const depth = (i: number): number => frame.actors[i].root.position[2]
     const order = frame.actors.map((_, i) => i).sort((a, b) => depth(a) - depth(b))
@@ -77,8 +108,7 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
       const sprite = sprites[i]
       const root = actor.root.position
       const anchor = screen([root[0], root[1], root[2]])
-      const left = Math.round(anchor[0] - sprite.size / 2)
-      const top = Math.round(anchor[1] - sprite.size / 2)
+      const { left, top } = boxOf(i, root)
       const shift = add(
         scale(sprite.camera.right, (anchor[0] - left - sprite.size / 2) / ppu),
         scale(sprite.camera.up, (sprite.size - (anchor[1] - top)) / ppu)
@@ -108,8 +138,11 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     return out
   }
   /** Redraws the terrain in another scene's palette. */
-  const setPalette = (palette: Palette): void => { backdrop = drawTerrain(terrain, options, palette, screen) }
-  return { render, screen, setPalette, camera: world }
+  const setPalette = (palette: Palette): void => {
+    backdrop = drawTerrain(terrain, options, palette, screen, [width, height])
+  }
+  const boxes = (frame: WorldFrame) => frame.actors.map((actor, i) => boxOf(i, actor.root.position))
+  return { render, screen, setPalette, boxes, camera: world }
 }
 
 function turnY (v: Vec3, yaw: number): Vec3 {
@@ -153,9 +186,10 @@ function drawTerrain (
   terrain: Terrain,
   options: WorldViewOptions,
   palette: Palette,
-  screen: (p: Vec3) => [number, number]
+  screen: (p: Vec3) => [number, number],
+  size: [number, number]
 ): Image {
-  const out = createImage(options.width, options.height)
+  const out = createImage(size[0], size[1])
   const sky = parseHex(palette.sky)
   const top = parseHex(palette.top)
   const side = parseHex(palette.side)

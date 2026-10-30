@@ -50,8 +50,9 @@ export type World = {
   terrain: Terrain
   /** Gravity and wind for cloth, read every frame: change them to change the weather. */
   environment: WorldConfig['environment']
-  /** How far the depth lanes reach either side of z = 0, metres. */
+  /** How far the depth lanes reach either side of z = 0, metres, and the stretch of x the world uses. */
   lanes: number
+  extent: [number, number]
   step: () => WorldFrame
   /** Startles an actor, as a click on it from a side does: it reacts with the poke steps. */
   poke: (actor: number, fromX: number) => void
@@ -480,6 +481,7 @@ export function createWorld (options: WorldOptions): World {
     terrain,
     environment,
     lanes: (cast.length - 1) / 2 * config.lanes.spacing,
+    extent: [span[0] - EDGE, span[1] + EDGE],
     poke: (index, fromX) => {
       const actor = actors[index]
       if (actor !== undefined) actor.poked = fromX

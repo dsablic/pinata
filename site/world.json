@@ -139,8 +139,6 @@
   },
   "view": {
     "pixelsPerMetre": 34,
-    "width": 560,
-    "height": 170,
     "azimuthDeg": 12,
     "elevationDeg": 14,
     "samples": 1,

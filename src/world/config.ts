@@ -73,8 +73,6 @@ export type WorldConfig = {
   reactions: { poke: { say: string, steps: Step[] } }
   view: {
     pixelsPerMetre: number
-    width: number
-    height: number
     azimuthDeg: number
     elevationDeg: number
     samples: number
@@ -216,8 +214,6 @@ export const WORLD_SCHEMA: Schema = {
       kind: 'object',
       fields: {
         pixelsPerMetre: { kind: 'number', min: 4, max: 400 },
-        width: { kind: 'number', min: 16, max: 4096, integer: true },
-        height: { kind: 'number', min: 16, max: 4096, integer: true },
         azimuthDeg: { kind: 'number', min: -180, max: 180 },
         elevationDeg: { kind: 'number', min: -89, max: 89 },
         samples: { kind: 'number', min: 1, max: 4, integer: true },

@@ -49,12 +49,17 @@ function build (): void {
   const world = createWorld({ seed, cast, config, fps: FPS })
   const scene = byId<HTMLSelectElement>('scene').value || config.view.scene
   const view = createWorldView(world.terrain, data.looks.slice(0, count), {
-    ...config.view, depth: 2 * world.lanes + 0.8, glyphs: config.glyphs, palette: config.scenes[scene]
+    ...config.view,
+    depth: 2 * world.lanes + 0.8,
+    extent: world.extent,
+    glyphs: config.glyphs,
+    palette: config.scenes[scene]
   })
-  canvas.width = config.view.width
-  canvas.height = config.view.height
-  canvas.style.width = `${config.view.width * SCALE}px`
-  canvas.style.height = `${config.view.height * SCALE}px`
+  const { width, height } = view.camera
+  canvas.width = width
+  canvas.height = height
+  canvas.style.width = `${width * SCALE}px`
+  canvas.style.height = `${height * SCALE}px`
   weather(world)
   running = {
     world,

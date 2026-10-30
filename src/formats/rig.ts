@@ -12,6 +12,7 @@ export type { Arm, ArmLimb, AppendageLimb, Bend, Leg, LegLimb, Limb, Limits, Osc
 export { armsOf, legsOf, rankFromFront } from './limbs.ts'
 export type { TemplateName } from './templates.ts'
 
+export type Lateral = 'rest' | 'spacing'
 export type Gait = {
   strideLength: number
   referenceSpeed: number
@@ -21,6 +22,7 @@ export type Gait = {
   armSwingDegrees: number
   footSpacing: number
   strideExponent?: number
+  lateral?: Lateral
 }
 export type Rig = { template?: TemplateName, limbs: Limb[], pelvis: string, upperBody: string[], gait: Gait }
 
@@ -34,10 +36,10 @@ const PHASE_TOLERANCE = 1e-9
 const TEMPLATE_GAIT: ReadonlySet<string> = new Set(['stanceFraction', 'armSwingDegrees'])
 const GAIT_FIELDS = [
   'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing',
-  'strideExponent'
+  'strideExponent', 'lateral'
 ] as const
 
-const GAIT_RANGES: Record<keyof Gait, { min: number, max: number, note: string }> = {
+const GAIT_RANGES: Record<Exclude<keyof Gait, 'lateral'>, { min: number, max: number, note: string }> = {
   strideLength: { min: 0, max: 10, note: 'metres per full cycle, above 0 and at most 10' },
   referenceSpeed: { min: 0, max: 20, note: 'm/s, above 0 and at most 20' },
   stanceFraction: { min: 0.5, max: 0.8, note: 'fraction of the cycle a foot is planted, 0.5 to 0.8' },
@@ -47,7 +49,7 @@ const GAIT_RANGES: Record<keyof Gait, { min: number, max: number, note: string }
   footSpacing: { min: 0, max: 2, note: 'metres between foot plants, 0 to 2' },
   strideExponent: { min: 0.2, max: 1, note: 'how fast stride grows with speed, 0.2 to 1, default 0.5' }
 }
-const OPTIONAL_GAIT: ReadonlySet<string> = new Set(['strideExponent'])
+const OPTIONAL_GAIT: ReadonlySet<string> = new Set(['strideExponent', 'lateral'])
 const EXCLUSIVE_MINIMUM: ReadonlySet<string> = new Set(['strideLength', 'referenceSpeed'])
 
 export function stride (gait: Gait, speed: number): number {
@@ -179,7 +181,14 @@ function validateGait (gait: unknown, hasTemplate: boolean, errors: ValidationEr
     return
   }
   checkKnownKeys(gait, GAIT_FIELDS, 'gait', errors)
-  for (const field of GAIT_FIELDS) {
+  if (gait.lateral !== undefined && gait.lateral !== 'rest' && gait.lateral !== 'spacing') {
+    errors.push({
+      path: 'gait.lateral',
+      message: "expected 'rest' or 'spacing': 'rest' plants each foot at its rest ankle's sideways offset, " +
+        "'spacing' at footSpacing / 2 from the centre line"
+    })
+  }
+  for (const field of GAIT_FIELDS.filter(f => f !== 'lateral')) {
     const { min, max, note } = GAIT_RANGES[field]
     const v = gait[field]
     if (v === undefined && (OPTIONAL_GAIT.has(field) || (hasTemplate && TEMPLATE_GAIT.has(field)))) continue

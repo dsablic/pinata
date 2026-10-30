@@ -227,3 +227,23 @@ test('resolveRig leaves a rig without a template as it is', () => {
   delete plain.template
   assert.deepEqual(resolveRig(plain, { joints: {} }), plain)
 })
+
+test('lateral is rest for hexapod and octopod templates, spacing otherwise, and an explicit value wins', () => {
+  const legsFor = (zs: string[]): Input[] => zs.flatMap(t => [leg('left', `L${t}`), leg('right', `R${t}`)])
+  assert.equal(expand(templated('hexapod', legsFor(['1', '2', '3']))).gait.lateral, 'rest')
+  assert.equal(expand(templated('octopod', legsFor(['1', '2', '3', '4']))).gait.lateral, 'rest')
+  assert.equal(expand(templated('quadruped', QUAD())).gait.lateral, 'spacing')
+  assert.equal(expand(templated('biped', BIPED())).gait.lateral, 'spacing')
+  const spaced = templated('hexapod', legsFor(['1', '2', '3']), { ...GAIT, lateral: 'spacing' })
+  assert.equal(expand(spaced).gait.lateral, 'spacing')
+})
+
+test('gait lateral is optional and must be rest or spacing', () => {
+  const plain = templated('biped', BIPED(), { ...GAIT, stanceFraction: 0.6, armSwingDegrees: 10, lateral: 'rest' })
+  delete plain.template
+  assert.deepEqual(validateRig(plain).errors, [])
+  const bad = templated('biped', BIPED(), { ...GAIT, lateral: 'wide' })
+  const errors = validateRig(bad).errors
+  assert.deepEqual(errors.map(e => e.path), ['gait.lateral'])
+  assert.match(errors[0].message, /expected 'rest' or 'spacing'/)
+})

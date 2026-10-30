@@ -16,10 +16,11 @@ export type TemplateDefaults = {
   stanceFraction: number
   armSwingDegrees: number
   phaseStep: number
+  lateral: 'rest' | 'spacing'
   bends: Bend[]
   gaitPerLegLength: GaitPerLegLength
 }
-export type TemplateGait = { stanceFraction?: number, armSwingDegrees?: number }
+export type TemplateGait = { stanceFraction?: number, armSwingDegrees?: number, lateral?: 'rest' | 'spacing' }
 
 const TEMPLATES: Record<TemplateName, TemplateDefaults> = {
   biped: {
@@ -29,6 +30,7 @@ const TEMPLATES: Record<TemplateName, TemplateDefaults> = {
     stanceFraction: 0.6,
     armSwingDegrees: 20,
     phaseStep: 0.5,
+    lateral: 'spacing',
     bends: ['forward'],
     gaitPerLegLength: {
       strideLength: 1.4, referenceSpeed: 1.8, stepHeight: 0.12, bobAmplitude: 0.035, footSpacing: 0.37
@@ -41,6 +43,7 @@ const TEMPLATES: Record<TemplateName, TemplateDefaults> = {
     stanceFraction: 0.75,
     armSwingDegrees: 0,
     phaseStep: 0.25,
+    lateral: 'spacing',
     bends: ['backward', 'forward'],
     gaitPerLegLength: {
       strideLength: 0.85, referenceSpeed: 0.75, stepHeight: 0.15, bobAmplitude: 0.017, footSpacing: 0.38
@@ -53,6 +56,7 @@ const TEMPLATES: Record<TemplateName, TemplateDefaults> = {
     stanceFraction: 0.6,
     armSwingDegrees: 0,
     phaseStep: 0.5,
+    lateral: 'rest',
     bends: ['forward'],
     gaitPerLegLength: {
       strideLength: 0.6, referenceSpeed: 0.8, stepHeight: 0.12, bobAmplitude: 0.01, footSpacing: 0.35
@@ -65,6 +69,7 @@ const TEMPLATES: Record<TemplateName, TemplateDefaults> = {
     stanceFraction: 0.6,
     armSwingDegrees: 0,
     phaseStep: 0.5,
+    lateral: 'rest',
     bends: ['forward'],
     gaitPerLegLength: {
       strideLength: 0.5, referenceSpeed: 0.6, stepHeight: 0.1, bobAmplitude: 0.008, footSpacing: 0.3
@@ -86,6 +91,7 @@ export function applyGaitDefaults (name: TemplateName, gait: TemplateGait): void
   const defaults = TEMPLATES[name]
   gait.stanceFraction ??= defaults.stanceFraction
   gait.armSwingDegrees ??= defaults.armSwingDegrees
+  gait.lateral ??= defaults.lateral
 }
 
 /**

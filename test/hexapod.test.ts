@@ -187,3 +187,39 @@ test('bend up puts every knee above its hip on a splayed leg', () => {
     assertClose(bone(pose, leg.hip, leg.knee), bone(wideRest, leg.hip, leg.knee), 1e-9)
   }
 })
+
+test('a splayed hexapod keeps its spread while walking and at the stop when lateral is rest', () => {
+  const wide = splayed()
+  const wideRest = restPose(wide)
+  const spread = { ...rig, gait: { ...rig.gait, lateral: 'rest' as const } }
+  const frames = planGait({
+    track: walkTrack(0.5, 5), rig: spread, rest: wideRest, mannequin: wide, duration: 8, fps: FPS
+  })
+  const last = frames[frames.length - 1]
+  let planted = 0
+  for (const frame of frames) {
+    legsOf(spread).forEach((leg, k) => {
+      if (!frame.feet[k].planted) return
+      planted++
+      assertClose(frame.feet[k].ankle[0], wideRest[leg.ankle][0], 1e-9)
+    })
+  }
+  assert.ok(planted > 200)
+  assert.ok(last.feet.every(foot => foot.planted))
+  legsOf(spread).forEach((leg, k) => assertClose(last.feet[k].ankle[0], wideRest[leg.ankle][0], 1e-9))
+  const { clamped } = poseAt({ frame: last, rig: spread, rest: wideRest, mannequin: wide })
+  assert.equal(clamped, 0)
+})
+
+test('without lateral rest the feet plant footSpacing / 2 from the centre line', () => {
+  const wide = splayed()
+  const frames = planGait({
+    track: walkTrack(0.5, 5), rig, rest: restPose(wide), mannequin: wide, duration: 8, fps: FPS
+  })
+  const spacing = rig.gait.footSpacing
+  for (const frame of frames.slice(120)) {
+    frame.feet.forEach(foot => {
+      if (foot.planted) assertClose(Math.abs(foot.ankle[0]), spacing / 2, 1e-9)
+    })
+  }
+})

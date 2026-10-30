@@ -170,6 +170,7 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
   const { track, rig, rest, mannequin, fps } = options
   const { gait } = rig
   const start = track(0)
+  const rested = gait.lateral === 'rest'
   const feet = legsOf(rig).map((leg, index): Foot => {
     const restAnkle = rest[leg.ankle]
     const planted: Vec3 = [restAnkle[0], restAnkle[1] - soleHeight(leg, rest, mannequin), restAnkle[2]]
@@ -198,13 +199,13 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
     if (isAtRest(landed)) {
       const side = lateral(landed.yaw)
       const beside = feet[foot.partner].plants[feet[foot.partner].plants.length - 1].ankle
-      const gap = foot.sign * gait.footSpacing
+      const gap = rested ? foot.planted[0] - feet[foot.partner].planted[0] : foot.sign * gait.footSpacing
       ankle = [beside[0] + side[0] * gap, beside[1], beside[2] + side[2] * gap]
       yaw = landed.yaw
     } else {
       const middle = track(timeAtPhase(phase, fps, landing + gait.stanceFraction / 2))
       const side = lateral(middle.yaw)
-      const offset = foot.sign * gait.footSpacing / 2
+      const offset = rested ? foot.planted[0] : foot.sign * gait.footSpacing / 2
       const forward = ahead(middle.yaw, foot.restHip[2])
       ankle = [
         middle.position[0] + side[0] * offset + forward[0],

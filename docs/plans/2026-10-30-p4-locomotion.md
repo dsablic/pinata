@@ -245,3 +245,9 @@ Supersedes two lines of the previous amendment:
 Scenario timings for Task C4 (known limits, logged in the findings): `accelSeconds` 0.5 (0.3 gives a 594 deg/s
 knee peak, a thin pass); the 180 degree pivot takes 1.5 s (1.0 s gives 659 deg/s, a fail). Starting gait as in the
 previous amendment with `strideExponent` 0.75 and `stepHeight` 0.08 (keep it at or below 0.1).
+
+## Amendment after the first P4 run (stricter)
+
+The first run passed every gate, but the walk strip shows the knight's sword tip swinging below the floor: only the
+feet were checked against the ground. New gate `partGroundPenetrationPx <= 0.5` per scenario: the lowest point of
+any part other than the feet (capsule end spheres; box corners) below y = 0, at 48px scale.

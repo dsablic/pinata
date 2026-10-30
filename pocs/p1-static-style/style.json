@@ -1,0 +1,16 @@
+{
+  "name": "default",
+  "light": [-0.5, 0.7, 0.5],
+  "bands": [0.05, 0.6],
+  "outline": "#1b1421",
+  "innerLineDepth": 0.12,
+  "decalMinFacing": 0.3,
+  "materials": {
+    "steel": ["#4a5368", "#8492ad", "#d0dbea"],
+    "steel-dark": ["#2b3040", "#4f5870", "#7d89a3"],
+    "leather": ["#3d2618", "#70452b", "#a8734a"],
+    "cloth-red": ["#4f1622", "#8e2a35", "#d0554e"],
+    "blade": ["#6a788c", "#b4c3d3", "#f2f7fb"]
+  },
+  "decalColors": { "x": "#1b1421" }
+}

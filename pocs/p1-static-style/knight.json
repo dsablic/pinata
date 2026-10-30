@@ -1,0 +1,66 @@
+{
+  "name": "knight",
+  "height": 1.8,
+  "joints": {
+    "hipsBottom": [0, 0.66, 0],
+    "pelvis": [0, 0.82, 0],
+    "chest": [0, 1.22, 0],
+    "head": [0, 1.5, 0],
+    "visor": [0, 1.52, 0.27],
+    "capeTop": [0, 1.2, -0.18],
+    "capeHem": [0, 0.35, -0.3],
+    "hipL": [0.13, 0.8, 0],
+    "kneeL": [0.13, 0.44, 0.01],
+    "ankleL": [0.13, 0.1, 0],
+    "toeL": [0.13, 0.06, 0.16],
+    "hipR": [-0.13, 0.8, 0],
+    "kneeR": [-0.13, 0.44, 0.01],
+    "ankleR": [-0.13, 0.1, 0],
+    "toeR": [-0.13, 0.06, 0.16],
+    "shoulderL": [0.33, 1.18, 0],
+    "elbowL": [0.37, 0.94, 0],
+    "wristL": [0.38, 0.72, 0.02],
+    "handL": [0.38, 0.66, 0.03],
+    "shoulderR": [-0.33, 1.18, 0],
+    "elbowR": [-0.37, 0.94, 0],
+    "wristR": [-0.38, 0.72, 0.02],
+    "handR": [-0.38, 0.66, 0.03],
+    "swordTip": [-0.42, 0.12, 0.42]
+  },
+  "parts": [
+    { "name": "helmet", "shape": "capsule", "a": "head", "b": "head", "radiusA": 0.27, "radiusB": 0.27, "material": "steel" },
+    {
+      "name": "torso", "shape": "box", "a": "pelvis", "b": "chest",
+      "width": 0.52, "thickness": 0.32, "rounding": 0.1, "widthAxis": [1, 0, 0], "material": "steel"
+    },
+    {
+      "name": "hips", "shape": "box", "a": "hipsBottom", "b": "pelvis",
+      "width": 0.44, "thickness": 0.28, "rounding": 0.08, "widthAxis": [1, 0, 0], "material": "leather"
+    },
+    {
+      "name": "cape", "shape": "box", "a": "capeTop", "b": "capeHem",
+      "width": 0.58, "thickness": 0.06, "rounding": 0.025, "widthAxis": [1, 0, 0], "material": "cloth-red"
+    },
+    { "name": "thighL", "shape": "capsule", "a": "hipL", "b": "kneeL", "radiusA": 0.11, "radiusB": 0.1, "material": "steel-dark" },
+    { "name": "shinL", "shape": "capsule", "a": "kneeL", "b": "ankleL", "radiusA": 0.1, "radiusB": 0.085, "material": "steel-dark" },
+    { "name": "footL", "shape": "capsule", "a": "ankleL", "b": "toeL", "radiusA": 0.075, "radiusB": 0.065, "material": "leather" },
+    { "name": "thighR", "shape": "capsule", "a": "hipR", "b": "kneeR", "radiusA": 0.11, "radiusB": 0.1, "material": "steel-dark" },
+    { "name": "shinR", "shape": "capsule", "a": "kneeR", "b": "ankleR", "radiusA": 0.1, "radiusB": 0.085, "material": "steel-dark" },
+    { "name": "footR", "shape": "capsule", "a": "ankleR", "b": "toeR", "radiusA": 0.075, "radiusB": 0.065, "material": "leather" },
+    { "name": "pauldronL", "shape": "capsule", "a": "shoulderL", "b": "shoulderL", "radiusA": 0.13, "radiusB": 0.13, "material": "steel" },
+    { "name": "upperArmL", "shape": "capsule", "a": "shoulderL", "b": "elbowL", "radiusA": 0.095, "radiusB": 0.085, "material": "steel-dark" },
+    { "name": "forearmL", "shape": "capsule", "a": "elbowL", "b": "wristL", "radiusA": 0.085, "radiusB": 0.075, "material": "steel-dark" },
+    { "name": "handL", "shape": "capsule", "a": "handL", "b": "handL", "radiusA": 0.085, "radiusB": 0.085, "material": "leather" },
+    { "name": "pauldronR", "shape": "capsule", "a": "shoulderR", "b": "shoulderR", "radiusA": 0.13, "radiusB": 0.13, "material": "steel" },
+    { "name": "upperArmR", "shape": "capsule", "a": "shoulderR", "b": "elbowR", "radiusA": 0.095, "radiusB": 0.085, "material": "steel-dark" },
+    { "name": "forearmR", "shape": "capsule", "a": "elbowR", "b": "wristR", "radiusA": 0.085, "radiusB": 0.075, "material": "steel-dark" },
+    { "name": "handR", "shape": "capsule", "a": "handR", "b": "handR", "radiusA": 0.085, "radiusB": 0.085, "material": "leather" },
+    {
+      "name": "sword", "shape": "capsule", "a": "handR", "b": "swordTip",
+      "radiusA": 0.035, "radiusB": 0.03, "material": "blade", "allowThin": true
+    }
+  ],
+  "decals": [
+    { "name": "visor", "anchor": "visor", "normal": [0, 0, 1], "pattern": ["xxx"] }
+  ]
+}

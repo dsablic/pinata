@@ -9,13 +9,15 @@ import type { Camera } from '../raster/camera.ts'
 import { EMPTY } from '../raster/gbuffer.ts'
 import type { GBuffer } from '../raster/gbuffer.ts'
 
+const MAX_STRAY_PASSES = 5
+
 export type StylizeResult = { image: Image, decalMask: Uint8Array }
 
 export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): StylizeResult {
   const shaded = createImage(g.width, g.height)
   shade(shaded, g, m, style)
   drawInnerLines(shaded, g, m, style)
-  const image = removeStrays(shaded, g)
+  const image = removeStrays(shaded, g, m)
   const decalMask = drawDecals(image, g, m, cam, style)
   drawOutline(image, parseHex(style.outline))
   return { image, decalMask }
@@ -69,27 +71,42 @@ function mostCommon (values: number[]): number {
   return best
 }
 
-function removeStrays (image: Image, g: GBuffer): Image {
+function removeStrays (image: Image, g: GBuffer, m: Mannequin): Image {
   const out: Image = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.data) }
+  for (let pass = 0; pass < MAX_STRAY_PASSES; pass++) {
+    if (!strayPass(out, g, m)) break
+  }
+  return out
+}
+
+function strayPass (image: Image, g: GBuffer, m: Mannequin): boolean {
+  let changed = false
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
       const part = g.part[y * g.width + x]
       if (part === EMPTY) continue
       const c = getPixel(image, x, y)
-      const around: number[] = []
+      const same: number[] = []
+      const other: number[] = []
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = x + dx
           const ny = y + dy
           if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= g.width || ny >= g.height) continue
-          if (g.part[ny * g.width + nx] === part) around.push(getPixel(image, nx, ny))
+          const neighbour = g.part[ny * g.width + nx]
+          if (neighbour === EMPTY) continue
+          const list = neighbour === part ? same : other
+          list.push(getPixel(image, nx, ny))
         }
       }
+      if (same.length === 0 && m.parts[part].allowThin === true) continue
+      const around = same.length > 0 ? same : other
       if (around.length === 0 || around.includes(c)) continue
-      setPixel(out, x, y, mostCommon(around))
+      setPixel(image, x, y, mostCommon(around))
+      changed = true
     }
   }
-  return out
+  return changed
 }
 
 function drawDecals (image: Image, g: GBuffer, m: Mannequin, cam: Camera, style: Style): Uint8Array {

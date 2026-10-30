@@ -103,13 +103,37 @@ test('shades an allowThin part with the middle ramp colour and keeps it free of 
   for (let k = 1; k <= 3; k++) assert.equal(getPixel(image, k, k), 0x00aa00)
 })
 
-test('leaves a pixel alone when it has no neighbours of its own part', () => {
+test('resolves a one pixel diagonal band that alternates two shades', () => {
+  const g = block([0, 0, 1])
+  g.part.fill(EMPTY)
+  for (let k = 1; k <= 3; k++) {
+    const i = k * 5 + k
+    g.part[i] = 0
+    g.normal.set([0, 0, k % 2 === 0 ? 1 : -1], i * 3)
+  }
+  const { image } = stylize(g, mannequin, camera, style)
+  const colours = new Set([1, 2, 3].map(k => getPixel(image, k, k)))
+  assert.equal(colours.size, 1)
+})
+
+test('gives a single pixel fragment the colour of the part around it', () => {
   const g = block([0, 0, 1])
   const two: Mannequin = { ...mannequin, parts: [...mannequin.parts, { ...mannequin.parts[0], name: 'q' }] }
   g.part[2 * 5 + 2] = 1
   g.normal.set([0, 0, -1], (2 * 5 + 2) * 3)
   const { image } = stylize(g, two, camera, style)
-  assert.equal(getPixel(image, 2, 2), DARK)
+  assert.equal(getPixel(image, 2, 2), LIGHT)
+})
+
+test('keeps an isolated allowThin pixel as it is', () => {
+  const g = block([0, 0, 1])
+  const thin: Mannequin = {
+    ...mannequin,
+    parts: [...mannequin.parts, { ...mannequin.parts[0], name: 'q', allowThin: true }]
+  }
+  g.part[2 * 5 + 2] = 1
+  const { image } = stylize(g, thin, camera, style)
+  assert.equal(getPixel(image, 2, 2), 0x0000ff)
 })
 
 const eye = { name: 'eye', anchor: 'o', normal: [0, 0, 1] as Vec3, pattern: ['x'] }

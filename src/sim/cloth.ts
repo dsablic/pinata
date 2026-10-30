@@ -87,8 +87,11 @@ export function buildChain (chain: Chain, m: Mannequin, material: SimMaterial): 
   const constraints: DistanceConstraint[] = []
   constrain(constraints, points, stretch, material.stretchCompliance)
   constrain(constraints, points, bend, material.bendCompliance)
-  const pins: Pin[] = [{ particle: 0, joint: chain.anchor, offset: [0, 0, 0] }]
-  return { particles: createParticles(points, material, new Set([0])), constraints, pins, material: [material] }
+  const pins: Pin[] = [
+    { particle: 0, joint: chain.anchor, offset: [0, 0, 0] },
+    { particle: 1, joint: chain.anchor, offset: step }
+  ]
+  return { particles: createParticles(points, material, new Set([0, 1])), constraints, pins, material: [material] }
 }
 
 export function mergeSystems (systems: System[]): System {

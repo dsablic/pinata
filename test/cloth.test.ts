@@ -61,13 +61,16 @@ test('only the top row of the cape is pinned, at interpolated anchor offsets', (
   assertClose(joint[1] + middle.offset[1], 1.5, 1e-9)
 })
 
-test('a chain has links + 1 particles, a pinned root and structural plus bending constraints', () => {
+test('a chain has links + 1 particles, two pinned particles and structural plus bending constraints', () => {
   const chain: Chain = { anchor: 'head', links: 6, linkLength: 0.05, direction: [0, 2, 0], material: 'wool' }
   const system = buildChain(chain, body, wool)
   assert.equal(system.particles.count, 7)
   assert.equal(system.constraints.length, 6 + 5)
-  assert.deepEqual(system.pins.map(pin => pin.particle), [0])
+  assert.deepEqual(system.pins.map(pin => pin.particle), [0, 1])
   assert.equal(system.particles.inverseMass[0], 0)
+  assert.equal(system.particles.inverseMass[1], 0)
+  assert.equal(system.particles.inverseMass[2], 1 / 0.05)
+  assertClose(system.pins[1].offset[1], 0.05, 1e-9)
   assertClose(system.particles.position[3 * 6 + 1], 1.8 + 0.3, 1e-9)
   const rests = system.constraints.map(c => c.rest)
   assert.equal(rests.filter(r => Math.abs(r - 0.05) < 1e-9).length, 6)
@@ -81,8 +84,9 @@ test('merging offsets particle and pin indices and keeps materials per particle'
   const merged = mergeSystems([a, b])
   assert.equal(merged.particles.count, 15)
   assert.equal(merged.constraints.length, a.constraints.length + b.constraints.length)
-  assert.equal(merged.pins.length, 4)
+  assert.equal(merged.pins.length, 5)
   assert.equal(merged.pins[3].particle, 12)
+  assert.equal(merged.pins[4].particle, 13)
   const last = merged.constraints[merged.constraints.length - 1]
   assert.ok(last.a >= 12 && last.b >= 12)
   assert.equal(merged.material[merged.particles.materialIndex[0]].name, 'silk')

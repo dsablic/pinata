@@ -48,21 +48,21 @@ function linkLengths (system: System): number[] {
   ))
 }
 
-test('a swinging 10-link chain settles hanging straight down with links near rest length', () => {
+test('a 10-link chain pinned horizontally settles hanging down from its pins with links near rest length', () => {
   const system = chain(10, [1, 0, 0], { ...rope, damping: 2 })
   run(system, {}, 5)
   const p = system.particles.position
-  for (let i = 0; i <= 10; i++) {
-    assertClose(p[3 * i], 0, 0.02)
-    assertClose(p[3 * i + 1], 2 - 0.1 * i, 0.02)
+  for (let i = 3; i <= 10; i++) {
+    assertClose(p[3 * i], 0.22, 0.02)
+    assertClose(p[3 * i + 1], 1.84 - 0.1 * (i - 3), 0.02)
   }
-  for (const length of linkLengths(system)) assert.ok(Math.abs(length - 0.1) <= 0.002, `link ${length}`)
+  for (const length of linkLengths(system).slice(3)) assert.ok(Math.abs(length - 0.1) <= 0.002, `link ${length}`)
 })
 
 test('a free particle dropped on a sphere ends outside it', () => {
   const system = chain(1, [0, 1, 0], rope)
   system.pins.length = 0
-  system.particles.inverseMass[0] = 1 / 0.05
+  system.particles.inverseMass.fill(1 / 0.05)
   system.constraints.length = 0
   system.particles.position.set([0.1, 1.5, 0, 0.3, 1.5, 0])
   system.particles.previous.set(system.particles.position)
@@ -76,23 +76,27 @@ test('a free particle dropped on a sphere ends outside it', () => {
   }
 })
 
-function pendulumEnergy (damping: number): number {
+function pendulumEnergy (damping: number, length: number, dt: number): number {
   const material = { ...rope, damping }
-  const pendulum: Chain = { anchor: 'top', links: 1, linkLength: 1, direction: [1, 0, 0], material: 'rope' }
+  const pendulum: Chain = { anchor: 'top', links: 2, linkLength: length, direction: [1, 0, 0], material: 'rope' }
   const system = buildChain(pendulum, body, material)
-  run(system, {}, 1)
+  system.constraints.splice(2)
+  const steps = Math.round(1 / dt)
+  for (let k = 1; k <= steps; k++) {
+    step(system, { env, body, exclude: [], track: stillTrack, t: k * dt, dt })
+  }
   const p = system.particles
   const v = Math.hypot(
-    p.position[3] - p.previous[3], p.position[4] - p.previous[4], p.position[5] - p.previous[5]
-  ) / DT
+    p.position[6] - p.previous[6], p.position[7] - p.previous[7], p.position[8] - p.previous[8]
+  ) / dt
   const mass = 0.05
-  const total = 0.5 * mass * v * v + mass * 9.81 * (p.position[4] - 1)
-  return total / (mass * 9.81)
+  const total = 0.5 * mass * v * v + mass * 9.81 * (p.position[7] - (2 - length))
+  return total / (mass * 9.81 * length)
 }
 
 test('an undamped pendulum keeps most of its energy over a second and a damped one loses most', () => {
-  const free = pendulumEnergy(0)
-  const damped = pendulumEnergy(2)
+  const free = pendulumEnergy(0, 1, DT)
+  const damped = pendulumEnergy(2, 1, DT)
   assert.ok(free > 0.9 && free < 1.05, `undamped ${free}`)
   assert.ok(damped < 0.5, `damped ${damped}`)
 })

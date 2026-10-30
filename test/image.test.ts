@@ -34,3 +34,11 @@ test('imageHash changes when a pixel changes', () => {
   setPixel(img, 0, 0, 0xffffff)
   assert.notEqual(imageHash(img), before)
 })
+
+test('writes outside the image are ignored', () => {
+  const img = createImage(2, 2)
+  setPixel(img, -1, 0, 0xffffff)
+  setPixel(img, 2, 0, 0xffffff)
+  setPixel(img, 0, 2, 0xffffff)
+  assert.ok(img.data.every((v) => v === 0))
+})

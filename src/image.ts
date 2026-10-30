@@ -23,6 +23,7 @@ export function getPixel (img: Image, x: number, y: number): number {
 }
 
 export function setPixel (img: Image, x: number, y: number, rgb: number): void {
+  if (x < 0 || y < 0 || x >= img.width || y >= img.height) return
   const i = (y * img.width + x) * 4
   if (rgb === TRANSPARENT) {
     img.data.fill(0, i, i + 4)

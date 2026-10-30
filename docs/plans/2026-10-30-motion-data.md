@@ -30,6 +30,14 @@ alone still reads as constructed motion.
   through the hierarchy. Characters whose proportions differ from a human (the dwarf's short legs, the wizard's robe)
   stay readable because only directions transfer.
 
+## Character style
+
+The same clip should not make every character move alike (user, 2026-10-30). Each character's retargeting carries a
+declarative `style`: per-joint amplitude (scale a joint's rotation about its mean in the clip, so a rogue swings its
+arms wider and a knight keeps its shoulders stiff), per-joint posture offsets (a dwarf's forward hunch, a wizard's bowed
+head), playback rate and stride, which takes it draws from or blends between, and seeded small variation so two
+characters on the same clip never move in lockstep.
+
 ## Playback
 
 - **Selection:** a small motion-matching loop. Each candidate frame is scored on its root velocity and the next
@@ -50,6 +58,7 @@ alone still reads as constructed motion.
 | Retargeting | bone lengths kept within 1e-9; a retargeted standing pose keeps both feet within 2 cm of the ground | unit tests |
 | Locomotion quality | foot slide <= 0.25 px, penetration <= 0.5 px, reach violations 0, knee limits 0 on every humanoid walking a generated course for 60 s | as the existing gates |
 | Natural | blind judge panel (both orders, a control): mocap-driven walk strips against the current procedural ones for the four humanoids, "which moves more naturally"; mocap picked in at least 80% of non-control answers | the point of the work |
+| Style | two characters on the same clip with different styles: their joint angle series differ by at least 5 degrees RMS on the styled joints; with the neutral style, retargeting is unchanged | parameters matter |
 | Transitions | at a clip switch, no joint moves more than 3 times its median per-frame movement of the surrounding second | smooth blending |
 | Adapts | a 4 m/s headwind slows the walk by at least 10%; a poke moves the body at least 0.1 m and plays a reaction | physics leads |
 | Real-time | 8 characters on the showcase page: p95 <= 40 ms in headless Chrome; clip data adds at most 2 MB gzipped | budget |
@@ -64,3 +73,15 @@ alone still reads as constructed motion.
   leading; quality and transition gates on terrain. Review.
 - **C. The world:** humanoids switch to mocap playback, activities set goals, wind, pokes and quakes act through the
   body; the remaining gates. Review, then release.
+
+## Log
+
+- **2026-10-30, batch A in progress.** ASF/AMC reader (`src/mocap/asf.ts`), clip format and conversion
+  (`src/mocap/clip.ts`, `npm run mocap`), eight CMU takes in `motion/clips` (724 KB, 204 KB gzipped), retargeting
+  (`src/mocap/retarget.ts`, `motion/humanoid.json`, each humanoid's `retarget.json`). Gates so far: existing outputs
+  byte-identical; licence (each clip names its take, tested); bone lengths kept (error ~1e-15); standing feet within
+  2 cm for rogue, dwarf and wizard (at most 0.9 cm). **Fail, recorded:** the knight's standing feet are 2.3 cm apart in
+  height, because its right leg is 1.3 cm longer than its left and modelled stepping forward, and one vertical
+  placement cannot put both down; the test is a todo until foot locking (batch B). Before IK, foot slide on the walk
+  is 2.0 to 3.7 px, also for batch B. Remaining in A: character style, the strip render command, the early judge
+  panel, review.

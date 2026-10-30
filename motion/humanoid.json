@@ -1,0 +1,8 @@
+{
+  "aim": {
+    "hipL": "lfemur", "kneeL": "ltibia", "hipR": "rfemur", "kneeR": "rtibia",
+    "shoulderL": "lhumerus", "elbowL": "lradius", "wristL": "lhand",
+    "shoulderR": "rhumerus", "elbowR": "rradius", "wristR": "rhand"
+  },
+  "turn": { "pelvis": "root", "chest": "thorax", "head": "head", "ankleL": "lfoot", "ankleR": "rfoot" }
+}

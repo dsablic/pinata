@@ -1,0 +1,18 @@
+{
+  "hang": {
+    "chest": [
+      "shoulderL",
+      "shoulderR",
+      "head",
+      "cloakL",
+      "cloakR",
+      "cloakTop"
+    ],
+    "head": [
+      "helmet",
+      "chin",
+      "eyeL",
+      "eyeR"
+    ]
+  }
+}

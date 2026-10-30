@@ -1,0 +1,19 @@
+{
+  "hang": {
+    "chest": [
+      "shoulderL",
+      "shoulderR",
+      "head"
+    ],
+    "head": [
+      "hatBase",
+      "hatTip",
+      "brimA",
+      "brimB",
+      "eyeL",
+      "eyeR",
+      "beardTop",
+      "beardTip"
+    ]
+  }
+}

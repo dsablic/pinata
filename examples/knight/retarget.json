@@ -1,0 +1,22 @@
+{
+  "hang": {
+    "chest": [
+      "shoulderL",
+      "shoulderR",
+      "head",
+      "emblem",
+      "capeTopL",
+      "capeTopR",
+      "capeAnchorL",
+      "capeAnchorR"
+    ],
+    "head": [
+      "visor",
+      "visorL",
+      "visorR",
+      "plumeFront",
+      "plumeBack",
+      "plumeBase"
+    ]
+  }
+}

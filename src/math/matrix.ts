@@ -77,3 +77,39 @@ export function interpolate (a: Matrix, b: Matrix, u: number): Matrix {
   if (angle === 0) return a
   return multiply(axisAngle(axis, angle * u), a)
 }
+
+/** Rotation by x, then y, then z radians about the fixed axes (Rz · Ry · Rx), as ASF and AMC files compose them. */
+export function eulerXyz (x: number, y: number, z: number): Matrix {
+  return multiply(axisAngle([0, 0, 1], z), multiply(axisAngle([0, 1, 0], y), axisAngle([1, 0, 0], x)))
+}
+
+/** The rotation of a unit quaternion [w, x, y, z]; the quaternion is normalized first. */
+export function fromQuaternion (q: readonly number[]): Matrix {
+  const size = Math.hypot(q[0], q[1], q[2], q[3])
+  const [w, x, y, z] = q.map(v => v / size)
+  return [
+    [1 - 2 * (y * y + z * z), 2 * (x * y - w * z), 2 * (x * z + w * y)],
+    [2 * (x * y + w * z), 1 - 2 * (x * x + z * z), 2 * (y * z - w * x)],
+    [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)]
+  ]
+}
+
+/** The unit quaternion [w, x, y, z] of a rotation matrix, with w >= 0. */
+export function toQuaternion (m: Matrix): [number, number, number, number] {
+  const trace = m[0][0] + m[1][1] + m[2][2]
+  let q: [number, number, number, number]
+  if (trace > 0) {
+    const s = 2 * Math.sqrt(trace + 1)
+    q = [s / 4, (m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s]
+  } else if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) {
+    const s = 2 * Math.sqrt(1 + m[0][0] - m[1][1] - m[2][2])
+    q = [(m[2][1] - m[1][2]) / s, s / 4, (m[0][1] + m[1][0]) / s, (m[0][2] + m[2][0]) / s]
+  } else if (m[1][1] > m[2][2]) {
+    const s = 2 * Math.sqrt(1 + m[1][1] - m[0][0] - m[2][2])
+    q = [(m[0][2] - m[2][0]) / s, (m[0][1] + m[1][0]) / s, s / 4, (m[1][2] + m[2][1]) / s]
+  } else {
+    const s = 2 * Math.sqrt(1 + m[2][2] - m[0][0] - m[1][1])
+    q = [(m[1][0] - m[0][1]) / s, (m[0][2] + m[2][0]) / s, (m[1][2] + m[2][1]) / s, s / 4]
+  }
+  return q[0] < 0 ? [-q[0], -q[1], -q[2], -q[3]] : q
+}

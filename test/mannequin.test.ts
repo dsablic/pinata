@@ -120,3 +120,50 @@ test('returned value does not alias the input', () => {
   assert.notEqual(value?.joints, input.joints)
   assert.notEqual(value?.parts[0], input.parts[0])
 })
+
+test('rejects direction vectors whose length overflows', () => {
+  const input = valid()
+  input.parts[1].widthAxis = [0, 0, 1e200]
+  input.decals[0].normal = [0, 0, 1e200]
+  assert.deepEqual(paths(input), ['parts[1].widthAxis', 'decals[0].normal'])
+})
+
+test('rejects joint coordinates of 1e6 or more', () => {
+  const input = valid()
+  input.joints.top = [0, 1e6, 0]
+  const [error] = validateMannequin(input).errors
+  assert.equal(error.path, 'joints.top')
+  assert.match(error.message, /absolute value below 1e6/)
+})
+
+test('asks for a joint name when the reference is missing or not a string', () => {
+  const input: Record<string, any> = valid()
+  delete input.parts[0].a
+  input.parts[0].b = 5
+  const errors = validateMannequin(input).errors
+  assert.deepEqual(errors.map(e => e.path), ['parts[0].a', 'parts[0].b'])
+  assert.match(errors[0].message, /^expected a joint name \(string\); known joints: base, top$/)
+})
+
+test('skips joint reference errors when joints is invalid', () => {
+  const input: Record<string, any> = valid()
+  input.joints = 'nope'
+  assert.deepEqual(paths(input), ['joints'])
+})
+
+test('names the allowed shapes when shape is missing', () => {
+  const input: Record<string, any> = valid()
+  delete input.parts[0].shape
+  const [error] = validateMannequin(input).errors
+  assert.equal(error.path, 'parts[0].shape')
+  assert.equal(error.message, "missing field 'shape'; expected 'capsule' or 'box'")
+})
+
+test('capsule radius message rounds numbers and says how to fix it', () => {
+  const input = valid()
+  input.joints.top = [0, 1 / 3, 0]
+  input.parts[0].radiusA = 1 / 7 + 1
+  const [error] = validateMannequin(input).errors
+  assert.match(error.message, /difference 0\.9429 must be smaller than the joint distance 0\.3333;/)
+  assert.match(error.message, /reduce radiusA or radiusB, or move the joints apart$/)
+})

@@ -70,3 +70,9 @@ test('returned value does not alias the input', () => {
   assert.notEqual(value, input)
   assert.notEqual(value?.materials, input.materials)
 })
+
+test('rejects a light vector whose length overflows', () => {
+  const input = valid()
+  input.light = [0, 0, 1e200]
+  assert.deepEqual(validateStyle(input).errors.map(e => e.path), ['light'])
+})

@@ -1,3 +1,4 @@
+import { length } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 
 export type ValidationError = { path: string, message: string }
@@ -22,6 +23,12 @@ export function isPositive (v: unknown): v is number {
 
 export function isVec3 (v: unknown): v is Vec3 {
   return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber)
+}
+
+export function isDirection (v: unknown): v is Vec3 {
+  if (!isVec3(v)) return false
+  const magnitude = length(v)
+  return Number.isFinite(magnitude) && magnitude > 0
 }
 
 export function checkKnownKeys (

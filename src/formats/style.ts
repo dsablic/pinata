@@ -1,7 +1,6 @@
-import { length } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import {
-  checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3
+  checkKnownKeys, copyKnownKeys, isDirection, isFiniteNumber, isNonEmptyString, isPositive, isRecord
 } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
@@ -31,7 +30,7 @@ export function validateStyle (input: unknown): Validated<Style> {
   const errors: ValidationError[] = []
   checkKnownKeys(input, KNOWN_FIELDS, '', errors)
   if (!isNonEmptyString(input.name)) errors.push({ path: 'name', message: 'expected a non-empty string' })
-  if (!isVec3(input.light) || length(input.light) === 0) {
+  if (!isDirection(input.light)) {
     errors.push({ path: 'light', message: 'expected a non-zero [x, y, z] in camera space pointing toward the light' })
   }
   const bands = Array.isArray(input.bands) && input.bands.every(isFiniteNumber) ? input.bands : undefined

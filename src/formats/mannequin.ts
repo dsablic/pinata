@@ -1,7 +1,7 @@
 import { cross, length, normalize, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import {
-  checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3
+  checkKnownKeys, copyKnownKeys, isDirection, isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3
 } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
@@ -47,7 +47,9 @@ const CAPSULE_FIELDS = [...PART_FIELDS, 'radiusA', 'radiusB'] as const
 const BOX_FIELDS = [...PART_FIELDS, 'width', 'thickness', 'rounding', 'widthAxis'] as const
 const DECAL_FIELDS = ['name', 'anchor', 'normal', 'pattern'] as const
 
-type Context = { joints: Record<string, unknown>, names: Set<string>, errors: ValidationError[] }
+const JOINT_LIMIT = 1e6
+
+type Context = { joints: Record<string, unknown> | undefined, names: Set<string>, errors: ValidationError[] }
 
 export function validateMannequin (input: unknown): Validated<Mannequin> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
@@ -60,12 +62,18 @@ export function validateMannequin (input: unknown): Validated<Mannequin> {
       message: 'expected a positive number: the standing height in model units, used to scale to pixels'
     })
   }
-  const joints = isRecord(input.joints) ? input.joints : {}
-  if (!isRecord(input.joints)) {
+  const joints = isRecord(input.joints) ? input.joints : undefined
+  if (joints === undefined) {
     errors.push({ path: 'joints', message: 'expected an object mapping joint name to [x, y, z]' })
-  }
-  for (const [name, value] of Object.entries(joints)) {
-    if (!isVec3(value)) errors.push({ path: `joints.${name}`, message: 'expected [x, y, z] of finite numbers' })
+  } else {
+    for (const [name, value] of Object.entries(joints)) {
+      if (!isVec3(value) || value.some(c => Math.abs(c) >= JOINT_LIMIT)) {
+        errors.push({
+          path: `joints.${name}`,
+          message: 'expected [x, y, z] of finite numbers, each with absolute value below 1e6'
+        })
+      }
+    }
   }
   if (!Array.isArray(input.parts) || input.parts.length === 0) {
     errors.push({ path: 'parts', message: 'expected a non-empty array of parts' })
@@ -84,14 +92,22 @@ export function validateMannequin (input: unknown): Validated<Mannequin> {
   return { value, errors }
 }
 
+function round (n: number): number {
+  return Number(n.toFixed(4))
+}
+
 function jointRef (value: unknown, path: string, ctx: Context): Vec3 | undefined {
-  const joint = typeof value === 'string' && Object.hasOwn(ctx.joints, value) ? ctx.joints[value] : undefined
-  if (isVec3(joint)) return joint
-  if (joint === undefined) {
-    const known = Object.keys(ctx.joints).join(', ')
-    ctx.errors.push({ path, message: `unknown joint '${String(value)}'; known joints: ${known}` })
+  if (ctx.joints === undefined) return undefined
+  const known = Object.keys(ctx.joints).join(', ')
+  if (typeof value !== 'string') {
+    ctx.errors.push({ path, message: `expected a joint name (string); known joints: ${known}` })
+    return undefined
   }
-  return undefined
+  const joint = Object.hasOwn(ctx.joints, value) ? ctx.joints[value] : undefined
+  if (joint === undefined) {
+    ctx.errors.push({ path, message: `unknown joint '${value}'; known joints: ${known}` })
+  }
+  return isVec3(joint) ? joint : undefined
 }
 
 function validatePart (part: unknown, path: string, ctx: Context): void {
@@ -121,10 +137,10 @@ function validatePart (part: unknown, path: string, ctx: Context): void {
     checkKnownKeys(part, BOX_FIELDS, path, ctx.errors)
     validateBox(part, path, ctx, [a, b])
   } else {
-    ctx.errors.push({
-      path: `${path}.shape`,
-      message: `unknown shape '${String(part.shape)}'; expected 'capsule' or 'box'`
-    })
+    const message = part.shape === undefined
+      ? "missing field 'shape'; expected 'capsule' or 'box'"
+      : `unknown shape '${String(part.shape)}'; expected 'capsule' or 'box'`
+    ctx.errors.push({ path: `${path}.shape`, message })
   }
 }
 
@@ -140,8 +156,8 @@ function validateCapsule (part: Record<string, unknown>, path: string, ctx: Cont
   if (span > 0 && difference >= span) {
     ctx.errors.push({
       path,
-      message: `radius difference ${difference} must be smaller than the joint distance ${span}; ` +
-        'otherwise one end sphere swallows the other'
+      message: `radius difference ${round(difference)} must be smaller than the joint distance ${round(span)}; ` +
+        'otherwise one end sphere swallows the other; reduce radiusA or radiusB, or move the joints apart'
     })
   }
 }
@@ -155,10 +171,10 @@ function validateBox (part: Record<string, unknown>, path: string, ctx: Context,
   } else if (isPositive(width) && isPositive(thickness) && rounding > Math.min(width, thickness) / 2) {
     ctx.errors.push({
       path: `${path}.rounding`,
-      message: `must be at most ${Math.min(width, thickness) / 2} (half the smaller of width and thickness)`
+      message: `must be at most ${round(Math.min(width, thickness) / 2)} (half the smaller of width and thickness)`
     })
   }
-  if (!isVec3(widthAxis) || length(widthAxis) === 0) {
+  if (!isDirection(widthAxis)) {
     ctx.errors.push({ path: `${path}.widthAxis`, message: 'expected a non-zero [x, y, z] pointing across the part' })
     return
   }
@@ -184,7 +200,7 @@ function validateDecal (decal: unknown, path: string, ctx: Context): void {
   checkKnownKeys(decal, DECAL_FIELDS, path, ctx.errors)
   if (!isNonEmptyString(decal.name)) ctx.errors.push({ path: `${path}.name`, message: 'expected a non-empty string' })
   jointRef(decal.anchor, `${path}.anchor`, ctx)
-  if (!isVec3(decal.normal) || length(decal.normal) === 0) {
+  if (!isDirection(decal.normal)) {
     ctx.errors.push({ path: `${path}.normal`, message: 'expected a non-zero [x, y, z] facing out of the surface' })
   }
   const { pattern } = decal

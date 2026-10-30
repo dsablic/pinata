@@ -50,6 +50,10 @@ works), from a compact character file and a small JavaScript runtime? The spike 
 adds online (frame-by-frame) motion for the hanging piñata with `hit()` and a few behaviours, renders at 64 px in a
 canvas, and tests real-time frame budget, reactions, behaviour transitions and Node-browser determinism headlessly
 with Playwright. Its result decides whether the runtime can use the procedural renderer or needs skins first.
+Behaviours are compositions of simple primitives (base motion, limb-masked layers, additive overlays, events,
+blending, a state machine), specified in
+[`docs/plans/2026-10-30-composable-behaviours.md`](plans/2026-10-30-composable-behaviours.md); the spike builds the
+first phase of that model, and the rest (stand and walk as bases, `check` gates, an authoring test) follows it.
 
 ## Phase 0: consolidate (about 1-2 weeks)
 

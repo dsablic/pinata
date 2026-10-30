@@ -26,7 +26,10 @@ walking characters, skins, multiple characters, a public API commitment.
      3D body orientation;
    - limp legs, mane and tail as cloth chains on the moving body (existing solver, stepped per frame);
    - events applied at the next frame: `hit({ impulse, spin })`, plus behaviour changes.
-4. **Behaviour API.** A small runtime object:
+4. **Behaviour API**, built on the composition model in
+   [`docs/plans/2026-10-30-composable-behaviours.md`](2026-10-30-composable-behaviours.md) (phase 1 of it): the five
+   behaviours below are compositions in a `behaviours.json` (base `hang`, layers, additive overlays, events,
+   blending and a state machine), not hard-coded. A small runtime object:
    - `createCharacter(artifact, canvas, options)`
    - `character.hit(options?)`
    - `character.play(name)` with `idle`, `think` (slow sway), `busy` (small bounces), `celebrate` (spin and bounce),
@@ -51,6 +54,7 @@ server is started by the test; nothing is deployed.
 | Behaviour switching | `idle` -> `think` -> `busy` -> `celebrate` -> `fail` -> `idle`: no errors, no frozen frames, and at each switch the frame-to-frame pixel change stays below 3 times the median change. |
 | Determinism | The same seeded event sequence gives identical frame hashes in Chromium and in Node. |
 | No console errors | Zero errors or warnings in the page console. |
+| Composition gates | Mask ownership, additive bounds and physics continuity from the composable behaviours spec hold for every behaviour. |
 | Stills | Screenshots and an 8-frame strip of each behaviour saved for review. |
 
 Headless Chromium timings are an estimate of a real browser tab; the report says so and gives the manual command.

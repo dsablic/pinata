@@ -38,7 +38,8 @@ type Foot = { side: 'left' | 'right', sign: number, planted: Vec3, restHip: Vec3
 const TURN_CYCLES_PER_RADIAN = 2 / Math.PI
 const REST_EPSILON = 1e-9
 const PHASE_EPSILON = 1e-9
-const REACH_FRACTION = 0.99
+const REST_REACH_FRACTION = 0.99
+const WALK_REACH_FRACTION = 0.96
 const DROP_SMOOTHING_SECONDS = 0.04
 const SWING_EDGE = 0.1
 
@@ -187,10 +188,10 @@ function footAt (foot: Foot, phase: number, options: Options): FootState {
   }
 }
 
-function neededOffset (foot: Foot, state: FootState, root: RootState): number {
+function neededOffset (foot: Foot, state: FootState, root: RootState, fraction: number): number {
   const hip = toWorld(foot.restHip, root)
   const run = Math.hypot(state.ankle[0] - hip[0], state.ankle[2] - hip[2])
-  const limit = foot.reach * REACH_FRACTION
+  const limit = foot.reach * fraction
   const room = Math.sqrt(Math.max(0, limit * limit - run * run))
   return room - (hip[1] - state.ankle[1])
 }
@@ -212,15 +213,17 @@ export function planGait (options: Options): GaitFrame[] {
   const feet = buildFeet(options, phase)
   const roots = phase.map((_, i) => track(i / fps))
   const stances = phase.map(p => feet.map(foot => footAt(foot, p, options)))
+  const eases = roots.map(root => Math.min(1, horizontalSpeed(root) / gait.referenceSpeed))
   const needed = stances.map((states, i) => {
-    return Math.min(0, ...feet.map((foot, k) => neededOffset(foot, states[k], roots[i])))
+    const fraction = REST_REACH_FRACTION + (WALK_REACH_FRACTION - REST_REACH_FRACTION) * eases[i]
+    return Math.min(0, ...feet.map((foot, k) => neededOffset(foot, states[k], roots[i], fraction)))
   })
   const drops = smoothDrops(needed, Math.round(DROP_SMOOTHING_SECONDS * fps))
   const frames: GaitFrame[] = []
   for (let i = 0; i < count; i++) {
     const root = roots[i]
     const states = stances[i]
-    const ease = Math.min(1, horizontalSpeed(root) / gait.referenceSpeed)
+    const ease = eases[i]
     const bob = ease === 0 ? 0 : -gait.bobAmplitude * Math.cos(4 * Math.PI * phase[i]) * ease
     const offset = Math.min(bob, drops[i])
     frames.push({

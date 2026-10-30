@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Rig } from '../src/formats/rig.ts'
-import { kneeBendsBackward } from '../src/motion/ik.ts'
+import { kneeBendsBackward, kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { planGait } from '../src/motion/gait.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
 import { restPose } from '../src/motion/pose.ts'
@@ -102,4 +102,16 @@ test('a carried joint keeps its distance to the hand during an arm swing', () =>
   const { pose } = poseAt({ frame, rig: carrying, rest: swordRest, mannequin: sword })
   assertClose(distance(pose, 'tip', 'handR'), distance(swordRest, 'tip', 'handR'), 1e-9)
   assert.ok(Math.abs(pose.tip[1] - swordRest.tip[1] - frame.pelvisOffset[1]) > 0.05)
+})
+
+function kneeFlexions (speed: number): number[][] {
+  return frames(speed, 4, 7).map(frame => {
+    const { pose } = poseAt({ frame, rig, rest, mannequin })
+    return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
+  })
+}
+
+test('knees stay at least 25 degrees bent while walking at the reference speed', () => {
+  const walking = kneeFlexions(1.2).slice(0, 96).flat()
+  assert.ok(Math.min(...walking) >= 25, `knee reached ${Math.min(...walking)} degrees`)
 })

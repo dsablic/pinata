@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Piñata — live characters</title>
-<meta name="description" content="A pixel-art piñata animated live in the browser by the Piñata motion engine: rope physics, spring limbs, behaviours and events.">
+<meta name="description" content="A pixel-art piñata animated live in the browser by the Piñata motion engine: rope and twist physics, spring limbs, live pixel-art rendering.">
 <style>
   :root {
     --bg: #f4ecd8; --ink: #2b2233; --muted: #6f6478; --panel: #fffaf0; --line: #d9ccb4; --accent: #c2477a;
@@ -28,8 +28,6 @@
   .stage pinata-character { margin-top: 6px; cursor: grab; }
   .readout { position: absolute; left: 10px; bottom: 8px; font: 12px ui-monospace, monospace; color: var(--muted);
     background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 2px 6px; border-radius: 4px; }
-  .now { position: absolute; right: 10px; bottom: 8px; font: 12px ui-monospace, monospace; color: var(--ink);
-    background: var(--panel); padding: 2px 8px; border-radius: 4px; border: 1px solid var(--line); }
   aside { display: grid; gap: 12px; align-content: start; }
   fieldset { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0; padding: 10px 12px; }
   legend { font-weight: 600; padding: 0 4px; }
@@ -41,9 +39,6 @@
     background: #fff; color: var(--ink); cursor: pointer; }
   button:hover { border-color: var(--accent); }
   button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .log { font: 12px/1.45 ui-monospace, monospace; height: 132px; overflow: auto; background: #241f2c; color: #e9e2f2;
-    border-radius: 6px; padding: 8px; margin-top: 8px; }
-  .log .event { color: #ffb4d0; }
   footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; }
   a { color: var(--accent); }
 </style>
@@ -51,30 +46,22 @@
 <body data-scene="day">
 <header>
   <h1>Piñata, live</h1>
-  <p>A pixel-art character animated in your browser, frame by frame: rope and twist physics, limp spring legs, a
-  flopping mane and tail, and behaviours that react to events. Poke it, drag it, or let the fake agent below keep it
-  busy. Everything is computed live by the <a href="https://github.com/dsablic/pinata">Piñata</a> motion engine.</p>
+  <p>A pixel-art character animated in your browser, frame by frame: rope and twist physics, limp spring legs and a
+  flopping mane and tail, rendered to pixel art on every frame. Poke it, drag it, and tune the environment and the
+  motion. Everything is computed live by the <a href="https://github.com/dsablic/pinata">Piñata</a> motion engine.</p>
 </header>
 <main>
   <section class="stage" aria-label="Live character">
     <div class="beam"></div>
     <pinata-character id="character" src="characters/unicorn.json" scale="3" samples="3" motion="full"></pinata-character>
     <div class="readout" id="readout">loading…</div>
-    <div class="now" id="now">idle</div>
   </section>
   <aside>
     <fieldset>
-      <legend>Behaviours</legend>
-      <div class="buttons" id="behaviours"></div>
-      <div class="buttons" style="margin-top:8px">
-        <button id="hit">Whack it</button>
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>Fake agent</legend>
-      <div class="buttons" id="events"></div>
-      <div class="buttons" style="margin-top:8px"><button id="agent">Run an agent session</button></div>
-      <div class="log" id="log" aria-live="polite"></div>
+      <legend>Interact</legend>
+      <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">Click the piñata to poke it from that side, or drag it
+      and let go.</p>
+      <div class="buttons"><button id="hit">Whack it</button></div>
     </fieldset>
     <fieldset>
       <legend>Environment</legend>
@@ -96,8 +83,8 @@
   </aside>
 </main>
 <footer>
-  Embed it on your own page: <code>&lt;pinata-character src="unicorn.json"&gt;&lt;/pinata-character&gt;</code>, then
-  <code>window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))</code>. Built from
+  Embed it on your own page with <code>&lt;pinata-character src="unicorn.json"&gt;&lt;/pinata-character&gt;</code>;
+  apps drive it through its events and methods. Built from
   <a id="commit" href="https://github.com/dsablic/pinata">the repository</a> for every release tag.
 </footer>
 <script type="module" src="js/runtime/showcase.js"></script>

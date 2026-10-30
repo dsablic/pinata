@@ -1,21 +1,5 @@
 import { PinataCharacter } from './browser.ts'
 
-type Step = { after: number, line: string, event?: string }
-
-const EVENTS = ['loading', 'thinking', 'toolStart', 'success', 'error', 'idle']
-const SESSION: Step[] = [
-  { after: 0, line: 'user: tidy up the parser and add tests', event: 'thinking' },
-  { after: 1800, line: 'agent: reading src/parser.ts', event: 'toolStart' },
-  { after: 1500, line: 'agent: planning the change', event: 'thinking' },
-  { after: 2200, line: 'agent: editing src/parser.ts', event: 'toolStart' },
-  { after: 1600, line: 'agent: running npm test', event: 'toolStart' },
-  { after: 2000, line: 'tool: 2 tests failed', event: 'error' },
-  { after: 2600, line: 'agent: fixing the off-by-one', event: 'thinking' },
-  { after: 1800, line: 'agent: running npm test', event: 'toolStart' },
-  { after: 2000, line: 'tool: all 48 tests pass', event: 'success' },
-  { after: 2600, line: 'agent: done', event: 'idle' }
-]
-
 function byId<T extends HTMLElement> (id: string): T {
   const element = document.getElementById(id)
   if (element === null) throw new Error(`#${id} is missing`)
@@ -23,24 +7,6 @@ function byId<T extends HTMLElement> (id: string): T {
 }
 
 let character = byId<PinataCharacter>('character')
-const log = byId<HTMLDivElement>('log')
-
-function say (line: string, event?: string): void {
-  const row = document.createElement('div')
-  row.textContent = line
-  if (event !== undefined) {
-    const tag = document.createElement('span')
-    tag.className = 'event'
-    tag.textContent = `  → ${event}`
-    row.append(tag)
-  }
-  log.append(row)
-  log.scrollTop = log.scrollHeight
-}
-
-function send (event: string): void {
-  window.dispatchEvent(new CustomEvent('pinata', { detail: event }))
-}
 
 type Slider = { id: string, digits: number, apply: (value: number) => void }
 
@@ -81,17 +47,6 @@ function apply (slider: Slider): void {
   slider.apply(value)
 }
 
-function behaviourButtons (): void {
-  const box = byId<HTMLDivElement>('behaviours')
-  const names = Object.keys(character.mounted?.character.behaviours.behaviours ?? {})
-  box.replaceChildren(...names.map(name => {
-    const button = document.createElement('button')
-    button.textContent = name
-    button.addEventListener('click', () => { character.play(name) })
-    return button
-  }))
-}
-
 function wire (): void {
   for (const slider of SLIDERS) {
     const input = byId<HTMLInputElement>(slider.id)
@@ -105,45 +60,14 @@ function wire (): void {
   byId<HTMLInputElement>('reduced').addEventListener('change', event => {
     remount({ motion: (event.target as HTMLInputElement).checked ? 'reduced' : 'full' })
   })
-  byId<HTMLDivElement>('events').replaceChildren(...EVENTS.map(name => {
-    const button = document.createElement('button')
-    button.textContent = name
-    button.addEventListener('click', () => {
-      say(`page: ${name}`, name)
-      send(name)
-    })
-    return button
-  }))
-  const agent = byId<HTMLButtonElement>('agent')
-  let timer = 0
-  agent.addEventListener('click', () => {
-    clearTimeout(timer)
-    log.replaceChildren()
-    agent.classList.add('on')
-    let i = 0
-    const next = (): void => {
-      const step = SESSION[i++]
-      if (step === undefined) {
-        agent.classList.remove('on')
-        return
-      }
-      say(step.line, step.event)
-      if (step.event !== undefined) send(step.event)
-      timer = window.setTimeout(next, SESSION[i]?.after ?? 0)
-    }
-    next()
-  })
   window.setInterval(() => {
     const mounted = character.mounted
     if (mounted === undefined) return
     const stats = mounted.stats()
+    const swing = mounted.live.frame().swing
     byId<HTMLDivElement>('readout').textContent = `frame ${stats.meanMs.toFixed(1)} ms mean, ` +
-      `${stats.p95Ms.toFixed(1)} ms p95 (budget 40 ms)`
-    byId<HTMLDivElement>('now').textContent = mounted.live.frame().behaviour
+      `${stats.p95Ms.toFixed(1)} ms p95 (budget 40 ms) · swing ${swing.toFixed(0)}°`
   }, 500)
 }
 
-character.addEventListener('pinata-ready', () => {
-  behaviourButtons()
-  wire()
-}, { once: true })
+character.addEventListener('pinata-ready', wire, { once: true })

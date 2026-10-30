@@ -34,7 +34,7 @@ The motion engine also runs live, frame by frame: a character hangs from a rope,
 behaviours (`idle`, `think`, `busy`, `celebrate`, `fail`) that page or agent events switch between.
 
 - **In the browser:** the [showcase page](https://dsablic.github.io/pinata/) (built by CI for every release tag)
-  lets you poke, drag and tune the unicorn piñata.
+  shows the component on its own: poke and drag the unicorn piñata, and tune its environment and motion live.
   Locally: `npm run runtime`, then open http://127.0.0.1:8080/. Embed it with
   `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
   `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.

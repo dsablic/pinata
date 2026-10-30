@@ -51,6 +51,17 @@ export function compile (m: Mannequin, part: Part): Primitive {
   return { sdf: p => dist(p[0], p[1], p[2]), dist, center, radius }
 }
 
+/** Where the ray enters the primitive's bounding sphere (0 if it starts inside), or Infinity if it misses. */
+function entry (prim: Primitive, ox: number, oy: number, oz: number, dir: Vec3): number {
+  const ocx = ox - prim.center[0]
+  const ocy = oy - prim.center[1]
+  const ocz = oz - prim.center[2]
+  const b = ocx * dir[0] + ocy * dir[1] + ocz * dir[2]
+  const disc = b * b - (ocx * ocx + ocy * ocy + ocz * ocz - prim.radius * prim.radius)
+  if (disc < 0) return Infinity
+  return Math.max(-b - Math.sqrt(disc), 0)
+}
+
 function trace (prim: Primitive, ox: number, oy: number, oz: number, dir: Vec3): number {
   const [dx, dy, dz] = dir
   const ocx = ox - prim.center[0]
@@ -82,17 +93,44 @@ function writeNormal (prim: Primitive, px: number, py: number, pz: number, out: 
   out[2] = l === 0 ? 0 : nz * k
 }
 
-type Scene = { prims: Primitive[], cam: Camera, acc: Accumulator, active: Int32Array, count: number }
+type Scene = {
+  prims: Primitive[]
+  cam: Camera
+  acc: Accumulator
+  active: Int32Array
+  count: number
+  entries: Float64Array
+  order: Int32Array
+}
 
+/**
+ * Traces the primitives in order of where the ray enters their bounding spheres and stops once the nearest hit lies
+ * before the next entry: a primitive can only be hit inside its sphere. Equal hits go to the lower part index, as a
+ * plain scan in index order would choose, so the result is the same as tracing every primitive.
+ */
 function sample (scene: Scene, ox: number, oy: number, oz: number): void {
-  const { prims, cam, acc, active } = scene
+  const { prims, cam, acc, active, entries, order } = scene
   const dir = cam.forward
-  let best = -1
-  let bestT = Infinity
+  let candidates = 0
   for (let k = 0; k < scene.count; k++) {
     const i = active[k]
+    const t = entry(prims[i], ox, oy, oz, dir)
+    if (t === Infinity) continue
+    let j = candidates++
+    while (j > 0 && (entries[j - 1] > t || (entries[j - 1] === t && order[j - 1] > i))) {
+      entries[j] = entries[j - 1]
+      order[j] = order[j - 1]
+      j--
+    }
+    entries[j] = t
+    order[j] = i
+  }
+  let best = -1
+  let bestT = Infinity
+  for (let k = 0; k < candidates && entries[k] <= bestT; k++) {
+    const i = order[k]
     const t = trace(prims[i], ox, oy, oz, dir)
-    if (t < bestT) {
+    if (t < bestT || (t === bestT && i < best)) {
       bestT = t
       best = i
     }
@@ -155,7 +193,15 @@ export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GB
     total: 0
   }
   const discs = prims.map(prim => screenDisc(cam, prim))
-  const scene: Scene = { prims, cam, acc, active: new Int32Array(prims.length), count: 0 }
+  const scene: Scene = {
+    prims,
+    cam,
+    acc,
+    active: new Int32Array(prims.length),
+    count: 0,
+    entries: new Float64Array(prims.length),
+    order: new Int32Array(prims.length)
+  }
   const [rx, ry, rz] = cam.right
   const [ux, uy, uz] = cam.up
   const behind = -cam.rayDistance

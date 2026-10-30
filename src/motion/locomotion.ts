@@ -12,6 +12,7 @@ type PoseOptions = { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequi
 
 const FORWARD: Vec3 = [0, 0, 1]
 const UP: Vec3 = [0, 1, 0]
+const MISS_TOLERANCE = 1e-4
 const MAX_TOE_PITCH = 20 * Math.PI / 180
 
 function toLocal (world: Vec3, frame: GaitFrame): Vec3 {
@@ -47,13 +48,13 @@ function placeLeg (leg: Leg, options: PoseOptions, foot: FootState): { placed: P
     target: toLocal(foot.ankle, frame),
     pole: leg.bends.includes('up') ? UP : FORWARD,
     bends: leg.bends.map(bend => bend === 'backward' ? -1 : 1),
-    limits: leg.limits ?? { min: 0, max: MAX_FLEXION_DEGREES }
+    limits: leg.limits ?? (leg.chain.length > 3 ? { min: 0, max: MAX_FLEXION_DEGREES } : undefined)
   })
   const placed: Pose = Object.fromEntries(leg.chain.map((name, i) => [name, result.joints[i]]))
   const flat = sub(rest[leg.toe], rest[leg.ankle])
   const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.toePitch), foot.toeYaw - frame.root.yaw)
   placed[leg.toe] = add(result.joints[leg.chain.length - 1], toe)
-  return { placed, clamped: result.clamped }
+  return { placed, clamped: result.clamped || result.missed > MISS_TOLERANCE }
 }
 
 export function poseAt (options: PoseOptions): { pose: Pose, clamped: number } {

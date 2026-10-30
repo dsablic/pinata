@@ -7,16 +7,27 @@ const CONVERGED = 1e-10
 const INITIAL_BULGE = 0.5
 const REST_SHAPE_MINIMUM = 1e-3
 const DEGREES = Math.PI / 180
+const MIN_BONE_LENGTH = 1e-9
 
 export const MAX_FLEXION_DEGREES = 150
 
-export type IkOptions = { hip: Vec3, target: Vec3, upper: number, lower: number, pole: Vec3 }
+export type FlexionLimits = { min: number, max: number }
+export type IkOptions = { hip: Vec3, target: Vec3, upper: number, lower: number, pole: Vec3, flexion?: FlexionLimits }
 
+function distanceAtFlexion (upper: number, lower: number, degrees: number): number {
+  return Math.sqrt(Math.max(0, upper * upper + lower * lower + 2 * upper * lower * Math.cos(degrees * DEGREES)))
+}
+
+/** Two bones with the knee flexion kept within `flexion` (degrees, positive toward the pole side, at least 0). */
 export function twoBoneIk (options: IkOptions): { knee: Vec3, end: Vec3, clamped: boolean } {
-  const { hip, target, upper, lower, pole } = options
+  const { hip, target, upper, lower, pole, flexion } = options
   const toTarget = sub(target, hip)
-  const maximum = upper + lower - REACH_MARGIN
-  const minimum = Math.abs(upper - lower) + REACH_MARGIN
+  let maximum = upper + lower - REACH_MARGIN
+  let minimum = Math.abs(upper - lower) + REACH_MARGIN
+  if (flexion !== undefined) {
+    maximum = Math.min(maximum, distanceAtFlexion(upper, lower, flexion.min))
+    minimum = Math.max(minimum, distanceAtFlexion(upper, lower, flexion.max))
+  }
   const distance = length(toTarget)
   const axis = distance === 0 ? orthogonal(pole) : normalize(toTarget)
   const reach = Math.min(maximum, Math.max(minimum, distance))
@@ -29,7 +40,6 @@ export function twoBoneIk (options: IkOptions): { knee: Vec3, end: Vec3, clamped
   return { knee, end: add(hip, scale(axis, reach)), clamped }
 }
 
-export type FlexionLimits = { min: number, max: number }
 export type ChainIkOptions = {
   joints: Vec3[]
   target: Vec3
@@ -42,23 +52,24 @@ type Plane = [number, number]
 
 /**
  * Places a chain of two or more bones with its first joint at `root` (default `joints[0]`) and its last joint at
- * `target`; `joints` supply the bone lengths. Two bones use `twoBoneIk`. More bones use FABRIK in the plane through
- * root, target and pole, started from a zigzag on the bend sides, run for at most MAX_ITERATIONS and ending on a
- * forward pass, so lengths are exact and flexion limits hold. A bend of 1 bulges a joint toward the pole, -1 away
- * from it; flexion is positive when a joint bends toward its bend side.
+ * `target`; `joints` supply the bone lengths. Two bones use `twoBoneIk`, with the knee flexion held within `limits`
+ * when given. More bones use FABRIK in the plane through root, target and pole, started from a zigzag on the bend
+ * sides, run for at most MAX_ITERATIONS and ending on a forward pass, so lengths are exact and flexion limits hold.
+ * A bend of 1 bulges a joint toward the pole, -1 away from it; flexion is positive when a joint bends toward its bend
+ * side. `missed` is the distance from the end to the target after the solve.
  */
-export function chainIk (options: ChainIkOptions): { joints: Vec3[], clamped: boolean } {
+export function chainIk (options: ChainIkOptions): { joints: Vec3[], clamped: boolean, missed: number } {
   const { joints, target, pole } = options
   const root = options.root ?? joints[0]
   const bones = joints.length - 1
   if (bones < 2) throw new Error(`a chain needs at least two bones, got ${bones}`)
   const lengths = joints.slice(1).map((joint, i) => length(sub(joint, joints[i])))
-  const signs = options.bends ?? lengths.slice(1).map(() => 1)
-  if (bones === 2) {
-    const flipped = signs[0] < 0 ? sub([0, 0, 0], pole) : pole
-    const result = twoBoneIk({ hip: root, target, upper: lengths[0], lower: lengths[1], pole: flipped })
-    return { joints: [root, result.knee, result.end], clamped: result.clamped }
+  const flat = lengths.findIndex(l => !(l >= MIN_BONE_LENGTH))
+  if (flat >= 0) {
+    throw new Error(`the chain has a zero-length bone between joints ${flat} and ${flat + 1}; move them apart`)
   }
+  const signs = options.bends ?? lengths.slice(1).map(() => 1)
+  if (bones === 2) return solveTwoBones(options, root, lengths, signs[0])
   const total = lengths.reduce((sum, l) => sum + l, 0)
   const toTarget = sub(target, root)
   const distance = length(toTarget)
@@ -70,9 +81,30 @@ export function chainIk (options: ChainIkOptions): { joints: Vec3[], clamped: bo
   const side = length(sideward) === 0 ? orthogonal(axis) : normalize(sideward)
   const ranges = limitRanges(options.limits, bones - 1)
   const start = startShape(joints, { pole, signs, reach, total })
-  const flat = fabrik({ lengths, signs, ranges, reach, start })
-  const placed = flat.map(([u, v]) => add(root, add(scale(axis, u), scale(side, v))))
-  return { joints: placed, clamped: reach !== distance }
+  const solved = fabrik({ lengths, signs, ranges, reach, start })
+  const placed = solved.map(([u, v]) => add(root, add(scale(axis, u), scale(side, v))))
+  return { joints: placed, clamped: reach !== distance, missed: length(sub(placed[bones], target)) }
+}
+
+type TwoBoneResult = { joints: Vec3[], clamped: boolean, missed: number }
+
+function solveTwoBones (options: ChainIkOptions, root: Vec3, lengths: number[], sign = 1): TwoBoneResult {
+  const { target, pole } = options
+  const given = Array.isArray(options.limits) ? options.limits[0] : options.limits
+  const opposite = given !== undefined && given.max < 0
+  let flexion: FlexionLimits | undefined
+  if (given !== undefined) {
+    flexion = opposite ? { min: -given.max, max: -given.min } : { min: Math.max(0, given.min), max: given.max }
+  }
+  const result = twoBoneIk({
+    hip: root,
+    target,
+    upper: lengths[0],
+    lower: lengths[1],
+    pole: opposite !== sign < 0 ? sub([0, 0, 0], pole) : pole,
+    flexion
+  })
+  return { joints: [root, result.knee, result.end], clamped: result.clamped, missed: length(sub(result.end, target)) }
 }
 
 function limitRanges (limits: FlexionLimits | FlexionLimits[] | undefined, count: number): FlexionLimits[] {

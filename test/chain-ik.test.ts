@@ -133,3 +133,73 @@ test('a target at the rest end of a bent chain gives back the rest shape', () =>
     for (let k = 0; k < 3; k++) assertClose(result.joints[i][k], joint[k], 1e-9)
   })
 })
+
+function missOf (joints: Vec3[], target: Vec3): number {
+  return length(sub(joints[joints.length - 1], target))
+}
+
+test('missed is the distance from the end to the target after the solve', () => {
+  for (const target of TARGETS) {
+    const result = chainIk({ joints: rest, target, pole })
+    assert.ok(result.missed < 1e-4)
+  }
+  const far = chainIk({ joints: rest, target: [0, -3, 0], pole })
+  assertClose(far.missed, missOf(far.joints, [0, -3, 0]), 1e-12)
+  assert.ok(far.missed > 1.5)
+  const two = chainIk({ joints: hanging([0.5, 0.45]), target: [0, -3, 0], pole })
+  assertClose(two.missed, 4.5 - 0.95, 1e-5)
+})
+
+test('missed reports targets that joint limits make unreachable', () => {
+  const cases: Array<[Vec3, { min: number, max: number }]> = [
+    [[0, 1.35, 0.3], { min: 0, max: 60 }],
+    [[0, 1.48, 0], { min: 0, max: 150 }],
+    [[0, 0.6, 0.3], { min: -30, max: 30 }],
+    [[0, 0.25, 0], { min: 20, max: 150 }]
+  ]
+  for (const [target, limits] of cases) {
+    const result = chainIk({ joints: rest, target, pole, limits })
+    assert.ok(result.missed > 0.01, `target ${target} missed ${result.missed}`)
+    assertClose(result.missed, missOf(result.joints, target), 1e-12)
+  }
+})
+
+test('zero-length bones throw a clear error', () => {
+  const doubled: Vec3[] = [[0, 1.5, 0], [0, 1.1, 0], [0, 1.1, 0], [0, 0.8, 0], [0, 0.55, 0]]
+  const solve = (joints: Vec3[], target: Vec3) => () => chainIk({ joints, target, pole })
+  assert.throws(solve(doubled, [0, 0.8, 0.2]), /zero-length bone between joints 1 and 2/)
+  const first: Vec3[] = [[0, 1.5, 0], [0, 1.5, 0], [0, 1.1, 0]]
+  assert.throws(solve(first, [0, 1.2, 0.1]), /zero-length bone between joints 0 and 1/)
+  const flat: Vec3[] = [[0, 1, 0], [0, 1, 0], [0, 1, 0], [0, 1, 0]]
+  assert.throws(solve(flat, [0, 0.5, 0]), /zero-length bone/)
+})
+
+test('limits on two bones clamp the knee flexion and report the miss', () => {
+  const joints = hanging([0.5, 0.45])
+  const target: Vec3 = [0, 0.8, 0.1]
+  const free = chainIk({ joints, target, pole })
+  assert.ok(kneeFlexionDegrees(...(free.joints as [Vec3, Vec3, Vec3])) > 60)
+  assert.ok(free.missed < 1e-9)
+  const limited = chainIk({ joints, target, pole, limits: { min: 0, max: 30 } })
+  const flexion = kneeFlexionDegrees(...(limited.joints as [Vec3, Vec3, Vec3]))
+  assertClose(flexion, 30, 1e-6)
+  assert.equal(limited.clamped, true)
+  assertClose(limited.missed, missOf(limited.joints, target), 1e-12)
+  assert.ok(limited.missed > 0.1)
+  bonesOf(limited.joints).forEach((l, i) => assertClose(l, [0.5, 0.45][i], 1e-9))
+})
+
+test('a minimum flexion on two bones holds the knee bent at full reach', () => {
+  const joints = hanging([0.5, 0.45])
+  const result = chainIk({ joints, target: [0, 0.56, 0], pole, limits: { min: 20, max: 150 } })
+  assertClose(kneeFlexionDegrees(...(result.joints as [Vec3, Vec3, Vec3])), 20, 1e-6)
+  assert.ok(result.missed > 0.001)
+})
+
+test('limits that are all negative put the two-bone knee on the other side', () => {
+  const joints = hanging([0.5, 0.45])
+  const result = chainIk({ joints, target: [0, 0.8, 0], pole, limits: { min: -90, max: -20 } })
+  assert.ok(result.joints[1][2] < 0)
+  const flexion = kneeFlexionDegrees(...(result.joints as [Vec3, Vec3, Vec3]))
+  assert.ok(flexion >= 20 - 1e-6 && flexion <= 90 + 1e-6)
+})

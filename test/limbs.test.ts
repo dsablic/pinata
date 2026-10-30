@@ -62,7 +62,7 @@ test('joint counts below the minimum name the kind and the count found', () => {
     { kind: 'appendage', joints: 'tail' }
   ])
   const errors = errorsOf(input)
-  assert.deepEqual(errors.map(e => e[0]), ['limbs[0].joints', 'limbs[1].joints', 'limbs[2].joints', 'limbs[3].joints', 'limbs[4].joints'])
+  assert.deepEqual(errors.map(e => e[0]), [0, 1, 2, 3, 4].map(i => `limbs[${i}].joints`))
   assert.match(errors[0][1], /4 or more joint names from the hip to the toe; found 2/)
   assert.match(errors[1][1], /found 3: a leg needs a hip, at least one bending joint, an ankle and a toe/)
   assert.match(errors[2][1], /2 or more joint names from the shoulder outward; found 1/)

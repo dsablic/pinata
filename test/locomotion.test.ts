@@ -6,6 +6,7 @@ import type { Rig } from '../src/formats/rig.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { planGait } from '../src/motion/gait.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
+import * as metrics from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
@@ -175,4 +176,19 @@ test('four feet are assigned to the legs by index, not by side', () => {
   for (const leg of legsOf(quadRig)) {
     for (let k = 0; k < 3; k++) assertClose(pose[leg.ankle][k], quadRest[leg.ankle][k], 1e-6)
   }
+})
+
+test('limits on two-bone legs clamp the knee and the missed target counts as clamped', () => {
+  const capped = (l: Rig['limbs'][number]): Rig['limbs'][number] => {
+    return l.kind === 'leg' ? { ...l, limits: { min: 0, max: 20 } } : l
+  }
+  const limited: Rig = { ...rig, limbs: rig.limbs.map(capped) }
+  const walked = planGait({ track: walkTrack(1.2, 4), rig: limited, rest, mannequin, duration: 6, fps: 24 })
+  const recording = metrics.recordLocomotion(walked, { rig: limited, rest, mannequin, fps: 24 })
+  assert.ok(recording.frames.every(f => f.clamped > 0))
+  assert.ok(metrics.reachViolations(recording) > 0)
+  for (const { joints } of recording.frames) {
+    assert.ok(kneeFlexionDegrees(joints.hipL, joints.kneeL, joints.ankleL) <= 20 + 1e-6)
+  }
+  assert.equal(metrics.kneeLimitViolations(recording, { rig: limited, mannequin }), 0)
 })

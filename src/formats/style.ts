@@ -1,6 +1,8 @@
 import { length } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import { isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3 } from './validate.ts'
+import {
+  checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3
+} from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type Style = {
@@ -14,6 +16,10 @@ export type Style = {
   decalColors: Record<string, string>
 }
 
+const KNOWN_FIELDS = [
+  'name', 'light', 'bands', 'outline', 'innerLineDepth', 'decalMinFacing', 'materials', 'decalColors'
+] as const
+
 const HEX = /^#[0-9a-fA-F]{6}$/
 
 function isHex (v: unknown): v is string {
@@ -23,6 +29,7 @@ function isHex (v: unknown): v is string {
 export function validateStyle (input: unknown): Validated<Style> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
   const errors: ValidationError[] = []
+  checkKnownKeys(input, KNOWN_FIELDS, '', errors)
   if (!isNonEmptyString(input.name)) errors.push({ path: 'name', message: 'expected a non-empty string' })
   if (!isVec3(input.light) || length(input.light) === 0) {
     errors.push({ path: 'light', message: 'expected a non-zero [x, y, z] in camera space pointing toward the light' })
@@ -41,7 +48,7 @@ export function validateStyle (input: unknown): Validated<Style> {
   validateMaterials(input.materials, bands, errors)
   validateDecalColors(input.decalColors, errors)
   if (errors.length > 0) return { errors }
-  return { value: input as unknown as Style, errors }
+  return { value: copyKnownKeys<Style>(input, KNOWN_FIELDS), errors }
 }
 
 function validateMaterials (materials: unknown, bands: number[] | undefined, errors: ValidationError[]): void {

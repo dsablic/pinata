@@ -55,3 +55,18 @@ test('cross-check reports materials and decal characters the style lacks', () =>
   assert.deepEqual(errors.map(e => e.path), ['parts[0].material', 'decals[0].pattern'])
   assert.match(errors[1].message, /character 'y'/)
 })
+
+test('rejects unknown fields', () => {
+  const input: Record<string, unknown> = valid()
+  input.bandz = []
+  const [error] = validateStyle(input).errors
+  assert.equal(error.path, 'bandz')
+  assert.match(error.message, /^unknown field 'bandz'; known fields: name, light, bands, /)
+})
+
+test('returned value does not alias the input', () => {
+  const input = valid()
+  const { value } = validateStyle(input)
+  assert.notEqual(value, input)
+  assert.notEqual(value?.materials, input.materials)
+})

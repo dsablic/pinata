@@ -90,3 +90,33 @@ test('rejects unknown shapes', () => {
   input.parts[0].shape = 'cone'
   assert.deepEqual(paths(input), ['parts[0].shape'])
 })
+
+test('rejects unknown fields at the root, parts and decals', () => {
+  const input: Record<string, any> = valid()
+  input.decal = []
+  input.parts[0].allowthin = true
+  input.parts[0].width = 1
+  input.parts[1].radiusA = 1
+  input.decals[0].colour = 'x'
+  assert.deepEqual(
+    paths(input),
+    ['decal', 'parts[0].allowthin', 'parts[0].width', 'parts[1].radiusA', 'decals[0].colour']
+  )
+})
+
+test('unknown field message lists the known fields', () => {
+  const input: Record<string, any> = valid()
+  input.decal = []
+  assert.equal(
+    validateMannequin(input).errors[0].message,
+    "unknown field 'decal'; known fields: name, height, joints, parts, decals"
+  )
+})
+
+test('returned value does not alias the input', () => {
+  const input = valid()
+  const { value } = validateMannequin(input)
+  assert.notEqual(value, input)
+  assert.notEqual(value?.joints, input.joints)
+  assert.notEqual(value?.parts[0], input.parts[0])
+})

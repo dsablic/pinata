@@ -1,6 +1,8 @@
 import { cross, length, normalize, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import { isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3 } from './validate.ts'
+import {
+  checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isPositive, isRecord, isVec3
+} from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type CapsulePart = {
@@ -39,11 +41,18 @@ export type Mannequin = {
   decals: Decal[]
 }
 
+const MANNEQUIN_FIELDS = ['name', 'height', 'joints', 'parts', 'decals'] as const
+const PART_FIELDS = ['name', 'shape', 'a', 'b', 'material', 'allowThin'] as const
+const CAPSULE_FIELDS = [...PART_FIELDS, 'radiusA', 'radiusB'] as const
+const BOX_FIELDS = [...PART_FIELDS, 'width', 'thickness', 'rounding', 'widthAxis'] as const
+const DECAL_FIELDS = ['name', 'anchor', 'normal', 'pattern'] as const
+
 type Context = { joints: Record<string, unknown>, names: Set<string>, errors: ValidationError[] }
 
 export function validateMannequin (input: unknown): Validated<Mannequin> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
   const errors: ValidationError[] = []
+  checkKnownKeys(input, MANNEQUIN_FIELDS, '', errors)
   if (!isNonEmptyString(input.name)) errors.push({ path: 'name', message: 'expected a non-empty string' })
   if (!isPositive(input.height)) {
     errors.push({
@@ -70,7 +79,9 @@ export function validateMannequin (input: unknown): Validated<Mannequin> {
   const decals: unknown[] = Array.isArray(input.decals) ? input.decals : []
   decals.forEach((decal, i) => { validateDecal(decal, `decals[${i}]`, ctx) })
   if (errors.length > 0) return { errors }
-  return { value: { ...input, decals } as unknown as Mannequin, errors }
+  const value = copyKnownKeys<Mannequin>(input, MANNEQUIN_FIELDS)
+  value.decals = value.decals ?? []
+  return { value, errors }
 }
 
 function jointRef (value: unknown, path: string, ctx: Context): Vec3 | undefined {
@@ -104,8 +115,10 @@ function validatePart (part: unknown, path: string, ctx: Context): void {
   const a = jointRef(part.a, `${path}.a`, ctx)
   const b = jointRef(part.b, `${path}.b`, ctx)
   if (part.shape === 'capsule') {
+    checkKnownKeys(part, CAPSULE_FIELDS, path, ctx.errors)
     validateCapsule(part, path, ctx, [a, b])
   } else if (part.shape === 'box') {
+    checkKnownKeys(part, BOX_FIELDS, path, ctx.errors)
     validateBox(part, path, ctx, [a, b])
   } else {
     ctx.errors.push({
@@ -168,6 +181,7 @@ function validateDecal (decal: unknown, path: string, ctx: Context): void {
     ctx.errors.push({ path, message: 'expected an object' })
     return
   }
+  checkKnownKeys(decal, DECAL_FIELDS, path, ctx.errors)
   if (!isNonEmptyString(decal.name)) ctx.errors.push({ path: `${path}.name`, message: 'expected a non-empty string' })
   jointRef(decal.anchor, `${path}.anchor`, ctx)
   if (!isVec3(decal.normal) || length(decal.normal) === 0) {

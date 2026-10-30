@@ -6,13 +6,37 @@ import type { Vec3 } from '../math/vec.ts'
 import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import type { Pose } from '../motion/pose.ts'
+import { cleanRotation, toGrid } from './rotsprite.ts'
+import type { Rotated } from './rotsprite.ts'
 
-export type SkinnedOptions = { mannequin: Mannequin, pose: Pose, skin: Skin, camera: Camera }
+export type SkinnedOptions = {
+  mannequin: Mannequin
+  pose: Pose
+  skin: Skin
+  camera: Camera
+  /**
+   * How limbs rotate: 'nearest' (the default) snaps to 22.5 degrees and samples the nearest pixel; 'clean' snaps to
+   * 11.25 degrees and rotates with RotSprite (see rotsprite.ts). With 'clean', `angles` keeps each part's last step
+   * between frames, so a bone near the middle of two steps does not flicker between them.
+   */
+  rotation?: 'nearest' | 'clean'
+  angles?: Map<string, number>
+}
 
 type Screen = { x: number, y: number, depth: number }
-type Placement = { rows: string[], pivot: [number, number], anchor: [number, number], angle: number, depth: number }
+type Placement = {
+  name: string
+  rows: string[]
+  pivot: [number, number]
+  anchor: [number, number]
+  angle: number
+  depth: number
+}
 
 export const ANGLE_STEP = Math.PI / 8
+export const CLEAN_STEP = Math.PI / 16
+/** How far past the middle between two steps a bone must turn before a clean rotation moves to the next step. */
+const HYSTERESIS = 0.25
 const SNAP = 1e-9
 const NEIGHBOURS: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 
@@ -39,8 +63,11 @@ function placements (o: SkinnedOptions): Placement[] {
     const a: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.a))
     const b: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.b))
     const single = part.a === part.b
-    const angle = single ? 0 : snapAngle(Math.atan2(b.y - a.y, b.x - a.x))
+    const raw = Math.atan2(b.y - a.y, b.x - a.x)
+    const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, o.angles?.get(part.name)) : snapAngle(raw)
+    if (!single && o.rotation === 'clean') o.angles?.set(part.name, angle)
     found.push({
+      name: part.name,
       rows: sprite.rows,
       pivot: sprite.pivotA,
       anchor: [Math.floor(a.x), Math.floor(a.y)],
@@ -49,6 +76,36 @@ function placements (o: SkinnedOptions): Placement[] {
     })
   }
   return found.sort((p, q) => q.depth - p.depth)
+}
+
+/** The 11.25-degree step nearest the angle, keeping the previous step until the angle is well past their middle. */
+export function cleanStep (radians: number, previous?: number): number {
+  const nearest = Math.round(radians / CLEAN_STEP) * CLEAN_STEP
+  if (previous === undefined) return nearest
+  const off = Math.atan2(Math.sin(radians - previous), Math.cos(radians - previous))
+  return Math.abs(off) <= CLEAN_STEP * (0.5 + HYSTERESIS) ? previous : nearest
+}
+
+const ROTATIONS = new Map<string, Rotated>()
+
+/** A part's sprite turned cleanly, cached by sprite and step. */
+function rotated (p: Placement): Rotated {
+  const step = Math.round(p.angle / CLEAN_STEP)
+  const key = `${p.rows.join('/')}|${p.pivot.join(',')}|${step}`
+  let found = ROTATIONS.get(key)
+  if (found === undefined) {
+    found = cleanRotation(toGrid(p.rows), p.pivot, step * CLEAN_STEP)
+    ROTATIONS.set(key, found)
+  }
+  return found
+}
+
+function paintClean (img: Image, p: Placement, colours: Map<string, number>): void {
+  const { grid, pivot } = rotated(p)
+  grid.forEach((row, y) => row.forEach((c, x) => {
+    const colour = colours.get(c)
+    if (colour !== undefined) setPixel(img, p.anchor[0] + x - pivot[0], p.anchor[1] + y - pivot[1], colour)
+  }))
 }
 
 function paint (img: Image, p: Placement, colours: Map<string, number>): void {
@@ -86,7 +143,10 @@ function drawOutline (img: Image, colour: number): void {
 export function renderSkinned (options: SkinnedOptions): Image {
   const img = createImage(options.camera.width, options.camera.height)
   const colours = new Map(Object.entries(options.skin.palette).map(([key, hex]) => [key, parseHex(hex)]))
-  for (const p of placements(options)) paint(img, p, colours)
+  for (const p of placements(options)) {
+    if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours)
+    else paint(img, p, colours)
+  }
   drawOutline(img, [...colours.values()].reduce((a, b) => luminance(b) < luminance(a) ? b : a))
   return img
 }

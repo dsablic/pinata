@@ -91,3 +91,21 @@ Headless Chromium timings are an estimate of a real browser tab; the report says
   budget, the runtime uses skins from the start.
 - In both cases, record what online motion required, since the same incremental planner is needed for walking
   characters in the runtime.
+
+## Progress log
+
+- **Renderer speed (exact):** primitives are now traced in order of where the ray enters their bounding spheres, and
+  tracing stops once the nearest hit is before the next entry; pixels are byte-identical everywhere. One 64 px frame
+  of the unicorn (104x92 canvas) in Node: 45 ms -> 31 ms at 4x4 samples, 21 ms at 3x3, 12 ms at 2x2, 5 ms at 1x1.
+- **Online motion core** (`src/runtime/`): rope pendulum with twist spring and full 3D body orientation, hits and
+  dragging (`hang.ts`); the `behaviours.json` format with `hang`, `sway`, `spin`, `bounce`, `breathe`, `hit`, blending,
+  `then` and a state machine (`behaviours.ts`, `director.ts`); the live character, with legs, mane and tail as spring
+  chains stepped per substep on the shared spring code (`character.ts`); the live renderer with a fixed anchor, the
+  rope as a thin part, turning decals and hysteresis (`render.ts`). Physics costs about 1 ms per frame; a full frame
+  at 3x3 samples on a 128x140 canvas is 25 ms mean, 33 ms p95 in Node.
+- **Gates checked in Node** (`test/runtime.test.ts`): hit reaction (25 degrees within 0.5 s, 1.2 degrees at 6 s),
+  pixel determinism, continuity at zero-blend switches, additive bounds, events firing once, reduced motion below
+  half, drag and release, masks. Found while testing: each behaviour restarted its waves at phase 0, so a switch
+  jumped; periodic primitives now run on the shared clock, and offsets fade over at least 0.2 s even on a zero blend.
+- **Delivery targets added by the user:** a GitHub Pages showcase (item 8), CI (done: typecheck and tests on every
+  push), and a Claude Code mod showing the piñata in a pane beside the chat, reacting to the agent's work.

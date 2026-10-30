@@ -1,9 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Mannequin } from '../src/formats/mannequin.ts'
 import { planGait } from '../src/motion/gait.ts'
 import {
   alternationViolations, boneLengthError, footSlidePx, frameHashes, groundPenetrationPx, kneeLimitViolations,
-  kneeSpeedDegPerSec, plantedFrames, reachViolations, recordLocomotion, rootSpeedError
+  kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, reachViolations, recordLocomotion, rootSpeedError
 } from '../src/motion/metrics.ts'
 import type { LocomotionFrame, LocomotionRecording } from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
@@ -77,6 +78,35 @@ test('groundPenetrationPx is the deepest sole point below y = 0 in pixels', () =
   const frames = [frame(0, withFeet(0, 0.5)), frame(1, withFeet(-0.01, 0.5)), frame(2, withFeet(-0.003, 0.5))]
   assertClose(groundPenetrationPx(recording(frames), geometry, SCALE), 0.01 / SCALE, 1e-9)
   assert.equal(groundPenetrationPx(recording([frame(0, withFeet(0.001, 0.5))]), geometry, SCALE), 0)
+})
+
+const withParts: Mannequin = {
+  ...mannequin,
+  parts: [
+    ...mannequin.parts,
+    { name: 'sword', shape: 'capsule', a: 'handR', b: 'wristR', radiusA: 0.03, radiusB: 0.02, material: 'm' },
+    {
+      name: 'plate', shape: 'box', a: 'chest', b: 'head', width: 0.2, thickness: 0.1, rounding: 0,
+      widthAxis: [1, 0, 0], material: 'm'
+    }
+  ]
+}
+const partOptions = { mannequin: withParts, rig, metresPerPixel: SCALE }
+
+test('partGroundPenetrationPx is the deepest capsule end below y = 0, feet ignored', () => {
+  const dip = structuredClone(rest)
+  dip.handR = [-0.27, 0.02, 0.06]
+  dip.ankleL = [0.1, -0.5, 0]
+  dip.toeL = [0.1, -0.5, 0.15]
+  assertClose(partGroundPenetrationPx(recording([frame(0, rest), frame(1, dip)]), partOptions), 0.01 / SCALE, 1e-9)
+  assert.equal(partGroundPenetrationPx(recording([frame(0, rest)]), partOptions), 0)
+})
+
+test('partGroundPenetrationPx uses the lowest box corner', () => {
+  const low = structuredClone(rest)
+  low.chest = [0, -0.01, 0]
+  low.head = [0, 0.4, 0]
+  assertClose(partGroundPenetrationPx(recording([frame(0, low)]), partOptions), 0.01 / SCALE, 1e-9)
 })
 
 test('reachViolations counts frames with a clamped target', () => {

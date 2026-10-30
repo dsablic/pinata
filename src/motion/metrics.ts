@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
-import type { Mannequin } from '../formats/mannequin.ts'
+import type { Mannequin, Part } from '../formats/mannequin.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
+import { boxFrame } from '../raster/sdf.ts'
 import { toWorld } from '../sim/body.ts'
 import type { GaitFrame } from './gait.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from './ik.ts'
@@ -129,6 +130,40 @@ export function groundPenetrationPx (
     }
   }
   return Math.max(0, -lowest) / metresPerPixel
+}
+
+function isFoot (part: Part, rig: Rig): boolean {
+  return part.shape === 'capsule' && rig.legs.some(leg => part.a === leg.ankle && part.b === leg.toe)
+}
+
+function lowestPointY (part: Part, joints: Pose): number {
+  const a = joints[part.a]
+  const b = joints[part.b]
+  if (part.shape === 'capsule') return Math.min(a[1] - part.radiusA, b[1] - part.radiusB)
+  const f = boxFrame(a, b, part)
+  let lowest = Infinity
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const y = f.center[1] + sx * f.half[0] * f.x[1] + sy * f.half[1] * f.y[1] + sz * f.half[2] * f.z[1]
+        lowest = Math.min(lowest, y)
+      }
+    }
+  }
+  return lowest
+}
+
+/** Deepest any non-foot part (capsule end spheres, box corners) goes below y = 0 in any frame, in pixels. */
+export function partGroundPenetrationPx (
+  recording: LocomotionRecording,
+  options: { mannequin: Mannequin, rig: Rig, metresPerPixel: number }
+): number {
+  const parts = options.mannequin.parts.filter(part => !isFoot(part, options.rig))
+  let lowest = 0
+  for (const { joints } of recording.frames) {
+    for (const part of parts) lowest = Math.min(lowest, lowestPointY(part, joints))
+  }
+  return Math.max(0, -lowest) / options.metresPerPixel
 }
 
 /** Frames in which at least one IK target was clamped. */

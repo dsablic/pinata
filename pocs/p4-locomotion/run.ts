@@ -146,6 +146,9 @@ function evaluateRun (run: Run): Record<string, number> {
   return {
     footSlidePx: metrics.footSlidePx(run.recording, g, METRES_PER_PIXEL),
     groundPenetrationPx: metrics.groundPenetrationPx(run.recording, g, METRES_PER_PIXEL),
+    partGroundPenetrationPx: metrics.partGroundPenetrationPx(run.recording, {
+      mannequin: run.mannequin, rig, metresPerPixel: METRES_PER_PIXEL
+    }),
     reachViolations: metrics.reachViolations(run.recording),
     kneeLimitViolations: metrics.kneeLimitViolations(run.recording, g),
     kneeSpeedDegPerSec: metrics.kneeSpeedDegPerSec(run.recording, g),

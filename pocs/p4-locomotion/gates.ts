@@ -15,6 +15,12 @@ export const P4_GATES = {
     threshold: 0.5,
     rationale: 'Lowest sole point below y = 0 at 48px scale, worst frame.'
   },
+  partGroundPenetrationPx: {
+    op: '<=',
+    threshold: 0.5,
+    rationale: 'Lowest point of any part other than the feet below y = 0 at 48px scale, worst frame: capsule end ' +
+      'spheres and box corners. Catches a dragged sword or a limb through the floor that the foot gate cannot see.'
+  },
   reachViolations: {
     op: '<=',
     threshold: 0,

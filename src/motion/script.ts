@@ -67,27 +67,73 @@ function yawRateAt (turns: Turn[], t: number): number {
   }, 0)
 }
 
-export function rootAt (script: Script, t: number): RootState {
-  const { changes, turns } = plan(script)
-  const duration = scriptDuration(script)
-  const end = Math.min(Math.max(t, 0), duration)
-  let x = 0
-  let z = 0
-  for (let time = 0; time < end; time += STEP) {
-    const h = Math.min(STEP, end - time)
-    const mid = time + h / 2
-    const speed = speedAt(changes, mid, script.accelSeconds)
-    const yaw = yawAt(turns, mid)
-    x += speed * Math.sin(yaw) * h
-    z += speed * Math.cos(yaw) * h
-  }
-  const yaw = yawAt(turns, end)
-  if (t >= duration) return { position: [x, 0, z], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
-  const speed = speedAt(changes, end, script.accelSeconds)
+type Model = { changes: SpeedChange[], turns: Turn[], accelSeconds: number, duration: number }
+
+function buildModel (script: Script): Model {
+  return { ...plan(script), accelSeconds: script.accelSeconds, duration: scriptDuration(script) }
+}
+
+function wholeSteps (end: number): number {
+  let count = Math.floor(end / STEP)
+  while (count * STEP > end) count--
+  return count
+}
+
+function advance (model: Model, index: number, h: number): [number, number] {
+  const mid = index * STEP + h / 2
+  const speed = speedAt(model.changes, mid, model.accelSeconds)
+  const yaw = yawAt(model.turns, mid)
+  return [speed * Math.sin(yaw) * h, speed * Math.cos(yaw) * h]
+}
+
+function stateAt (model: Model, t: number, x: number, z: number): RootState {
+  const end = Math.min(Math.max(t, 0), model.duration)
+  const yaw = yawAt(model.turns, end)
+  if (t >= model.duration) return { position: [x, 0, z], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
+  const speed = speedAt(model.changes, end, model.accelSeconds)
   return {
     position: [x, 0, z],
     yaw,
     velocity: [speed * Math.sin(yaw), 0, speed * Math.cos(yaw)],
-    angularVelocity: yawRateAt(turns, end)
+    angularVelocity: yawRateAt(model.turns, end)
   }
+}
+
+export function createRootTrack (script: Script): (t: number) => RootState {
+  const model = buildModel(script)
+  const count = wholeSteps(model.duration)
+  const xs = new Float64Array(count + 1)
+  const zs = new Float64Array(count + 1)
+  for (let k = 0; k < count; k++) {
+    const [dx, dz] = advance(model, k, STEP)
+    xs[k + 1] = xs[k] + dx
+    zs[k + 1] = zs[k] + dz
+  }
+  return (t: number): RootState => {
+    const end = Math.min(Math.max(t, 0), model.duration)
+    const k = Math.min(wholeSteps(end), count)
+    const h = end - k * STEP
+    const [dx, dz] = h > 0 ? advance(model, k, h) : [0, 0]
+    return stateAt(model, t, xs[k] + dx, zs[k] + dz)
+  }
+}
+
+export function rootAt (script: Script, t: number): RootState {
+  const model = buildModel(script)
+  const end = Math.min(Math.max(t, 0), model.duration)
+  const count = wholeSteps(end)
+  let x = 0
+  let z = 0
+  for (let k = 0; k < count; k++) {
+    const [dx, dz] = advance(model, k, STEP)
+    x += dx
+    z += dz
+  }
+  const h = end - count * STEP
+  if (h > 0) {
+    const [dx, dz] = advance(model, count, h)
+    x += dx
+    z += dz
+  }
+  return stateAt(model, t, x, z)
 }

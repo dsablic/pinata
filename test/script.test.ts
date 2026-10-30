@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { rootAt, scriptDuration } from '../src/motion/script.ts'
+import { createRootTrack, rootAt, scriptDuration } from '../src/motion/script.ts'
 import type { Script } from '../src/motion/script.ts'
 
 test('a zero-length script stays at the origin', () => {
@@ -128,4 +128,43 @@ test('position and yaw differences match velocity and angular velocity', () => {
     }
     assert.ok(Math.abs((b.yaw - a.yaw) / (2 * h) - mid.angularVelocity) < 1e-3, `yaw at t = ${t}`)
   }
+})
+
+const mixed: Script = {
+  segments: [
+    { action: 'move', speed: 1.5, duration: 2 },
+    { action: 'turn', degrees: 120, duration: 1.5 },
+    { action: 'move', speed: 0.5, duration: 1.3 },
+    { action: 'hold', duration: 1 }
+  ],
+  accelSeconds: 0.4
+}
+
+test('createRootTrack matches rootAt at random times, including past the ends', () => {
+  const track = createRootTrack(mixed)
+  const times = [-1, 0, scriptDuration(mixed), scriptDuration(mixed) + 3]
+  for (let i = 0; i < 200; i++) times.push(Math.random() * scriptDuration(mixed))
+  for (const t of times) {
+    const a = track(t)
+    const b = rootAt(mixed, t)
+    for (let i = 0; i < 3; i++) {
+      assert.ok(Math.abs(a.position[i] - b.position[i]) < 1e-6, `position at t = ${t}`)
+      assert.ok(Math.abs(a.velocity[i] - b.velocity[i]) < 1e-6, `velocity at t = ${t}`)
+    }
+    assert.ok(Math.abs(a.yaw - b.yaw) < 1e-6)
+    assert.ok(Math.abs(a.angularVelocity - b.angularVelocity) < 1e-6)
+  }
+})
+
+test('createRootTrack is a pure function of t', () => {
+  const track = createRootTrack(mixed)
+  const first = track(3.3)
+  track(0.2)
+  track(7)
+  assert.deepEqual(track(3.3), first)
+  assert.deepEqual(createRootTrack(mixed)(3.3), first)
+})
+
+test('createRootTrack handles an empty script', () => {
+  assert.deepEqual(createRootTrack({ segments: [], accelSeconds: 0.3 })(1).position, [0, 0, 0])
 })

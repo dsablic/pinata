@@ -121,3 +121,23 @@ If A/B still fails, move to the skins fallback.
 - Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 2).
 - Observed: the silhouette is no longer symmetric; the forward arm and stepped leg read as a stance rather than a
   T-pose. Ready for the P1b judge panel.
+
+## P1b review (AI judge panel)
+
+Same packet builder, same references, 3 fresh judges. Artefacts in `docs/plans/p1-judge/p1b/`.
+
+- A/B: reference picked in 18 of 18 real comparisons; controls "can't tell" 12 of 12 (panel valid). By the rule
+  fixed before the changes, this is "unchanged": the procedural style is still reliably detected. Judges now cite
+  "soft, gradient-like / systematic banded shading", "blocky or standardized construction" and "stiff" pose; the
+  outline and missing accent details were no longer the main complaints, and judges rated their confidence higher
+  (mostly 4), not lower.
+- Facing: majority-correct on 5 of 16 frames (el30: 2 of 8). Judges scored 15, 5 and 5 of 16; judges 2 and 3 gave
+  near-identical wrong answers (15 of 16 identical), which suggests a shared systematic misreading rather than
+  independent evidence. Facing judgements from this panel are too noisy to gate on.
+
+Verdict: P1b fails the "looks hand-made" criterion. Per the pre-registered rule, next is the skins fallback.
+
+Lessons for later judge panels:
+- A/B detection is stable and well calibrated (controls never drifted across 6 judges).
+- Facing identification is not: prefer a geometric check (for example, facing from the projected positions of the
+  visor and cape anchors) and use judges only as a secondary signal.

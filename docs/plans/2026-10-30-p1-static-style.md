@@ -2196,12 +2196,12 @@ export const P1_GATES = {
   outlineGaps: {
     op: '<=',
     threshold: 0,
-    rationale: 'An unbroken outline makes the silhouette read on any background; a single gap reads as damage.'
+    rationale: 'The outline is closed by construction; a gap means the silhouette was clipped at the frame edge.'
   },
   maxThinFraction: {
     op: '<=',
     threshold: 0.25,
-    rationale: 'Parts mostly 1px thick vanish or flicker at 32px; a quarter allows tapered ends and occlusion slivers.'
+    rationale: 'Parts mostly 1px thick vanish or flicker at 32px; a quarter allows tapered ends. Occlusion is ignored.'
   },
   paletteSize: {
     op: '<=',
@@ -2469,7 +2469,11 @@ rmSync(outDir, { recursive: true, force: true })
 for (const f of frames) writeOutput(join(outDir, 'frames', `${f.id}.png`), encodePng(f.image))
 const sheetOptions = { scale: SHEET_SCALE, gap: SHEET_SCALE, background: SHEET_BACKGROUND }
 function writeSheet (name: string, cell: (f: Frame) => Image): void {
-  writeOutput(join(outDir, name), encodePng(sheet(rows.map(r => r.map(cell)), sheetOptions)))
+  const cells = rows.map(r => r.map(f => {
+    const anchor: [number, number] = [f.camera.width / 2, f.camera.baseline]
+    return { image: cell(f), anchor }
+  }))
+  writeOutput(join(outDir, name), encodePng(sheet(cells, sheetOptions)))
 }
 writeSheet('sheet.png', f => f.image)
 writeSheet('debug-parts.png', f => partImage(f.gbuffer))

@@ -41,6 +41,15 @@ export function disc (img: Image, cx: number, cy: number, r: number, rgb: number
   }
 }
 
+export function ring (img: Image, cx: number, cy: number, r: number, rgb: number): void {
+  const reach = Math.ceil(r) + 1
+  for (let y = Math.round(cy) - reach; y <= Math.round(cy) + reach; y++) {
+    for (let x = Math.round(cx) - reach; x <= Math.round(cx) + reach; x++) {
+      if (Math.abs(Math.hypot(x - Math.round(cx), y - Math.round(cy)) - r) < 0.5) setPixel(img, x, y, rgb)
+    }
+  }
+}
+
 export type Series = { values: number[], rgb: number }
 export type PlotOptions = { width: number, height: number, yMin: number, yMax: number }
 

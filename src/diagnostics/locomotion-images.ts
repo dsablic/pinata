@@ -10,7 +10,7 @@ import { fitCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { rasterize } from '../raster/gbuffer.ts'
 import { stylize } from '../style/stylize.ts'
-import { disc, line } from './draw.ts'
+import { disc, line, ring } from './draw.ts'
 import { sheet } from './images.ts'
 
 export const LEFT_FOOT = 0x2c7bb6
@@ -21,7 +21,7 @@ const BACKGROUND = 0xf7f7f7
 const LEFT_OLD = 0xc6dbef
 const RIGHT_OLD = 0xfcbba1
 const MARGIN_PX = 12
-const FOOT_RADIUS = 0.06
+const START_RADIUS = 5
 const STRIP_MARGIN = 2
 
 type Geometry = { rig: Rig, mannequin: Mannequin }
@@ -45,44 +45,55 @@ function mix (from: number, to: number, t: number): number {
 
 export type FootprintOptions = Geometry & { size: number }
 
-/** Top view, +x right and +z up: black root path, one disc per planted foot run (left blue, right red). */
-export function footprintTrace (recording: LocomotionRecording, options: FootprintOptions): Image {
-  const { size, rig, mannequin } = options
-  const runs = plantedRuns(recording, { rig, mannequin })
-  const centre = (side: string, start: number, end: number): [number, number] => {
-    const leg = rig.legs.find(l => l.side === side)!
-    let x = 0
-    let z = 0
-    let n = 0
-    for (let i = start; i <= end; i++) {
-      for (const p of solePoints(recording.frames[i].joints, leg, mannequin)) {
-        x += p[0]
-        z += p[2]
-        n++
-      }
+type Footprint = { side: string, heel: [number, number], toe: [number, number] }
+
+function footprints (recording: LocomotionRecording, options: Geometry): Footprint[] {
+  const { rig, mannequin } = options
+  return plantedRuns(recording, { rig, mannequin }).map(run => {
+    const leg = rig.legs.find(l => l.side === run.side)!
+    const sums = [[0, 0], [0, 0]]
+    for (let i = run.start; i <= run.end; i++) {
+      solePoints(recording.frames[i].joints, leg, mannequin).forEach((p, k) => {
+        sums[k][0] += p[0]
+        sums[k][1] += p[2]
+      })
     }
-    return [x / n, z / n]
-  }
-  const plants = runs.map(run => ({ side: run.side, at: centre(run.side, run.start, run.end) }))
-  const points = [...recording.frames.map((f): [number, number] => [f.root.position[0], f.root.position[2]]),
-    ...plants.map(p => p.at)]
+    const n = run.end - run.start + 1
+    return { side: run.side, heel: [sums[0][0] / n, sums[0][1] / n], toe: [sums[1][0] / n, sums[1][1] / n] }
+  })
+}
+
+/**
+ * View from above in the right-handed Y-up frame, the walker heading up the image: +x is on the left, +z up. Black
+ * root path with a hollow circle at its start, and one heel-to-toe mark per planted foot run (left blue, right red).
+ */
+export function footprintTrace (recording: LocomotionRecording, options: FootprintOptions): Image {
+  const { size } = options
+  const prints = footprints(recording, options)
+  const path = recording.frames.map((f): [number, number] => [f.root.position[0], f.root.position[2]])
+  const points = [...path, ...prints.flatMap(p => [p.heel, p.toe])]
   const xs = points.map(p => p[0])
   const zs = points.map(p => p[1])
   const pad = 0.3
-  const minX = Math.min(...xs) - pad
+  const maxX = Math.max(...xs) + pad
   const minZ = Math.min(...zs) - pad
-  const span = Math.max(Math.max(...xs) + pad - minX, Math.max(...zs) + pad - minZ)
+  const span = Math.max(maxX - (Math.min(...xs) - pad), Math.max(...zs) + pad - minZ)
   const scale = (size - 2 * MARGIN_PX) / span
-  const toPixel = (x: number, z: number): [number, number] => {
-    return [MARGIN_PX + (x - minX) * scale, size - MARGIN_PX - (z - minZ) * scale]
+  const toPixel = (p: [number, number]): [number, number] => {
+    return [MARGIN_PX + (maxX - p[0]) * scale, size - MARGIN_PX - (p[1] - minZ) * scale]
   }
   const img = blank(size, size)
-  const path = recording.frames.map(f => toPixel(f.root.position[0], f.root.position[2]))
-  for (let i = 1; i < path.length; i++) line(img, path[i - 1][0], path[i - 1][1], path[i][0], path[i][1], PATH)
-  const radius = Math.max(3, FOOT_RADIUS * scale)
-  for (const { side, at } of plants) {
-    const [px, py] = toPixel(at[0], at[1])
-    disc(img, px, py, radius, side === 'left' ? LEFT_FOOT : RIGHT_FOOT)
+  const pixels = path.map(toPixel)
+  for (let i = 1; i < pixels.length; i++) {
+    line(img, pixels[i - 1][0], pixels[i - 1][1], pixels[i][0], pixels[i][1], PATH)
+  }
+  ring(img, pixels[0][0], pixels[0][1], START_RADIUS, PATH)
+  for (const { side, heel, toe } of prints) {
+    const rgb = side === 'left' ? LEFT_FOOT : RIGHT_FOOT
+    const [hx, hy] = toPixel(heel)
+    const [tx, ty] = toPixel(toe)
+    for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) line(img, hx + dx, hy + dy, tx + dx, ty + dy, rgb)
+    disc(img, hx, hy, 2.5, rgb)
   }
   return img
 }
@@ -96,7 +107,7 @@ export type OnionOptions = Geometry & {
   axis: 'x' | 'z'
 }
 
-/** Side view in world space of hip-knee-ankle-toe lines every Nth frame from `from` to `to`, older frames lighter. */
+/** Side view in world space of hip, knee, ankle and sole-point lines every Nth frame, older frames lighter. */
 export function legOnionSkin (recording: LocomotionRecording, options: OnionOptions): Image {
   const { width, height, rig } = options
   const axis = options.axis === 'x' ? 0 : 2
@@ -106,7 +117,9 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
   const chain = (i: number, side: string): Array<[number, number]> => {
     const leg = rig.legs.find(l => l.side === side)!
     const { joints } = recording.frames[i]
-    return [leg.hip, leg.knee, leg.ankle, leg.toe].map(name => [joints[name][axis], joints[name][1]])
+    const joint = (name: string): [number, number] => [joints[name][axis], joints[name][1]]
+    const soles = solePoints(joints, leg, options.mannequin).map((p): [number, number] => [p[axis], p[1]])
+    return [joint(leg.hip), joint(leg.knee), joint(leg.ankle), ...soles]
   }
   const all = shown.flatMap(i => rig.legs.flatMap(l => chain(i, l.side)))
   const minA = Math.min(...all.map(p => p[0]))

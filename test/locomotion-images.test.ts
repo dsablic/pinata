@@ -145,3 +145,92 @@ test('pixelStrip lays frames side by side with a fixed camera so the character m
   })
   assert.ok(centres[0] < centres[1] && centres[1] < centres[2] && centres[2] < centres[3], centres.join(','))
 })
+
+function footprintRecording (yawRate: number): LocomotionRecording {
+  const frames: LocomotionFrame[] = []
+  for (let i = 0; i < 40; i++) {
+    const yaw = yawRate * i
+    const z = i * 0.05 * Math.cos(yaw)
+    const x = i * 0.05 * Math.sin(yaw)
+    const joints = structuredClone(rest)
+    for (const [name, [jx, y, jz]] of Object.entries(rest)) joints[name] = [jx + x, y, jz + z]
+    const leftOn = i % 20 < 10
+    const rightOn = i % 20 >= 10
+    joints.ankleL = [0.1 + x, leftOn ? 0.1 : 0.4, z]
+    joints.toeL = [0.1 + x, leftOn ? 0.05 : 0.35, z + 0.15]
+    joints.ankleR = [-0.1 + x, rightOn ? 0.1 : 0.4, z]
+    joints.toeR = [-0.1 + x, rightOn ? 0.05 : 0.35, z + 0.15]
+    frames.push({
+      time: i / 24,
+      root: { position: [x, 0, z], yaw, velocity: [0, 0, 0], angularVelocity: 0 },
+      joints,
+      clamped: 0,
+      planted: { left: leftOn, right: rightOn }
+    })
+  }
+  return { fps: 24, frames }
+}
+
+function centroidX (img: Image, rgb: number): number {
+  let sum = 0
+  let n = 0
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      if (getPixel(img, x, y) === rgb) {
+        sum += x
+        n++
+      }
+    }
+  }
+  return sum / n
+}
+
+test('footprintTrace is a view from above: a left foot at +X is left of a path that goes up the image', () => {
+  const img = footprintTrace(footprintRecording(0), { ...geometry, size: 256 })
+  assert.ok(centroidX(img, LEFT_FOOT) < centroidX(img, RIGHT_FOOT))
+})
+
+test('footprintTrace bends the path to the walker\'s left for a positive yaw turn', () => {
+  const img = footprintTrace(footprintRecording(0.03), { ...geometry, size: 256 })
+  let top = -1
+  let bottom = -1
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      if (getPixel(img, x, y) !== 0x000000) continue
+      if (top < 0) top = x
+      bottom = x
+    }
+  }
+  assert.ok(top < bottom, `path top at ${top}, bottom at ${bottom}`)
+})
+
+test('footprintTrace draws each footprint as a heel-to-toe mark and a hollow start marker', () => {
+  const img = footprintTrace(footprintRecording(0), { ...geometry, size: 256 })
+  let rows = 0
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      if (getPixel(img, x, y) === LEFT_FOOT) {
+        rows++
+        break
+      }
+    }
+  }
+  assert.ok(rows >= 4, `left footprints span ${rows} rows`)
+  let widest = 0
+  for (let y = 0; y < img.height; y++) {
+    const xs = [...Array(img.width).keys()].filter(x => getPixel(img, x, y) === 0x000000)
+    if (xs.length > 0) widest = Math.max(widest, xs[xs.length - 1] - xs[0])
+  }
+  assert.ok(widest >= 8, `widest black row ${widest}`)
+})
+
+test('legOnionSkin draws the sole points, so a planted foot touches the ground line', () => {
+  const options = { ...geometry, width: 320, height: 160, from: 0, to: 0, every: 1, axis: 'z' as const }
+  const img = legOnionSkin(walkRecording(), options)
+  const ground = [...Array(img.height).keys()].filter(y => getPixel(img, 0, y) === GROUND)[0]
+  let lowest = -1
+  for (let y = 0; y < ground; y++) {
+    for (let x = 0; x < img.width; x++) if (getPixel(img, x, y) === LEFT_FOOT) lowest = y
+  }
+  assert.ok(ground - lowest <= 1, `foot ends ${ground - lowest} px above the ground`)
+})

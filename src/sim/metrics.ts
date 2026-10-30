@@ -22,11 +22,15 @@ export type RecordOptions = {
   particleRadius: number
 }
 
-/** Copies the particle positions and stores per-particle penetration depth, max(0, particleRadius - distance). */
+/**
+ * Copies the particle positions and stores per-particle penetration depth, max(0, particleRadius - distance).
+ * Pinned particles (inverse mass 0) are placed by the root, not simulated, so their depth is recorded as 0.
+ */
 export function recordFrame (recording: Recording, options: RecordOptions): void {
   const { particles, distance, particleRadius } = options
   const penetration = new Float64Array(particles.count)
   for (let i = 0; i < particles.count; i++) {
+    if (particles.inverseMass[i] === 0) continue
     const p = particles.position
     const d = distance([p[3 * i], p[3 * i + 1], p[3 * i + 2]])
     penetration[i] = Math.max(0, particleRadius - d)

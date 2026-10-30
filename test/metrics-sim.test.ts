@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import type { DistanceConstraint } from '../src/sim/cloth.ts'
 import type { Recording } from '../src/sim/metrics.ts'
 import {
-  frameHashes, lagFrames, maxSpeed, maxStrain, nonFinite, overshootDegrees,
-  penetratingFrames, settleSeconds, swingAngles, windAlignment
+  createRecording, frameHashes, lagFrames, maxSpeed, maxStrain, nonFinite, overshootDegrees,
+  penetratingFrames, recordFrame, settleSeconds, swingAngles, windAlignment
 } from '../src/sim/metrics.ts'
 import { assertClose } from './helpers.ts'
 
@@ -143,4 +143,21 @@ test('frameHashes differ per frame and are stable', () => {
   assert.match(a[0], /^[0-9a-f]{64}$/)
   assert.notEqual(a[0], a[1])
   assert.deepEqual(frameHashes(rec), a)
+})
+
+test('recordFrame records penetration for free particles and zero for pinned ones', () => {
+  const particles = {
+    position: Float64Array.from([0, 0, 0, 1, 0, 0]),
+    previous: new Float64Array(6),
+    inverseMass: Float64Array.from([0, 1]),
+    materialIndex: new Uint32Array(2),
+    count: 2
+  }
+  const system = { particles, constraints: [], pins: [], material: [] }
+  const rec = createRecording(system)
+  const origin: [number, number, number] = [0, 0, 0]
+  const root = { position: origin, yaw: 0, velocity: origin, angularVelocity: 0 }
+  recordFrame(rec, { time: 0, root, particles, distance: p => p[0] - 0.5, particleRadius: 0.75 })
+  assertClose(rec.frames[0].penetration[0], 0)
+  assertClose(rec.frames[0].penetration[1], 0.25)
 })

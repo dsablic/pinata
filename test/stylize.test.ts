@@ -111,3 +111,33 @@ test('leaves a pixel alone when it has no neighbours of its own part', () => {
   const { image } = stylize(g, two, camera, style)
   assert.equal(getPixel(image, 2, 2), DARK)
 })
+
+const eye = { name: 'eye', anchor: 'o', normal: [0, 0, 1] as Vec3, pattern: ['x'] }
+const RED = 0xff0000
+
+function decalScene (decalNormal: Vec3, surfaceDepth: number) {
+  const g = block([0, 0, 1])
+  g.depth.fill(surfaceDepth)
+  const m: Mannequin = { ...mannequin, decals: [{ ...eye, normal: decalNormal }] }
+  return stylize(g, m, camera, style)
+}
+
+test('draws a camera-facing decal at the projected anchor and marks it in the mask', () => {
+  const { image, decalMask } = decalScene([0, 0, 1], 4)
+  assert.equal(getPixel(image, 2, 3), RED)
+  assert.equal(decalMask[3 * 5 + 2], 1)
+  assert.equal(decalMask.reduce((a, b) => a + b, 0), 1)
+})
+
+test('skips a decal facing away from the camera', () => {
+  const { image, decalMask } = decalScene([0, 0, -1], 4)
+  assert.notEqual(getPixel(image, 2, 3), RED)
+  assert.equal(decalMask.reduce((a, b) => a + b, 0), 0)
+})
+
+test('skips a decal covered by a surface more than one pixel depth in front of it', () => {
+  const covered = decalScene([0, 0, 1], 2)
+  assert.notEqual(getPixel(covered.image, 2, 3), RED)
+  assert.equal(covered.decalMask.reduce((a, b) => a + b, 0), 0)
+  assert.equal(getPixel(decalScene([0, 0, 1], 3.5).image, 2, 3), RED)
+})

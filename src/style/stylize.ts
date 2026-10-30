@@ -11,9 +11,6 @@ import type { GBuffer } from '../raster/gbuffer.ts'
 
 export type StylizeResult = { image: Image, decalMask: Uint8Array }
 
-// Model units. The decal anchor sits on the surface, so a surface closer than this means something covers it.
-const DECAL_OCCLUSION = 0.05
-
 export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): StylizeResult {
   const shaded = createImage(g.width, g.height)
   shade(shaded, g, m, style)
@@ -97,6 +94,7 @@ function removeStrays (image: Image, g: GBuffer): Image {
 
 function drawDecals (image: Image, g: GBuffer, m: Mannequin, cam: Camera, style: Style): Uint8Array {
   const mask = new Uint8Array(g.width * g.height)
+  const pixelDepth = 1 / cam.pixelsPerUnit
   for (const decal of m.decals) {
     if (-dot(normalize(decal.normal), cam.forward) < style.decalMinFacing) continue
     const p = project(cam, m.joints[decal.anchor])
@@ -104,7 +102,7 @@ function drawDecals (image: Image, g: GBuffer, m: Mannequin, cam: Camera, style:
     const cy = Math.floor(p.y)
     if (cx < 0 || cy < 0 || cx >= g.width || cy >= g.height) continue
     const centre = cy * g.width + cx
-    if (g.part[centre] === EMPTY || g.depth[centre] < p.depth - DECAL_OCCLUSION) continue
+    if (g.part[centre] === EMPTY || g.depth[centre] < p.depth - pixelDepth) continue
     const ox = cx - Math.floor(decal.pattern[0].length / 2)
     const oy = cy - Math.floor(decal.pattern.length / 2)
     decal.pattern.forEach((row, dy) => {

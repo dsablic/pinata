@@ -7,6 +7,8 @@
     "chest": [0, 1.22, 0],
     "head": [0, 1.5, 0],
     "visor": [0, 1.52, 0.27],
+    "plumeFront": [0, 1.78, 0.08],
+    "plumeBack": [0, 1.7, -0.24],
     "capeTop": [0, 1.2, -0.18],
     "capeHem": [0, 0.35, -0.3],
     "hipL": [0.13, 0.8, 0],
@@ -29,6 +31,7 @@
   },
   "parts": [
     { "name": "helmet", "shape": "capsule", "a": "head", "b": "head", "radiusA": 0.27, "radiusB": 0.27, "material": "steel" },
+    { "name": "plume", "shape": "capsule", "a": "plumeFront", "b": "plumeBack", "radiusA": 0.07, "radiusB": 0.05, "material": "cloth-red" },
     {
       "name": "torso", "shape": "box", "a": "pelvis", "b": "chest",
       "width": 0.52, "thickness": 0.32, "rounding": 0.1, "widthAxis": [1, 0, 0], "material": "steel"

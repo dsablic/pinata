@@ -19,3 +19,10 @@ Gate thresholds are locked (see `pocs/p1-static-style/gates.ts`). Each run chang
   All automated gates pass.
 - Observed: side-view cape is now a 2px strip attached to the back. Limbs read as limbs at 32px. Remaining visual
   issues: helmet silhouette is generic, cape back is flat, sword overlapping a leg reads as a ladder at 32px.
+
+## Run 3
+
+- Change: added a `plume` capsule (cloth-red, r 0.07 -> 0.05) sweeping from the helmet top to the back.
+- Gates: all pass, unchanged (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 1).
+- Observed: the silhouette now reads as a knight at 32px, and the backward sweep makes facing easier to read in the
+  3/4 and side views. No new colours. Remaining: cape back is one flat rectangle.

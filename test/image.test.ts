@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createImage, getPixel, imageHash, neighbours4, parseHex, setPixel, TRANSPARENT } from '../src/image.ts'
+import {
+  createImage, getPixel, imageHash, neighbours4, parseHex, setPixel, TRANSPARENT, upscale
+} from '../src/image.ts'
 
 test('pixels round-trip as packed RGB and start transparent', () => {
   const img = createImage(2, 2)
@@ -41,4 +43,14 @@ test('writes outside the image are ignored', () => {
   setPixel(img, 2, 0, 0xffffff)
   setPixel(img, 0, 2, 0xffffff)
   assert.ok(img.data.every((v) => v === 0))
+})
+
+test('upscale repeats each pixel factor times in both directions', () => {
+  const img = createImage(2, 1)
+  setPixel(img, 0, 0, 0xff0000)
+  const big = upscale(img, 3)
+  assert.equal(big.width, 6)
+  assert.equal(big.height, 3)
+  assert.equal(getPixel(big, 2, 2), 0xff0000)
+  assert.equal(getPixel(big, 3, 0), TRANSPARENT)
 })

@@ -46,3 +46,14 @@ export function neighbours8 (img: Image, x: number, y: number): number[] {
 export function imageHash (img: Image): string {
   return createHash('sha256').update(`${img.width}x${img.height}`).update(img.data).digest('hex')
 }
+
+export function upscale (img: Image, factor: number): Image {
+  const out = createImage(img.width * factor, img.height * factor)
+  for (let y = 0; y < out.height; y++) {
+    for (let x = 0; x < out.width; x++) {
+      const from = (Math.floor(y / factor) * img.width + Math.floor(x / factor)) * 4
+      out.data.set(img.data.subarray(from, from + 4), (y * out.width + x) * 4)
+    }
+  }
+  return out
+}

@@ -4,7 +4,13 @@ import type { RootState } from '../motion/script.ts'
 import { toWorld } from './body.ts'
 import type { DistanceConstraint, Particles, System } from './cloth.ts'
 
-export type Frame = { time: number, root: RootState, positions: Float64Array, penetration: Float64Array, linkPenetration: Float64Array }
+export type Frame = {
+  time: number
+  root: RootState
+  positions: Float64Array
+  penetration: Float64Array
+  linkPenetration: Float64Array
+}
 export type Recording = { constraints: DistanceConstraint[], frames: Frame[] }
 
 /** Hem particle indices and the cape's top-centre anchor in body-local space (joint position plus offset). */

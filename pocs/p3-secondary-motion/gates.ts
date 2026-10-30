@@ -22,12 +22,14 @@ export const P3_GATES = {
   penetratingFrames: {
     op: '<=',
     threshold: 0.01,
-    rationale: 'Fraction of frames with any particle deeper than 0.5 px (at 48px scale) inside the body.'
+    rationale: 'Fraction of frames with any particle, or constraint midpoint between free particles, deeper than ' +
+      '0.5 px (at 48px scale) inside the body.'
   },
   settleSecondsMin: {
     op: '>=',
     threshold: 0.2,
-    rationale: 'Time after the stop until max particle speed < 0.05 m/s; faster than 0.2 s is a rigid cape.'
+    rationale: 'Time after the root comes to rest until max cape particle speed < 0.05 m/s; ' +
+      'faster than 0.2 s is a rigid cape.'
   },
   settleSecondsMax: {
     op: '<=',
@@ -48,12 +50,25 @@ export const P3_GATES = {
   lagFrames: {
     op: '>=',
     threshold: 1,
-    rationale: 'The peak sideways swing comes at least one frame after the peak of the body turn rate.'
+    rationale: 'The peak sideways swing, at least 0.5 degrees, comes at least one frame after the peak of the body ' +
+      'turn rate; -1 otherwise.'
   },
   windAlignment: {
     op: '>=',
     threshold: 0.7,
     rationale: 'Mean cosine between the horizontal hem displacement from windless rest and the wind direction.'
+  },
+  windDriftMetres: {
+    op: '>=',
+    threshold: 0.05,
+    rationale: 'Mean horizontal hem drift from the windless rest during the wind run; alignment alone ' +
+      'only checks the sign of the drag.'
+  },
+  rigidControlFails: {
+    op: '>=',
+    threshold: 1,
+    rationale: '1 if the rigid control, the cape at rest pose moved with the body, fails a motion gate ' +
+      '(settle, lag, overshoot); a gate set a rigid cape passes proves nothing.'
   },
   nondeterministicFrames: {
     op: '<=',

@@ -8,6 +8,7 @@ import { checkScenario, scenarioDuration, validateScenario, validateSimMaterials
 import type { Scenario, SimMaterial } from '../../src/formats/sim.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
 import type { Validated } from '../../src/formats/validate.ts'
+import type { Vec3 } from '../../src/math/vec.ts'
 import { createRootTrack, scriptDuration } from '../../src/motion/script.ts'
 import type { RootState } from '../../src/motion/script.ts'
 import { bodyCollider, toWorld } from '../../src/sim/body.ts'
@@ -31,6 +32,7 @@ const MAX_ONION_FRAMES = 60
 const BODY_STEP = 4
 const STOP_STEP = 2
 const FOLLOW_SECONDS = 1.5
+const MIN_LAG_PEAK_DEGREES = 0.5
 const CHILD_TIMEOUT_MS = 120000
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -183,23 +185,77 @@ function turnWindow (scenario: Scenario): { turnStart: number, turnEnd: number }
   return fail(`${scenario.name}.json: the script has no turn segment`)
 }
 
-function windlessRestHem (run: Run): [number, number, number] {
+const restHems = new Map<string, Vec3>()
+
+function windlessRestHem (run: Run): Vec3 {
+  const cached = restHems.get(run.material)
+  if (cached !== undefined) return cached
   const calm = { ...run.scenario, wind: undefined }
   const { frames } = simulate(calm, materialByName.get(run.material) as SimMaterial)
   const last = frames[frames.length - 1].positions
   const hem = run.hem
   const mean = (axis: number): number => hem.reduce((sum, i) => sum + last[3 * i + axis], 0) / hem.length
-  return [mean(0), mean(1), mean(2)]
+  const rest: Vec3 = [mean(0), mean(1), mean(2)]
+  restHems.set(run.material, rest)
+  return rest
 }
 
-function turnStopMetrics (material: string): { settle: number, overshoot: number, lag: number } {
-  const run = find('turn-stop', material)
+function rigidRecording (run: Run): Recording {
+  const system = buildSystem(run.scenario, materialByName.get(run.material) as SimMaterial)
+  const rest = system.particles.position
+  const frames = run.recording.frames.map(({ time, root }) => {
+    const positions = new Float64Array(rest.length)
+    for (let i = 0; i < rest.length; i += 3) {
+      positions.set(toWorld([rest[i], rest[i + 1], rest[i + 2]], root as RootState), i)
+    }
+    return {
+      time,
+      root,
+      positions,
+      penetration: new Float64Array(rest.length / 3),
+      linkPenetration: new Float64Array(system.constraints.length)
+    }
+  })
+  return { constraints: system.constraints, frames }
+}
+
+const rigids = new Map<string, Recording>()
+
+function rigidOf (material: string): Recording {
+  const cached = rigids.get(material)
+  if (cached !== undefined) return cached
+  const rigid = rigidRecording(find('turn-stop', material))
+  rigids.set(material, rigid)
+  return rigid
+}
+
+function capeParticles (scenario: Scenario): number[] {
+  const cape = scenario.cape as NonNullable<Scenario['cape']>
+  return Array.from({ length: cape.columns * cape.rows }, (_, i) => i)
+}
+
+function motionMetrics (run: Run, recording: Recording): { settle: number, overshoot: number, lag: number } {
   const stopTime = finalHold(run.scenario)
   return {
-    settle: metrics.settleSeconds(run.recording, { fromTime: stopTime, speedThreshold: SETTLE_SPEED }),
-    overshoot: metrics.overshootDegrees(run.recording, { stopTime, swing: run.swing }),
-    lag: metrics.lagFrames(run.recording, { ...turnWindow(run.scenario), swing: run.swing })
+    settle: metrics.settleSeconds(recording, {
+      fromTime: stopTime + run.scenario.script.accelSeconds,
+      speedThreshold: SETTLE_SPEED,
+      particles: capeParticles(run.scenario)
+    }),
+    overshoot: metrics.overshootDegrees(recording, { stopTime, swing: run.swing }),
+    lag: metrics.lagFrames(recording, {
+      ...turnWindow(run.scenario), swing: run.swing, minPeakDegrees: MIN_LAG_PEAK_DEGREES
+    })
   }
+}
+
+function rigidControlFails (material: string, rigid: { settle: number, overshoot: number, lag: number }): number {
+  const gates = [
+    gate('settleSecondsMin', rigid.settle, material),
+    gate('lagFrames', rigid.lag, material),
+    gate('overshootDegrees', rigid.overshoot, material)
+  ]
+  return evaluate(gates).some(g => !g.pass) ? 1 : 0
 }
 
 function windMetric (material: string): number {
@@ -210,31 +266,27 @@ function windMetric (material: string): number {
   })
 }
 
-function windDisplacement (material: string): number {
+function windDrift (material: string): number {
   const run = find('wind', material)
-  const rest = windlessRestHem(run)
-  const total = run.recording.frames.reduce((sum, frame) => {
-    let x = 0
-    let z = 0
-    for (const i of run.hem) {
-      x += frame.positions[3 * i] / run.hem.length
-      z += frame.positions[3 * i + 2] / run.hem.length
-    }
-    return sum + Math.hypot(x - rest[0], z - rest[2])
-  }, 0)
-  return total / run.recording.frames.length
+  return metrics.windDriftMetres(run.recording, { hem: run.hem, restHem: windlessRestHem(run) })
 }
 
 const penetrationLimit = PENETRATION_PX * (bodies.get('turn-stop') as Mannequin).height / PX_SCALE
 const other = childHashes()
 const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
 
-const perMaterial = Object.fromEntries(MATERIALS.map(name => [name, {
-  ...turnStopMetrics(name),
-  wind: windMetric(name),
-  windDisplacementMetres: windDisplacement(name),
-  maxSpeed: metrics.maxSpeed(find('soak', name).recording)
-}]))
+const perMaterial = Object.fromEntries(MATERIALS.map(name => {
+  const run = find('turn-stop', name)
+  const rigid = motionMetrics(run, rigidOf(name))
+  return [name, {
+    ...motionMetrics(run, run.recording),
+    wind: windMetric(name),
+    windDriftMetres: windDrift(name),
+    maxSpeed: metrics.maxSpeed(find('soak', name).recording),
+    rigid,
+    rigidControlFails: rigidControlFails(name, rigid)
+  }]
+}))
 const perRun = runs.map(r => ({
   id: r.id,
   nonFinite: metrics.nonFinite(r.recording),
@@ -256,28 +308,11 @@ const results = evaluate([
   ...MATERIALS.slice(0, 2).map(name => gate('overshootDegrees', perMaterial[name].overshoot, name)),
   ...MATERIALS.map(name => gate('lagFrames', perMaterial[name].lag, name)),
   ...MATERIALS.map(name => gate('windAlignment', perMaterial[name].wind, name)),
+  ...MATERIALS.map(name => gate('windDriftMetres', perMaterial[name].windDriftMetres, name)),
+  ...MATERIALS.map(name => gate('rigidControlFails', perMaterial[name].rigidControlFails, name)),
   gate('nondeterministicFrames', nondeterministic)
 ])
 const summary = summarize('P3 secondary motion', results)
-
-function rigidRecording (run: Run): Recording {
-  const system = buildSystem(run.scenario, materialByName.get(run.material) as SimMaterial)
-  const rest = system.particles.position
-  const frames = run.recording.frames.map(({ time, root }) => {
-    const positions = new Float64Array(rest.length)
-    for (let i = 0; i < rest.length; i += 3) {
-      positions.set(toWorld([rest[i], rest[i + 1], rest[i + 2]], root as RootState), i)
-    }
-    return {
-      time,
-      root,
-      positions,
-      penetration: new Float64Array(rest.length / 3),
-      linkPenetration: new Float64Array(system.constraints.length)
-    }
-  })
-  return { constraints: system.constraints, frames }
-}
 
 function frameRange (run: Run, fromTime: number, step: number): number[] {
   const fps = run.scenario.fps
@@ -319,8 +354,8 @@ function writeStills (run: Run): void {
   if (run.scenario.name === 'turn-stop') writeBodyFrameStills(run, run.id, run.recording)
   if (run.scenario.name === 'wind') writeWindFront(run)
   if (run.id === 'turn-stop-silk') {
-    writeBodyFrameStills(run, 'turn-stop-rigid', rigidRecording(run))
-    writeOutput(join(outDir, 'turn-stop-rigid-side.png'), encodePng(sideOnionSkin(rigidRecording(run), onion)))
+    writeBodyFrameStills(run, 'turn-stop-rigid', rigidOf(run.material))
+    writeOutput(join(outDir, 'turn-stop-rigid-side.png'), encodePng(sideOnionSkin(rigidOf(run.material), onion)))
   }
 }
 

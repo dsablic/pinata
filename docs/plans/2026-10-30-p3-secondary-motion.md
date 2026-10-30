@@ -253,3 +253,22 @@ plane; that is enough for stills. Tests: line endpoints and length, plot axes in
   1 gate failed, 2 harness error, a stale report is cleared at the start).
 
 Review batch C, then run the judge panel (controller task) and log findings in `docs/plans/p3-findings.md`.
+
+## Gate amendment (after the batch C review, all gates passing)
+
+The batch C review showed that several gates also pass for a rigid cape that never moves. These changes only make
+the gates stricter; no threshold is loosened.
+
+- `settleSeconds`: the clock starts when the root comes to rest (start of the final hold plus `accelSeconds`), not at
+  the start of the hold, and only cape particles count (the plume is a separate object). The [0.2, 3.0] range and
+  the silk > wool > leather order are unchanged.
+- `lagFrames`: only counts when the peak absolute sideways swing in the window is at least 0.5 degrees; otherwise it
+  is -1 (fails the >= 1 gate). Noise-level swings no longer produce a lag.
+- New gate `windDriftMetres >= 0.05` per material: mean horizontal hem drift from the windless rest during the wind
+  scenario. `windAlignment` stays, but alone it only checks the sign of the drag.
+- `penetratingFrames` also samples the midpoint of every constraint between two free particles, so cloth passing
+  through the body counts, not only particles left inside it.
+- New gate `rigidControlFails >= 1` per material: the rigid control (cape at rest pose moved with the body, no
+  simulation) is run through the motion gates (settleSeconds minimum, lagFrames, overshootDegrees at the material's
+  threshold or 5 degrees if the material has none) and must fail at least one of them. A gate set that a rigid cape
+  passes proves nothing about motion.

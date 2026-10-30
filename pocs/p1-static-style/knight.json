@@ -9,8 +9,10 @@
     "visor": [0, 1.52, 0.27],
     "plumeFront": [0, 1.78, 0.08],
     "plumeBack": [0, 1.7, -0.24],
-    "capeTop": [0, 1.2, -0.18],
-    "capeHem": [0, 0.35, -0.3],
+    "capeTopL": [0.14, 1.2, -0.2],
+    "capeHemL": [0.16, 0.35, -0.33],
+    "capeTopR": [-0.14, 1.2, -0.2],
+    "capeHemR": [-0.16, 0.35, -0.33],
     "hipL": [0.13, 0.8, 0],
     "kneeL": [0.13, 0.44, 0.01],
     "ankleL": [0.13, 0.1, 0],
@@ -41,8 +43,12 @@
       "width": 0.44, "thickness": 0.28, "rounding": 0.08, "widthAxis": [1, 0, 0], "material": "leather"
     },
     {
-      "name": "cape", "shape": "box", "a": "capeTop", "b": "capeHem",
-      "width": 0.58, "thickness": 0.11, "rounding": 0.04, "widthAxis": [1, 0, 0], "material": "cloth-red"
+      "name": "capeL", "shape": "box", "a": "capeTopL", "b": "capeHemL",
+      "width": 0.3, "thickness": 0.11, "rounding": 0.04, "widthAxis": [1, 0, 0.3], "material": "cloth-red"
+    },
+    {
+      "name": "capeR", "shape": "box", "a": "capeTopR", "b": "capeHemR",
+      "width": 0.3, "thickness": 0.11, "rounding": 0.04, "widthAxis": [1, 0, -0.3], "material": "cloth-red"
     },
     { "name": "thighL", "shape": "capsule", "a": "hipL", "b": "kneeL", "radiusA": 0.11, "radiusB": 0.1, "material": "steel-dark" },
     { "name": "shinL", "shape": "capsule", "a": "kneeL", "b": "ankleL", "radiusA": 0.1, "radiusB": 0.085, "material": "steel-dark" },

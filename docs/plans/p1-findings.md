@@ -26,3 +26,22 @@ Gate thresholds are locked (see `pocs/p1-static-style/gates.ts`). Each run chang
 - Gates: all pass, unchanged (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 1).
 - Observed: the silhouette now reads as a knight at 32px, and the backward sweep makes facing easier to read in the
   3/4 and side views. No new colours. Remaining: cape back is one flat rectangle.
+
+## Run 4
+
+- Change: split the cape into two panels (`capeL`, `capeR`, width 0.3 each) with width axes angled +/-0.3 in z, so
+  the light hits them differently.
+- Gates: all pass, unchanged (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 1).
+- Observed: the back view shows a lit and a shadowed panel, which reads as a centre fold; side views show a slight
+  flare. A few inner-line streaks on the back panels at 48px 3/4 back-left.
+
+## Stopping after run 4
+
+All automated gates pass and the remaining issues are minor:
+
+- maxThinFraction sits exactly at 0.25, so small asset changes can tip it. Watch it when the knight changes.
+- At 32px, where the sword crosses a leg in the side view, it reads as a ladder (blade fill plus outline).
+- Faces carry no detail beyond the 3px visor, which is hidden from the side. Expected for procedural rendering;
+  decals at more anchors would be the next lever.
+
+Next: reference sprites (Task 14), then the human and external review (Task 15).

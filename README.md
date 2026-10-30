@@ -28,6 +28,26 @@ The working conclusion is that the value is in the motion engine (scripted locom
 machine-checkable diagnostics, authored by AI), with per-part sprites as the visual layer. See [`docs/FINDINGS.md`](docs/FINDINGS.md) and
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
+## Live characters
+
+The motion engine also runs live, frame by frame: a character hangs from a rope, swings, twists and flops, and plays
+behaviours (`idle`, `think`, `busy`, `celebrate`, `fail`) that page or agent events switch between.
+
+- **In the browser:** the showcase page (built by CI on every push) lets you poke, drag and tune the unicorn piñata.
+  Locally: `npm run runtime`, then open http://127.0.0.1:8080/. Embed it with
+  `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
+  `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.
+- **In Claude Code:** the `pinata` mod shows the piñata in a pane beside the chat, reacting as the agent works
+  (thinking on a prompt, bouncing on tool calls, a whack on a failure, a spin when a turn succeeds). Working in this
+  repository, it is enabled for you once you trust the folder (`.claude/settings.json`). Elsewhere:
+
+  ```
+  /plugin install pinata --marketplace dsablic/pinata
+  ```
+
+  Then `/pinata` opens the pane and `/pinata hit` whacks it. Real pixels in kitty, Ghostty and iTerm2 3.5+, coloured
+  blocks elsewhere. It needs Node.js 24 on the PATH.
+
 ## Running it
 
 Requires Node.js 24 or later; TypeScript runs directly through Node's type stripping, with no build step.

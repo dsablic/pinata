@@ -1,0 +1,11 @@
+{
+  "extraKnownMarketplaces": {
+    "pinata": {
+      "source": { "source": "github", "repo": "dsablic/pinata" },
+      "autoUpdate": true
+    }
+  },
+  "enabledPlugins": {
+    "pinata@pinata": true
+  }
+}

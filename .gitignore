@@ -2,3 +2,7 @@ node_modules/
 reports/
 report/
 mods/*/.claude-plugin/types/
+dist/
+_site/
+.claude/*
+!.claude/settings.json

@@ -37,7 +37,11 @@
     "demo": "node pocs/demo-pinata/run.ts",
     "check": "node src/cli/check.ts",
     "new": "node src/cli/new.ts",
-    "judge": "node src/cli/judge.ts"
+    "judge": "node src/cli/judge.ts",
+    "build:web": "tsc -p tsconfig.web.json",
+    "site": "npm run build:web && node src/cli/site.ts",
+    "runtime": "npm run site && node src/cli/serve.ts _site",
+    "artifact": "node src/cli/artifact.ts"
   },
   "devDependencies": {
     "@types/node": "24.19.2",

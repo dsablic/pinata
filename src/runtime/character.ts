@@ -111,6 +111,8 @@ export function createLive (
   const limbs = hangingChains(rig, settings)
   const chains = new Map<string, SpringChain>(limbs.map(limb => [limb.joints[0], createSpringChain(limb, rest)]))
   const chainJoints = new Set(limbs.flatMap(limb => limb.joints.slice(1)))
+  const limp = new Set(rig.limbs.filter(limb => limb.kind !== 'appendage').map(limb => limb.joints[0]))
+  const limpChains = [...chains.entries()].filter(([root]) => limp.has(root)).map(([, chain]) => chain)
   const masks = new Map<string[], Set<string>>()
   const state: HangState = restingHang(options.anchor, settings)
   const dt = 1 / (options.fps * options.substeps)
@@ -195,6 +197,10 @@ export function createLive (
       index++
       const time = index / options.fps
       directions = director.update(time)
+      for (const chain of limpChains) {
+        chain.limb.stiffness = settings.limbStiffness
+        chain.limb.damping = settings.limbDamping
+      }
       for (const event of [...directions.events, ...pending]) kick(state, event.impulse, event.spin, settings)
       pending = []
       let placed = { joints: last.joints, rotation: last.rotation }

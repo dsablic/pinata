@@ -1,0 +1,12 @@
+{
+  "name": "pinata",
+  "description": "Piñata: live pixel-art characters for Claude Code",
+  "owner": { "name": "Denis Sablic" },
+  "plugins": [
+    {
+      "name": "pinata",
+      "source": "./mods/pinata",
+      "description": "A live pixel-art piñata in a pane beside the chat that reacts to what Claude Code is doing"
+    }
+  ]
+}

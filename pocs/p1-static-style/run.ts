@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -83,6 +84,12 @@ function renderFrame (size: number, elevation: number, direction: number): Frame
 const frames = SIZES.flatMap(size => ELEVATIONS.flatMap(elevation => {
   return Array.from({ length: DIRECTIONS }, (_, direction) => renderFrame(size, elevation, direction))
 }))
+
+if (process.argv.includes('--hashes')) {
+  for (const f of frames) console.log(`${f.id} ${imageHash(f.image)}`)
+  process.exit(0)
+}
+
 const rows = SIZES.flatMap(size => ELEVATIONS.map(elevation => {
   return frames.filter(f => f.size === size && f.elevation === elevation)
 }))
@@ -99,9 +106,18 @@ const frameMetrics = frames.map(f => {
   }
 })
 
-const nondeterministic = [frames[0], frames[frames.length - 1]].filter(f => {
-  return imageHash(renderFrame(f.size, f.elevation, f.direction).image) !== imageHash(f.image)
-}).length
+function childHashes (): Map<string, string> {
+  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--hashes'], { encoding: 'utf8' })
+  const hashes = new Map<string, string>()
+  for (const line of output.split('\n').filter(l => l !== '')) {
+    const [id, hash] = line.split(' ')
+    hashes.set(id, hash)
+  }
+  return hashes
+}
+
+const other = childHashes()
+const nondeterministic = frames.filter(f => other.get(f.id) !== imageHash(f.image)).length
 
 const results = evaluate([
   gate('outlineGaps', Math.max(...frameMetrics.map(m => m.outlineGaps))),

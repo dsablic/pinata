@@ -1,5 +1,5 @@
 import type { Mannequin } from '../formats/mannequin.ts'
-import type { Cape, Chain, SimMaterial } from '../formats/sim.ts'
+import type { Cape, Chain, Scenario, SimMaterial } from '../formats/sim.ts'
 import { add, normalize, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 
@@ -126,4 +126,22 @@ export function mergeSystems (systems: System[]): System {
 /** Particle indices of the cape's bottom row, left to right. */
 export function capeHemIndices (cape: Cape): number[] {
   return Array.from({ length: cape.columns }, (_, i) => (cape.rows - 1) * cape.columns + i)
+}
+
+function material (materials: SimMaterial[], name: string): SimMaterial {
+  const found = materials.find(m => m.name === name)
+  if (found === undefined) throw new Error(`unknown material '${name}'`)
+  return found
+}
+
+/** The scenario's cape and chains as one particle system, at rest in body-local space. */
+export function buildClothSystem (
+  options: { mannequin: Mannequin, scenario: Scenario, materials: SimMaterial[] }
+): System {
+  const { mannequin, scenario, materials } = options
+  const systems: System[] = []
+  const { cape } = scenario
+  if (cape !== undefined) systems.push(buildCape(cape, mannequin, material(materials, cape.material)))
+  for (const chain of scenario.chains) systems.push(buildChain(chain, mannequin, material(materials, chain.material)))
+  return mergeSystems(systems)
 }

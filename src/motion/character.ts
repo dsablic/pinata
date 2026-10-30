@@ -2,7 +2,7 @@ import type { Mannequin } from '../formats/mannequin.ts'
 import type { Rig } from '../formats/rig.ts'
 import { scenarioDuration } from '../formats/sim.ts'
 import type { Scenario, SimMaterial } from '../formats/sim.ts'
-import { buildCape, buildChain, mergeSystems } from '../sim/cloth.ts'
+import { buildClothSystem } from '../sim/cloth.ts'
 import type { System } from '../sim/cloth.ts'
 import { partsCollider, posedParts } from '../sim/body.ts'
 import { createRecording, recordFrame } from '../sim/metrics.ts'
@@ -32,25 +32,6 @@ export type CharacterRun = {
   timing: { planSeconds: number, simulateSeconds: number }
 }
 
-function material (materials: SimMaterial[], name: string): SimMaterial {
-  const found = materials.find(m => m.name === name)
-  if (found === undefined) throw new Error(`unknown material '${name}'`)
-  return found
-}
-
-function buildSystem (options: CharacterOptions): System {
-  const { mannequin, scenario, materials } = options
-  const systems: System[] = []
-  if (scenario.cape !== undefined) {
-    const cape = scenario.cape
-    systems.push(buildCape(cape, mannequin, material(materials, cape.material)))
-  }
-  for (const chain of scenario.chains) {
-    systems.push(buildChain(chain, mannequin, material(materials, chain.material)))
-  }
-  return mergeSystems(systems)
-}
-
 /**
  * Plans the gait for the scenario's script, poses every frame and simulates the scenario's cape and chains on the
  * posed body with the P3 conventions: `substeps` substeps per frame, frame 0 recorded before stepping. Frame i's
@@ -70,7 +51,7 @@ export function simulateCharacter (options: CharacterOptions): CharacterRun {
   const { transforms } = posed
   const simulateStart = performance.now()
 
-  const system = buildSystem(options)
+  const system = buildClothSystem(options)
   const env = { gravity: scenario.gravity, wind: scenario.wind, particleRadius: scenario.particleRadius }
   const exclude = scenario.bodyExcludeParts
   const frameDt = 1 / fps

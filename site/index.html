@@ -30,8 +30,8 @@
 <body>
 <header>
   <h1>Piñata world</h1>
-  <p>A cast of pixel-art characters living on procedurally generated terrain: they wander, look around, visit each
-  other for a chat, dash about, and rest. Click one to startle it. Every footstep, ramp and stair, every frame, is
+  <p>A cast of characters living on procedurally generated terrain: they wander, look around, visit each other for
+  a chat, dash about, and rest; capes and tails stream in the wind. Click one to startle it. Every footstep, ramp and stair, every frame, is
   planned and rendered live in your browser by the <a href="https://github.com/dsablic/pinata">Piñata</a> motion
   engine; the world is <a href="world.json">one declarative config</a>.</p>
 </header>
@@ -43,6 +43,13 @@
     <label>Characters <input id="count" type="range" min="1" max="8" step="1" value="8"> <output id="countOut">8</output></label>
     <label>Render samples <input id="samples" type="range" min="1" max="3" step="1" value="1"> <output id="samplesOut">1</output></label>
     <span class="readout" id="readout">loading…</span>
+  </div>
+  <div class="bar">
+    <label>Scene <select id="scene"></select></label>
+    <label>Wind <input id="wind" type="range" min="-8" max="8" step="0.1" value="1.2"> <output id="windOut">1.2</output> m/s</label>
+    <label>Gusts <input id="gust" type="range" min="0" max="1" step="0.05" value="0.4"> <output id="gustOut">0.4</output></label>
+    <label>Gravity <input id="gravity" type="range" min="1" max="25" step="0.1" value="9.8"> <output id="gravityOut">9.8</output></label>
+    <label>Hills <input id="hills" type="range" min="0" max="2" step="0.1" value="1"> <output id="hillsOut">1</output> m</label>
   </div>
   <ul id="doing"></ul>
 </main>

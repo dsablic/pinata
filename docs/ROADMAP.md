@@ -43,6 +43,10 @@ for previews, collision geometry and checks.
   and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
   octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under
   the front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.
+- **Effects and weather** (user, 2026-10-30): a particle effects layer for the runtime component (emitters attached
+  to joints or events: dust at footsteps, confetti on a hit, rain, snow, sparks), drawn in the active style and
+  deterministic; weather and world events (wind, rain, earthquakes) that characters react to through behaviours.
+  First in the world showcase ([plan](plans/2026-10-30-world-showcase.md), batch F).
 - **Rigid-body behaviours:** a prototype hung the unicorn piñata from a rope, whacked it, and let it swing and twist
   with limp legs, mane and tail (simulated as cloth on the moving body). To make that a motion script like walking:
   a root with full 3D orientation (today it can only yaw), a `hang` behaviour (rope or spring from an anchor), scripted

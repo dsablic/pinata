@@ -57,6 +57,15 @@ agent wiring stays out of it.
 - **B. Windows and activities** (Node): `initialPlants`, the activity chooser, liveliness and join gates. Review.
 - **C. World rendering and page** (browser): compositing, terrain tiles, the page, budget and poke gates in Chrome.
   Review, then tag a release to deploy.
+- **F. Weather, events and particle effects** (user, 2026-10-30): declarative in `world.json`. Weather: wind (live
+  now for cloth), rain and snow, earthquakes (the ground shakes; characters brace, stagger or stop). Each event has a
+  reaction in the activities, the way a poke does, so characters visibly adapt (hurry or huddle in rain, widen their
+  stance in a quake). Particle effects as emitters: rain and snow drops, dust puffs at footsteps and landings, confetti
+  when the piñata is hit, a burst on a poke; drawn as pixels in the scene's palette, moved by wind and gravity,
+  deterministic for a seed.
+- **G. Styles in the world** (user, 2026-10-30): a style selector over the existing style variants (palettes, shading
+  bands, outline modes, as P6 showed), then skinned characters (the skins spike's per-part pixel-art sprites), then the
+  image-and-points renderer; the procedural capsule render is the baseline, not the target look.
 - **D. Later: a physics engine spike** (user, 2026-10-30): props, character-to-character bumps and ragdoll falls
   (knocked off a platform) through a rigid-body engine behind a narrow interface, with characters staying kinematic.
   Candidates: Box3D, Rapier, Jolt (WebAssembly builds); judged on bundle size, frame cost and Node-browser
@@ -137,3 +146,15 @@ agent wiring stays out of it.
   Chrome, 8 characters run at 19.6 ms mean, 19.8 ms p95 per frame.
 - Pages: `index.html` is the world; the hanging piñata moved to `pinata.html`. The site builder writes
   `world.bundle.json` (config plus the cast's mannequin, style and rig), validated in the browser.
+- **Secondary motion and environment (user, 2026-10-30: "no secondary motion", "too wooden and stiff"):** capes and
+  chains from each character's motion file are simulated live on its moving body with the existing cloth solver
+  (pins turn with their joints); `environment` in the config (gravity, wind, gusts, cloth substeps) drives them and
+  the page changes it live, with scenes (named palettes) and terrain hilliness. A `life` section adds a damped lean
+  spring for the upper body (into acceleration and turns, overshooting at stops), breathing, and a weight-shifting
+  sway while standing; the legs and pelvis are untouched, so feet stay planted.
+- Each character's render box is sized from its full reach (farthest joint, thickest part, and the length of its cape
+  or chains), which fixed the spider's legs being cut off. The rasterizer now skips pixels outside the rectangle its
+  primitives' screen discs can touch (exact: byte-identical on every output), so the larger boxes cost nothing: the
+  world runs at about 24 ms per frame for 8 characters in headless Chrome.
+- A wander that would leave the world is reflected instead of clamped: a character at the edge kept choosing the wall
+  and stood still for a minute.

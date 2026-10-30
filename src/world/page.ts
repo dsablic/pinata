@@ -1,5 +1,6 @@
 import { readWorldBundle } from './bundle.ts'
 import type { ReadWorld } from './bundle.ts'
+import type { Palette } from './config.ts'
 import { createWorldView } from './render.ts'
 import { createWorld } from './world.ts'
 import type { World, WorldFrame } from './world.ts'
@@ -17,6 +18,7 @@ function byId<T extends HTMLElement> (id: string): T {
 
 type Running = {
   world: World
+  setPalette: (palette: Palette) => void
   render: (frame: WorldFrame) => ImageData
   screen: (p: [number, number, number]) => [number, number]
 }
@@ -36,18 +38,27 @@ function build (): void {
   const seed = Number(byId<HTMLInputElement>('seed').value) || 1
   const count = Number(byId<HTMLInputElement>('count').value)
   const samples = Number(byId<HTMLInputElement>('samples').value)
-  const config = { ...data.config, cast: data.config.cast.slice(0, count), view: { ...data.config.view, samples } }
+  const hills = Number(byId<HTMLInputElement>('hills').value)
+  const config = {
+    ...data.config,
+    cast: data.config.cast.slice(0, count),
+    terrain: { ...data.config.terrain, maxHeight: hills },
+    view: { ...data.config.view, samples }
+  }
   const cast = data.cast.slice(0, count)
   const world = createWorld({ seed, cast, config, fps: FPS })
+  const scene = byId<HTMLSelectElement>('scene').value || config.view.scene
   const view = createWorldView(world.terrain, data.looks.slice(0, count), {
-    ...config.view, depth: 2 * world.lanes + 0.8, glyphs: config.glyphs
+    ...config.view, depth: 2 * world.lanes + 0.8, glyphs: config.glyphs, palette: config.scenes[scene]
   })
   canvas.width = config.view.width
   canvas.height = config.view.height
   canvas.style.width = `${config.view.width * SCALE}px`
   canvas.style.height = `${config.view.height * SCALE}px`
+  weather(world)
   running = {
     world,
+    setPalette: view.setPalette,
     screen: view.screen,
     render: frame => {
       const image = view.render(frame)
@@ -99,12 +110,28 @@ canvas.addEventListener('click', event => {
   running.world.poke(best, poked[0] + side * 0.5)
 })
 
-for (const id of ['count', 'samples']) {
+/** Copies the environment sliders into the running world; cloth reads them every frame. */
+function weather (world: World): void {
+  world.environment.wind.speed = Math.abs(Number(byId<HTMLInputElement>('wind').value))
+  world.environment.wind.direction = [Math.sign(Number(byId<HTMLInputElement>('wind').value)) || 1, 0, 0]
+  world.environment.wind.gust = Number(byId<HTMLInputElement>('gust').value)
+  world.environment.gravity = Number(byId<HTMLInputElement>('gravity').value)
+}
+
+for (const id of ['count', 'samples', 'hills', 'wind', 'gust', 'gravity']) {
   byId<HTMLInputElement>(id).addEventListener('input', event => {
     byId<HTMLOutputElement>(`${id}Out`).value = (event.target as HTMLInputElement).value
-    build()
+    if (['wind', 'gust', 'gravity'].includes(id)) {
+      if (running !== undefined) weather(running.world)
+    } else build()
   })
 }
+byId<HTMLSelectElement>('scene').addEventListener('change', event => {
+  const name = (event.target as HTMLSelectElement).value
+  const palette = data?.config.scenes[name]
+  if (palette !== undefined) running?.setPalette(palette)
+  document.body.style.background = palette?.sky ?? ''
+})
 byId<HTMLButtonElement>('new').addEventListener('click', () => {
   byId<HTMLInputElement>('seed').value = String(1 + Math.floor(Math.random() * 9999))
   build()
@@ -129,6 +156,13 @@ void (async () => {
   const read = readWorldBundle(await (await fetch('world.bundle.json')).json())
   if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
   data = read.value
+  const scene = byId<HTMLSelectElement>('scene')
+  scene.replaceChildren(...Object.keys(data.config.scenes).map(name => {
+    const option = document.createElement('option')
+    option.textContent = name
+    return option
+  }))
+  scene.value = data.config.view.scene
   const count = byId<HTMLInputElement>('count')
   count.max = String(data.cast.length)
   count.value = String(data.cast.length)

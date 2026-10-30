@@ -31,11 +31,11 @@ test('the showcase world config validates, and mistakes name their path', () => 
   broken.activities.wander.steps[0].to = 'moon'
   broken.activities.rest.steps[1].seconds = [5, 1]
   broken.reactions.poke.steps = []
-  broken.view.palette.sky = 'blue'
+  broken.scenes.day.sky = 'blue'
   broken.lanes.width = 3
   assert.deepEqual(validateWorldConfig(broken).errors.map(e => e.path).sort(), [
     'activities.rest.steps[1].seconds', 'activities.wander.steps[0].to', 'lanes.width', 'reactions.poke.steps',
-    'view.palette.sky'
+    'scenes.day.sky'
   ])
 })
 

@@ -11,6 +11,32 @@
   "lanes": {
     "spacing": 0.45
   },
+  "life": {
+    "lean": {
+      "frequency": 2.2,
+      "damping": 0.4,
+      "perAcceleration": 7,
+      "perTurn": 6,
+      "max": 18
+    },
+    "breathe": {
+      "amplitude": 0.006,
+      "period": 3.4
+    },
+    "sway": {
+      "degrees": 1.6,
+      "period": 5
+    }
+  },
+  "environment": {
+    "gravity": 9.81,
+    "wind": {
+      "direction": [1, 0, 0],
+      "speed": 1.2,
+      "gust": 0.4
+    },
+    "clothSubsteps": 8
+  },
   "motion": {
     "settleSeconds": 0.7,
     "turnSecondsPerRadian": 0.45,
@@ -80,17 +106,38 @@
     "elevationDeg": 14,
     "samples": 1,
     "floorPx": 22,
-    "palette": {
-      "top": "#8fbf6a",
-      "side": "#9a7350",
-      "edge": "#4f3a2a",
-      "sky": "#f4ecd8"
-    }
+    "scene": "day"
   },
   "glyphs": {
     "…": [".....", ".....", ".....", ".....", "#.#.#"],
     "?": [".###.", "#...#", "...#.", ".....", "..#.."],
     "!": ["..#..", "..#..", "..#..", ".....", "..#.."],
     "z": ["#####", "...#.", "..#..", ".#...", "#####"]
+  },
+  "scenes": {
+    "day": {
+      "top": "#8fbf6a",
+      "side": "#9a7350",
+      "edge": "#4f3a2a",
+      "sky": "#f4ecd8"
+    },
+    "dusk": {
+      "top": "#9a8a5a",
+      "side": "#6b4a3a",
+      "edge": "#3a2630",
+      "sky": "#f2b98c"
+    },
+    "night": {
+      "top": "#3f5a5a",
+      "side": "#3a3048",
+      "edge": "#1d1828",
+      "sky": "#1f2440"
+    },
+    "snow": {
+      "top": "#f2f4f8",
+      "side": "#8a8fa8",
+      "edge": "#4a4e66",
+      "sky": "#dfe8f2"
+    }
   }
 }

@@ -158,6 +158,27 @@ function screenDisc (cam: Camera, prim: Primitive): Disc {
   return { x, y, r2: r * r }
 }
 
+/**
+ * The pixel rectangle [x0, x1) x [y0, y1) that any primitive's screen disc can touch; pixels outside it get no samples
+ * and resolve to empty, exactly as a pixel with no hits does, so they are skipped.
+ */
+function coveredRect (discs: Disc[], cam: Camera): [number, number, number, number] {
+  if (discs.length === 0) return [0, 0, 0, 0]
+  let [left, right, top, bottom] = [Infinity, -Infinity, Infinity, -Infinity]
+  for (const d of discs) {
+    const r = Math.sqrt(d.r2)
+    left = Math.min(left, d.x - r)
+    right = Math.max(right, d.x + r)
+    top = Math.min(top, d.y - r)
+    bottom = Math.max(bottom, d.y + r)
+  }
+  const clamp = (v: number, max: number): number => Math.min(max, Math.max(0, v))
+  return [
+    clamp(Math.floor(left) - 1, cam.width), clamp(Math.ceil(right) + 1, cam.width),
+    clamp(Math.floor(top) - 1, cam.height), clamp(Math.ceil(bottom) + 1, cam.height)
+  ]
+}
+
 function cull (discs: Disc[], px: number, py: number, active: Int32Array): number {
   let count = 0
   for (let i = 0; i < discs.length; i++) {
@@ -206,8 +227,9 @@ export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GB
   const [ux, uy, uz] = cam.up
   const behind = -cam.rayDistance
   const [bx, by, bz] = [cam.forward[0] * behind, cam.forward[1] * behind, cam.forward[2] * behind]
-  for (let py = 0; py < cam.height; py++) {
-    for (let px = 0; px < cam.width; px++) {
+  const [x0, x1, y0, y1] = coveredRect(discs, cam)
+  for (let py = y0; py < y1; py++) {
+    for (let px = x0; px < x1; px++) {
       acc.hits.fill(0)
       acc.depth.fill(0)
       acc.normal.fill(0)

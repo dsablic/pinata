@@ -1,4 +1,4 @@
-import type { Mannequin } from '../formats/mannequin.ts'
+import type { Mannequin, Part } from '../formats/mannequin.ts'
 import type { Style } from '../formats/style.ts'
 import { createImage, getPixel, parseHex, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
@@ -9,15 +9,35 @@ import type { Camera } from '../raster/camera.ts'
 import { rasterize } from '../raster/gbuffer.ts'
 import type { GBuffer } from '../raster/gbuffer.ts'
 import { stylize } from '../style/stylize.ts'
-import type { WorldConfig } from './config.ts'
+import type { Scenario } from '../formats/sim.ts'
+import { clothParts, withClothParts } from '../sim/render.ts'
+import type { Palette, WorldConfig } from './config.ts'
 import type { Terrain } from './terrain.ts'
 import type { WorldFrame } from './world.ts'
 
 /** The config's view, plus the depth of the walkable band (metres either side of z = 0) and the bubble glyphs. */
-export type WorldViewOptions = WorldConfig['view'] & { depth: number, glyphs: WorldConfig['glyphs'] }
-export type Look = { mannequin: Mannequin, style: Style }
+export type WorldViewOptions = WorldConfig['view'] & { depth: number, glyphs: WorldConfig['glyphs'], palette: Palette }
+/** How a cast member is drawn: its mannequin and style, and its cloth scenario when it has a cape or chains. */
+export type Look = { mannequin: Mannequin, style: Style, cloth?: Scenario }
 
 type Sprite = { camera: Camera, previous?: GBuffer, size: number }
+
+const SPRITE_MARGIN = 1.15
+
+/**
+ * How far a character can reach from its root in any direction, metres: its farthest joint plus the thickest part,
+ * plus the full length of its cape or chains (which can swing anywhere).
+ */
+function reachOf (look: Look): number {
+  const joints = Object.values(look.mannequin.joints)
+  const farthest = Math.max(...joints.map(p => Math.hypot(p[0], p[1], p[2])))
+  const thickness = (p: Part): number => p.shape === 'capsule' ? Math.max(p.radiusA, p.radiusB) : p.width
+  const thickest = Math.max(0, ...look.mannequin.parts.map(thickness))
+  const { cloth } = look
+  const chains = cloth?.chains.map(c => c.links * c.linkLength) ?? []
+  const hanging = Math.max(cloth?.cape?.length ?? 0, ...chains)
+  return farthest + thickest + hanging
+}
 
 
 
@@ -40,11 +60,11 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     return [world.width / 2 + dot(q, world.right) * ppu, world.baseline - dot(q, world.up) * ppu]
   }
   const sprites: Sprite[] = looks.map(look => {
-    const size = Math.ceil(look.mannequin.height * ppu * 1.9) + 6
+    const size = Math.ceil(2 * reachOf(look) * ppu * SPRITE_MARGIN) + 6
     const camera: Camera = { ...base, width: size, height: size, baseline: size }
     return { camera, size }
   })
-  const backdrop = drawTerrain(terrain, options, screen)
+  let backdrop = drawTerrain(terrain, options, options.palette, screen)
 
   const render = (frame: WorldFrame): Image => {
     const out = createImage(options.width, options.height)
@@ -58,7 +78,7 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
       const root = actor.root.position
       const anchor = screen([root[0], root[1], root[2]])
       const left = Math.round(anchor[0] - sprite.size / 2)
-      const top = Math.round(anchor[1] - sprite.size * 0.78)
+      const top = Math.round(anchor[1] - sprite.size / 2)
       const shift = add(
         scale(sprite.camera.right, (anchor[0] - left - sprite.size / 2) / ppu),
         scale(sprite.camera.up, (sprite.size - (anchor[1] - top)) / ppu)
@@ -69,7 +89,13 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
       }
       const yaw = actor.root.yaw
       const decals = look.mannequin.decals.map(d => ({ ...d, normal: turnY(d.normal, yaw) }))
-      const posed: Mannequin = { ...look.mannequin, joints, decals }
+      let posed: Mannequin = { ...look.mannequin, joints, decals }
+      if (look.cloth !== undefined && actor.cloth !== undefined) {
+        const here = { position: actor.root.position, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+        const cloth = clothParts(look.cloth, actor.cloth, here)
+        for (const name of Object.keys(cloth.joints)) cloth.joints[name] = add(cloth.joints[name], shift)
+        posed = withClothParts(posed, cloth)
+      }
       const g = rasterize(posed, sprite.camera, options.samples, sprite.previous)
       sprite.previous = g
       const image = stylize(g, posed, sprite.camera, look.style).image
@@ -81,7 +107,9 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     }
     return out
   }
-  return { render, screen, camera: world }
+  /** Redraws the terrain in another scene's palette. */
+  const setPalette = (palette: Palette): void => { backdrop = drawTerrain(terrain, options, palette, screen) }
+  return { render, screen, setPalette, camera: world }
 }
 
 function turnY (v: Vec3, yaw: number): Vec3 {
@@ -121,12 +149,17 @@ function bubble (out: Image, rows: string[], cx: number, bottom: number): void {
 }
 
 /** The terrain as pixel art: sky, the top band between the back and front of the lanes, and the front face below it. */
-function drawTerrain (terrain: Terrain, options: WorldViewOptions, screen: (p: Vec3) => [number, number]): Image {
+function drawTerrain (
+  terrain: Terrain,
+  options: WorldViewOptions,
+  palette: Palette,
+  screen: (p: Vec3) => [number, number]
+): Image {
   const out = createImage(options.width, options.height)
-  const sky = parseHex(options.palette.sky)
-  const top = parseHex(options.palette.top)
-  const side = parseHex(options.palette.side)
-  const edge = parseHex(options.palette.edge)
+  const sky = parseHex(palette.sky)
+  const top = parseHex(palette.top)
+  const side = parseHex(palette.side)
+  const edge = parseHex(palette.edge)
   for (let y = 0; y < out.height; y++) for (let x = 0; x < out.width; x++) setPixel(out, x, y, sky)
   const back = -options.depth / 2
   const front = options.depth / 2

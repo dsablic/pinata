@@ -14,6 +14,8 @@ export type Step =
   | { do: 'stand', seconds: [number, number], say?: string }
 export type Activity = { weight: number, steps: Step[] }
 
+export type Palette = { top: string, side: string, edge: string, sky: string }
+
 /** Everything about a world that is tuning rather than mechanism; see site/world.json. */
 export type WorldConfig = {
   /** Example character names, in lane order from back to front. */
@@ -29,6 +31,21 @@ export type WorldConfig = {
     treadOfFoot: number
   }
   lanes: { spacing: number }
+  /**
+   * Life in the upper body: a damped spring leans it (degrees per m/s^2 of forward acceleration, degrees per rad/s of
+   * turning, at most max), breathing raises the chest, and a slow sway shifts the weight while standing.
+   */
+  life: {
+    lean: { frequency: number, damping: number, perAcceleration: number, perTurn: number, max: number }
+    breathe: { amplitude: number, period: number }
+    sway: { degrees: number, period: number }
+  }
+  /** Gravity (m/s^2, downward) and wind for cloth, and cloth substeps per frame; the page can change them live. */
+  environment: {
+    gravity: number
+    wind: { direction: [number, number, number], speed: number, gust: number }
+    clothSubsteps: number
+  }
   motion: { settleSeconds: number, turnSecondsPerRadian: number, minTurnSeconds: number, springSubsteps: number }
   /** How far walks go: a wander and a dash in seconds at the walk's speed, a visit's gap, a startled run in metres. */
   targets: { random: number, far: number, friendGap: number, away: [number, number] }
@@ -42,8 +59,10 @@ export type WorldConfig = {
     elevationDeg: number
     samples: number
     floorPx: number
-    palette: { top: string, side: string, edge: string, sky: string }
+    /** The scene shown first; scenes are named palettes. */
+    scene: string
   }
+  scenes: Record<string, Palette>
   /** Bubble glyphs as rows of '#' (ink) and '.' (paper); a glyph not listed draws as the first one. */
   glyphs: Record<string, string[]>
 }
@@ -84,6 +103,37 @@ export const WORLD_SCHEMA: Schema = {
       }
     },
     lanes: { kind: 'object', fields: { spacing: { kind: 'number', min: 0.1, max: 3 } } },
+    life: {
+      kind: 'object',
+      fields: {
+        lean: {
+          kind: 'object',
+          fields: {
+            frequency: { kind: 'number', min: 0.1, max: 20, note: 'Hz of the lean spring' },
+            damping: positive(2, 'damping ratio, 1 settles without overshoot'),
+            perAcceleration: positive(45, 'degrees per m/s^2'),
+            perTurn: positive(45, 'degrees per rad/s'),
+            max: positive(60, 'degrees')
+          }
+        },
+        breathe: {
+          kind: 'object',
+          fields: { amplitude: positive(0.1, 'metres'), period: { kind: 'number', min: 0.5, max: 30 } }
+        },
+        sway: { kind: 'object', fields: { degrees: positive(20), period: { kind: 'number', min: 0.5, max: 60 } } }
+      }
+    },
+    environment: {
+      kind: 'object',
+      fields: {
+        gravity: positive(50, 'm/s^2, downward'),
+        wind: {
+          kind: 'object',
+          fields: { direction: { kind: 'vec3' }, speed: positive(30, 'm/s'), gust: positive(1, '0 steady to 1 gusty') }
+        },
+        clothSubsteps: { kind: 'number', min: 1, max: 64, integer: true }
+      }
+    },
     motion: {
       kind: 'object',
       fields: {
@@ -121,12 +171,15 @@ export const WORLD_SCHEMA: Schema = {
         elevationDeg: { kind: 'number', min: -89, max: 89 },
         samples: { kind: 'number', min: 1, max: 4, integer: true },
         floorPx: positive(1000),
-        palette: {
-          kind: 'object',
-          fields: {
-            top: { kind: 'colour' }, side: { kind: 'colour' }, edge: { kind: 'colour' }, sky: { kind: 'colour' }
-          }
-        }
+        scene: { kind: 'string', note: 'a name in scenes' }
+      }
+    },
+    scenes: {
+      kind: 'map',
+      minItems: 1,
+      of: {
+        kind: 'object',
+        fields: { top: { kind: 'colour' }, side: { kind: 'colour' }, edge: { kind: 'colour' }, sky: { kind: 'colour' } }
       }
     },
     glyphs: { kind: 'map', minItems: 1, of: { kind: 'array', of: { kind: 'string' }, minItems: 1 } }
@@ -136,6 +189,12 @@ export const WORLD_SCHEMA: Schema = {
 export function validateWorldConfig (input: unknown): Validated<WorldConfig> {
   const errors: ValidationError[] = []
   check(input, WORLD_SCHEMA, '', errors)
+  if (errors.length === 0) {
+    const config = input as WorldConfig
+    if (config.scenes[config.view.scene] === undefined) {
+      errors.push({ path: 'view.scene', message: `expected one of ${Object.keys(config.scenes).join(', ')}` })
+    }
+  }
   return errors.length > 0 ? { errors } : { value: structuredClone(input) as WorldConfig, errors }
 }
 

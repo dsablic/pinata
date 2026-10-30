@@ -24,7 +24,9 @@ function worldBundle (examples: string): unknown {
       name,
       mannequin: read(join(dir, 'mannequin.json')),
       style: read(join(dir, 'style.json')),
-      rig: read(join(dir, 'rig.json'))
+      rig: read(join(dir, 'rig.json')),
+      materials: read(join(dir, 'materials.json')),
+      motion: read(join(dir, 'motion.json'))
     }
   })
   return { config, cast }

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const ok = new URL('./fixtures/character-ok', import.meta.url).pathname
+const dog = new URL('../examples/dog', import.meta.url).pathname
 const invalid = new URL('./fixtures/character-invalid', import.meta.url).pathname
 const cli = new URL('../src/cli/check.ts', import.meta.url).pathname
 
@@ -28,9 +29,9 @@ function check (dir: string, out = tmp('pinata-report-')): Run {
   return { status: run.status, stdout: run.stdout, stderr: run.stderr, out }
 }
 
-function variant (edit: (dir: string) => void): string {
+function variant (edit: (dir: string) => void, source = ok): string {
   const dir = tmp('pinata-character-')
-  cpSync(ok, dir, { recursive: true })
+  cpSync(source, dir, { recursive: true })
   edit(dir)
   return dir
 }
@@ -115,6 +116,27 @@ test('a cape with a render entry is drawn into sheet.png and walk.png without ch
   }
   const gates = (run: Run): unknown => JSON.parse(readFileSync(join(run.out, 'metrics.json'), 'utf8')).gates
   assert.deepEqual(gates(drawn), gates(plain))
+})
+
+test('the four-legged dog example passes every gate with one planted gate per leg', () => {
+  const run = check(dog)
+  assert.equal(run.status, 0, run.stdout + run.stderr)
+  const summary = readFileSync(join(run.out, 'summary.txt'), 'utf8')
+  for (const leg of ['left hind', 'left front', 'right hind', 'right front']) {
+    assert.match(summary, new RegExp(`^PASS {2}plantedFrames\\.${leg}: `, 'm'))
+  }
+})
+
+test('hints for a four-legged character name the leg', () => {
+  const run = check(variant(d => { patch(d, 'rig.json', j => { j.gait.stepHeight = 0.001 }) }, dog))
+  const summary = readFileSync(join(run.out, 'summary.txt'), 'utf8')
+  assert.match(summary, /hint: the (left|right) (hind|front) foot moves/)
+})
+
+test('four legs without phases are rejected with the walk order', () => {
+  const run = check(variant(d => { patch(d, 'rig.json', j => { delete j.legs[1].phase }) }, dog))
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /^rig\.json: legs\[1\]\.phase: .*left hind 0, left front 0\.25/m)
 })
 
 const OUTPUTS = ['sheet.png', 'walk.png', 'footprints.png', 'cloth.png', 'metrics.json']

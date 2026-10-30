@@ -1,0 +1,11 @@
+{
+  "name": "hound", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#2b1a12",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "fur": ["#6b3d1f", "#a8642c", "#d99a5b"],
+    "dark": ["#2e1a10", "#4f2f1b", "#7a5033"],
+    "cream": ["#b99a72", "#e3c79b", "#f6e8c8"],
+    "nose": ["#0d0d12", "#1d1d26", "#44444f"]
+  },
+  "decalColors": { "e": "#1d1d26", "w": "#ffffff" }
+}

@@ -1,0 +1,61 @@
+{
+ "legs": [
+  {
+   "side": "left",
+   "hip": "hipLH",
+   "knee": "kneeLH",
+   "ankle": "ankleLH",
+   "toe": "toeLH",
+   "phase": 0,
+   "bend": "backward"
+  },
+  {
+   "side": "left",
+   "hip": "hipLF",
+   "knee": "kneeLF",
+   "ankle": "ankleLF",
+   "toe": "toeLF",
+   "phase": 0.25
+  },
+  {
+   "side": "right",
+   "hip": "hipRH",
+   "knee": "kneeRH",
+   "ankle": "ankleRH",
+   "toe": "toeRH",
+   "phase": 0.5,
+   "bend": "backward"
+  },
+  {
+   "side": "right",
+   "hip": "hipRF",
+   "knee": "kneeRF",
+   "ankle": "ankleRF",
+   "toe": "toeRF",
+   "phase": 0.75
+  }
+ ],
+ "arms": [],
+ "pelvis": "pelvis",
+ "upperBody": [
+  "rump",
+  "chest",
+  "neck",
+  "head",
+  "nose",
+  "earBaseL",
+  "earTipL",
+  "earBaseR",
+  "earTipR",
+  "tailBase"
+ ],
+ "gait": {
+  "strideLength": 0.4,
+  "referenceSpeed": 0.35,
+  "stanceFraction": 0.75,
+  "stepHeight": 0.07,
+  "bobAmplitude": 0.008,
+  "armSwingDegrees": 0,
+  "footSpacing": 0.18
+ }
+}

@@ -1,0 +1,315 @@
+{
+ "name": "dog",
+ "height": 0.77,
+ "joints": {
+  "pelvis": [
+   0,
+   0.5,
+   0
+  ],
+  "rump": [
+   0,
+   0.5,
+   -0.22
+  ],
+  "chest": [
+   0,
+   0.5,
+   0.22
+  ],
+  "neck": [
+   0,
+   0.6,
+   0.3
+  ],
+  "head": [
+   0,
+   0.66,
+   0.4
+  ],
+  "nose": [
+   0,
+   0.62,
+   0.49
+  ],
+  "earBaseL": [
+   0.07,
+   0.72,
+   0.37
+  ],
+  "earTipL": [
+   0.1,
+   0.62,
+   0.36
+  ],
+  "earBaseR": [
+   -0.07,
+   0.72,
+   0.37
+  ],
+  "earTipR": [
+   -0.1,
+   0.62,
+   0.36
+  ],
+  "tailBase": [
+   0,
+   0.54,
+   -0.3
+  ],
+  "hipLH": [
+   0.09,
+   0.44,
+   -0.22
+  ],
+  "kneeLH": [
+   0.09,
+   0.25,
+   -0.35
+  ],
+  "ankleLH": [
+   0.09,
+   0.05,
+   -0.22
+  ],
+  "toeLH": [
+   0.09,
+   0.03,
+   -0.14
+  ],
+  "hipLF": [
+   0.09,
+   0.44,
+   0.22
+  ],
+  "kneeLF": [
+   0.09,
+   0.25,
+   0.33999999999999997
+  ],
+  "ankleLF": [
+   0.09,
+   0.05,
+   0.22
+  ],
+  "toeLF": [
+   0.09,
+   0.03,
+   0.3
+  ],
+  "hipRH": [
+   -0.09,
+   0.44,
+   -0.22
+  ],
+  "kneeRH": [
+   -0.09,
+   0.25,
+   -0.35
+  ],
+  "ankleRH": [
+   -0.09,
+   0.05,
+   -0.22
+  ],
+  "toeRH": [
+   -0.09,
+   0.03,
+   -0.14
+  ],
+  "hipRF": [
+   -0.09,
+   0.44,
+   0.22
+  ],
+  "kneeRF": [
+   -0.09,
+   0.25,
+   0.33999999999999997
+  ],
+  "ankleRF": [
+   -0.09,
+   0.05,
+   0.22
+  ],
+  "toeRF": [
+   -0.09,
+   0.03,
+   0.3
+  ]
+ },
+ "parts": [
+  {
+   "name": "body",
+   "shape": "capsule",
+   "a": "rump",
+   "b": "chest",
+   "radiusA": 0.1,
+   "radiusB": 0.11,
+   "material": "fur"
+  },
+  {
+   "name": "neckPart",
+   "shape": "capsule",
+   "a": "chest",
+   "b": "neck",
+   "radiusA": 0.085,
+   "radiusB": 0.07,
+   "material": "fur"
+  },
+  {
+   "name": "headPart",
+   "shape": "capsule",
+   "a": "neck",
+   "b": "head",
+   "radiusA": 0.07,
+   "radiusB": 0.095,
+   "material": "fur"
+  },
+  {
+   "name": "snout",
+   "shape": "capsule",
+   "a": "head",
+   "b": "nose",
+   "radiusA": 0.08,
+   "radiusB": 0.06,
+   "material": "cream"
+  },
+  {
+   "name": "noseTip",
+   "shape": "capsule",
+   "a": "nose",
+   "b": "nose",
+   "radiusA": 0.045,
+   "radiusB": 0.045,
+   "material": "nose"
+  },
+  {
+   "name": "earL",
+   "shape": "capsule",
+   "a": "earBaseL",
+   "b": "earTipL",
+   "radiusA": 0.035,
+   "radiusB": 0.025,
+   "material": "dark"
+  },
+  {
+   "name": "thighLH",
+   "shape": "capsule",
+   "a": "hipLH",
+   "b": "kneeLH",
+   "radiusA": 0.06,
+   "radiusB": 0.04,
+   "material": "fur"
+  },
+  {
+   "name": "shinLH",
+   "shape": "capsule",
+   "a": "kneeLH",
+   "b": "ankleLH",
+   "radiusA": 0.04,
+   "radiusB": 0.035,
+   "material": "fur"
+  },
+  {
+   "name": "footLH",
+   "shape": "capsule",
+   "a": "ankleLH",
+   "b": "toeLH",
+   "radiusA": 0.05,
+   "radiusB": 0.03,
+   "material": "cream"
+  },
+  {
+   "name": "thighLF",
+   "shape": "capsule",
+   "a": "hipLF",
+   "b": "kneeLF",
+   "radiusA": 0.06,
+   "radiusB": 0.04,
+   "material": "fur"
+  },
+  {
+   "name": "shinLF",
+   "shape": "capsule",
+   "a": "kneeLF",
+   "b": "ankleLF",
+   "radiusA": 0.04,
+   "radiusB": 0.035,
+   "material": "fur"
+  },
+  {
+   "name": "footLF",
+   "shape": "capsule",
+   "a": "ankleLF",
+   "b": "toeLF",
+   "radiusA": 0.05,
+   "radiusB": 0.03,
+   "material": "cream"
+  },
+  {
+   "name": "earR",
+   "shape": "capsule",
+   "a": "earBaseR",
+   "b": "earTipR",
+   "radiusA": 0.035,
+   "radiusB": 0.025,
+   "material": "dark"
+  },
+  {
+   "name": "thighRH",
+   "shape": "capsule",
+   "a": "hipRH",
+   "b": "kneeRH",
+   "radiusA": 0.06,
+   "radiusB": 0.04,
+   "material": "fur"
+  },
+  {
+   "name": "shinRH",
+   "shape": "capsule",
+   "a": "kneeRH",
+   "b": "ankleRH",
+   "radiusA": 0.04,
+   "radiusB": 0.035,
+   "material": "fur"
+  },
+  {
+   "name": "footRH",
+   "shape": "capsule",
+   "a": "ankleRH",
+   "b": "toeRH",
+   "radiusA": 0.05,
+   "radiusB": 0.03,
+   "material": "cream"
+  },
+  {
+   "name": "thighRF",
+   "shape": "capsule",
+   "a": "hipRF",
+   "b": "kneeRF",
+   "radiusA": 0.06,
+   "radiusB": 0.04,
+   "material": "fur"
+  },
+  {
+   "name": "shinRF",
+   "shape": "capsule",
+   "a": "kneeRF",
+   "b": "ankleRF",
+   "radiusA": 0.04,
+   "radiusB": 0.035,
+   "material": "fur"
+  },
+  {
+   "name": "footRF",
+   "shape": "capsule",
+   "a": "ankleRF",
+   "b": "toeRF",
+   "radiusA": 0.05,
+   "radiusB": 0.03,
+   "material": "cream"
+  }
+ ],
+ "decals": []
+}

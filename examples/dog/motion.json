@@ -1,0 +1,12 @@
+{
+  "script": { "accelSeconds": 1, "segments": [
+    { "action": "move", "speed": 0.35, "duration": 4.5 },
+    { "action": "turn", "degrees": 90, "duration": 2 },
+    { "action": "move", "speed": 0.35, "duration": 3.5 },
+    { "action": "hold", "duration": 2 } ] },
+  "chains": [
+    { "anchor": "tailBase", "links": 6, "linkLength": 0.05, "direction": [0, 0.6, -0.8], "material": "tail",
+      "render": { "material": "fur", "radius": 0.02 } }
+  ],
+  "gravity": [0, -9.81, 0], "fps": 24, "substeps": 30, "particleRadius": 0.015
+}

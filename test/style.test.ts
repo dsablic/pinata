@@ -1,0 +1,57 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { validateStyle } from '../src/formats/style.ts'
+import type { Style } from '../src/formats/style.ts'
+import { checkReferences } from '../src/formats/references.ts'
+import type { Mannequin } from '../src/formats/mannequin.ts'
+
+function valid () {
+  return {
+    name: 'test',
+    light: [0, 1, 1],
+    bands: [0, 0.6],
+    outline: '#101010',
+    innerLineDepth: 0.1,
+    decalMinFacing: 0.3,
+    materials: { skin: ['#300000', '#600000', '#900000'] },
+    decalColors: { x: '#000000' }
+  }
+}
+
+test('accepts a valid style', () => {
+  assert.deepEqual(validateStyle(valid()).errors, [])
+})
+
+test('rejects a ramp whose length does not match the bands', () => {
+  const input = valid()
+  input.materials.skin = ['#300000', '#600000']
+  const [error] = validateStyle(input).errors
+  assert.equal(error.path, 'materials.skin')
+  assert.match(error.message, /2 colours but bands define 3 shades/)
+})
+
+test('rejects bands that are not ascending', () => {
+  const input = valid()
+  input.bands = [0.6, 0]
+  assert.deepEqual(validateStyle(input).errors.map(e => e.path), ['bands'])
+})
+
+test('rejects malformed colours', () => {
+  const input = valid()
+  input.outline = 'black'
+  assert.deepEqual(validateStyle(input).errors.map(e => e.path), ['outline'])
+})
+
+test('cross-check reports materials and decal characters the style lacks', () => {
+  const style = validateStyle(valid()).value as Style
+  const mannequin: Mannequin = {
+    name: 'm',
+    height: 1,
+    joints: { o: [0, 0, 0] },
+    parts: [{ name: 'p', shape: 'capsule', a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'metal' }],
+    decals: [{ name: 'd', anchor: 'o', normal: [0, 0, 1], pattern: ['x.y'] }]
+  }
+  const errors = checkReferences(mannequin, style)
+  assert.deepEqual(errors.map(e => e.path), ['parts[0].material', 'decals[0].pattern'])
+  assert.match(errors[1].message, /character 'y'/)
+})

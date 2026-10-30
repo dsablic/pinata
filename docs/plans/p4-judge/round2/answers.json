@@ -1,0 +1,3 @@
+{"judge1": {"q1": {"g1": "right", "g2": "left"}, "q2": {"s1": "top", "s2": "bottom"}, "q3": {"r1": "left", "r2": "right"}},
+ "judge2": {"q1": {"g1": "right", "g2": "left"}, "q2": {"s1": "top", "s2": "bottom"}, "q3": {"r1": "left", "r2": "right"}},
+ "judge3": {"q1": {"g1": "right", "g2": "left"}, "q2": {"s1": "top", "s2": "bottom"}, "q3": {"r1": "left", "r2": "right"}}}

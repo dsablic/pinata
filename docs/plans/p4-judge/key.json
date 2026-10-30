@@ -1,0 +1,14 @@
+{
+ "grip": {
+  "g1": "left",
+  "g2": "right"
+ },
+ "strip": {
+  "s1": "top",
+  "s2": "bottom"
+ },
+ "turn": {
+  "r1": "right",
+  "r2": "left"
+ }
+}

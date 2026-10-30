@@ -1,7 +1,7 @@
 # Piñata Roadmap
 
 This roadmap turns the proof-of-concept results into a plan for building the tool. Every proof's plan, gates,
-findings and judge artefacts are in `docs/plans/`.
+findings and judge artefacts are in [`docs/plans/`](plans).
 
 ## What the proofs showed
 
@@ -61,7 +61,7 @@ Exit: all proof suites pass from the library; cloth is visible in rendered frame
 
 1. **Skins v1.** Per-part sprites for 4 and then 8 directions, with view buckets and pivots; rotation that keeps
    pixel art clean (pre-drawn angle variants for limbs, or a RotSprite-style algorithm instead of nearest-neighbour
-   at 22.5 degree steps); skin validation and stills in `check`. An AI artist guide alongside `docs/authoring.md`.
+   at 22.5 degree steps); skin validation and stills in `check`. An AI artist guide alongside [`docs/authoring.md`](authoring.md).
    Proof gate before building it out: **P7** (below).
 2. **Interfaces.** `pinata check`, `pinata render` and `pinata export` as a CLI, and an MCP server wrapping them, so
    agents in Claude Code and other clients use the tool directly.
@@ -87,7 +87,7 @@ stay consistent across views and survive walking, at 48 px and 32 px. Gates to f
 
 ## Body plans and rigid-body behaviours (in progress)
 
-- **General limbs** (`docs/plans/2026-10-30-general-limbs.md`): any number of legs with any segment count, arms,
+- **General limbs** ([`docs/plans/2026-10-30-general-limbs.md`](plans/2026-10-30-general-limbs.md)): any number of legs with any segment count, arms,
   and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
   octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under
   the front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.

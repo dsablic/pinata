@@ -149,4 +149,4 @@ Replaces human checklist review wherever a judge can plausibly answer.
 - One command per PoC writes a report folder: metrics JSON, still images, preview HTML, pass/fail summary against gates.
 - Gates live in code with their thresholds and rationale.
 - Golden-hash tests for determinism; unit tests for maths (IK, constraints, rasterization).
-- Reference sprites in `refs/` with licence recorded.
+- Reference sprites in [`refs/`](../../refs) with licence recorded.

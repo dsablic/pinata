@@ -4,7 +4,7 @@
 
 **Goal:** Prove that a behaviour script (walk, turn, stop, idle) compiles into believable locomotion: feet planted
 without sliding, legs solved by IK within joint limits, no knee pops, root speed matching the script, readable from
-several directions. Design: `docs/plans/2026-10-30-viability-design.md`, section "P4 Planner and IK".
+several directions. Design: [`docs/plans/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P4 Planner and IK".
 
 **Architecture:** A pose is a map of joint positions in body-local space (no bone hierarchy). A rig file says which
 joints form each leg and arm and which move rigidly with the pelvis. Each frame, the gait planner turns the root
@@ -24,7 +24,7 @@ write code test-first; each batch is reviewed.
 - Units, axes and yaw as P3 (Y up, the knight faces +Z at yaw 0, positive yaw turns the front toward +X).
 - 24 fps output. The gait is evaluated per output frame (it is kinematic, no substeps).
 - The ground is the plane y = 0.
-- Body-local to world: `world = R(yaw) * local + rootPosition`, as `toWorld` in `src/sim/body.ts`.
+- Body-local to world: `world = R(yaw) * local + rootPosition`, as `toWorld` in [`src/sim/body.ts`](../../src/sim/body.ts).
 
 ## Gates (locked before implementation)
 
@@ -63,7 +63,7 @@ Pass: majority correct on each question; the skating control never preferred by 
 
 ## Batch A: rig, pose and IK
 
-### Task A1: Rig format (`src/formats/rig.ts`)
+### Task A1: Rig format ([`src/formats/rig.ts`](../../src/formats/rig.ts))
 
 ```ts
 export type Leg = { side: 'left' | 'right', hip: string, knee: string, ankle: string, toe: string }
@@ -86,7 +86,7 @@ exactly one of legs, arms, pelvis or upperBody (otherwise it would silently stay
 and ranges for the gait values. Stride length can vary with speed: `stride(speed) = strideLength * sqrt(speed /
 referenceSpeed)`, clamped to [0.5, 1.5] x strideLength, so faster walking takes longer and quicker steps.
 
-### Task A2: Pose and two-bone IK (`src/motion/pose.ts`, `src/motion/ik.ts`)
+### Task A2: Pose and two-bone IK ([`src/motion/pose.ts`](../../src/motion/pose.ts), [`src/motion/ik.ts`](../../src/motion/ik.ts))
 
 ```ts
 export type Pose = Record<string, Vec3>                // body-local joint positions
@@ -109,7 +109,7 @@ Commit after each task. Review batch A, then continue.
 
 ## Batch B: gait planner
 
-### Task B1: Footstep planner (`src/motion/gait.ts`)
+### Task B1: Footstep planner ([`src/motion/gait.ts`](../../src/motion/gait.ts))
 
 ```ts
 export type FootState = { side: 'left' | 'right', ankle: Vec3, toeYaw: number, planted: boolean, lift: number }
@@ -143,7 +143,7 @@ Tests (synthetic rig and straight-line tracks): walking at constant speed plants
 both feet are planted side by side and nothing moves; the phase at 0.6 m/s advances at half the rate per second of
 the phase at 1.2 m/s times the stride ratio; determinism.
 
-### Task B2: Pose from gait (`src/motion/locomotion.ts`)
+### Task B2: Pose from gait ([`src/motion/locomotion.ts`](../../src/motion/locomotion.ts))
 
 ```ts
 export function poseAt (options: { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequin }):
@@ -164,7 +164,7 @@ Commit after each task. Review batch B, then continue.
 
 ## Batch C: metrics, stills and runner
 
-### Task C1: Locomotion metrics (`src/motion/metrics.ts`)
+### Task C1: Locomotion metrics ([`src/motion/metrics.ts`](../../src/motion/metrics.ts))
 
 A recording stores per frame: time, root state, world-space joint positions, the clamp count, and the planner's
 planted flags (kept for diagnostics only; gates use geometry). Metrics, each a pure function of the recording, one
@@ -172,13 +172,13 @@ per gate in the table (footSlidePx and groundPenetrationPx take the metres-per-p
 Each with synthetic tests whose answers are known (for example, a foot that sits on the ground and moves 1 cm per
 frame gives the expected slide).
 
-### Task C2: Skating control (`src/motion/skating.ts`)
+### Task C2: Skating control ([`src/motion/skating.ts`](../../src/motion/skating.ts))
 
 Same rig, track and pose code, but feet are placed relative to the root every frame: the ankle follows a cyclic
 offset (forward/back by `stride / 4 * sin(2 pi phase)`, lifted during the back half) under the hip, so the legs move
 and the feet slide. Test: the control's footSlidePx exceeds 1 px/frame on a steady walk.
 
-### Task C3: Stills (`src/diagnostics/locomotion-images.ts`)
+### Task C3: Stills ([`src/diagnostics/locomotion-images.ts`](../../src/diagnostics/locomotion-images.ts))
 
 - `footprintTrace`: top-down, root path and every planted-foot position (left and right in two colours).
 - `legOnionSkin`: side view in world space over a time window, with a ground line, legs drawn as lines
@@ -188,7 +188,7 @@ and the feet slide. Test: the control's footSlidePx exceeds 1 px/frame on a stea
   frame) so the character visibly moves across the strip; frames laid side by side.
 Tests: sizes, ground line present, planted footprints counted.
 
-### Task C4: P4 assets, gates and runner (`pocs/p4-locomotion/`)
+### Task C4: P4 assets, gates and runner ([`pocs/p4-locomotion/`](../../pocs/p4-locomotion))
 
 - `knight.json`: copy of the P3 knight (cape and plume parts excluded from rendering are fine to keep; they move
   with the upper body).
@@ -201,7 +201,7 @@ Tests: sizes, ground line present, planted footprints counted.
   footprint traces, leg onion skins (ours and control), pixel strips (ours and control, side view) and an 8-direction
   contact sheet of one mid-stride frame; determinism via a child process.
 
-Review batch C, then run the judge panel (controller) and log findings in `docs/plans/p4-findings.md`.
+Review batch C, then run the judge panel (controller) and log findings in [`docs/plans/p4-findings.md`](p4-findings.md).
 
 ## Amendment after batch B (before batch C)
 
@@ -254,7 +254,7 @@ any part other than the feet (capsule end spheres; box corners) below y = 0, at 
 
 ## Amendment after the batch C review (stricter; the judge panel is re-run)
 
-A first judge panel ran before this review; its results are kept in `docs/plans/p4-judge/` but superseded, because
+A first judge panel ran before this review; its results are kept in [`docs/plans/p4-judge/`](p4-judge) but superseded, because
 the review found the stills and the control unfair:
 - `rootSpeedError` compared the root with the track it came from (always 0). It now measures the gait: the forward
   advance of the planted feet over each steady window (first to last plant, projected on the path) divided by the

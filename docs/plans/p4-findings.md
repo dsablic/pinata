@@ -1,6 +1,6 @@
 # P4 Findings
 
-Gate thresholds are locked (see `pocs/p4-locomotion/gates.ts`); every change after the first run made them stricter.
+Gate thresholds are locked (see [`pocs/p4-locomotion/gates.ts`](../../pocs/p4-locomotion/gates.ts)); every change after the first run made them stricter.
 
 ## Build and fixes before the first full run
 
@@ -32,9 +32,9 @@ Gate thresholds are locked (see `pocs/p4-locomotion/gates.ts`); every change aft
 
 ## Judge panels
 
-Round 1 (`docs/plans/p4-judge/`) is superseded: the control was unfair and the footprints mirrored.
+Round 1 ([`docs/plans/p4-judge/`](p4-judge)) is superseded: the control was unfair and the footprints mirrored.
 
-Round 2 (`docs/plans/p4-judge/round2/`), 3 fresh judges:
+Round 2 ([`docs/plans/p4-judge/round2/`](p4-judge/round2)), 3 fresh judges:
 
 | Question | Result |
 |---|---|
@@ -62,7 +62,7 @@ The judge packets that stacked or paired images used `-splice` with centre gravi
 through the middle of each image instead of between them. Both sides of every pair were cut the same way, so no
 comparison was biased, but legibility suffered (this also affected the P2 difference strips and the P3 pairs, whose
 results were unanimous regardless). The P4 strip question was rerun with clean images and fresh judges
-(`docs/plans/p4-judge/round3/`): 3 of 6 correct, confidence 1-2, two judges saying the strips look nearly identical.
+([`docs/plans/p4-judge/round3/`](p4-judge/round3)): 3 of 6 correct, confidence 1-2, two judges saying the strips look nearly identical.
 So the honest result is that 8 small stills cannot show sliding feet at all, rather than a preference for the
 sliding control; the gate still fails (majority wrong on one order). The skins spike later showed the walk itself
 reads well once drawn with hand-made-looking sprites.

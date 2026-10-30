@@ -25,7 +25,7 @@ was written, and visual quality is judged by blind, calibrated AI judge panels r
 | Skins spike | Do AI-drawn per-part sprites look better than procedural rendering? | Promising: preferred in walk strips and rated more hand-made than CC0 references in 44 of 54 comparisons, but formally inconclusive. |
 
 The working conclusion is that the value is in the motion engine (scripted locomotion, IK and secondary motion with
-machine-checkable diagnostics, authored by AI), with per-part sprites as the visual layer. See `docs/ROADMAP.md`.
+machine-checkable diagnostics, authored by AI), with per-part sprites as the visual layer. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Running it
 
@@ -53,22 +53,22 @@ gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a pla
 
 ## Repository layout
 
-- `src/`: the library, one directory per component (formats, raster, style, sim, motion, diagnostics).
-- `pocs/`: one directory per proof of concept, with its assets, gates and runner.
-- `examples/`: character packages: the knight, a four-legged dog, the piñata, and three characters authored by AI
+- [`src/`](src): the library, one directory per component (formats, raster, style, sim, motion, diagnostics).
+- [`pocs/`](pocs): one directory per proof of concept, with its assets, gates and runner.
+- [`examples/`](examples): character packages: the knight, a four-legged dog, the piñata, and three characters authored by AI
   agents in P5 (rogue, dwarf, wizard).
-- `docs/assets/`: the provisional logo (a hanging unicorn piñata, rendered with the engine).
-- `test/`: unit tests.
-- `refs/`: CC0 reference sprites used in the P1 judge panel, with sources in `refs/LICENSES.md`.
-- `docs/plans/`: the viability design, the plan for each proof, findings logs and the judge panel artefacts.
+- [`docs/assets/`](docs/assets): the provisional logo (a hanging unicorn piñata, rendered with the engine).
+- [`test/`](test): unit tests.
+- [`refs/`](refs): CC0 reference sprites used in the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
+- [`docs/plans/`](docs/plans): the viability design, the plan for each proof, findings logs and the judge panel artefacts.
 
 ## Further reading
 
-- `docs/ROADMAP.md`: what the proofs showed and the plan for building the tool.
-- `docs/authoring.md`: how to write a character package.
-- `docs/plans/2026-10-30-viability-design.md`: requirements, components, proofs and the AI judge panel method.
-- `docs/plans/*-findings.md`: every tuning run and judge result, per proof.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): what the proofs showed and the plan for building the tool.
+- [`docs/authoring.md`](docs/authoring.md): how to write a character package.
+- [`docs/plans/2026-10-30-viability-design.md`](docs/plans/2026-10-30-viability-design.md): requirements, components, proofs and the AI judge panel method.
+- [`docs/plans/*-findings.md`](docs/plans): every tuning run and judge result, per proof.
 
 ## Licence
 
-MIT, see `LICENSE`. The reference sprites in `refs/` are CC0 works by their respective authors.
+MIT, see `LICENSE`. The reference sprites in [`refs/`](refs) are CC0 works by their respective authors.

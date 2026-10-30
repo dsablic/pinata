@@ -68,7 +68,7 @@ rig, style, materials, motion) that passes `check`.
   appendages placed at rest (dynamics in C). Review.
 - **C. Dynamics and gates:** appendage spring and oscillator; balance metric and gate; appendage gates; every metric
   and hint per limb; knee speed per bending joint. Review.
-- **D. Starter command, examples, guide:** `pinata new`, the three new examples, `docs/authoring.md` updated (templates,
+- **D. Starter command, examples, guide:** `pinata new`, the three new examples, [`docs/authoring.md`](../authoring.md) updated (templates,
   limbs, appendages). Final review, then a lineup render.
 
 ## Decisions after batch A

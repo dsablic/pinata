@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build the PoC harness and run P1 from `docs/plans/2026-10-30-viability-design.md`: render a hand-written
+**Goal:** Build the PoC harness and run P1 from [`docs/plans/2026-10-30-viability-design.md`](2026-10-30-viability-design.md): render a hand-written
 3D mannequin in a standing pose as pixel art (8 directions, side and 3/4 views, 32px and 48px), measure it against
 the P1 gates, and produce a review report.
 
@@ -51,7 +51,7 @@ split into workspaces only when a second consumer needs it.
 ### Task 0: Repository setup
 
 **Files:**
-- Create: `package.json`, `tsconfig.json`, `.gitignore`
+- Create: [`package.json`](../../package.json), [`tsconfig.json`](../../tsconfig.json), [`.gitignore`](../../.gitignore)
 
 **Step 1: Initialise git**
 
@@ -60,7 +60,7 @@ cd /Users/denis/Documents/labtiva/pinata
 git init -b main
 ```
 
-**Step 2: Create `package.json`**
+**Step 2: Create [`package.json`](../../package.json)**
 
 ```json
 {
@@ -76,7 +76,7 @@ git init -b main
 }
 ```
 
-**Step 3: Create `tsconfig.json`**
+**Step 3: Create [`tsconfig.json`](../../tsconfig.json)**
 
 ```json
 {
@@ -95,7 +95,7 @@ git init -b main
 }
 ```
 
-**Step 4: Create `.gitignore`**
+**Step 4: Create [`.gitignore`](../../.gitignore)**
 
 ```
 node_modules/
@@ -110,7 +110,7 @@ Use @readcube-ai-skills:npm-safe-install for this step.
 npm install --save-dev typescript @types/node@24
 ```
 
-Expected: `package.json` gains `devDependencies` with `typescript` and `@types/node`.
+Expected: [`package.json`](../../package.json) gains `devDependencies` with `typescript` and `@types/node`.
 
 **Step 6: Commit**
 
@@ -124,13 +124,13 @@ git commit -m "Add project scaffold and viability design" -m "Co-Authored-By: Cl
 ### Task 1: Vector math
 
 **Files:**
-- Create: `src/math/vec.ts`
-- Create: `test/helpers.ts`
-- Test: `test/vec.test.ts`
+- Create: [`src/math/vec.ts`](../../src/math/vec.ts)
+- Create: [`test/helpers.ts`](../../test/helpers.ts)
+- Test: [`test/vec.test.ts`](../../test/vec.test.ts)
 
 **Step 1: Write the test helper**
 
-`test/helpers.ts`:
+[`test/helpers.ts`](../../test/helpers.ts):
 
 ```ts
 import assert from 'node:assert/strict'
@@ -142,7 +142,7 @@ export function assertClose (actual: number, expected: number, tolerance = 1e-9)
 
 **Step 2: Write the failing test**
 
-`test/vec.test.ts`:
+[`test/vec.test.ts`](../../test/vec.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -174,11 +174,11 @@ test('normalize returns a unit vector and leaves zero alone', () => {
 **Step 3: Run test to verify it fails**
 
 Run: `node --test test/vec.test.ts`
-Expected: FAIL with `Cannot find module` for `src/math/vec.ts`.
+Expected: FAIL with `Cannot find module` for [`src/math/vec.ts`](../../src/math/vec.ts).
 
 **Step 4: Write the implementation**
 
-`src/math/vec.ts`:
+[`src/math/vec.ts`](../../src/math/vec.ts):
 
 ```ts
 export type Vec3 = [number, number, number]
@@ -234,12 +234,12 @@ git commit -m "Add vector math" -m "Co-Authored-By: Claude Opus 5.5 <noreply@ant
 ### Task 2: Image and PNG encoding
 
 **Files:**
-- Create: `src/image.ts`, `src/png/encode.ts`
-- Test: `test/image.test.ts`, `test/png.test.ts`
+- Create: [`src/image.ts`](../../src/image.ts), [`src/png/encode.ts`](../../src/png/encode.ts)
+- Test: [`test/image.test.ts`](../../test/image.test.ts), [`test/png.test.ts`](../../test/png.test.ts)
 
 **Step 1: Write the failing tests**
 
-`test/image.test.ts`:
+[`test/image.test.ts`](../../test/image.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -280,7 +280,7 @@ test('imageHash changes when a pixel changes', () => {
 })
 ```
 
-`test/png.test.ts`:
+[`test/png.test.ts`](../../test/png.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -316,7 +316,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/image.ts`:
+[`src/image.ts`](../../src/image.ts):
 
 ```ts
 import { createHash } from 'node:crypto'
@@ -368,7 +368,7 @@ export function imageHash (img: Image): string {
 }
 ```
 
-`src/png/encode.ts`:
+[`src/png/encode.ts`](../../src/png/encode.ts):
 
 ```ts
 import { deflateSync } from 'node:zlib'
@@ -448,12 +448,12 @@ git commit -m "Add RGBA image helpers and PNG encoder" -m "Co-Authored-By: Claud
 The format is the contract an AI writes, so every error names the path, says what is wrong, and says what to do.
 
 **Files:**
-- Create: `src/formats/validate.ts`, `src/formats/mannequin.ts`
-- Test: `test/mannequin.test.ts`
+- Create: [`src/formats/validate.ts`](../../src/formats/validate.ts), [`src/formats/mannequin.ts`](../../src/formats/mannequin.ts)
+- Test: [`test/mannequin.test.ts`](../../test/mannequin.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/mannequin.test.ts`:
+[`test/mannequin.test.ts`](../../test/mannequin.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -557,7 +557,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/formats/validate.ts`:
+[`src/formats/validate.ts`](../../src/formats/validate.ts):
 
 ```ts
 import type { Vec3 } from '../math/vec.ts'
@@ -591,7 +591,7 @@ export function formatErrors (file: string, errors: ValidationError[]): string {
 }
 ```
 
-`src/formats/mannequin.ts`:
+[`src/formats/mannequin.ts`](../../src/formats/mannequin.ts):
 
 ```ts
 import { cross, length, normalize, sub } from '../math/vec.ts'
@@ -802,12 +802,12 @@ git commit -m "Add mannequin format with actionable validation" -m "Co-Authored-
 ### Task 4: Style format and cross-file checks
 
 **Files:**
-- Create: `src/formats/style.ts`, `src/formats/references.ts`
-- Test: `test/style.test.ts`
+- Create: [`src/formats/style.ts`](../../src/formats/style.ts), [`src/formats/references.ts`](../../src/formats/references.ts)
+- Test: [`test/style.test.ts`](../../test/style.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/style.test.ts`:
+[`test/style.test.ts`](../../test/style.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -876,7 +876,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/formats/style.ts`:
+[`src/formats/style.ts`](../../src/formats/style.ts):
 
 ```ts
 import { length } from '../math/vec.ts'
@@ -958,7 +958,7 @@ function validateDecalColors (decalColors: unknown, errors: ValidationError[]): 
 }
 ```
 
-`src/formats/references.ts`:
+[`src/formats/references.ts`](../../src/formats/references.ts):
 
 ```ts
 import type { Mannequin } from './mannequin.ts'
@@ -1009,12 +1009,12 @@ Round cones (capsules with different end radii) and rounded boxes are enough for
 formula is Inigo Quilez's exact SDF (https://iquilezles.org/articles/distfunctions/).
 
 **Files:**
-- Create: `src/raster/sdf.ts`
-- Test: `test/sdf.test.ts`
+- Create: [`src/raster/sdf.ts`](../../src/raster/sdf.ts)
+- Test: [`test/sdf.test.ts`](../../test/sdf.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/sdf.test.ts`:
+[`test/sdf.test.ts`](../../test/sdf.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1053,7 +1053,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/raster/sdf.ts`:
+[`src/raster/sdf.ts`](../../src/raster/sdf.ts):
 
 ```ts
 import { add, cross, dot, length, normalize, scale, sub } from '../math/vec.ts'
@@ -1130,12 +1130,12 @@ front. Elevation 0 is a pure side view; 30 is a 3/4 view. Pixel rows grow downwa
 root) sits on `baseline`.
 
 **Files:**
-- Create: `src/raster/camera.ts`
-- Test: `test/camera.test.ts`
+- Create: [`src/raster/camera.ts`](../../src/raster/camera.ts)
+- Test: [`test/camera.test.ts`](../../test/camera.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/camera.test.ts`:
+[`test/camera.test.ts`](../../test/camera.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1188,7 +1188,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/raster/camera.ts`:
+[`src/raster/camera.ts`](../../src/raster/camera.ts):
 
 ```ts
 import { add, cross, dot, normalize, scale } from '../math/vec.ts'
@@ -1275,12 +1275,12 @@ Each sub-sample ray is tested against each part's bounding sphere, then sphere-t
 nearest hit wins. A pixel is filled when at least half its sub-samples hit; it takes the part with the most hits.
 
 **Files:**
-- Create: `src/raster/gbuffer.ts`
-- Test: `test/gbuffer.test.ts`
+- Create: [`src/raster/gbuffer.ts`](../../src/raster/gbuffer.ts)
+- Test: [`test/gbuffer.test.ts`](../../test/gbuffer.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/gbuffer.test.ts`:
+[`test/gbuffer.test.ts`](../../test/gbuffer.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1337,7 +1337,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/raster/gbuffer.ts`:
+[`src/raster/gbuffer.ts`](../../src/raster/gbuffer.ts):
 
 ```ts
 import type { Mannequin, Part } from '../formats/mannequin.ts'
@@ -1494,12 +1494,12 @@ Pipeline order matters: shade, then inner lines, then stray cleanup (so cleanup 
 (cleanup must not erase intentional single-pixel features), then the outline last (so it wraps everything).
 
 **Files:**
-- Create: `src/style/stylize.ts`
-- Test: `test/stylize.test.ts`
+- Create: [`src/style/stylize.ts`](../../src/style/stylize.ts)
+- Test: [`test/stylize.test.ts`](../../test/stylize.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/stylize.test.ts`:
+[`test/stylize.test.ts`](../../test/stylize.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1598,7 +1598,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/style/stylize.ts`:
+[`src/style/stylize.ts`](../../src/style/stylize.ts):
 
 ```ts
 import { createImage, getPixel, neighbours4, neighbours8, parseHex, setPixel, TRANSPARENT } from '../image.ts'
@@ -1742,12 +1742,12 @@ git commit -m "Add pixel-art stylizer" -m "Co-Authored-By: Claude Opus 5.5 <nore
 ### Task 9: P1 metrics
 
 **Files:**
-- Create: `src/diagnostics/metrics.ts`
-- Test: `test/metrics.test.ts`
+- Create: [`src/diagnostics/metrics.ts`](../../src/diagnostics/metrics.ts)
+- Test: [`test/metrics.test.ts`](../../test/metrics.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/metrics.test.ts`:
+[`test/metrics.test.ts`](../../test/metrics.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1825,7 +1825,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/diagnostics/metrics.ts`:
+[`src/diagnostics/metrics.ts`](../../src/diagnostics/metrics.ts):
 
 ```ts
 import { getPixel, neighbours4, neighbours8, TRANSPARENT } from '../image.ts'
@@ -1912,12 +1912,12 @@ git commit -m "Add P1 pixel metrics" -m "Co-Authored-By: Claude Opus 5.5 <norepl
 ### Task 10: Debug images and report helpers
 
 **Files:**
-- Create: `src/diagnostics/images.ts`, `src/diagnostics/report.ts`
-- Test: `test/report.test.ts`
+- Create: [`src/diagnostics/images.ts`](../../src/diagnostics/images.ts), [`src/diagnostics/report.ts`](../../src/diagnostics/report.ts)
+- Test: [`test/report.test.ts`](../../test/report.test.ts)
 
 **Step 1: Write the failing test**
 
-`test/report.test.ts`:
+[`test/report.test.ts`](../../test/report.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -1960,7 +1960,7 @@ Expected: FAIL with `Cannot find module`.
 
 **Step 3: Write the implementation**
 
-`src/diagnostics/report.ts`:
+[`src/diagnostics/report.ts`](../../src/diagnostics/report.ts):
 
 ```ts
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -1992,7 +1992,7 @@ export function writeOutput (path: string, contents: string | Uint8Array): void 
 }
 ```
 
-`src/diagnostics/images.ts`:
+[`src/diagnostics/images.ts`](../../src/diagnostics/images.ts):
 
 ```ts
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
@@ -2087,7 +2087,7 @@ The knight is deliberately chunky (big head, thick limbs): 32px characters are u
 need about 3px of width to survive. Model units are metres; +X is the character's left.
 
 **Files:**
-- Create: `pocs/p1-static-style/knight.json`, `pocs/p1-static-style/style.json`, `pocs/p1-static-style/gates.ts`
+- Create: [`pocs/p1-static-style/knight.json`](../../pocs/p1-static-style/knight.json), [`pocs/p1-static-style/style.json`](../../pocs/p1-static-style/style.json), [`pocs/p1-static-style/gates.ts`](../../pocs/p1-static-style/gates.ts)
 
 **Step 1: Create `knight.json`**
 
@@ -2229,7 +2229,7 @@ export function gate (name: keyof typeof P1_GATES, value: number): Gate {
 
 There is no runner yet, so check the assets from a test:
 
-`test/p1-assets.test.ts`:
+[`test/p1-assets.test.ts`](../../test/p1-assets.test.ts):
 
 ```ts
 import { test } from 'node:test'
@@ -2268,7 +2268,7 @@ git commit -m "Add P1 knight mannequin, default style and gates" -m "Co-Authored
 ### Task 12: P1 runner and preview
 
 **Files:**
-- Create: `pocs/p1-static-style/preview.ts`, `pocs/p1-static-style/run.ts`, `refs/README.md`
+- Create: [`pocs/p1-static-style/preview.ts`](../../pocs/p1-static-style/preview.ts), [`pocs/p1-static-style/run.ts`](../../pocs/p1-static-style/run.ts), [`refs/README.md`](../../refs/README.md)
 
 **Step 1: Create `preview.ts`**
 
@@ -2496,7 +2496,7 @@ diffs readable.
 
 Exit codes: 0 when all automated gates pass, 1 when any fails, 2 on invalid input. The AI loop relies on these.
 
-**Step 3: Create `refs/README.md`**
+**Step 3: Create [`refs/README.md`](../../refs/README.md)**
 
 ```markdown
 # Reference sprites
@@ -2535,9 +2535,9 @@ git commit -m "Add P1 runner with report and A/B preview" -m "Co-Authored-By: Cl
 This is the iteration loop from the design: metrics first, then Claude's review of the still images.
 
 **Files:**
-- Create: `docs/plans/p1-findings.md`
-- Modify (as needed): `pocs/p1-static-style/knight.json`, `pocs/p1-static-style/style.json`, `src/style/stylize.ts`,
-  `src/raster/gbuffer.ts`
+- Create: [`docs/plans/p1-findings.md`](p1-findings.md)
+- Modify (as needed): [`pocs/p1-static-style/knight.json`](../../pocs/p1-static-style/knight.json), [`pocs/p1-static-style/style.json`](../../pocs/p1-static-style/style.json), [`src/style/stylize.ts`](../../src/style/stylize.ts),
+  [`src/raster/gbuffer.ts`](../../src/raster/gbuffer.ts)
 
 **Step 1: Review the first run**
 
@@ -2546,7 +2546,7 @@ note concrete issues with frame IDs, for example "32px-el0-d2: far arm is a 1px 
 
 **Step 2: Log the iteration**
 
-Start `docs/plans/p1-findings.md` with one entry per run:
+Start [`docs/plans/p1-findings.md`](p1-findings.md) with one entry per run:
 
 ```markdown
 ## Run N
@@ -2580,11 +2580,11 @@ git commit -m "Record P1 iteration findings" -m "Co-Authored-By: Claude Opus 5.5
 
 ### Task 14: Reference sprites (user or agent with web access)
 
-**Step 1:** Find 3 to 5 sprites matching `refs/README.md`. Verify each licence on its source page; do not rely on a
+**Step 1:** Find 3 to 5 sprites matching [`refs/README.md`](../../refs/README.md). Verify each licence on its source page; do not rely on a
 listing summary.
 
 **Step 2:** Crop single frames without scaling, save them as `refs/p1/<name>.png`, and record each in
-`refs/LICENSES.md`.
+[`refs/LICENSES.md`](../../refs/LICENSES.md).
 
 **Step 3:** Run `npm run p1` and confirm the A/B section of `reports/p1/preview.html` shows one pair per reference.
 
@@ -2605,6 +2605,6 @@ then checks the answers against it.
 **Step 2:** Send the same page (contact sheet plus A/B pairs, with the key removed) to 3 to 5 outside reviewers,
 including at least one pixel artist (Lospec or r/PixelArt).
 
-**Step 3:** Record the answers in `docs/plans/p1-findings.md` under `## Review`. P1 passes when the automated gates
+**Step 3:** Record the answers in [`docs/plans/p1-findings.md`](p1-findings.md) under `## Review`. P1 passes when the automated gates
 pass, facing is identified correctly for at least 7 of 8 directions, parts are identifiable at 32px, and the A/B
 answers are mostly "can't tell" or split. Otherwise apply the fallback from the design.

@@ -4,7 +4,7 @@
 
 **Goal:** Prove that cloth and hair driven by the body's motion read as inertia (lag, overshoot, settle), that
 materials and wind are distinguishable by motion alone, and that the simulation is stable, collision-free and
-deterministic. Design: `docs/plans/2026-10-30-viability-design.md`, section "P3 Secondary motion".
+deterministic. Design: [`docs/plans/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P3 Secondary motion".
 
 **Architecture:** The P1 knight is the collision body, moved as a rigid whole by a scripted root transform (position
 plus yaw). A cape (a particle grid) and a plume (a particle chain) are pinned to body anchors and simulated with
@@ -72,7 +72,7 @@ Pass: majority correct on each question, and the rigid control is never preferre
 
 ## Batch A: motion script and formats
 
-### Task A1: Root motion script (`src/motion/script.ts`)
+### Task A1: Root motion script ([`src/motion/script.ts`](../../src/motion/script.ts))
 
 Types:
 
@@ -103,7 +103,7 @@ Tests: zero-length script stays at the origin; `move 1 m/s for 2 s` with `accelS
 `speed * 1ms / accelSeconds * 2`); `turn 90` ends at yaw = pi/2 and faces +X; `hold` ends with zero velocity;
 calling twice with the same `t` gives identical results.
 
-### Task A2: Simulation materials and scenario formats (`src/formats/sim.ts`)
+### Task A2: Simulation materials and scenario formats ([`src/formats/sim.ts`](../../src/formats/sim.ts))
 
 ```ts
 export type SimMaterial = {
@@ -140,13 +140,13 @@ export type Scenario = {
 
 Validators follow the P1 pattern (`Validated<T>`, unknown keys rejected, actionable messages), plus a cross-check
 `checkScenario(scenario, mannequin, materials)` for joint names, excluded part names and material names. Tests in
-the style of `test/mannequin.test.ts`.
+the style of [`test/mannequin.test.ts`](../../test/mannequin.test.ts).
 
 Commit after each task. Review batch A, then continue.
 
 ## Batch B: body collider and particle system
 
-### Task B1: Body collider (`src/sim/body.ts`)
+### Task B1: Body collider ([`src/sim/body.ts`](../../src/sim/body.ts))
 
 ```ts
 export type Collider = { distance: (p: Vec3) => number, normal: (p: Vec3) => Vec3 }
@@ -157,12 +157,12 @@ export function anchorWorld (m: Mannequin, joint: string, root: RootState): Vec3
 The distance is the union (minimum) of the included parts' SDFs, evaluated in body-local space
 (`local = R(-yaw) * (p - position)`). Cull by bounding sphere: skip a part when the distance to its bounding sphere
 already exceeds the current minimum. The normal is the central-difference gradient in local space, rotated back to
-world space. Reuse `src/raster/sdf.ts` and `src/raster/bounds.ts`.
+world space. Reuse [`src/raster/sdf.ts`](../../src/raster/sdf.ts) and [`src/raster/bounds.ts`](../../src/raster/bounds.ts).
 
 Tests: a point 1 m in front of a sphere part at the origin has distance 1 - r and normal +Z; the same with
 `yaw = pi/2` faces +X; excluded parts don't collide; `anchorWorld` rotates and translates joints.
 
-### Task B2: Particle system builders (`src/sim/cloth.ts`)
+### Task B2: Particle system builders ([`src/sim/cloth.ts`](../../src/sim/cloth.ts))
 
 ```ts
 export type Particles = { position: Float64Array, previous: Float64Array, inverseMass: Float64Array, count: number }
@@ -184,7 +184,7 @@ so metrics and drag can look it up (store an index per particle if simpler; docu
 Tests: particle and constraint counts for a 3 x 4 cape; rest lengths match the grid spacing; the top row is pinned
 and nothing else is; merging offsets indices correctly.
 
-### Task B3: XPBD solver (`src/sim/solver.ts`)
+### Task B3: XPBD solver ([`src/sim/solver.ts`](../../src/sim/solver.ts))
 
 ```ts
 export type Environment = { gravity: Vec3, wind?: Wind, particleRadius: number }
@@ -218,7 +218,7 @@ Commit after each task. Review batch B, then continue.
 
 ## Batch C: metrics, stills and runner
 
-### Task C1: Simulation recorder and metrics (`src/sim/metrics.ts`)
+### Task C1: Simulation recorder and metrics ([`src/sim/metrics.ts`](../../src/sim/metrics.ts))
 
 A recorder stores, per output frame: time, root state, all particle positions (copied), and per-particle
 penetration depth (`particleRadius - distance` when positive). Metrics, each a pure function of the recording:
@@ -229,7 +229,7 @@ penetration depth (`particleRadius - distance` when positive). Metrics, each a p
 `windAlignment(restHem)`, and `frameHashes` (sha256 of each frame's positions). Test each with small synthetic
 recordings whose answers are known.
 
-### Task C2: Drawing primitives and P3 stills (`src/diagnostics/draw.ts`, `src/diagnostics/motion-images.ts`)
+### Task C2: Drawing primitives and P3 stills ([`src/diagnostics/draw.ts`](../../src/diagnostics/draw.ts), [`src/diagnostics/motion-images.ts`](../../src/diagnostics/motion-images.ts))
 
 `draw.ts`: `line(img, x0, y0, x1, y1, rgb)` (Bresenham), `disc(img, cx, cy, r, rgb)`, and
 `plot(series: Array<{ values: number[], rgb: number }>, options: { width, height, yMin, yMax })` returning an Image
@@ -238,21 +238,21 @@ with axes. `motion-images.ts`: `topDownTrace` (body path plus hem centroid path,
 body yaw over time). Body silhouettes come from the collider: sample the body's distance on a coarse grid in the view
 plane; that is enough for stills. Tests: line endpoints and length, plot axes inside bounds.
 
-### Task C3: P3 assets, gates and runner (`pocs/p3-secondary-motion/`)
+### Task C3: P3 assets, gates and runner ([`pocs/p3-secondary-motion/`](../../pocs/p3-secondary-motion))
 
 - `materials.json`: `silk`, `wool`, `leather`. Starting values (to be tuned only within the gates, logged in a
   findings file): silk mass 0.01, stretch 1e-6, bend 1e-3, damping 0.3, drag 0.02; wool mass 0.02, stretch 1e-7,
   bend 1e-4, damping 0.5, drag 0.015; leather mass 0.04, stretch 1e-8, bend 1e-5, damping 1.0, drag 0.01.
 - `turn-stop.json`, `wind.json`, `soak.json`: body `../p1-static-style/knight.json`, excluding `capeL`, `capeR`,
   `plume`; a cape between new body anchors (add `capeAnchorL`/`capeAnchorR` joints to a copy of the knight in
-  `pocs/p3-secondary-motion/knight.json` rather than changing P1's file); a plume chain from the helmet top.
+  [`pocs/p3-secondary-motion/knight.json`](../../pocs/p3-secondary-motion/knight.json) rather than changing P1's file); a plume chain from the helmet top.
 - `gates.ts`: the gate table above with rationales.
 - `run.ts`: runs every scenario for every material, records, computes metrics, evaluates gates, writes
   `reports/p3/` (`metrics.json`, `summary.txt`, stills per scenario and material, a rigid-control onion skin for the
   judge panel), checks determinism in a child process the way P1 does, and uses P1's exit-code contract (0 pass,
   1 gate failed, 2 harness error, a stale report is cleared at the start).
 
-Review batch C, then run the judge panel (controller task) and log findings in `docs/plans/p3-findings.md`.
+Review batch C, then run the judge panel (controller task) and log findings in [`docs/plans/p3-findings.md`](p3-findings.md).
 
 ## Gate amendment (after the batch C review, all gates passing)
 

@@ -1,11 +1,11 @@
 # Skins Spike Findings
 
-Gates fixed in `docs/plans/2026-10-30-remaining-proofs.md` before implementation.
+Gates fixed in [`docs/plans/2026-10-30-remaining-proofs.md`](2026-10-30-remaining-proofs.md) before implementation.
 
 ## Artist
 
 A fresh agent with only the brief and the preview command drew a 21-part, 16-colour skin
-(`pocs/skins-spike/artist-skin.json`). It validated on the first run and the agent used 2 of 6 previews. Gate (finish
+([`pocs/skins-spike/artist-skin.json`](../../pocs/skins-spike/artist-skin.json)). It validated on the first run and the agent used 2 of 6 previews. Gate (finish
 within 3 attempts): pass. Rule slip: it patched its JSON with a small Python script, though the preview was the only
 permitted command; it changed nothing outside its folder. Its notes: the 48 px torso (about 9 by 12 px) leaves little
 room for detail and is mostly hidden by the near arm, 16 colours are tight, and 22.5 degree rotation steps make
@@ -15,7 +15,7 @@ rotated limb edges jaggy.
 
 Packet: the skinned knight's standing frame vs the three CC0 references from P1, both orders, plus 4 hand-made vs
 hand-made controls; and the 8-frame walk strip, skins vs the P4 procedural walk, both orders. Key and every answer in
-`docs/plans/skins-judge/`.
+[`docs/plans/skins-judge/`](skins-judge).
 
 | Round | Wording | Reference picked (of 18) | Controls "can't tell" (of 12) |
 |---|---|---|---|

@@ -12,7 +12,7 @@ fresh blind judges, neutral names, both orders, controls that must fail, ground-
 **Question:** does the procedural renderer stay stable in motion (no crawl or flicker) without making motion look
 steppy?
 
-**Setup (`pocs/p2-pixel-stability/`):** the P4 knight and P1 style. Two sequences, each rendered at 32 and 48 px,
+**Setup ([`pocs/p2-pixel-stability/`](../../pocs/p2-pixel-stability)):** the P4 knight and P1 style. Two sequences, each rendered at 32 and 48 px,
 elevation 30:
 - `turntable`: the knight standing at rest, yawing 1 degree per frame through 90 degrees (a slow rigid rotation is
   the worst case for crawl).
@@ -54,7 +54,7 @@ correct on both orders.
 **Question:** is style independent of motion: can one character and its motion be rendered in clearly different
 styles that still read as the same character?
 
-**Setup (`pocs/p6-style-swap/`):** two characters (the knight package and one character authored by an agent in P5),
+**Setup ([`pocs/p6-style-swap/`](../../pocs/p6-style-swap)):** two characters (the knight package and one character authored by an agent in P5),
 three styles: the P1 default, `muted` (desaturated, 2 shades per material plus a dark outline) and `vivid` (high
 contrast, 4 shades per material, selective outline). Styles are written by an agent from a one-line brief each; the
 renderer is unchanged.

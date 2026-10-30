@@ -1,6 +1,6 @@
 # P1 Findings
 
-Gate thresholds are locked (see `pocs/p1-static-style/gates.ts`). Each run changes one thing.
+Gate thresholds are locked (see [`pocs/p1-static-style/gates.ts`](../../pocs/p1-static-style/gates.ts)). Each run changes one thing.
 
 ## Run 1 (baseline, plan assets)
 
@@ -55,7 +55,7 @@ Next: reference sprites (Task 14), then the human and external review (Task 15).
 Method: 3 blind judges (fresh agents, no project context) saw neutrally named, 8x upscaled images only. Facing: 16
 frames (32px, elevations 0 and 30, 8 directions). A/B: 3 real pairs (ours vs a hand-made reference) and 2 control
 pairs (hand-made vs hand-made), each in both left/right orders. Packet builder, key, raw answers and scoring are in
-`docs/plans/p1-judge/` (`score.txt` has the full table).
+[`docs/plans/p1-judge/`](p1-judge) (`score.txt` has the full table).
 
 - A/B: the hand-made reference was picked on all 18 real comparisons; controls were "can't tell" on all 12. The
   judges are calibrated, so this is a reliable detection. Reasons given, consistently: one uniform black outline,
@@ -124,7 +124,7 @@ If A/B still fails, move to the skins fallback.
 
 ## P1b review (AI judge panel)
 
-Same packet builder, same references, 3 fresh judges. Artefacts in `docs/plans/p1-judge/p1b/`.
+Same packet builder, same references, 3 fresh judges. Artefacts in [`docs/plans/p1-judge/p1b/`](p1-judge/p1b).
 
 - A/B: reference picked in 18 of 18 real comparisons; controls "can't tell" 12 of 12 (panel valid). By the rule
   fixed before the changes, this is "unchanged": the procedural style is still reliably detected. Judges now cite

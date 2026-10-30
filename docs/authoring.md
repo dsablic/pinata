@@ -275,7 +275,7 @@ the leg whose phase comes next after the previous plant's leg (see `alternationV
   script an `accelSeconds` at least as long as the first stance (about a second for a dog), or the rest-pose plants
   fall inside the steady window and distort `rootSpeedError`.
 
-Starting values for a dog 0.6 m tall at the shoulder (`examples/dog`): `strideLength` 0.4, `referenceSpeed` 0.35
+Starting values for a dog 0.6 m tall at the shoulder ([`examples/dog`](../examples/dog)): `strideLength` 0.4, `referenceSpeed` 0.35
 (also the script speed), `stanceFraction` 0.75, `stepHeight` 0.07, `bobAmplitude` 0.008, `footSpacing` 0.18 (the
 hip distance), `armSwingDegrees` 0, `accelSeconds` 1, `arms` `[]`. A quadruped's knee flexes quickly, so a low
 reference speed is what keeps `kneeSpeedDegPerSec` down: the peak grows with speed and barely changes with stride.
@@ -395,7 +395,7 @@ key of `materials` in `style.json` and `radius` is the thickness in metres. The 
 thin capsules, one per link (for the cape, one per grid edge), in a single colour of that ramp; without `render` the
 strand is simulated but not drawn. Rendered strands are not collision parts and are not checked by the static gates;
 `npm run check` draws them into `sheet.png` and `walk.png` (the sheet shows the middle of the first steady walk).
-The library function `clothParts` in `src/sim/render.ts` turns a recorded frame into those parts.
+The library function `clothParts` in [`src/sim/render.ts`](../src/sim/render.ts) turns a recorded frame into those parts.
 
 ### wind
 

@@ -1,6 +1,6 @@
 # P3 Findings
 
-Gate thresholds are locked (see `pocs/p3-secondary-motion/gates.ts`). Material values are tuned within them.
+Gate thresholds are locked (see [`pocs/p3-secondary-motion/gates.ts`](../../pocs/p3-secondary-motion/gates.ts)). Material values are tuned within them.
 
 ## Run 1 (starting materials from the plan)
 
@@ -30,7 +30,7 @@ Gate thresholds are locked (see `pocs/p3-secondary-motion/gates.ts`). Material v
 
 ## Review (AI judge panel)
 
-Packet: body-frame stills from `reports/p3/`, renamed and shuffled. Key and answers in `docs/plans/p3-judge/`.
+Packet: body-frame stills from `reports/p3/`, renamed and shuffled. Key and answers in [`docs/plans/p3-judge/`](p3-judge).
 3 blind judges, fresh agents, no project context.
 
 | Question | Result | Chance level |

@@ -42,13 +42,22 @@ export const P4_GATES = {
   boneLengthError: {
     op: '<=',
     threshold: 0.01,
-    rationale: 'Max relative change of thigh, shin, foot, upper-arm and forearm lengths from the rest pose.'
+    rationale: 'Construction check, not evidence of quality: two-bone IK preserves lengths exactly, so this catches ' +
+      'a broken rig or solver. Max relative change of thigh, shin, foot, upper-arm and forearm lengths from the ' +
+      'rest pose.'
   },
   rootSpeedError: {
     op: '<=',
     threshold: 0.05,
-    rationale: 'During steady move segments (after the first accelSeconds, clear of turns), relative difference ' +
-      'between the root\'s distance per second and the script speed.'
+    rationale: 'During steady move segments (after the first accelSeconds, clear of turns), the forward advance of ' +
+      'each foot from its first to its last plant along the path, per second, against the script speed. Measures ' +
+      'what the feet do, not the track the root was taken from.'
+  },
+  unsupportedFrames: {
+    op: '<=',
+    threshold: 0,
+    rationale: 'Frames in which no sole point of either foot is within 2 cm of the ground. Walking never leaves ' +
+      'the ground; with footSlidePx this closes the gap where a foot hovering just above 2 cm escapes the slide check.'
   },
   alternationViolations: {
     op: '<=',
@@ -60,6 +69,12 @@ export const P4_GATES = {
     threshold: 1,
     rationale: '1 if the skating control (legs cycle with phase, feet are never planted in world space) fails ' +
       'footSlidePx on walk-turn-stop; a gate set the control passes proves nothing.'
+  },
+  skatingControlFair: {
+    op: '>=',
+    threshold: 1,
+    rationale: '1 if the skating control passes every gate except footSlidePx on walk-turn-stop: a fair control ' +
+      'differs from our walk only in sliding, not in locked legs or hovering feet.'
   },
   nondeterministicFrames: {
     op: '<=',

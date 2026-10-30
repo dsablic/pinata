@@ -4,7 +4,8 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 import { planGait } from '../src/motion/gait.ts'
 import {
   alternationViolations, boneLengthError, footSlidePx, frameHashes, groundPenetrationPx, kneeLimitViolations,
-  kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, reachViolations, recordLocomotion, rootSpeedError
+  kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, reachViolations, recordLocomotion, rootSpeedError,
+  unsupportedFrames
 } from '../src/motion/metrics.ts'
 import type { LocomotionFrame, LocomotionRecording } from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
@@ -148,22 +149,49 @@ test('boneLengthError is the largest relative change of a bone from the rest pos
   assert.equal(boneLengthError(recording([frame(0, rest)]), geometry, rest), 0)
 })
 
-function moving (speed: number, count: number, fast = speed): LocomotionRecording {
-  const frames = []
-  let z = 0
-  for (let i = 0; i < count; i++) {
-    z += (i < 24 ? speed : fast) / 24
-    frames.push(frame(i, rest, { root: rootAt(z) }))
-  }
+const PERIOD = 12
+const STANCE = 4
+
+function stepPose (leftZ: number, leftUp: number, rightZ: number, rightUp: number): Pose {
+  const pose = structuredClone(rest)
+  pose.ankleL = [0.1, 0.1 + leftUp, leftZ]
+  pose.toeL = [0.1, 0.05 + leftUp, leftZ + 0.15]
+  pose.ankleR = [-0.1, 0.1 + rightUp, rightZ]
+  pose.toeR = [-0.1, 0.05 + rightUp, rightZ + 0.15]
+  return pose
+}
+
+function stepping (step: number, rootSpeed: number, count = 48): LocomotionRecording {
+  const frames = Array.from({ length: count }, (_, i) => {
+    const left = Math.floor(i / PERIOD)
+    const right = Math.floor((i + PERIOD / 2) / PERIOD)
+    const leftUp = i % PERIOD < STANCE ? 0 : 0.3
+    const rightUp = (i + PERIOD / 2) % PERIOD < STANCE ? 0 : 0.3
+    return frame(i, stepPose(left * step, leftUp, right * step, rightUp), { root: rootAt(rootSpeed * i / 24) })
+  })
   return recording(frames)
 }
 
-test('rootSpeedError compares distance per second with the script speed inside steady segments', () => {
-  const rec = moving(1.2, 48, 2)
-  assertClose(rootSpeedError(rec, [{ start: 0.2, end: 0.9, speed: 1.2 }]), 0, 1e-9)
-  assertClose(rootSpeedError(rec, [{ start: 0.2, end: 0.9, speed: 1.1 }]), 0.1 / 1.1, 1e-9)
-  const both = [{ start: 0.2, end: 0.9, speed: 1.2 }, { start: 1.2, end: 1.9, speed: 1.6 }]
-  assertClose(rootSpeedError(rec, both), 0.25, 1e-9)
+const WINDOW = [{ start: 0, end: 2, speed: 1.2 }]
+
+test('rootSpeedError is the advance of the planted feet per second against the script speed', () => {
+  assertClose(rootSpeedError(stepping(0.6, 1.2), geometry, WINDOW), 0, 1e-9)
+  assertClose(rootSpeedError(stepping(0.5, 1.2), geometry, WINDOW), 0.2 / 1.2, 1e-9)
+  assertClose(rootSpeedError(stepping(0.6, 1.2), geometry, [{ start: 0, end: 2, speed: 1 }]), 0.2, 1e-9)
+})
+
+test('rootSpeedError does not trust the root: feet that stay put while the root moves are an error of 1', () => {
+  assertClose(rootSpeedError(stepping(0, 1.2), geometry, WINDOW), 1, 1e-9)
+})
+
+test('rootSpeedError is infinite when a window has no two plants of a foot', () => {
+  assert.equal(rootSpeedError(stepping(0.6, 1.2, 10), geometry, WINDOW), Infinity)
+})
+
+test('unsupportedFrames counts frames where no sole point of either foot is within 2 cm of the ground', () => {
+  assert.equal(unsupportedFrames(pattern('11000', '00110'), geometry), 1)
+  assert.equal(unsupportedFrames(pattern('11000', '00000'), geometry), 3)
+  assert.equal(unsupportedFrames(pattern('10101', '01010'), geometry), 0)
 })
 
 test('alternationViolations counts the same foot planting twice in a row inside the windows', () => {

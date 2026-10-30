@@ -153,36 +153,51 @@ function evaluateRun (run: Run): Record<string, number> {
     kneeLimitViolations: metrics.kneeLimitViolations(run.recording, g),
     kneeSpeedDegPerSec: metrics.kneeSpeedDegPerSec(run.recording, g),
     boneLengthError: metrics.boneLengthError(run.recording, g, rest),
-    rootSpeedError: metrics.rootSpeedError(run.recording, steady),
+    rootSpeedError: metrics.rootSpeedError(run.recording, g, steady),
+    unsupportedFrames: metrics.unsupportedFrames(run.recording, g),
     alternationViolations: metrics.alternationViolations(run.recording, g, steady)
   }
 }
 
-const planted = new Map(runs.map(run => [run.scenario.name, metrics.plantedFrames(run.recording, geometry(run))]))
+function plantedOf (run: Run): Record<'left' | 'right', number> {
+  return metrics.plantedFrames(run.recording, geometry(run))
+}
+
+const walkTurnStop = runs.find(r => r.scenario.name === 'walk-turn-stop') as Run
+const control = plan(walkTurnStop.scenario, planSkating)
+const planted = new Map([
+  ...runs.map((run): [string, Record<'left' | 'right', number>] => [run.scenario.name, plantedOf(run)]),
+  ['control', plantedOf(control)] as [string, Record<'left' | 'right', number>]
+])
 for (const [name, counts] of planted) {
   for (const side of ['left', 'right'] as const) {
     if (counts[side] === 0) fail(`${name}: the ${side} foot never counts as planted; footSlidePx would measure nothing`)
   }
 }
 
-const walkTurnStop = runs.find(r => r.scenario.name === 'walk-turn-stop') as Run
-const control = plan(walkTurnStop.scenario, planSkating)
-const controlSlide = metrics.footSlidePx(control.recording, geometry(control), METRES_PER_PIXEL)
 const other = childHashes()
 const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
 const perScenario = Object.fromEntries(runs.map(run => [run.scenario.name, evaluateRun(run)]))
+const controlValues = evaluateRun(control)
+const controlResults = evaluate(Object.entries(controlValues).map(([name, value]) => {
+  return gate(name as Parameters<typeof gate>[0], value, 'control')
+}))
+const controlSlide = controlValues.footSlidePx
+const controlSlides = !controlResults.find(r => r.name === 'footSlidePx.control')?.pass
+const controlFair = controlResults.every(r => r.pass || r.name === 'footSlidePx.control')
 
 const results = evaluate([
   ...runs.flatMap(run => Object.entries(perScenario[run.scenario.name]).map(([name, value]) => {
     return gate(name as Parameters<typeof gate>[0], value, run.scenario.name)
   })),
-  gate('skatingControlFails', evaluate([gate('footSlidePx', controlSlide)])[0].pass ? 0 : 1),
+  gate('skatingControlFails', controlSlides ? 1 : 0),
+  gate('skatingControlFair', controlFair ? 1 : 0),
   gate('nondeterministicFrames', nondeterministic)
 ])
 const plantedLines = [...planted].map(([name, c]) => `planted frames ${name}: left ${c.left}, right ${c.right}`)
 const summary = [
   summarize('P4 locomotion', results),
-  `skating control footSlidePx: ${controlSlide.toFixed(3)}`,
+  ...controlResults.map(r => `skating control ${r.name}: ${r.value.toFixed(3)} ${r.pass ? 'pass' : 'FAIL'}`),
   ...plantedLines
 ].join('\n')
 
@@ -255,6 +270,7 @@ function finite (key: string, value: unknown): unknown {
 const metricsReport = {
   gates: results,
   perScenario,
+  skatingControl: { values: controlValues, gates: controlResults },
   skatingControlSlidePx: controlSlide,
   planted: Object.fromEntries(planted)
 }

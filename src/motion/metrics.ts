@@ -221,20 +221,62 @@ export function boneLengthError (recording: LocomotionRecording, geometry: Geome
   return worst
 }
 
-/** Largest relative difference between the root's distance per second and the script speed in steady segments. */
-export function rootSpeedError (recording: LocomotionRecording, segments: SteadySegment[]): number {
-  const { frames, fps } = recording
-  let worst = 0
-  for (const { start, end, speed } of segments) {
-    for (let i = 1; i < frames.length; i++) {
-      if (frames[i - 1].time < start - TIME_EPSILON || frames[i].time > end + TIME_EPSILON) continue
-      const a = frames[i - 1].root.position
-      const b = frames[i].root.position
-      const actual = Math.hypot(b[0] - a[0], b[2] - a[2]) * fps
-      worst = Math.max(worst, Math.abs(actual - speed) / speed)
+function plantCentre (recording: LocomotionRecording, leg: Leg, mannequin: Mannequin, run: PlantedRun) {
+  let x = 0
+  let z = 0
+  let n = 0
+  for (let i = run.start; i <= run.end; i++) {
+    for (const p of solePoints(recording.frames[i].joints, leg, mannequin)) {
+      x += p[0]
+      z += p[2]
+      n++
     }
   }
+  const time = (recording.frames[run.start].time + recording.frames[run.end].time) / 2
+  return { time, x: x / n, z: z / n }
+}
+
+/**
+ * Largest relative difference, over each foot in each steady segment, between the foot's advance along the path
+ * from its first to its last plant in the segment, per second between those plants, and the script speed. The path
+ * direction is the root's displacement over the segment. A foot or segment without two plants measures nothing and
+ * gives Infinity.
+ */
+export function rootSpeedError (recording: LocomotionRecording, geometry: Geometry, segments: SteadySegment[]): number {
+  const runs = plantedRuns(recording, geometry)
+  const { frames } = recording
+  const at = (time: number): Vec3 => {
+    const i = Math.min(frames.length - 1, Math.max(0, Math.round(time * recording.fps)))
+    return frames[i].root.position
+  }
+  let worst = 0
+  for (const { start, end, speed } of segments) {
+    const from = at(start)
+    const to = at(end)
+    const travelled = Math.hypot(to[0] - from[0], to[2] - from[2])
+    const measured: number[] = []
+    for (const leg of geometry.rig.legs) {
+      const plants = runs.filter(run => run.side === leg.side)
+        .map(run => plantCentre(recording, leg, geometry.mannequin, run))
+        .filter(c => c.time >= start - TIME_EPSILON && c.time <= end + TIME_EPSILON)
+      if (plants.length < 2 || travelled === 0) continue
+      const first = plants[0]
+      const last = plants[plants.length - 1]
+      const advance = ((last.x - first.x) * (to[0] - from[0]) + (last.z - first.z) * (to[2] - from[2])) / travelled
+      measured.push(Math.abs(advance / (last.time - first.time) - speed) / speed)
+    }
+    worst = Math.max(worst, measured.length === 0 ? Infinity : Math.max(...measured))
+  }
   return worst
+}
+
+/** Frames in which no sole point of either foot is within 2 cm of the ground. */
+export function unsupportedFrames (recording: LocomotionRecording, geometry: Geometry): number {
+  return recording.frames.filter(({ joints }) => {
+    return !geometry.rig.legs.some(leg => {
+      return solePoints(joints, leg, geometry.mannequin).some(p => p[1] <= PLANT_HEIGHT)
+    })
+  }).length
 }
 
 /** Plants inside the windows by the same foot as the previous plant (geometric plants, time of first frame). */

@@ -1,0 +1,425 @@
+{
+  "name": "horse",
+  "height": 1.44,
+  "joints": {
+    "pelvis": [
+      0,
+      0.88,
+      0
+    ],
+    "rump": [
+      0,
+      0.91,
+      -0.34
+    ],
+    "chest": [
+      0,
+      0.88,
+      0.28
+    ],
+    "withers": [
+      0,
+      1,
+      0.36
+    ],
+    "neck": [
+      0,
+      1.12,
+      0.54
+    ],
+    "head": [
+      0,
+      1.27,
+      0.66
+    ],
+    "nose": [
+      0,
+      1.1,
+      0.86
+    ],
+    "mane1": [
+      0,
+      1.11,
+      0.32
+    ],
+    "mane2": [
+      0,
+      1.35,
+      0.6
+    ],
+    "tail1": [
+      0,
+      0.95,
+      -0.56
+    ],
+    "tail2": [
+      0,
+      0.8,
+      -0.66
+    ],
+    "tail3": [
+      0,
+      0.58,
+      -0.7
+    ],
+    "earL1": [
+      0.04,
+      1.33,
+      0.62
+    ],
+    "earL2": [
+      0.05,
+      1.42,
+      0.6
+    ],
+    "earR1": [
+      -0.04,
+      1.33,
+      0.62
+    ],
+    "earR2": [
+      -0.05,
+      1.42,
+      0.6
+    ],
+    "hipLH": [
+      0.12,
+      0.8,
+      -0.34
+    ],
+    "stifleLH": [
+      0.12,
+      0.58,
+      -0.25
+    ],
+    "hockLH": [
+      0.12,
+      0.36,
+      -0.43
+    ],
+    "fetlockLH": [
+      0.12,
+      0.07,
+      -0.39
+    ],
+    "hoofLH": [
+      0.12,
+      0.06,
+      -0.325
+    ],
+    "shoulderLF": [
+      0.12,
+      0.8,
+      0.34
+    ],
+    "elbowLF": [
+      0.12,
+      0.58,
+      0.3
+    ],
+    "kneeLF": [
+      0.12,
+      0.34,
+      0.345
+    ],
+    "fetlockLF": [
+      0.12,
+      0.07,
+      0.32
+    ],
+    "hoofLF": [
+      0.12,
+      0.06,
+      0.385
+    ],
+    "hipRH": [
+      -0.12,
+      0.8,
+      -0.34
+    ],
+    "stifleRH": [
+      -0.12,
+      0.58,
+      -0.25
+    ],
+    "hockRH": [
+      -0.12,
+      0.36,
+      -0.43
+    ],
+    "fetlockRH": [
+      -0.12,
+      0.07,
+      -0.39
+    ],
+    "hoofRH": [
+      -0.12,
+      0.06,
+      -0.325
+    ],
+    "shoulderRF": [
+      -0.12,
+      0.8,
+      0.34
+    ],
+    "elbowRF": [
+      -0.12,
+      0.58,
+      0.3
+    ],
+    "kneeRF": [
+      -0.12,
+      0.34,
+      0.345
+    ],
+    "fetlockRF": [
+      -0.12,
+      0.07,
+      0.32
+    ],
+    "hoofRF": [
+      -0.12,
+      0.06,
+      0.385
+    ]
+  },
+  "parts": [
+    {
+      "name": "barrel",
+      "shape": "capsule",
+      "a": "rump",
+      "b": "chest",
+      "radiusA": 0.2,
+      "radiusB": 0.21,
+      "material": "coat"
+    },
+    {
+      "name": "withersPart",
+      "shape": "capsule",
+      "a": "chest",
+      "b": "withers",
+      "radiusA": 0.18,
+      "radiusB": 0.14,
+      "material": "coat"
+    },
+    {
+      "name": "neckPart",
+      "shape": "capsule",
+      "a": "withers",
+      "b": "neck",
+      "radiusA": 0.14,
+      "radiusB": 0.1,
+      "material": "coat"
+    },
+    {
+      "name": "pollPart",
+      "shape": "capsule",
+      "a": "neck",
+      "b": "head",
+      "radiusA": 0.09,
+      "radiusB": 0.075,
+      "material": "coat"
+    },
+    {
+      "name": "headPart",
+      "shape": "capsule",
+      "a": "head",
+      "b": "nose",
+      "radiusA": 0.085,
+      "radiusB": 0.065,
+      "material": "coat"
+    },
+    {
+      "name": "mane",
+      "shape": "capsule",
+      "a": "mane1",
+      "b": "mane2",
+      "radiusA": 0.05,
+      "radiusB": 0.045,
+      "material": "hair"
+    },
+    {
+      "name": "tailRoot",
+      "shape": "capsule",
+      "a": "tail1",
+      "b": "tail2",
+      "radiusA": 0.045,
+      "radiusB": 0.06,
+      "material": "hair"
+    },
+    {
+      "name": "tailHair",
+      "shape": "capsule",
+      "a": "tail2",
+      "b": "tail3",
+      "radiusA": 0.06,
+      "radiusB": 0.045,
+      "material": "hair"
+    },
+    {
+      "name": "earL",
+      "shape": "capsule",
+      "a": "earL1",
+      "b": "earL2",
+      "radiusA": 0.04,
+      "radiusB": 0.02,
+      "material": "coat",
+      "allowThin": true
+    },
+    {
+      "name": "earR",
+      "shape": "capsule",
+      "a": "earR1",
+      "b": "earR2",
+      "radiusA": 0.04,
+      "radiusB": 0.02,
+      "material": "coat",
+      "allowThin": true
+    },
+    {
+      "name": "upperLH",
+      "shape": "capsule",
+      "a": "hipLH",
+      "b": "stifleLH",
+      "radiusA": 0.11,
+      "radiusB": 0.07,
+      "material": "coat"
+    },
+    {
+      "name": "lowerLH",
+      "shape": "capsule",
+      "a": "stifleLH",
+      "b": "hockLH",
+      "radiusA": 0.07,
+      "radiusB": 0.05,
+      "material": "coat"
+    },
+    {
+      "name": "cannonLH",
+      "shape": "capsule",
+      "a": "hockLH",
+      "b": "fetlockLH",
+      "radiusA": 0.05,
+      "radiusB": 0.042,
+      "material": "hair"
+    },
+    {
+      "name": "hoofLH",
+      "shape": "capsule",
+      "a": "fetlockLH",
+      "b": "hoofLH",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "hoof"
+    },
+    {
+      "name": "upperLF",
+      "shape": "capsule",
+      "a": "shoulderLF",
+      "b": "elbowLF",
+      "radiusA": 0.09,
+      "radiusB": 0.06,
+      "material": "coat"
+    },
+    {
+      "name": "lowerLF",
+      "shape": "capsule",
+      "a": "elbowLF",
+      "b": "kneeLF",
+      "radiusA": 0.06,
+      "radiusB": 0.048,
+      "material": "coat"
+    },
+    {
+      "name": "cannonLF",
+      "shape": "capsule",
+      "a": "kneeLF",
+      "b": "fetlockLF",
+      "radiusA": 0.048,
+      "radiusB": 0.042,
+      "material": "hair"
+    },
+    {
+      "name": "hoofLF",
+      "shape": "capsule",
+      "a": "fetlockLF",
+      "b": "hoofLF",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "hoof"
+    },
+    {
+      "name": "upperRH",
+      "shape": "capsule",
+      "a": "hipRH",
+      "b": "stifleRH",
+      "radiusA": 0.11,
+      "radiusB": 0.07,
+      "material": "coat"
+    },
+    {
+      "name": "lowerRH",
+      "shape": "capsule",
+      "a": "stifleRH",
+      "b": "hockRH",
+      "radiusA": 0.07,
+      "radiusB": 0.05,
+      "material": "coat"
+    },
+    {
+      "name": "cannonRH",
+      "shape": "capsule",
+      "a": "hockRH",
+      "b": "fetlockRH",
+      "radiusA": 0.05,
+      "radiusB": 0.042,
+      "material": "hair"
+    },
+    {
+      "name": "hoofRH",
+      "shape": "capsule",
+      "a": "fetlockRH",
+      "b": "hoofRH",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "hoof"
+    },
+    {
+      "name": "upperRF",
+      "shape": "capsule",
+      "a": "shoulderRF",
+      "b": "elbowRF",
+      "radiusA": 0.09,
+      "radiusB": 0.06,
+      "material": "coat"
+    },
+    {
+      "name": "lowerRF",
+      "shape": "capsule",
+      "a": "elbowRF",
+      "b": "kneeRF",
+      "radiusA": 0.06,
+      "radiusB": 0.048,
+      "material": "coat"
+    },
+    {
+      "name": "cannonRF",
+      "shape": "capsule",
+      "a": "kneeRF",
+      "b": "fetlockRF",
+      "radiusA": 0.048,
+      "radiusB": 0.042,
+      "material": "hair"
+    },
+    {
+      "name": "hoofRF",
+      "shape": "capsule",
+      "a": "fetlockRF",
+      "b": "hoofRF",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "hoof"
+    }
+  ],
+  "decals": []
+}

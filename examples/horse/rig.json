@@ -1,0 +1,149 @@
+{
+  "template": "quadruped",
+  "pelvis": "pelvis",
+  "upperBody": [
+    "rump",
+    "chest",
+    "withers",
+    "neck",
+    "head",
+    "nose",
+    "mane1",
+    "mane2"
+  ],
+  "limbs": [
+    {
+      "kind": "leg",
+      "name": "legLH",
+      "side": "left",
+      "joints": [
+        "hipLH",
+        "stifleLH",
+        "hockLH",
+        "fetlockLH",
+        "hoofLH"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legLF",
+      "side": "left",
+      "joints": [
+        "shoulderLF",
+        "elbowLF",
+        "kneeLF",
+        "fetlockLF",
+        "hoofLF"
+      ],
+      "bend": [
+        "backward",
+        "forward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legRH",
+      "side": "right",
+      "joints": [
+        "hipRH",
+        "stifleRH",
+        "hockRH",
+        "fetlockRH",
+        "hoofRH"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legRF",
+      "side": "right",
+      "joints": [
+        "shoulderRF",
+        "elbowRF",
+        "kneeRF",
+        "fetlockRF",
+        "hoofRF"
+      ],
+      "bend": [
+        "backward",
+        "forward"
+      ]
+    },
+    {
+      "kind": "appendage",
+      "name": "tail",
+      "joints": [
+        "tail1",
+        "tail2",
+        "tail3"
+      ],
+      "stiffness": 0.35,
+      "damping": 0.3,
+      "oscillate": {
+        "axis": [
+          0.45,
+          1,
+          0
+        ],
+        "degrees": 22,
+        "period": 1.6,
+        "phase": 0
+      }
+    },
+    {
+      "kind": "appendage",
+      "name": "earL",
+      "joints": [
+        "earL1",
+        "earL2"
+      ],
+      "stiffness": 0.8,
+      "damping": 0.5,
+      "oscillate": {
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 6,
+        "period": 2.4,
+        "phase": 0
+      }
+    },
+    {
+      "kind": "appendage",
+      "name": "earR",
+      "joints": [
+        "earR1",
+        "earR2"
+      ],
+      "stiffness": 0.8,
+      "damping": 0.5,
+      "oscillate": {
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 6,
+        "period": 2.4,
+        "phase": 0.5
+      }
+    }
+  ],
+  "gait": {
+    "strideLength": 0.42,
+    "referenceSpeed": 0.4,
+    "stanceFraction": 0.75,
+    "stepHeight": 0.08,
+    "bobAmplitude": 0.01,
+    "footSpacing": 0.24
+  }
+}

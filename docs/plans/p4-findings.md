@@ -55,3 +55,14 @@ P4 passes on locomotion: a behaviour script compiles into planted, non-sliding, 
 change speed, pivot and stop correctly, and blind judges see the grip and the turn. P4 fails on pixel-art
 readability of the walk at 48px. Together with P1, this places the remaining risk in the visual layer, not in the
 motion.
+
+## Correction: packet assembly bug and strip rerun
+
+The judge packets that stacked or paired images used `-splice` with centre gravity, which inserted the 30 px spacer
+through the middle of each image instead of between them. Both sides of every pair were cut the same way, so no
+comparison was biased, but legibility suffered (this also affected the P2 difference strips and the P3 pairs, whose
+results were unanimous regardless). The P4 strip question was rerun with clean images and fresh judges
+(`docs/plans/p4-judge/round3/`): 3 of 6 correct, confidence 1-2, two judges saying the strips look nearly identical.
+So the honest result is that 8 small stills cannot show sliding feet at all, rather than a preference for the
+sliding control; the gate still fails (majority wrong on one order). The skins spike later showed the walk itself
+reads well once drawn with hand-made-looking sprites.

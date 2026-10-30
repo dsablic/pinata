@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { evaluate, summarize } from '../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize } from '../src/diagnostics/report.ts'
 import { partImage, sheet } from '../src/diagnostics/images.ts'
 import type { SheetCell } from '../src/diagnostics/images.ts'
 import type { GBuffer } from '../src/raster/gbuffer.ts'
@@ -18,6 +18,15 @@ test('summary lists every gate and the overall verdict', () => {
   const text = summarize('P1', evaluate([{ name: 'gaps', value: 0.5, op: '<=', threshold: 0, rationale: '' }]))
   assert.match(text, /FAIL {2}gaps: 0\.500 <= 0/)
   assert.match(text, /automated gates: FAIL$/)
+})
+
+test('a skipped gate is reported as skipped, not as a pass', () => {
+  const gate = { name: 'nondeterministicFrames', value: 0, op: '<=' as const, threshold: 0, rationale: '' }
+  const text = summarize('P1', evaluate([optionalGate(gate, false)]))
+  assert.match(text, /SKIP {2}nondeterministicFrames/)
+  assert.match(text, /automated gates: PASS \(1 skipped\)$/)
+  assert.doesNotMatch(text, /PASS {2}/)
+  assert.match(summarize('P1', evaluate([optionalGate(gate, true)])), /PASS {2}nondeterministicFrames/)
 })
 
 test('sheet upscales cells onto a background grid', () => {

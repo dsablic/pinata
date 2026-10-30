@@ -39,10 +39,15 @@ npm run p1          # P1: render the knight in 8 directions, evaluate gates, wri
 npm run p3          # P3: simulate cape and plume in three scenarios per material, write reports/p3/
 npm run p2          # P2, p4, p6 and skins likewise; see package.json
 npm run check -- examples/knight   # check a character package (see docs/authoring.md)
+npm run p1:verify   # same as p1 plus the determinism re-run; likewise p2:verify, p3:verify, p4:verify, p6:verify
 ```
 
 Each proof-of-concept runner exits 0 when all gates pass, 1 when a gate fails and 2 when the harness itself fails,
 and writes a `summary.txt`, `metrics.json` and still images to `reports/<poc>/`. P1 also writes `preview.html`.
+
+The determinism check (the `nondeterministicFrames` gate) re-renders everything in a child process and roughly
+doubles the run time, so it only runs with `--verify` (`npm run p1 -- --verify` or `npm run p1:verify`). Without it the
+gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a plain pass.
 
 ## Repository layout
 

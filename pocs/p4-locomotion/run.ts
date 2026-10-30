@@ -24,7 +24,7 @@ import { rasterize } from '../../src/raster/gbuffer.ts'
 import { stylize } from '../../src/style/stylize.ts'
 import { footprintTrace, legOnionSkin, pixelStrip } from '../../src/diagnostics/locomotion-images.ts'
 import { sheet } from '../../src/diagnostics/images.ts'
-import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { gate, SCENARIOS } from './gates.ts'
 
@@ -40,6 +40,7 @@ const CHILD_TIMEOUT_MS = 120000
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = join(here, '..', '..', 'reports', 'p4')
 const hashesMode = process.argv.includes('--hashes')
+const verify = process.argv.includes('--verify')
 
 if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
@@ -161,8 +162,12 @@ for (const [name, counts] of planted) {
   }
 }
 
-const other = childHashes()
-const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
+function mismatches (): number {
+  const other = childHashes()
+  return runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
+}
+
+const nondeterministic = verify ? mismatches() : 0
 const perScenario = Object.fromEntries(runs.map(run => [run.scenario.name, evaluateRun(run)]))
 const controlValues = evaluateRun(control)
 const controlResults = evaluate(Object.entries(controlValues).map(([name, value]) => {
@@ -178,7 +183,7 @@ const results = evaluate([
   })),
   gate('skatingControlFails', controlSlides ? 1 : 0),
   gate('skatingControlFair', controlFair ? 1 : 0),
-  gate('nondeterministicFrames', nondeterministic)
+  optionalGate(gate('nondeterministicFrames', nondeterministic), verify)
 ])
 const plantedLines = [...planted].map(([name, c]) => `planted frames ${name}: left ${c.left}, right ${c.right}`)
 const summary = [

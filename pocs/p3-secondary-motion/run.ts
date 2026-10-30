@@ -18,7 +18,7 @@ import { step } from '../../src/sim/solver.ts'
 import * as metrics from '../../src/sim/metrics.ts'
 import type { Recording, SwingOptions } from '../../src/sim/metrics.ts'
 import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../../src/diagnostics/motion-images.ts'
-import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { gate, MATERIALS } from './gates.ts'
 
@@ -38,6 +38,7 @@ const CHILD_TIMEOUT_MS = 120000
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = join(here, '..', '..', 'reports', 'p3')
 const hashesMode = process.argv.includes('--hashes')
+const verify = process.argv.includes('--verify')
 
 if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
@@ -272,8 +273,12 @@ function windDrift (material: string): number {
 }
 
 const penetrationLimit = PENETRATION_PX * (bodies.get('turn-stop') as Mannequin).height / PX_SCALE
-const other = childHashes()
-const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
+function mismatches (): number {
+  const other = childHashes()
+  return runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
+}
+
+const nondeterministic = verify ? mismatches() : 0
 
 const perMaterial = Object.fromEntries(MATERIALS.map(name => {
   const run = find('turn-stop', name)
@@ -310,7 +315,7 @@ const results = evaluate([
   ...MATERIALS.map(name => gate('windAlignment', perMaterial[name].wind, name)),
   ...MATERIALS.map(name => gate('windDriftMetres', perMaterial[name].windDriftMetres, name)),
   ...MATERIALS.map(name => gate('rigidControlFails', perMaterial[name].rigidControlFails, name)),
-  gate('nondeterministicFrames', nondeterministic)
+  optionalGate(gate('nondeterministicFrames', nondeterministic), verify)
 ])
 const summary = summarize('P3 secondary motion', results)
 

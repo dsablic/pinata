@@ -22,7 +22,7 @@ import { encodePng } from '../../src/png/encode.ts'
 import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
 import { sheet } from '../../src/diagnostics/images.ts'
 import type { SheetCell } from '../../src/diagnostics/images.ts'
-import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { flickerFraction } from '../../src/diagnostics/stability.ts'
 import { MIN_PIXELS_FOR_THIN } from '../p1-static-style/gates.ts'
 import { render, turntable } from '../p2-pixel-stability/sequences.ts'
@@ -55,6 +55,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const outDir = join(root, 'reports', 'p6')
 const hashesMode = process.argv.includes('--hashes')
+const verify = process.argv.includes('--verify')
 
 if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
@@ -193,8 +194,12 @@ function childHashes (): Map<string, string> {
   return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
 }
 
-const other = childHashes()
-const nondeterministic = hashLines().filter(([id, hash]) => other.get(id) !== hash).length
+function mismatches (): number {
+  const other = childHashes()
+  return hashLines().filter(([id, hash]) => other.get(id) !== hash).length
+}
+
+const nondeterministic = verify ? mismatches() : 0
 
 function staticValues (cell: Cell): Record<string, number> {
   const { mannequin } = cell.character
@@ -242,7 +247,7 @@ const results = evaluate([
       ...SIZES.map(size => gate('flickerFraction', v[`flicker${size}`], `${c.key}.turntable-${size}`))
     ]
   }),
-  gate('nondeterministicFrames', nondeterministic)
+  optionalGate(gate('nondeterministicFrames', nondeterministic), verify)
 ])
 
 const motionFrames = characters.map(c => `${c.name} ${cells.find(x => x.character === c)?.motion.length} frames`)

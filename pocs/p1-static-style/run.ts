@@ -17,7 +17,7 @@ import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
 import { depthImage, normalImage, partImage, sheet } from '../../src/diagnostics/images.ts'
-import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { gate, MIN_PIXELS_FOR_THIN } from './gates.ts'
 import { pngHeight, planAb } from './ab.ts'
 import type { AbPlan } from './ab.ts'
@@ -47,6 +47,7 @@ const root = join(here, '..', '..')
 const outDir = join(root, 'reports', 'p1')
 const refsDir = join(root, 'refs', 'p1')
 const hashesMode = process.argv.includes('--hashes')
+const verify = process.argv.includes('--verify')
 
 if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
@@ -157,15 +158,19 @@ function childHashes (): Map<string, string> {
   return hashes
 }
 
-const other = childHashes()
-const nondeterministic = frames.filter(f => other.get(f.id) !== imageHash(f.image)).length
+function mismatches (): number {
+  const other = childHashes()
+  return frames.filter(f => other.get(f.id) !== imageHash(f.image)).length
+}
+
+const nondeterministic = verify ? mismatches() : 0
 
 const results = evaluate([
   gate('outlineGaps', Math.max(...frameMetrics.map(m => m.outlineGaps))),
   gate('maxThinFraction', Math.max(...frameMetrics.map(m => m.maxThinFraction))),
   gate('paletteSize', paletteSize(frames.map(f => f.image))),
   gate('maxStrayPixels', Math.max(...frameMetrics.map(m => m.strayPixels))),
-  gate('nondeterministicFrames', nondeterministic)
+  optionalGate(gate('nondeterministicFrames', nondeterministic), verify)
 ])
 const summary = summarize('P1 static style', results)
 

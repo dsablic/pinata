@@ -17,7 +17,7 @@ import { createRootTrack, scriptDuration } from '../../src/motion/script.ts'
 import { imageHash } from '../../src/image.ts'
 import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
-import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { flickerFraction, partAreaJump } from '../../src/diagnostics/stability.ts'
 import { differenceStrip } from '../../src/diagnostics/stability-images.ts'
 import { FLICKER_LIMIT, gate } from './gates.ts'
@@ -37,6 +37,7 @@ const CHILD_TIMEOUT_MS = 300000
 const here = dirname(fileURLToPath(import.meta.url))
 const outDir = join(here, '..', '..', 'reports', 'p2')
 const hashesMode = process.argv.includes('--hashes')
+const verify = process.argv.includes('--verify')
 
 if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
@@ -123,8 +124,12 @@ function childHashes (): Map<string, string> {
   return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
 }
 
-const other = childHashes()
-const nondeterministic = hashes().filter(([id, hash]) => other.get(id) !== hash).length
+function mismatches (): number {
+  const other = childHashes()
+  return hashes().filter(([id, hash]) => other.get(id) !== hash).length
+}
+
+const nondeterministic = verify ? mismatches() : 0
 
 const values = new Map(sequences.map(s => [s.label, {
   flickerFraction: flickerFraction(s.rendered.images),
@@ -143,7 +148,7 @@ const results = evaluate([
     return gate('outlineGaps', valueOf(s.label).outlineGaps, s.label)
   }),
   gate('controlFails', controlsFailing),
-  gate('nondeterministicFrames', nondeterministic)
+  optionalGate(gate('nondeterministicFrames', nondeterministic), verify)
 ])
 
 const reported = sequences.filter(s => s.label.startsWith('walk') || s.label.startsWith('control')).flatMap(s => {

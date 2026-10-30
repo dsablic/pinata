@@ -1,0 +1,5 @@
+[
+  { "name": "silk", "particleMass": 0.01, "stretchCompliance": 1e-6, "bendCompliance": 1e-3, "damping": 0.3, "drag": 0.02 },
+  { "name": "wool", "particleMass": 0.02, "stretchCompliance": 1e-7, "bendCompliance": 1e-4, "damping": 2.4, "drag": 0.015 },
+  { "name": "leather", "particleMass": 0.04, "stretchCompliance": 1e-8, "bendCompliance": 1e-5, "damping": 5.0, "drag": 0.01 }
+]

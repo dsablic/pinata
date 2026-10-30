@@ -11,6 +11,25 @@
   "lanes": {
     "spacing": 0.45
   },
+  "dress": {
+    "knight": {
+      "cape": { "material": "cloth-red", "radius": 0.05 },
+      "chains": {
+        "0": { "material": "cloth-red", "radius": 0.03 }
+      },
+      "hide": ["capeL", "capeR", "plume"]
+    },
+    "dwarf": {
+      "cape": { "material": "fur", "radius": 0.05 },
+      "hide": ["cloakBack"]
+    },
+    "rogue": {
+      "chains": {
+        "0": { "material": "scarf", "radius": 0.025 }
+      },
+      "hide": ["scarfTail"]
+    }
+  },
   "life": {
     "lean": {
       "frequency": 2.2,

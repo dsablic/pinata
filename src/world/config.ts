@@ -15,6 +15,8 @@ export type Step =
 export type Activity = { weight: number, steps: Step[] }
 
 export type Palette = { top: string, side: string, edge: string, sky: string }
+export type Look = { material: string, radius: number }
+export type Dress = { cape?: Look, chains?: Record<string, Look>, hide?: string[] }
 
 /** Everything about a world that is tuning rather than mechanism; see site/world.json. */
 export type WorldConfig = {
@@ -31,6 +33,11 @@ export type WorldConfig = {
     treadOfFoot: number
   }
   lanes: { spacing: number }
+  /**
+   * How to draw cast members' simulated cloth in the world, by name: the cape's and each chain's (by index) material
+   * and radius, and the fixed parts of the mannequin the cloth replaces.
+   */
+  dress: Record<string, Dress>
   /**
    * Life in the upper body: a damped spring leans it (degrees per m/s^2 of forward acceleration, degrees per rad/s of
    * turning, at most max), breathing raises the chest, and a slow sway shifts the weight while standing.
@@ -86,6 +93,19 @@ const STEP: Schema = {
   }
 }
 const STEPS: Schema = { kind: 'array', of: STEP, minItems: 1 }
+const CLOTH_LOOK: Schema = {
+  kind: 'object',
+  fields: { material: { kind: 'string', note: 'a material of the character\'s style' }, radius: positive(1, 'metres') }
+}
+const DRESS: Schema = {
+  kind: 'object',
+  fields: {
+    cape: CLOTH_LOOK,
+    chains: { kind: 'map', of: CLOTH_LOOK, note: 'by chain index' },
+    hide: { kind: 'array', of: { kind: 'string' }, note: 'mannequin parts the cloth replaces' }
+  },
+  optional: ['cape', 'chains', 'hide']
+}
 
 export const WORLD_SCHEMA: Schema = {
   kind: 'object',
@@ -103,6 +123,7 @@ export const WORLD_SCHEMA: Schema = {
       }
     },
     lanes: { kind: 'object', fields: { spacing: { kind: 'number', min: 0.1, max: 3 } } },
+    dress: { kind: 'map', of: DRESS },
     life: {
       kind: 'object',
       fields: {

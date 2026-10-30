@@ -7,7 +7,8 @@ import { isRecord } from '../formats/validate.ts'
 import type { ValidationError } from '../formats/validate.ts'
 import type { Look } from './render.ts'
 import { validateWorldConfig } from './config.ts'
-import type { WorldConfig } from './config.ts'
+import type { Dress, WorldConfig } from './config.ts'
+import type { Scenario } from '../formats/sim.ts'
 import type { CastMember } from './world.ts'
 
 /** A world in one file for the browser: its config and every cast member's mannequin, style and rig as written. */
@@ -40,11 +41,26 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     if (mannequin.value === undefined || style.value === undefined || rig.value === undefined) return
     const resolved = resolveRig(rig.value, mannequin.value)
     errors.push(...checkRig(resolved, mannequin.value).map(e => at('rig', e)))
-    const cloth = readCloth(member, mannequin.value, Object.keys(style.value.materials), errors, at)
-    const dressed = cloth === undefined ? {} : { cloth }
-    cast.push({ name: member.name, mannequin: mannequin.value, rig: resolved, ...dressed })
+    const read = readCloth(member, mannequin.value, Object.keys(style.value.materials), errors, at)
+    const dress = config.value?.dress[member.name]
+    const cloth = read === undefined || dress === undefined
+      ? read
+      : { ...read, scenario: dressed(read.scenario, dress) }
+    if (cloth !== undefined) {
+      const known = Object.keys(style.value.materials)
+      const wrong = checkRenderMaterials(cloth.scenario, known)
+      errors.push(...wrong.map(e => ({ ...e, path: `config.dress.${member.name}` })))
+    }
+    const hidden = new Set(dress?.hide ?? [])
+    const missing = [...hidden].filter(name => !mannequin.value!.parts.some(part => part.name === name))
+    for (const name of missing) {
+      errors.push({ path: `config.dress.${member.name}.hide`, message: `'${name}' is not a part of ${member.name}` })
+    }
+    const look = { ...mannequin.value, parts: mannequin.value.parts.filter(part => !hidden.has(part.name)) }
+    const clothed = cloth === undefined ? {} : { cloth }
+    cast.push({ name: member.name, mannequin: look, rig: resolved, ...clothed })
     const drape = cloth === undefined ? {} : { cloth: cloth.scenario }
-    looks.push({ mannequin: mannequin.value, style: style.value, ...drape })
+    looks.push({ mannequin: look, style: style.value, ...drape })
   })
   if (errors.length > 0 || config.value === undefined) return { errors }
   return { value: { config: config.value, cast, looks }, errors }
@@ -76,4 +92,18 @@ function readCloth (
   ]
   errors.push(...cross.map(e => at('motion', e)))
   return cross.length > 0 ? undefined : { scenario: scenario.value, materials: materials.value }
+}
+
+/** The scenario with the world's dress: how its cape and chains are drawn. */
+function dressed (scenario: Scenario, dress: Dress): Scenario {
+  return {
+    ...scenario,
+    ...(scenario.cape === undefined || dress.cape === undefined
+      ? {}
+      : { cape: { ...scenario.cape, render: dress.cape } }),
+    chains: scenario.chains.map((chain, i) => {
+      const render = dress.chains?.[String(i)]
+      return render === undefined ? chain : { ...chain, render }
+    })
+  }
 }

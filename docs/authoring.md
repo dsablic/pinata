@@ -224,6 +224,7 @@ antennae, wings), which move rigidly with the body, and the gait.
 | `limbs` | array | Every leg, arm and appendage (see Limbs). At least one leg; as many left as right legs. |
 | `pelvis` | joint name | The root joint; the body bobs with it. |
 | `upperBody` | array of joint names | Joints that move rigidly with the pelvis: chest, head, decal anchors, cape and chain anchors. |
+| `attached` | object, optional | Joints that move rigidly with another joint, as `{ "joint": "parent joint" }`: a badge on a forearm, a feather on a leg, a decal anchor on a tail tip. The parent can be any joint, including another attached joint; chains must end at the pelvis. |
 | `gait` | object | Walk parameters. |
 
 `limbs`, `pelvis`, `upperBody` and `gait` are required. Start a new package with
@@ -235,10 +236,15 @@ it is translated to `limbs`. A rig uses one format or the other, not both. The o
 only, with `bend` `"forward"` or `"backward"`: for appendages, longer legs, bend arrays, `"up"` or `limits`, write
 `limbs`.
 
-**Rig coverage.** Every joint in the mannequin must appear in exactly one place among: `pelvis`, `upperBody`, a
-limb's `joints`, an arm's `carried`. A joint listed twice, a joint that does not exist, or a joint that is listed
-nowhere is an error. Decal anchors, cape anchors and chain anchors are joints too, so list them in `upperBody` (or
-`carried`).
+**Rig coverage.** Every joint in the mannequin must appear in exactly one place among: `pelvis`, `upperBody`,
+`attached`, a limb's `joints`, an arm's `carried`. A joint listed twice, a joint that does not exist, or a joint that
+is listed nowhere is an error. Decal anchors, cape anchors and chain anchors are joints too, so list them in
+`upperBody`, `attached` or `carried`. Together these form a hierarchy: every joint has a parent (the pelvis for
+`upperBody` and for the first joint of legs and arms, the previous joint along a limb, the last arm joint for
+`carried`, the named joint for `attached` and for an appendage's `parent`), and a joint that nothing else moves
+follows its parent's position and rotation. Cloth and chains pinned to a joint turn with it too. Cape anchors must
+still move with the body as one piece: `upperBody`, or attached joints whose parents lead to the pelvis through
+`upperBody` only.
 
 ### Limbs
 
@@ -265,15 +271,16 @@ knee, ankle, toe) uses exact two-bone IK; a longer leg (say hip, stifle, hock, f
 **Arms** swing about their first joint, in counter-phase to the nearest leg on the same side, by
 `gait.armSwingDegrees`. `carried` lists joints that move rigidly with the arm, such as the tip of a held sword.
 
-**Appendages** hang off the body and swing with its motion. Each segment is a rigid bone pulled by a damped spring
-toward its rest direction relative to its parent segment (the first segment's parent is the body), so the tail lags
-when the body speeds up, turns or bobs, and settles back. There is no gravity: the rest pose is the shape it returns
-to.
+**Appendages** hang off the body, or off any joint (see `parent`), and swing with its motion. Each segment is a rigid
+bone pulled by a damped spring toward its rest direction relative to its parent segment (the first segment's parent
+is the joint the appendage hangs from), so a tail lags when the body speeds up, turns or bobs, and settles back. There
+is no gravity: the rest pose is the shape it returns to.
 
 | Appendage field | Range | Meaning |
 |---|---|---|
 | `stiffness` | 0 to 1, default 0.6 | How hard it springs back: natural frequency 0.3 Hz at 0 up to 3 Hz just below 1; exactly 1 is rigid. |
 | `damping` | 0 to 1, default 0.4 | Damping ratio: 0 swings on, 1 settles without overshoot. |
+| `parent` | joint name, default the pelvis | The joint the appendage hangs from: it moves and turns with that joint (a tassel on a hand, a plume on a helmet joint, a tail on the last joint of another appendage). |
 | `oscillate` | `{ "axis": [x, y, z], "degrees": number, "period": seconds, "phase": 0..1 }` | Optional rhythmic swing of the first segment about `axis` (body space; `[0, 1, 0]` wags side to side), `degrees` (0 to 180) either way, one full swing every `period` seconds (required when `degrees` > 0). The rest of the chain follows. |
 
 A soft appendage on a very fast spin (a half turn in a fraction of a second) trails nearly 180 degrees behind and

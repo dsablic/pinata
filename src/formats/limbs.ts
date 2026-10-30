@@ -21,6 +21,7 @@ export type AppendageLimb = {
   name: string
   joints: string[]
   side?: Side
+  parent?: string
   stiffness: number
   damping: number
   oscillate?: Oscillator
@@ -76,7 +77,7 @@ const LIMIT_RANGE = 180
 const LIMB_FIELDS: Record<LimbKind, readonly string[]> = {
   leg: ['name', 'kind', 'joints', 'side', 'phase', 'bend', 'limits'],
   arm: ['name', 'kind', 'joints', 'side', 'carried'],
-  appendage: ['name', 'kind', 'joints', 'side', 'stiffness', 'damping', 'oscillate']
+  appendage: ['name', 'kind', 'joints', 'side', 'parent', 'stiffness', 'damping', 'oscillate']
 }
 const JOINT_NOTE: Record<LimbKind, string> = {
   leg: 'from the hip to the toe',
@@ -330,6 +331,9 @@ function validateLimits (limits: unknown, here: string, errors: ValidationError[
 }
 
 function validateAppendage (limb: Record<string, unknown>, here: string, errors: ValidationError[]): void {
+  if (limb.parent !== undefined && !isNonEmptyString(limb.parent)) {
+    errors.push({ path: `${here}.parent`, message: 'expected the name of the joint the appendage hangs from' })
+  }
   for (const field of ['stiffness', 'damping'] as const) {
     const v = limb[field]
     if (v === undefined) continue

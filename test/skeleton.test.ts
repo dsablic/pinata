@@ -1,0 +1,141 @@
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { checkRig, validateRig } from '../src/formats/rig.ts'
+import type { AppendageLimb, Rig } from '../src/formats/rig.ts'
+import type { Mannequin } from '../src/formats/mannequin.ts'
+import { planGait } from '../src/motion/gait.ts'
+import type { GaitFrame } from '../src/motion/gait.ts'
+import { poseAt } from '../src/motion/locomotion.ts'
+import { restPose } from '../src/motion/pose.ts'
+import type { Scenario, SimMaterial } from '../src/formats/sim.ts'
+import { simulateCharacter } from '../src/motion/character.ts'
+import { poseSequence } from '../src/motion/sequence.ts'
+import { toWorld } from '../src/sim/body.ts'
+import { hierarchyOrder, parentsOf } from '../src/motion/skeleton.ts'
+import { apply } from '../src/math/matrix.ts'
+import { add, length, sub } from '../src/math/vec.ts'
+import type { Vec3 } from '../src/math/vec.ts'
+import { assertClose } from './helpers.ts'
+import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
+
+const FPS = 24
+
+/** The biped fixture with a tassel hanging from the left hand and a badge attached to the left forearm. */
+const tasselled: Mannequin = {
+  ...mannequin,
+  joints: {
+    ...mannequin.joints,
+    tassel1: add(mannequin.joints.handL, [0, -0.02, 0]),
+    tassel2: add(mannequin.joints.handL, [0, -0.12, -0.02]),
+    badge: add(mannequin.joints.wristL, [0.03, 0, 0])
+  }
+}
+const tassel: AppendageLimb = {
+  kind: 'appendage', name: 'tassel', joints: ['tassel1', 'tassel2'], parent: 'handL', stiffness: 1, damping: 0.4
+}
+const armed: Rig = { ...rig, limbs: [...rig.limbs, tassel], attached: { badge: 'wristL' } }
+const rest = restPose(tasselled)
+
+function walk (r: Rig): GaitFrame[] {
+  return planGait({ track: walkTrack(1.2, 4), rig: r, rest, mannequin: tasselled, duration: 2, fps: FPS })
+}
+
+test('parents follow the rig: upperBody and limb roots under the pelvis, chains in order, attached and carried', () => {
+  const parents = parentsOf(armed)
+  assert.equal(parents.pelvis, undefined)
+  assert.equal(parents.chest, 'pelvis')
+  assert.equal(parents.kneeL, 'hipL')
+  assert.equal(parents.hipL, 'pelvis')
+  assert.equal(parents.tassel1, 'handL')
+  assert.equal(parents.tassel2, 'tassel1')
+  assert.equal(parents.badge, 'wristL')
+  const order = hierarchyOrder(parents)
+  assert.ok(order.indexOf('handL') < order.indexOf('tassel1'))
+  assert.throws(() => hierarchyOrder({ a: 'b', b: 'a' }), /cycle: a -> b -> a/)
+})
+
+test('the pelvis group is placed exactly as rest plus the pelvis offset', () => {
+  for (const frame of walk(rig).slice(0, 30)) {
+    const { pose, transforms } = poseAt({ frame, rig, rest, mannequin: tasselled })
+    for (const name of [rig.pelvis, ...rig.upperBody]) {
+      assert.deepEqual(pose[name], add(rest[name], frame.pelvisOffset))
+      assert.equal(transforms[name].rotation, undefined)
+    }
+  }
+})
+
+test('an attached joint moves rigidly with a swinging forearm', () => {
+  for (const frame of walk(armed).slice(10, 40)) {
+    const { pose } = poseAt({ frame, rig: armed, rest, mannequin: tasselled })
+    const before = sub(rest.badge, rest.wristL)
+    const after = sub(pose.badge, pose.wristL)
+    assertClose(length(after), length(before), 1e-12)
+    const elbow = sub(rest.elbowL, rest.wristL)
+    const posedElbow = sub(pose.elbowL, pose.wristL)
+    const dot = (a: Vec3, b: Vec3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+    assertClose(dot(after, posedElbow), dot(before, elbow), 1e-12)
+  }
+})
+
+test('a rigid appendage hanging from a hand turns with the arm swing', () => {
+  const frames = walk(armed)
+  const { poses, transforms } = poseSequence(frames, { rig: armed, rest, mannequin: tasselled, fps: FPS })
+  let swung = 0
+  poses.forEach((pose, f) => {
+    const rotation = transforms[f].handL.rotation
+    assert.ok(rotation !== undefined)
+    const expected = add(pose.tassel1, apply(rotation, sub(rest.tassel2, rest.tassel1)))
+    for (let k = 0; k < 3; k++) assertClose(pose.tassel2[k], expected[k], 1e-9)
+    swung = Math.max(swung, length(sub(sub(pose.tassel2, pose.tassel1), sub(rest.tassel2, rest.tassel1))))
+  })
+  assert.ok(swung > 0.01, `largest swing of the tassel: ${swung}`)
+})
+
+test('validation rejects unknown, self and cyclic attachments and an appendage hanging from itself', () => {
+  const input = (extra: Record<string, unknown>): unknown => {
+    const limbs = [...rig.limbs, { ...tassel, ...extra }]
+    return { limbs, pelvis: rig.pelvis, upperBody: rig.upperBody, gait: rig.gait, attached: { badge: 'wristL' } }
+  }
+  const ok = validateRig(input({}))
+  assert.deepEqual(ok.errors, [])
+  assert.deepEqual(checkRig(ok.value!, tasselled), [])
+  const own = validateRig(input({ parent: 'tassel2' })).value!
+  assert.match(checkRig(own, tasselled).map(e => e.message).join(), /one of this appendage's own joints/)
+  const unknown = { ...ok.value!, attached: { badge: 'elbowX' } }
+  const unknownErrors = checkRig(unknown, tasselled).map(e => `${e.path}: ${e.message}`).join()
+  assert.match(unknownErrors, /attached.badge: unknown joint 'elbowX'/)
+  const looped = { ...ok.value!, attached: { badge: 'tassel2' }, limbs: [...rig.limbs, { ...tassel, parent: 'badge' }] }
+  assert.match(checkRig(looped, tasselled).map(e => e.message).join(), /cycle/)
+  const numeric = validateRig({ ...(input({}) as object), attached: { badge: 3 } })
+  assert.match(numeric.errors[0].message, /mapping joint names/)
+})
+
+test('a cloth chain pinned to a swinging hand turns with it', () => {
+  const scenario: Scenario = {
+    name: 'walk',
+    body: 'unused.json',
+    bodyExcludeParts: [],
+    script: { accelSeconds: 0.3, segments: [{ action: 'move', speed: 1.2, duration: 1.5 }] },
+    chains: [{ anchor: 'handL', links: 3, linkLength: 0.05, direction: [0, -1, 0], material: 'silk' }],
+    gravity: [0, -9.81, 0],
+    fps: FPS,
+    substeps: 4,
+    particleRadius: 0.02,
+    durationSeconds: 1.5
+  }
+  const silk: SimMaterial = {
+    name: 'silk', particleMass: 0.01, stretchCompliance: 1e-6, bendCompliance: 1e-3, damping: 0.3, drag: 0.02
+  }
+  const run = simulateCharacter({ mannequin: tasselled, rig: armed, scenario, materials: [silk] })
+  const step: Vec3 = [0, -0.05, 0]
+  let turned = 0
+  run.recording.frames.forEach((recorded, f) => {
+    if (f === 0) return
+    const rotation = run.transforms[f].handL.rotation!
+    const local = add(run.poses[f].handL, apply(rotation, step))
+    const world = toWorld(local, recorded.root)
+    for (let k = 0; k < 3; k++) assertClose(recorded.positions[3 + k], world[k], 1e-9)
+    turned = Math.max(turned, length(sub(apply(rotation, step), step)))
+  })
+  assert.ok(turned > 0.005, `largest turn of the pinned link: ${turned} m`)
+})

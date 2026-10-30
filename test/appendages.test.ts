@@ -38,7 +38,9 @@ function frames (seconds: number, position: (t: number) => Vec3, yaw: (t: number
 
 function animate (rig: Rig, gait: GaitFrame[], from: Pose = rest): Pose[] {
   const poses = gait.map(() => ({ ...from }))
-  return animateAppendages(gait, poses, { rig, rest: from, fps: FPS, substeps: SUBSTEPS })
+  const transforms = gait.map(() => ({ pelvis: { translation: [0, 0, 0] as Vec3 } }))
+  animateAppendages({ frames: gait, poses, transforms }, { rig, rest: from, fps: FPS, substeps: SUBSTEPS })
+  return poses
 }
 
 function angleBetween (a: Vec3, b: Vec3): number {
@@ -104,9 +106,11 @@ test('the oscillator swings the first segment by degrees at the period and the r
 
 test('a rig without appendages returns the poses untouched', () => {
   const poses = [{ ...rest }]
-  assert.equal(animateAppendages(frames(0, () => [0, 0, 0]), poses, {
+  const before = structuredClone(poses)
+  animateAppendages({ frames: frames(0, () => [0, 0, 0]), poses, transforms: [{}] }, {
     rig: { ...hexRig, limbs: [] }, rest, fps: FPS, substeps: SUBSTEPS
-  }), poses)
+  })
+  assert.deepEqual(poses, before)
 })
 
 test('a rigid drooping tail wagged about the vertical turns as one piece', () => {

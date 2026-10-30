@@ -5,11 +5,10 @@ import type { Bend, Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
-import { animateAppendages, DEFAULT_APPENDAGE_SUBSTEPS } from './appendages.ts'
 import type { GaitFrame } from './gait.ts'
 import { kneeBendsBackward, kneeFlexionDegrees, MAX_FLEXION_DEGREES } from './ik.ts'
 import { verticalExtent } from './extent.ts'
-import { poseAt } from './locomotion.ts'
+import { poseSequence } from './sequence.ts'
 import { bendingJoints, footRadii, legLabels, restPose } from './pose.ts'
 import type { JointTriple } from './pose.ts'
 import type { Pose } from './pose.ts'
@@ -41,14 +40,12 @@ export function recordLocomotion (
 ): LocomotionRecording {
   const { rig, rest, mannequin, fps } = options
   const labels = legLabels(rig, rest)
-  const posed = frames.map(frame => poseAt({ frame, rig, rest, mannequin }))
-  const substeps = options.substeps ?? DEFAULT_APPENDAGE_SUBSTEPS
-  const poses = animateAppendages(frames, posed.map(p => p.pose), { rig, rest, fps, substeps })
+  const { poses, clamped: clamps } = poseSequence(frames, options)
   return {
     fps,
     frames: frames.map((frame, i) => {
       const pose = poses[i]
-      const { clamped } = posed[i]
+      const clamped = clamps[i]
       const joints: Pose = {}
       for (const [name, local] of Object.entries(pose)) joints[name] = toWorld(local, frame.root)
       const planted = Object.fromEntries(labels.map((label, k) => [label, frame.feet[k]?.planted ?? false]))

@@ -1,12 +1,16 @@
 import type { Mannequin } from '../formats/mannequin.ts'
 import { armsOf, legsOf } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
-import { add, sub } from '../math/vec.ts'
+import { add, normalize, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
+import { between } from '../math/matrix.ts'
+import type { Matrix } from '../math/matrix.ts'
 import type { FootState, GaitFrame } from './gait.ts'
 import { chainIk, MAX_FLEXION_DEGREES } from './ik.ts'
 import { nearestLegs } from './pose.ts'
 import type { Pose } from './pose.ts'
+import { hierarchyOrder, inherit, parentsOf, transformTo } from './skeleton.ts'
+import type { Transform, Transforms } from './skeleton.ts'
 
 type PoseOptions = { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequin }
 
@@ -36,6 +40,27 @@ function rotateX (v: Vec3, angle: number): Vec3 {
   return [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]
 }
 
+function xRotation (angle: number): Matrix {
+  const c = Math.cos(angle)
+  const s = Math.sin(angle)
+  return [[1, 0, 0], [0, c, -s], [0, s, c]]
+}
+
+/**
+ * Transforms of a posed leg: each joint turns with the bone that leaves it (the toe with the foot), by the smallest
+ * rotation from its rest direction.
+ */
+function legTransforms (leg: Leg, rest: Pose, pose: Pose): Transforms {
+  const { joints } = leg
+  const transforms: Transforms = {}
+  joints.forEach((joint, i) => {
+    const [from, to] = i < joints.length - 1 ? [joint, joints[i + 1]] : [joints[i - 1], joint]
+    const rotation = between(normalize(sub(rest[to], rest[from])), normalize(sub(pose[to], pose[from])))
+    transforms[joint] = transformTo(rotation, rest[joint], pose[joint])
+  })
+  return transforms
+}
+
 function pitchUp (v: Vec3, angle: number): Vec3 {
   return rotateX(v, -angle)
 }
@@ -57,30 +82,45 @@ function placeLeg (leg: Leg, options: PoseOptions, foot: FootState): { placed: P
   return { placed, clamped: result.clamped || result.missed > MISS_TOLERANCE }
 }
 
-export function poseAt (options: PoseOptions): { pose: Pose, clamped: number } {
+export type Posed = { pose: Pose, transforms: Transforms, clamped: number }
+
+/**
+ * Body-local positions and transforms of every joint the rig names for one gait frame. The pelvis and upperBody move
+ * with the pelvis offset, legs by IK to their planned feet, arms swing about the shoulder with their carried joints;
+ * every other joint (attached joints, and appendages until their springs run) moves rigidly with its parent.
+ */
+export function poseAt (options: PoseOptions): Posed {
   const { frame, rig, rest } = options
   const pose: Pose = {}
+  const transforms: Transforms = {}
+  const body: Transform = { translation: frame.pelvisOffset }
   const shift = (name: string): Vec3 => add(rest[name], frame.pelvisOffset)
-  for (const name of [rig.pelvis, ...rig.upperBody]) pose[name] = shift(name)
+  for (const name of [rig.pelvis, ...rig.upperBody]) {
+    pose[name] = shift(name)
+    transforms[name] = body
+  }
   let clamped = 0
   for (const [index, leg] of legsOf(rig).entries()) {
     const foot = frame.feet[index]
     if (foot === undefined) throw new Error(`gait frame has no foot for leg ${index}`)
     const { placed, clamped: bound } = placeLeg(leg, options, foot)
     Object.assign(pose, placed)
+    Object.assign(transforms, legTransforms(leg, rest, pose))
     if (bound) clamped++
   }
   const followed = nearestLegs(rig, rest)
   for (const [index, arm] of armsOf(rig).entries()) {
     const shoulder = shift(arm.shoulder)
     const angle = frame.armSwings[followed[index]] * Math.PI / 180
+    const rotation = xRotation(angle)
     pose[arm.shoulder] = shoulder
+    transforms[arm.shoulder] = transformTo(rotation, rest[arm.shoulder], shoulder)
     for (const name of [...arm.joints.slice(1), ...(arm.carried ?? [])]) {
       pose[name] = add(shoulder, rotateX(sub(rest[name], rest[arm.shoulder]), angle))
+      transforms[name] = transforms[arm.shoulder]
     }
   }
-  for (const limb of rig.limbs) {
-    if (limb.kind === 'appendage') for (const name of limb.joints) pose[name] = shift(name)
-  }
-  return { pose, clamped }
+  const parents = parentsOf(rig)
+  inherit(pose, transforms, { rest, parents, order: hierarchyOrder(parents), driven: new Set(Object.keys(pose)) })
+  return { pose, transforms, clamped }
 }

@@ -6,6 +6,7 @@ import type { Bend, Leg, Limb, Side } from './limbs.ts'
 import { applyGaitDefaults, applyLegDefaults, isTemplateName, TEMPLATE_NAMES } from './templates.ts'
 import type { TemplateName } from './templates.ts'
 import { checkKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './validate.ts'
+import { hierarchyOrder, parentsOf } from '../motion/skeleton.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type { Arm, ArmLimb, AppendageLimb, Bend, Leg, LegLimb, Limb, Limits, Oscillator, Side } from './limbs.ts'
@@ -31,10 +32,12 @@ export type Rig = {
   legacy?: LegacyRef[]
   pelvis: string
   upperBody: string[]
+  /** Joints that move rigidly with another joint, by name: { joint: parent }. */
+  attached?: Record<string, string>
   gait: Gait
 }
 
-const RIG_FIELDS = ['template', 'legs', 'arms', 'limbs', 'pelvis', 'upperBody', 'gait'] as const
+const RIG_FIELDS = ['template', 'legs', 'arms', 'limbs', 'pelvis', 'upperBody', 'attached', 'gait'] as const
 const LEG_JOINTS = ['hip', 'knee', 'ankle', 'toe'] as const
 const ARM_JOINTS = ['shoulder', 'elbow', 'wrist', 'hand'] as const
 const LEG_FIELDS = ['side', ...LEG_JOINTS, 'phase', 'bend'] as const
@@ -91,11 +94,13 @@ export function validateRig (input: unknown): Validated<Rig> {
     errors.push({ path: 'upperBody', message: 'expected an array of joint names that move rigidly with the pelvis' })
   }
   validateGait(input.gait, named, errors)
+  validateAttached(input.attached, errors)
   if (errors.length > 0) return { errors }
   const gait = structuredClone(input.gait) as Gait
   if (template !== undefined) applyGaitDefaults(template, gait)
   const upperBody = structuredClone(input.upperBody as string[])
   const rig: Rig = { limbs, pelvis: input.pelvis as string, upperBody, gait }
+  if (input.attached !== undefined) rig.attached = structuredClone(input.attached as Record<string, string>)
   if (legacy !== undefined) rig.legacy = legacy
   if (template !== undefined) rig.template = template
   return { value: rig, errors }
@@ -110,6 +115,16 @@ export function resolveRig (rig: Rig, mannequin: Pick<Mannequin, 'joints'>): Rig
   const limbs = structuredClone(rig.limbs)
   applyLegDefaults(rig.template, limbs, leg => mannequin.joints[leg.joints[0]]?.[2] ?? 0)
   return withLimbs(rig, limbs)
+}
+
+function validateAttached (value: unknown, errors: ValidationError[]): void {
+  if (value === undefined) return
+  if (!isRecord(value) || !Object.values(value).every(isNonEmptyString)) {
+    errors.push({
+      path: 'attached',
+      message: 'expected an object mapping joint names to the joint each moves rigidly with, like { "visor": "head" }'
+    })
+  }
 }
 
 function validateTemplate (value: unknown, errors: ValidationError[]): TemplateName | undefined {
@@ -254,6 +269,8 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
   })
   use(rig.pelvis, 'pelvis')
   rig.upperBody.forEach((joint, i) => { use(joint, `upperBody[${i}]`) })
+  for (const joint of Object.keys(rig.attached ?? {})) use(joint, `attached.${joint}`)
+  checkParents(rig, known, errors)
   checkBones(rig, mannequin, errors)
   errors.push(...checkLegs(rig))
   const missing = known.filter(joint => !used.has(joint))
@@ -265,6 +282,30 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     })
   }
   return errors
+}
+
+function checkParents (rig: Rig, known: string[], errors: ValidationError[]): void {
+  const unknown = (joint: string): string => `unknown joint '${joint}'; known joints: ${known.join(', ')}`
+  for (const [joint, parent] of Object.entries(rig.attached ?? {})) {
+    if (!known.includes(parent)) errors.push({ path: `attached.${joint}`, message: unknown(parent) })
+    else if (parent === joint) errors.push({ path: `attached.${joint}`, message: 'a joint cannot move with itself' })
+  }
+  rig.limbs.forEach((limb, i) => {
+    if (limb.kind !== 'appendage' || limb.parent === undefined) return
+    const path = `${limbPath(rig, i)}.parent`
+    if (!known.includes(limb.parent)) errors.push({ path, message: unknown(limb.parent) })
+    else if (limb.joints.includes(limb.parent)) {
+      const message = `'${limb.parent}' is one of this appendage's own joints; name the joint it hangs from`
+      errors.push({ path, message })
+    }
+  })
+  if (errors.length > 0) return
+  try {
+    hierarchyOrder(parentsOf(rig))
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    errors.push({ path: 'attached', message: `${message}; every chain of attached joints must end at the pelvis` })
+  }
 }
 
 function checkLegs (rig: Rig): ValidationError[] {
@@ -322,8 +363,13 @@ function checkBones (rig: Rig, mannequin: Mannequin, errors: ValidationError[]):
   })
 }
 
-function groupOf (rig: Rig, joint: string): string {
+function groupOf (rig: Rig, joint: string, seen: ReadonlySet<string> = new Set()): string {
   if (rig.pelvis === joint || rig.upperBody.includes(joint)) return 'rigid'
+  const parent = rig.attached?.[joint]
+  if (parent !== undefined) {
+    const rigid = !seen.has(parent) && groupOf(rig, parent, new Set([...seen, joint])) === 'rigid'
+    return rigid ? 'rigid' : 'attached to a joint that moves on its own'
+  }
   const limb = rig.limbs.find(l => l.joints.includes(joint) || (l.kind === 'arm' && l.carried?.includes(joint)))
   if (limb === undefined) return 'unlisted'
   return { leg: 'a leg joint', arm: 'an arm joint', appendage: 'an appendage joint' }[limb.kind]

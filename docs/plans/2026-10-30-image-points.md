@@ -5,8 +5,10 @@ springs, oscillators, behaviours) and the image follows by a 2D mesh warp, re-pi
 depends on named body parts: a point is a point, and what moves it is configuration. Templates (biped, quadruped,
 hexapod, octopod) stay as starting points: a preset set of points and drivers that the author refines.
 
-**Status:** draft for review (decisions from the user on 2026-10-30: 2D mesh warp; points placed by the author, with a
-helper that can propose them; one shared motion core with the 3D mannequin and the image warp as two renderers).
+**Status:** approved by the user on 2026-10-30, batch A first, then the runtime spike (P8) on top of it (decisions: 2D
+mesh warp; points placed by the author, with a helper that can propose them; one shared motion core with the 3D
+mannequin and the image warp as two renderers). P2's `partAreaJump` stays a recorded fail; area change is measured
+properly by this plan's `areaChange` gate instead.
 
 **Constraint:** existing packages keep working, and every existing output stays byte-identical (P1, P3, P4, P6 and
 `check` on every example), as in the general limbs work.
@@ -157,3 +159,20 @@ ordinary `points.json` the author edits. `check` validates any points file the s
 - Turning: one image per direction from the author, or generated directions (AI-drawn, as in the skins spike)?
 - Where the point model and the composable behaviours spec should merge (masks, evaluation order) is decided in batch
   A, before the runtime spike (P8) builds on either.
+
+## Decisions during batch A
+
+- Transforms: every joint's pose is `rotation · rest + translation` in body-local space, with an absent rotation for
+  the identity, computed as `rest + translation` exactly. Drivers keep their existing formulas for the joints they
+  own (pelvis group, IK legs, swinging arms with carried joints, appendage springs) and report a transform for each;
+  only joints no driver owns are placed from their parent's transform. That keeps every existing output
+  byte-identical without reproducing old float operations through the hierarchy.
+- Leg joints turn with the bone that leaves them (the toe with the foot), by the smallest rotation from rest: no
+  twist. Good enough for attachments; a twist source can come with behaviours.
+- Format, kept small until batch B's `points.json`: a rig field `attached` (`{ joint: parent }`) for joints that ride
+  rigidly on any joint, and an appendage field `parent`. The hierarchy (`parentsOf`) is derived from the rig;
+  cycles are load errors. Legs and arms still hang from the pelvis.
+- Appendages run parents first over the whole sequence; the parent joint's rotation is interpolated between frames
+  about a single axis, and the joints attached below are placed again after each appendage.
+- Cloth and chain pins turn with their joint's rotation. Cape anchors must still be rigid with the body (upperBody,
+  or attached joints whose parents lead to the pelvis through upperBody).

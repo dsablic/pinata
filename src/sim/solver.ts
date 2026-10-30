@@ -3,6 +3,8 @@ import type { Wind } from '../formats/sim.ts'
 import { normalize } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import type { Pose } from '../motion/pose.ts'
+import type { Transforms } from '../motion/skeleton.ts'
+import { apply } from '../math/matrix.ts'
 import type { RootState } from '../motion/script.ts'
 import { bodyCollider, partsCollider, posedParts, toWorld } from './body.ts'
 import type { System } from './cloth.ts'
@@ -15,6 +17,7 @@ export type StepOptions = {
   exclude: string[]
   track: (t: number) => RootState
   pose?: (t: number) => Pose
+  transforms?: (t: number) => Transforms
   t: number
   dt: number
 }
@@ -31,7 +34,8 @@ export function windAt (wind: Wind | undefined, t: number): Vec3 {
  * Advances the system by one substep of length dt. `t` is the simulation time at the end of the substep: the pinned
  * particles move to the root pose at `t` and the wind is sampled there. The caller loops substeps. With `pose`, the
  * collider and pins use that body-local pose instead of the rest mannequin; it must return the same object for every
- * `t` within a frame so the collider is compiled once per frame.
+ * `t` within a frame so the collider is compiled once per frame. With `transforms`, a pin's offset also turns with
+ * its joint's rotation.
  */
 export function step (system: System, options: StepOptions): void {
   const { env, dt } = options
@@ -39,9 +43,12 @@ export function step (system: System, options: StepOptions): void {
   const { position, previous, inverseMass, materialIndex, count } = system.particles
   const pose = options.pose?.(options.t)
   const joints = pose ?? options.body.joints
+  const transforms = options.transforms?.(options.t)
   for (const pin of system.pins) {
     const joint = joints[pin.joint]
-    const world = toWorld([joint[0] + pin.offset[0], joint[1] + pin.offset[1], joint[2] + pin.offset[2]], root)
+    const rotation = transforms?.[pin.joint]?.rotation
+    const offset = rotation === undefined ? pin.offset : apply(rotation, pin.offset)
+    const world = toWorld([joint[0] + offset[0], joint[1] + offset[1], joint[2] + offset[2]], root)
     position.set(world, 3 * pin.particle)
     previous.set(world, 3 * pin.particle)
   }

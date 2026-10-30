@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { planGait } from '../src/motion/gait.ts'
-import { footSlidePx, groundPenetrationPx, plantedFrames, recordLocomotion } from '../src/motion/metrics.ts'
+import {
+  footSlidePx, groundPenetrationPx, plantedFrames, reachViolations, recordLocomotion, unsupportedFrames
+} from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
 import { planSkating } from '../src/motion/skating.ts'
 import { assertClose } from './helpers.ts'
@@ -36,7 +38,7 @@ test('the skating control lifts a foot only while it moves forward relative to t
   const frames = planSkating(options)
   frames.forEach(frame => {
     for (const foot of frame.feet) {
-      const phase = frame.phase + (foot.side === 'left' ? 0 : 0.5)
+      const phase = frame.phase + (foot.side === 'left' ? 0 : 0.5) + 0.25
       assertClose(foot.lift, Math.max(0, Math.cos(2 * Math.PI * phase)), 1e-12)
     }
   })
@@ -55,4 +57,6 @@ test('the skating control slides more than 1 px per frame on a steady walk, ours
   assert.ok(plantedFrames(control, geometry).left > 0)
   assert.ok(footSlidePx(ours, geometry, SCALE) < 0.25)
   assert.ok(groundPenetrationPx(control, geometry, SCALE) < 0.5)
+  assert.equal(reachViolations(control), 0)
+  assert.equal(unsupportedFrames(control, geometry), 0)
 })

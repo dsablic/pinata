@@ -348,6 +348,12 @@ Each chain: `anchor` (joint name, listed in the rig), `links` (integer 1 to 64),
 `materials.json`). Total length is `links * linkLength`. The first two particles are pinned to the anchor joint, so the
 first link always points along `direction` relative to the body, however the chain is meant to hang.
 
+A chain or the cape may carry an optional `render` object, `{ "material": "pink", "radius": 0.016 }`: `material` is a
+key of `materials` in `style.json` and `radius` is the thickness in metres. The pixel renderer then draws that strand as
+thin capsules, one per link (for the cape, one per grid edge), in a single colour of that ramp; without `render` the
+strand is simulated but not drawn. Rendered strands are not collision parts and are not checked by the static gates.
+The library function `clothParts` in `src/sim/render.ts` turns a recorded frame into those parts.
+
 ### wind
 
 `{ "direction": [x, y, z] (non-zero), "speed": m/s >= 0, "gust": number in [0, 1] }`. `gust` is a fraction of `speed`.

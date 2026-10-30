@@ -16,6 +16,8 @@ export type SimMaterial = {
   drag: number
 }
 
+export type Render = { material: string, radius: number }
+
 export type Cape = {
   anchorLeft: string
   anchorRight: string
@@ -23,9 +25,17 @@ export type Cape = {
   rows: number
   length: number
   material: string
+  render?: Render
 }
 
-export type Chain = { anchor: string, links: number, linkLength: number, direction: Vec3, material: string }
+export type Chain = {
+  anchor: string
+  links: number
+  linkLength: number
+  direction: Vec3
+  material: string
+  render?: Render
+}
 
 export type Wind = { direction: Vec3, speed: number, gust: number }
 
@@ -55,8 +65,9 @@ const SEGMENT_FIELDS = {
   turn: ['action', 'degrees', 'duration'],
   hold: ['action', 'duration']
 } as const
-const CAPE_FIELDS = ['anchorLeft', 'anchorRight', 'columns', 'rows', 'length', 'material'] as const
-const CHAIN_FIELDS = ['anchor', 'links', 'linkLength', 'direction', 'material'] as const
+const CAPE_FIELDS = ['anchorLeft', 'anchorRight', 'columns', 'rows', 'length', 'material', 'render'] as const
+const CHAIN_FIELDS = ['anchor', 'links', 'linkLength', 'direction', 'material', 'render'] as const
+const RENDER_FIELDS = ['material', 'radius'] as const
 const WIND_FIELDS = ['direction', 'speed', 'gust'] as const
 
 function isNonNegative (v: unknown): v is number {
@@ -212,6 +223,7 @@ function validateCape (cape: unknown, errors: ValidationError[]): void {
   expect(isIntegerBetween(cape.rows, 2, 64), 'cape.rows', 'expected an integer from 2 to 64', errors)
   expect(isPositive(cape.length), 'cape.length', 'expected a positive length in metres', errors)
   validateMaterialName(cape, 'cape', errors)
+  validateRender(cape.render, 'cape.render', errors)
 }
 
 function validateChain (chain: unknown, path: string, errors: ValidationError[]): void {
@@ -225,6 +237,18 @@ function validateChain (chain: unknown, path: string, errors: ValidationError[])
   expect(isPositive(chain.linkLength), `${path}.linkLength`, 'expected a positive length in metres', errors)
   expect(isDirection(chain.direction), `${path}.direction`, 'expected a non-zero [x, y, z]', errors)
   validateMaterialName(chain, path, errors)
+  validateRender(chain.render, `${path}.render`, errors)
+}
+
+function validateRender (render: unknown, path: string, errors: ValidationError[]): void {
+  if (render === undefined) return
+  if (!isRecord(render)) {
+    errors.push({ path, message: 'expected an object { material, radius }' })
+    return
+  }
+  checkKnownKeys(render, RENDER_FIELDS, path, errors)
+  expect(isNonEmptyString(render.material), `${path}.material`, 'expected a style material name', errors)
+  expect(isPositive(render.radius), `${path}.radius`, 'expected a positive radius in metres', errors)
 }
 
 function validateWind (wind: unknown, errors: ValidationError[]): void {
@@ -282,4 +306,16 @@ function checkCapeWidth (cape: Cape, mannequin: Mannequin, errors: ValidationErr
     const message = `joints '${cape.anchorLeft}' and '${cape.anchorRight}' coincide, so the cape has no width`
     errors.push({ path, message })
   }
+}
+
+export function checkRenderMaterials (scenario: Scenario, known: string[]): ValidationError[] {
+  const errors: ValidationError[] = []
+  const check = (render: Render | undefined, path: string): void => {
+    if (render === undefined || known.includes(render.material)) return
+    const message = `unknown style material '${render.material}'; known materials: ${known.join(', ')}`
+    errors.push({ path: `${path}.material`, message })
+  }
+  check(scenario.cape?.render, 'cape.render')
+  scenario.chains.forEach((chain, i) => { check(chain.render, `chains[${i}].render`) })
+  return errors
 }

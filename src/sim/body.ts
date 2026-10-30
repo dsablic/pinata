@@ -20,6 +20,15 @@ export function toWorld (local: Vec3, root: RootState): Vec3 {
   ]
 }
 
+export function toLocal (p: Vec3, root: RootState): Vec3 {
+  const c = Math.cos(root.yaw)
+  const s = Math.sin(root.yaw)
+  const x = p[0] - root.position[0]
+  const y = p[1] - root.position[1]
+  const z = p[2] - root.position[2]
+  return [x * c - z * s, y, x * s + z * c]
+}
+
 export function anchorWorld (m: Mannequin, joint: string, root: RootState): Vec3 {
   return toWorld(m.joints[joint], root)
 }
@@ -59,15 +68,9 @@ export function bodyCollider (m: Mannequin, exclude: string[], root: RootState):
 export function partsCollider (parts: Primitive[], root: RootState): Collider {
   const c = Math.cos(root.yaw)
   const s = Math.sin(root.yaw)
-  const toLocal = (p: Vec3): Vec3 => {
-    const x = p[0] - root.position[0]
-    const y = p[1] - root.position[1]
-    const z = p[2] - root.position[2]
-    return [x * c - z * s, y, x * s + z * c]
-  }
-  const distance = (p: Vec3): number => localDistance(parts, toLocal(p))
+  const distance = (p: Vec3): number => localDistance(parts, toLocal(p, root))
   const normal = (p: Vec3): Vec3 => {
-    const [x, y, z] = toLocal(p)
+    const [x, y, z] = toLocal(p, root)
     const h = NORMAL_STEP
     const gx = localDistance(parts, [x + h, y, z]) - localDistance(parts, [x - h, y, z])
     const gy = localDistance(parts, [x, y + h, z]) - localDistance(parts, [x, y - h, z])

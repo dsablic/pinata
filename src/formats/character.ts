@@ -3,7 +3,7 @@ import { isAbsolute, join } from 'node:path'
 import { verticalExtent } from '../motion/extent.ts'
 import { steadySegments } from '../motion/metrics.ts'
 import { restPose, soleHeight } from '../motion/pose.ts'
-import { checkScenario, validateScenario, validateSimMaterials } from './sim.ts'
+import { checkRenderMaterials, checkScenario, validateScenario, validateSimMaterials } from './sim.ts'
 import type { Scenario, SimMaterial } from './sim.ts'
 import { checkReferences } from './references.ts'
 import { validateMannequin } from './mannequin.ts'
@@ -166,7 +166,9 @@ function crossChecks (parts: Omit<Character, 'name' | 'description' | 'dir' | 'f
     ]),
     ...tag(files.rig, [...checkRig(rig, mannequin), ...feet]),
     ...tag(files.motion, [
-      ...fromExclude(checkScenario(scenario, mannequin, materials)), ...capeErrors, ...checkWalk(scenario)
+      ...fromExclude(checkScenario(scenario, mannequin, materials)), 
+      ...checkRenderMaterials(scenario, Object.keys(style.materials)),
+      ...capeErrors, ...checkWalk(scenario)
     ])
   ]
 }

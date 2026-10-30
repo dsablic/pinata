@@ -62,8 +62,6 @@ before building.
       outline pixels (knight, spider).
 - [ ] Quadruped gait tuning for short legs (knee speed) and turning (the dragon only passed at 0.1 m/s, no turn).
 - [ ] P2 gate `partAreaJump` counts occlusion as instability; redefine on unoccluded footprints in a future version.
-- [ ] `bobAmplitude` is hidden when the planner lowers the pelvis for reach: the unicorn drops 3.2 cm, so any bob
-      below that has no effect. Either add bob on top of the drop or say so in the guide and the hints.
 - [ ] Remaining renderer speedups that keep pixels: PNG compression and sheet assembly.
 
 ## Logo

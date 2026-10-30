@@ -334,7 +334,7 @@ stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm 
 | `referenceSpeed` | above 0, at most 20 | m/s at which stride equals `strideLength`. Use the speed in the walk script. |
 | `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. Two legs: start at 0.55, keep below 0.7; four legs: 0.75; many legs: 0.6 or more. A lower value lowers knee speed. Optional with a template. |
 | `stepHeight` | 0 to 2 | Metres of swing-foot lift. Must clearly exceed 0.02. Start at about 0.15 x leg length. A higher value raises knee speed. |
-| `bobAmplitude` | 0 to 1 | Metres of pelvis bob. 0.015 to 0.025 typical. |
+| `bobAmplitude` | 0 to 1 | Metres of pelvis bob. 0.015 to 0.025 typical. The walk lowers the pelvis when a leg would otherwise be overstretched, and a bob smaller than that drop does not show: legs nearly straight at rest (short legs especially) hide the bob. Bend the knees more at rest to get it back. |
 | `armSwingDegrees` | 0 to 90 | Arm swing, against the nearest leg on the same side, so left and right arms swing opposite ways. Optional with a template. |
 | `footSpacing` | 0 to 2 | Metres between left and right foot plants. Use the distance between the hip joints. Unused by legs that plant at rest (`lateral`). |
 | `lateral` | `"spacing"` or `"rest"`, optional | Where feet land: under the hip at `footSpacing` / 2 from the centre line (default), or at each ankle's rest position relative to the body (default for the hexapod and octopod templates). |

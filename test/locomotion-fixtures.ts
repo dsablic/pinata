@@ -26,7 +26,10 @@ export const mannequin: Mannequin = {
     wristR: [-0.27, 0.9, 0.05],
     handR: [-0.27, 0.82, 0.06]
   },
-  parts: [],
+  parts: [
+    { name: 'footL', shape: 'capsule', a: 'ankleL', b: 'toeL', radiusA: 0.1, radiusB: 0.05, material: 'm' },
+    { name: 'footR', shape: 'capsule', a: 'ankleR', b: 'toeR', radiusA: 0.1, radiusB: 0.05, material: 'm' }
+  ],
   decals: []
 }
 

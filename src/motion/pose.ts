@@ -1,3 +1,4 @@
+import type { Leg } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Vec3 } from '../math/vec.ts'
 
@@ -9,4 +10,14 @@ export function restPose (m: Mannequin): Pose {
 
 export function posedMannequin (m: Mannequin, pose: Pose): Mannequin {
   return { ...m, joints: structuredClone(pose) }
+}
+
+export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number {
+  const foot = mannequin.parts.find(part => {
+    return part.shape === 'capsule' && part.a === leg.ankle && part.b === leg.toe
+  })
+  if (foot === undefined || foot.shape !== 'capsule') {
+    throw new Error(`no capsule part spans ankle '${leg.ankle}' and toe '${leg.toe}'`)
+  }
+  return Math.min(rest[leg.ankle][1] - foot.radiusA, rest[leg.toe][1] - foot.radiusB)
 }

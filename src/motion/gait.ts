@@ -1,8 +1,10 @@
 import { stride } from '../formats/rig.ts'
+import type { Mannequin } from '../formats/mannequin.ts'
 import type { Rig } from '../formats/rig.ts'
 import { toWorld } from '../sim/body.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
+import { soleHeight } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState } from './script.ts'
 
@@ -15,9 +17,16 @@ export type GaitFrame = {
   phase: number
 }
 
-type Options = { track: (t: number) => RootState, rig: Rig, rest: Pose, duration: number, fps: number }
+type Options = {
+  track: (t: number) => RootState
+  rig: Rig
+  rest: Pose
+  mannequin: Mannequin
+  duration: number
+  fps: number
+}
 type Plant = { phase: number, ankle: Vec3, yaw: number }
-type Foot = { side: 'left' | 'right', sign: number, restAnkle: Vec3, restHip: Vec3, reach: number, plants: Plant[] }
+type Foot = { side: 'left' | 'right', sign: number, planted: Vec3, restHip: Vec3, reach: number, plants: Plant[] }
 
 const TURN_CYCLES_PER_RADIAN = 2 / Math.PI
 const REST_EPSILON = 1e-9
@@ -84,22 +93,23 @@ function timeAtPhase (phase: number[], fps: number, target: number): number {
 }
 
 function buildFeet (options: Options, phase: number[]): Foot[] {
-  const { track, rig, rest, fps } = options
+  const { track, rig, rest, mannequin, fps } = options
   const { gait } = rig
   const start = track(0)
   const feet = rig.legs.map((leg): Foot => {
     const restAnkle = rest[leg.ankle]
+    const planted: Vec3 = [restAnkle[0], restAnkle[1] - soleHeight(leg, rest, mannequin), restAnkle[2]]
     const upper = length(sub(rest[leg.knee], rest[leg.hip]))
     const lower = length(sub(rest[leg.ankle], rest[leg.knee]))
     const initial: Plant = {
       phase: leg.side === 'left' ? 0 : -0.5,
-      ankle: toWorld(restAnkle, start),
+      ankle: toWorld(planted, start),
       yaw: start.yaw
     }
     return {
       side: leg.side,
       sign: restAnkle[0] >= 0 ? 1 : -1,
-      restAnkle,
+      planted,
       restHip: rest[leg.hip],
       reach: upper + lower,
       plants: [initial]
@@ -126,7 +136,7 @@ function buildFeet (options: Options, phase: number[]): Foot[] {
       const offset = foot.sign * gait.footSpacing / 2
       ankle = [
         middle.position[0] + side[0] * offset,
-        middle.position[1] + foot.restAnkle[1],
+        middle.position[1] + foot.planted[1],
         middle.position[2] + side[2] * offset
       ]
       yaw = middle.yaw

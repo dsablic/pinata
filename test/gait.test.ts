@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import type { Mannequin } from '../src/formats/mannequin.ts'
 import { stride } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { planGait } from '../src/motion/gait.ts'
@@ -14,7 +15,7 @@ import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
 const FPS = 24
 
 function plan (track: (t: number) => RootState, duration: number, gaitRig: Rig = rig): GaitFrame[] {
-  return planGait({ track, rig: gaitRig, rest: restPose(mannequin), duration, fps: FPS })
+  return planGait({ track, rig: gaitRig, rest: restPose(mannequin), mannequin, duration, fps: FPS })
 }
 
 type Landing = { frame: number, side: string, ankle: Vec3 }
@@ -154,4 +155,22 @@ test('planning is deterministic', () => {
   const a = plan(walkTrack(1.2, 3), 5)
   const b = plan(walkTrack(1.2, 3), 5)
   assert.equal(JSON.stringify(a), JSON.stringify(b))
+})
+
+test('planted feet put the lowest sole point on the ground', () => {
+  const thick: Mannequin = {
+    ...mannequin,
+    parts: mannequin.parts.map(part => (part.shape === 'capsule' ? { ...part, radiusA: 0.12 } : part))
+  }
+  const track = walkTrack(1, 3)
+  const frames = planGait({ track, rig, rest: restPose(mannequin), mannequin: thick, duration: 5, fps: FPS })
+  let planted = 0
+  for (const frame of frames) {
+    for (const foot of frame.feet) {
+      if (!foot.planted) continue
+      planted++
+      assertClose(foot.ankle[1], 0.12, 1e-9)
+    }
+  }
+  assert.ok(planted > 100)
 })

@@ -13,7 +13,7 @@ import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
 const rest = restPose(mannequin)
 
 function frames (speed: number, walkSeconds: number, duration: number) {
-  return planGait({ track: walkTrack(speed, walkSeconds), rig, rest, duration, fps: 24 })
+  return planGait({ track: walkTrack(speed, walkSeconds), rig, rest, mannequin, duration, fps: 24 })
 }
 
 function distance (pose: Record<string, Vec3>, a: string, b: string): number {

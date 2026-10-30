@@ -68,7 +68,8 @@ export function buildCape (cape: Cape, m: Mannequin, material: SimMaterial): Sys
   constrain(constraints, points, stretch, material.stretchCompliance)
   constrain(constraints, points, shear, material.stretchCompliance)
   constrain(constraints, points, bend, material.bendCompliance)
-  // Every pin references anchorLeft: offsets are body-local, so one joint is enough while the body is rigid.
+  // Every pin references anchorLeft: offsets are body-local, so one joint is enough because checkCapeAnchors
+  // requires both anchors to move rigidly together.
   const pins: Pin[] = []
   for (let i = 0; i < columns; i++) {
     pins.push({ particle: index(i, 0), joint: cape.anchorLeft, offset: sub(points[index(i, 0)], left) })

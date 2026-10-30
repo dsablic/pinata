@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRig, stride, validateRig } from '../src/formats/rig.ts'
+import { checkCapeAnchors, checkRig, stride, validateRig } from '../src/formats/rig.ts'
 import { validateMannequin } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
 
@@ -177,4 +177,31 @@ test('checkRig puts each carried joint in exactly one group', () => {
   assert.deepEqual(errors.map(e => e.path), ['arms[0].carried[1]', 'upperBody[0]'])
   assert.match(errors[0].message, /unknown joint 'ghost'/)
   assert.match(errors[1].message, /already used by arms\[0\]\.carried\[0\]/)
+})
+
+test('checkRig rejects limb bones of zero length', () => {
+  const m = mannequin()
+  m.joints.wrL = [...m.joints.elL]
+  m.joints.toeR = [...m.joints.ankleR]
+  const errors = checkRig(validateRig(rig()).value!, m)
+  assert.deepEqual(errors.map(e => e.path), ['legs[1]', 'arms[0]'])
+  assert.match(errors[0].message, /'ankleR' and 'toeR' are at the same position/)
+  assert.match(errors[1].message, /'elL' and 'wrL' are at the same position/)
+})
+
+test('checkCapeAnchors accepts pelvis and upperBody joints', () => {
+  const input = rig()
+  input.upperBody.push('capeL')
+  const cape = { anchorLeft: 'capeL', anchorRight: 'pelvis' }
+  assert.deepEqual(checkCapeAnchors(cape, validateRig(input).value!), [])
+})
+
+test('checkCapeAnchors names an anchor that does not move rigidly with the body', () => {
+  const input = rig()
+  const errors = checkCapeAnchors({ anchorLeft: 'chest', anchorRight: 'shL' }, validateRig(input).value!)
+  assert.deepEqual(errors.map(e => e.path), ['cape.anchorRight'])
+  assert.match(errors[0].message, /'shL' is an arm joint.*pelvis or upperBody/)
+  const leg = checkCapeAnchors({ anchorLeft: 'hipL', anchorRight: 'nowhere' }, validateRig(input).value!)
+  assert.deepEqual(leg.map(e => e.path), ['cape.anchorLeft'])
+  assert.match(leg[0].message, /a leg joint/)
 })

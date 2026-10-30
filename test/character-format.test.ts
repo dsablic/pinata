@@ -100,3 +100,27 @@ test('steadySegments skips the acceleration time and moves that overlap a turn',
   })
   assert.deepEqual(windows, [{ start: 0.5, end: 2, speed: 1.2 }, { start: 3.5, end: 4.5, speed: 1.2 }])
 })
+
+test('a missing manifest is reported once', () => {
+  const dir = variant(d => { rmSync(join(d, 'character.json')) })
+  const lines = formatCharacterErrors(loadCharacter(dir).errors).split('\n')
+  assert.deepEqual(lines, ['character.json: (root): file not found'])
+  rmSync(dir, { recursive: true })
+})
+
+test('a height far from the span of the parts is an error with both numbers', () => {
+  const dir = variant(d => { patch(d, 'mannequin.json', j => { j.height = 1.5 }) })
+  const lines = formatCharacterErrors(loadCharacter(dir).errors).split('\n')
+  assert.equal(lines.length, 1, lines.join('\n'))
+  assert.match(lines[0], /^mannequin\.json: height: 1\.5 m differs from the parts, which span 1\.\d+ m from the lowest/)
+  patch(dir, 'mannequin.json', j => { j.height = 1.25 })
+  assert.deepEqual(loadCharacter(dir).errors, [])
+  rmSync(dir, { recursive: true })
+})
+
+test('cape anchors outside the pelvis and upperBody are an error in motion.json', () => {
+  const dir = variant(d => { patch(d, 'motion.json', j => { j.cape.anchorRight = 'wristR' }) })
+  const lines = formatCharacterErrors(loadCharacter(dir).errors).split('\n')
+  assert.ok(lines.some(l => l.startsWith("motion.json: cape.anchorRight: 'wristR' is an arm joint")), lines.join('\n'))
+  rmSync(dir, { recursive: true })
+})

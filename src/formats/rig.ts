@@ -1,4 +1,6 @@
+import { length, sub } from '../math/vec.ts'
 import type { Mannequin } from './mannequin.ts'
+import type { Cape } from './sim.ts'
 import { checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
@@ -139,6 +141,7 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
   })
   use(rig.pelvis, 'pelvis')
   rig.upperBody.forEach((joint, i) => { use(joint, `upperBody[${i}]`) })
+  checkBones(rig, mannequin, errors)
   const sides = rig.legs.map(l => l.side).sort().join(',')
   if (sides !== 'left,right') {
     errors.push({ path: 'legs', message: `expected one left and one right leg; found ${sides}` })
@@ -149,6 +152,52 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
       path: 'upperBody',
       message: `joints not moved by any group would stay at rest: ${missing.map(j => `'${j}'`).join(', ')}; ` +
         'add them to upperBody, legs, arms or pelvis'
+    })
+  }
+  return errors
+}
+
+const BONES: Record<'legs' | 'arms', Array<readonly [string, string]>> = {
+  legs: [['hip', 'knee'], ['knee', 'ankle'], ['ankle', 'toe']],
+  arms: [['shoulder', 'elbow'], ['elbow', 'wrist']]
+}
+const MIN_BONE_LENGTH = 1e-6
+
+function checkBones (rig: Rig, mannequin: Mannequin, errors: ValidationError[]): void {
+  for (const group of ['legs', 'arms'] as const) {
+    rig[group].forEach((limb: Record<string, unknown>, i) => {
+      for (const [from, to] of BONES[group]) {
+        const a = mannequin.joints[limb[from] as string]
+        const b = mannequin.joints[limb[to] as string]
+        if (a === undefined || b === undefined || length(sub(a, b)) >= MIN_BONE_LENGTH) continue
+        errors.push({
+          path: `${group}[${i}]`,
+          message: `joints '${limb[from]}' and '${limb[to]}' are at the same position, which gives a zero-length ` +
+            'bone; move them apart in the mannequin'
+        })
+      }
+    })
+  }
+}
+
+function groupOf (rig: Rig, joint: string): string {
+  if (rig.pelvis === joint || rig.upperBody.includes(joint)) return 'rigid'
+  if (rig.legs.some(leg => LEG_JOINTS.some(f => leg[f] === joint))) return 'a leg joint'
+  const arm = rig.arms.find(a => ARM_JOINTS.some(f => a[f] === joint) || a.carried?.includes(joint))
+  return arm === undefined ? 'unlisted' : 'an arm joint'
+}
+
+export function checkCapeAnchors (cape: Pick<Cape, 'anchorLeft' | 'anchorRight'>, rig: Rig): ValidationError[] {
+  const errors: ValidationError[] = []
+  for (const field of ['anchorLeft', 'anchorRight'] as const) {
+    const joint = cape[field]
+    const group = groupOf(rig, joint)
+    if (group === 'rigid' || group === 'unlisted') continue
+    errors.push({
+      path: `cape.${field}`,
+      message: `'${joint}' is ${group}, which moves on its own; both cape ` +
+        'anchors must be pelvis or upperBody joints, which move together rigidly (the cloth is pinned to the body ' +
+        'as one piece)'
     })
   }
   return errors

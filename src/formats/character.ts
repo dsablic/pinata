@@ -1,12 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
+import { verticalExtent } from '../motion/extent.ts'
 import { steadySegments } from '../motion/metrics.ts'
+import { restPose, soleHeight } from '../motion/pose.ts'
 import { checkScenario, validateScenario, validateSimMaterials } from './sim.ts'
 import type { Scenario, SimMaterial } from './sim.ts'
 import { checkReferences } from './references.ts'
 import { validateMannequin } from './mannequin.ts'
 import type { Mannequin } from './mannequin.ts'
-import { checkRig, validateRig } from './rig.ts'
+import { checkCapeAnchors, checkRig, validateRig } from './rig.ts'
 import type { Rig } from './rig.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
@@ -133,6 +135,20 @@ function checkFeet (rig: Rig, mannequin: Mannequin): Errors {
   return errors
 }
 
+const HEIGHT_TOLERANCE = 0.1
+
+function checkHeight (rig: Rig, mannequin: Mannequin): Errors {
+  const rest = restPose(mannequin)
+  const lowest = Math.min(...rig.legs.map(leg => soleHeight(leg, rest, mannequin)))
+  const top = Math.max(...mannequin.parts.map(part => verticalExtent(part, rest).high))
+  const span = top - lowest
+  if (Math.abs(mannequin.height - span) <= HEIGHT_TOLERANCE * span) return []
+  const message = `${mannequin.height} m differs from the parts, which span ${span.toFixed(3)} m from the lowest ` +
+    `sole point (y = ${lowest.toFixed(3)}) to the top of the highest part (y = ${top.toFixed(3)}); set height to ` +
+    'about that span, since height scales the figure to pixels'
+  return [{ path: 'height', message }]
+}
+
 function checkWalk (scenario: Scenario): Errors {
   if (steadySegments(scenario.script).some(s => s.speed > 0)) return []
   const message = "no steady walking window: add a 'move' segment with speed above 0 that lasts longer than " +
@@ -142,10 +158,16 @@ function checkWalk (scenario: Scenario): Errors {
 
 function crossChecks (parts: Omit<Character, 'name' | 'description' | 'dir' | 'files'>, files: CharacterFiles): Errors {
   const { mannequin, style, rig, materials, scenario } = parts
+  const feet = checkFeet(rig, mannequin)
+  const capeErrors = scenario.cape === undefined ? [] : checkCapeAnchors(scenario.cape, rig)
   return [
-    ...tag(files.mannequin, checkReferences(mannequin, style)),
-    ...tag(files.rig, [...checkRig(rig, mannequin), ...checkFeet(rig, mannequin)]),
-    ...tag(files.motion, [...fromExclude(checkScenario(scenario, mannequin, materials)), ...checkWalk(scenario)])
+    ...tag(files.mannequin, [
+      ...checkReferences(mannequin, style), ...(feet.length === 0 ? checkHeight(rig, mannequin) : [])
+    ]),
+    ...tag(files.rig, [...checkRig(rig, mannequin), ...feet]),
+    ...tag(files.motion, [
+      ...fromExclude(checkScenario(scenario, mannequin, materials)), ...capeErrors, ...checkWalk(scenario)
+    ])
   ]
 }
 
@@ -156,7 +178,9 @@ function crossChecks (parts: Omit<Character, 'name' | 'description' | 'dir' | 'f
  */
 export function loadCharacter (dir: string): Validated<Character> {
   const errors: Errors = []
-  const manifest = validateManifest(readJson(dir, MANIFEST_FILE, errors), errors)
+  const input = readJson(dir, MANIFEST_FILE, errors)
+  if (input === undefined) return { errors }
+  const manifest = validateManifest(input, errors)
   if (manifest === undefined) return { errors }
   const files = resolveFiles(manifest, errors)
   const name = isNonEmptyString(manifest.name) ? manifest.name : 'character'

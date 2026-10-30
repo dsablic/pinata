@@ -23,7 +23,12 @@
     "amplitude": {
       "shoulderR": 0.35,
       "elbowR": 0.4,
-      "wristR": 0.3
+      "wristR": 0.3,
+      "hipL": 1.3,
+      "hipR": 1.3,
+      "kneeL": 1.2,
+      "kneeR": 1.2,
+      "shoulderL": 1.8
     },
     "offset": {
       "wristR": [

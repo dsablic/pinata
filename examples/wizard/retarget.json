@@ -15,5 +15,15 @@
       "beardTop",
       "beardTip"
     ]
+  },
+  "style": {
+    "amplitude": {
+      "hipL": 1.3,
+      "hipR": 1.3,
+      "kneeL": 1.2,
+      "kneeR": 1.2,
+      "shoulderL": 1.8,
+      "shoulderR": 1.8
+    }
   }
 }

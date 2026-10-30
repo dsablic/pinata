@@ -1,0 +1,164 @@
+{
+  "template": "hexapod",
+  "pelvis": "pelvis",
+  "upperBody": [
+    "thorax",
+    "abdomen",
+    "shellFront",
+    "shellBack",
+    "pronotum",
+    "head",
+    "mandL",
+    "mandR"
+  ],
+  "limbs": [
+    {
+      "kind": "leg",
+      "name": "legL1",
+      "side": "left",
+      "joints": [
+        "hipL1",
+        "kneeL1",
+        "hockL1",
+        "ankleL1",
+        "toeL1"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legL2",
+      "side": "left",
+      "joints": [
+        "hipL2",
+        "kneeL2",
+        "hockL2",
+        "ankleL2",
+        "toeL2"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legL3",
+      "side": "left",
+      "joints": [
+        "hipL3",
+        "kneeL3",
+        "hockL3",
+        "ankleL3",
+        "toeL3"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR1",
+      "side": "right",
+      "joints": [
+        "hipR1",
+        "kneeR1",
+        "hockR1",
+        "ankleR1",
+        "toeR1"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR2",
+      "side": "right",
+      "joints": [
+        "hipR2",
+        "kneeR2",
+        "hockR2",
+        "ankleR2",
+        "toeR2"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR3",
+      "side": "right",
+      "joints": [
+        "hipR3",
+        "kneeR3",
+        "hockR3",
+        "ankleR3",
+        "toeR3"
+      ],
+      "bend": [
+        "forward",
+        "backward"
+      ]
+    },
+    {
+      "kind": "appendage",
+      "name": "antennaL",
+      "side": "left",
+      "joints": [
+        "antL1",
+        "antL2",
+        "antL3"
+      ],
+      "stiffness": 0.7,
+      "damping": 0.5,
+      "oscillate": {
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 8,
+        "period": 1.6,
+        "phase": 0
+      }
+    },
+    {
+      "kind": "appendage",
+      "name": "antennaR",
+      "side": "right",
+      "joints": [
+        "antR1",
+        "antR2",
+        "antR3"
+      ],
+      "stiffness": 0.7,
+      "damping": 0.5,
+      "oscillate": {
+        "axis": [
+          1,
+          0,
+          0
+        ],
+        "degrees": 8,
+        "period": 1.6,
+        "phase": 0.5
+      }
+    }
+  ],
+  "gait": {
+    "strideLength": 0.1,
+    "referenceSpeed": 0.14,
+    "stepHeight": 0.075,
+    "bobAmplitude": 0.002,
+    "footSpacing": 0.25,
+    "lateral": "rest"
+  }
+}

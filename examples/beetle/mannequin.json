@@ -1,0 +1,550 @@
+{
+  "name": "beetle",
+  "height": 0.32,
+  "joints": {
+    "pelvis": [
+      0,
+      0.18,
+      0
+    ],
+    "thorax": [
+      0,
+      0.18,
+      0.14
+    ],
+    "abdomen": [
+      0,
+      0.19,
+      -0.22
+    ],
+    "shellFront": [
+      0,
+      0.21,
+      0.12
+    ],
+    "shellBack": [
+      0,
+      0.21,
+      -0.26
+    ],
+    "pronotum": [
+      0,
+      0.18,
+      0.2
+    ],
+    "head": [
+      0,
+      0.16,
+      0.3
+    ],
+    "mandL": [
+      0.03,
+      0.13999999999999999,
+      0.37
+    ],
+    "mandR": [
+      -0.03,
+      0.13999999999999999,
+      0.37
+    ],
+    "antL1": [
+      0.04,
+      0.18,
+      0.34
+    ],
+    "antL2": [
+      0.09,
+      0.21,
+      0.42
+    ],
+    "antL3": [
+      0.13,
+      0.23,
+      0.48
+    ],
+    "antR1": [
+      -0.04,
+      0.18,
+      0.34
+    ],
+    "antR2": [
+      -0.09,
+      0.21,
+      0.42
+    ],
+    "antR3": [
+      -0.13,
+      0.23,
+      0.48
+    ],
+    "hipL1": [
+      0.1,
+      0.16,
+      0.17
+    ],
+    "kneeL1": [
+      0.17,
+      0.12,
+      0.25
+    ],
+    "hockL1": [
+      0.22,
+      0.075,
+      0.19000000000000003
+    ],
+    "ankleL1": [
+      0.25,
+      0.026,
+      0.22000000000000003
+    ],
+    "toeL1": [
+      0.26,
+      0.026,
+      0.27
+    ],
+    "hipL2": [
+      0.1,
+      0.16,
+      0
+    ],
+    "kneeL2": [
+      0.17,
+      0.12,
+      0.06
+    ],
+    "hockL2": [
+      0.22,
+      0.075,
+      -0.02
+    ],
+    "ankleL2": [
+      0.25,
+      0.026,
+      0.01
+    ],
+    "toeL2": [
+      0.26,
+      0.026,
+      0.06
+    ],
+    "hipL3": [
+      0.1,
+      0.16,
+      -0.17
+    ],
+    "kneeL3": [
+      0.17,
+      0.12,
+      -0.13
+    ],
+    "hockL3": [
+      0.22,
+      0.075,
+      -0.23
+    ],
+    "ankleL3": [
+      0.25,
+      0.026,
+      -0.2
+    ],
+    "toeL3": [
+      0.26,
+      0.026,
+      -0.15000000000000002
+    ],
+    "hipR1": [
+      -0.1,
+      0.16,
+      0.17
+    ],
+    "kneeR1": [
+      -0.17,
+      0.12,
+      0.25
+    ],
+    "hockR1": [
+      -0.22,
+      0.075,
+      0.19000000000000003
+    ],
+    "ankleR1": [
+      -0.25,
+      0.026,
+      0.22000000000000003
+    ],
+    "toeR1": [
+      -0.26,
+      0.026,
+      0.27
+    ],
+    "hipR2": [
+      -0.1,
+      0.16,
+      0
+    ],
+    "kneeR2": [
+      -0.17,
+      0.12,
+      0.06
+    ],
+    "hockR2": [
+      -0.22,
+      0.075,
+      -0.02
+    ],
+    "ankleR2": [
+      -0.25,
+      0.026,
+      0.01
+    ],
+    "toeR2": [
+      -0.26,
+      0.026,
+      0.06
+    ],
+    "hipR3": [
+      -0.1,
+      0.16,
+      -0.17
+    ],
+    "kneeR3": [
+      -0.17,
+      0.12,
+      -0.13
+    ],
+    "hockR3": [
+      -0.22,
+      0.075,
+      -0.23
+    ],
+    "ankleR3": [
+      -0.25,
+      0.026,
+      -0.2
+    ],
+    "toeR3": [
+      -0.26,
+      0.026,
+      -0.15000000000000002
+    ]
+  },
+  "parts": [
+    {
+      "name": "shell",
+      "shape": "box",
+      "a": "shellBack",
+      "b": "shellFront",
+      "width": 0.3,
+      "thickness": 0.14,
+      "rounding": 0.07,
+      "widthAxis": [
+        1,
+        0,
+        0
+      ],
+      "material": "shell"
+    },
+    {
+      "name": "dome",
+      "shape": "capsule",
+      "a": "abdomen",
+      "b": "pelvis",
+      "radiusA": 0.13,
+      "radiusB": 0.12,
+      "material": "shell"
+    },
+    {
+      "name": "pronotumPart",
+      "shape": "capsule",
+      "a": "thorax",
+      "b": "pronotum",
+      "radiusA": 0.085,
+      "radiusB": 0.075,
+      "material": "dark"
+    },
+    {
+      "name": "headPart",
+      "shape": "capsule",
+      "a": "head",
+      "b": "head",
+      "radiusA": 0.06,
+      "radiusB": 0.06,
+      "material": "dark"
+    },
+    {
+      "name": "mandibleL",
+      "shape": "capsule",
+      "a": "head",
+      "b": "mandL",
+      "radiusA": 0.025,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "mandibleR",
+      "shape": "capsule",
+      "a": "head",
+      "b": "mandR",
+      "radiusA": 0.025,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "antennaLa",
+      "shape": "capsule",
+      "a": "antL1",
+      "b": "antL2",
+      "radiusA": 0.012,
+      "radiusB": 0.012,
+      "material": "limb",
+      "allowThin": true
+    },
+    {
+      "name": "antennaLb",
+      "shape": "capsule",
+      "a": "antL2",
+      "b": "antL3",
+      "radiusA": 0.012,
+      "radiusB": 0.018,
+      "material": "limb",
+      "allowThin": true
+    },
+    {
+      "name": "antennaRa",
+      "shape": "capsule",
+      "a": "antR1",
+      "b": "antR2",
+      "radiusA": 0.012,
+      "radiusB": 0.012,
+      "material": "limb",
+      "allowThin": true
+    },
+    {
+      "name": "antennaRb",
+      "shape": "capsule",
+      "a": "antR2",
+      "b": "antR3",
+      "radiusA": 0.012,
+      "radiusB": 0.018,
+      "material": "limb",
+      "allowThin": true
+    },
+    {
+      "name": "femurL1",
+      "shape": "capsule",
+      "a": "hipL1",
+      "b": "kneeL1",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaL1",
+      "shape": "capsule",
+      "a": "kneeL1",
+      "b": "hockL1",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusL1",
+      "shape": "capsule",
+      "a": "hockL1",
+      "b": "ankleL1",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footL1",
+      "shape": "capsule",
+      "a": "ankleL1",
+      "b": "toeL1",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    },
+    {
+      "name": "femurL2",
+      "shape": "capsule",
+      "a": "hipL2",
+      "b": "kneeL2",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaL2",
+      "shape": "capsule",
+      "a": "kneeL2",
+      "b": "hockL2",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusL2",
+      "shape": "capsule",
+      "a": "hockL2",
+      "b": "ankleL2",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footL2",
+      "shape": "capsule",
+      "a": "ankleL2",
+      "b": "toeL2",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    },
+    {
+      "name": "femurL3",
+      "shape": "capsule",
+      "a": "hipL3",
+      "b": "kneeL3",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaL3",
+      "shape": "capsule",
+      "a": "kneeL3",
+      "b": "hockL3",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusL3",
+      "shape": "capsule",
+      "a": "hockL3",
+      "b": "ankleL3",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footL3",
+      "shape": "capsule",
+      "a": "ankleL3",
+      "b": "toeL3",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    },
+    {
+      "name": "femurR1",
+      "shape": "capsule",
+      "a": "hipR1",
+      "b": "kneeR1",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaR1",
+      "shape": "capsule",
+      "a": "kneeR1",
+      "b": "hockR1",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusR1",
+      "shape": "capsule",
+      "a": "hockR1",
+      "b": "ankleR1",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footR1",
+      "shape": "capsule",
+      "a": "ankleR1",
+      "b": "toeR1",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    },
+    {
+      "name": "femurR2",
+      "shape": "capsule",
+      "a": "hipR2",
+      "b": "kneeR2",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaR2",
+      "shape": "capsule",
+      "a": "kneeR2",
+      "b": "hockR2",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusR2",
+      "shape": "capsule",
+      "a": "hockR2",
+      "b": "ankleR2",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footR2",
+      "shape": "capsule",
+      "a": "ankleR2",
+      "b": "toeR2",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    },
+    {
+      "name": "femurR3",
+      "shape": "capsule",
+      "a": "hipR3",
+      "b": "kneeR3",
+      "radiusA": 0.026,
+      "radiusB": 0.022,
+      "material": "limb"
+    },
+    {
+      "name": "tibiaR3",
+      "shape": "capsule",
+      "a": "kneeR3",
+      "b": "hockR3",
+      "radiusA": 0.02,
+      "radiusB": 0.018,
+      "material": "limb"
+    },
+    {
+      "name": "tarsusR3",
+      "shape": "capsule",
+      "a": "hockR3",
+      "b": "ankleR3",
+      "radiusA": 0.018,
+      "radiusB": 0.016,
+      "material": "limb"
+    },
+    {
+      "name": "footR3",
+      "shape": "capsule",
+      "a": "ankleR3",
+      "b": "toeR3",
+      "radiusA": 0.026,
+      "radiusB": 0.026,
+      "material": "dark"
+    }
+  ],
+  "decals": []
+}

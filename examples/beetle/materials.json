@@ -1,0 +1,10 @@
+[
+  {
+    "name": "cloth",
+    "particleMass": 0.02,
+    "stretchCompliance": 1e-7,
+    "bendCompliance": 0.0001,
+    "damping": 2.4,
+    "drag": 0.015
+  }
+]

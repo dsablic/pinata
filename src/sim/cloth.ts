@@ -121,3 +121,8 @@ export function mergeSystems (systems: System[]): System {
   }
   return merged
 }
+
+/** Particle indices of the cape's bottom row, left to right. */
+export function capeHemIndices (cape: Cape): number[] {
+  return Array.from({ length: cape.columns }, (_, i) => (cape.rows - 1) * cape.columns + i)
+}

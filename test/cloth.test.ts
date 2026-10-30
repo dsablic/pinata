@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Chain, SimMaterial } from '../src/formats/sim.ts'
-import { buildCape, buildChain, mergeSystems } from '../src/sim/cloth.ts'
+import { buildCape, buildChain, capeHemIndices, mergeSystems } from '../src/sim/cloth.ts'
 import { assertClose } from './helpers.ts'
 
 const body: Mannequin = {
@@ -92,4 +92,11 @@ test('merging offsets particle and pin indices and keeps materials per particle'
   assert.equal(merged.material[merged.particles.materialIndex[0]].name, 'silk')
   assert.equal(merged.material[merged.particles.materialIndex[14]].name, 'wool')
   assert.equal(merged.particles.previous.length, 45)
+})
+
+test('capeHemIndices lists the bottom row, which hangs lowest', () => {
+  const hem = capeHemIndices(cape)
+  assert.deepEqual(hem, [9, 10, 11])
+  const { position } = buildCape(cape, body, silk).particles
+  for (const i of hem) assertClose(position[3 * i + 1], 1.5 - 0.9)
 })

@@ -1,0 +1,214 @@
+{
+  "name": "soak",
+  "body": "knight.json",
+  "bodyExcludeParts": [
+    "capeL",
+    "capeR",
+    "plume"
+  ],
+  "cape": {
+    "anchorLeft": "capeAnchorL",
+    "anchorRight": "capeAnchorR",
+    "columns": 6,
+    "rows": 8,
+    "length": 0.85,
+    "material": "wool"
+  },
+  "chains": [
+    {
+      "anchor": "plumeBase",
+      "links": 6,
+      "linkLength": 0.05,
+      "direction": [
+        0,
+        1,
+        -1
+      ],
+      "material": "wool"
+    }
+  ],
+  "gravity": [
+    0,
+    -9.81,
+    0
+  ],
+  "fps": 24,
+  "substeps": 40,
+  "particleRadius": 0.02,
+  "script": {
+    "accelSeconds": 0.3,
+    "segments": [
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 1.5
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 0.6
+      },
+      {
+        "action": "move",
+        "speed": 1.2,
+        "duration": 0.8
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      }
+    ]
+  }
+}

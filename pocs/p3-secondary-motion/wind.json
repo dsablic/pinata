@@ -1,0 +1,56 @@
+{
+  "name": "wind",
+  "body": "knight.json",
+  "bodyExcludeParts": [
+    "capeL",
+    "capeR",
+    "plume"
+  ],
+  "cape": {
+    "anchorLeft": "capeAnchorL",
+    "anchorRight": "capeAnchorR",
+    "columns": 6,
+    "rows": 8,
+    "length": 0.85,
+    "material": "wool"
+  },
+  "chains": [
+    {
+      "anchor": "plumeBase",
+      "links": 6,
+      "linkLength": 0.05,
+      "direction": [
+        0,
+        1,
+        -1
+      ],
+      "material": "wool"
+    }
+  ],
+  "gravity": [
+    0,
+    -9.81,
+    0
+  ],
+  "fps": 24,
+  "substeps": 40,
+  "particleRadius": 0.02,
+  "script": {
+    "accelSeconds": 0.3,
+    "segments": [
+      {
+        "action": "hold",
+        "duration": 6
+      }
+    ]
+  },
+  "wind": {
+    "direction": [
+      1,
+      0,
+      0
+    ],
+    "speed": 4,
+    "gust": 0.4
+  }
+}

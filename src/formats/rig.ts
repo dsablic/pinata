@@ -24,7 +24,15 @@ export type Gait = {
   strideExponent?: number
   lateral?: Lateral
 }
-export type Rig = { template?: TemplateName, limbs: Limb[], pelvis: string, upperBody: string[], gait: Gait }
+export type LegacyRef = { list: 'legs' | 'arms', index: number }
+export type Rig = {
+  template?: TemplateName
+  limbs: Limb[]
+  legacy?: LegacyRef[]
+  pelvis: string
+  upperBody: string[]
+  gait: Gait
+}
 
 const RIG_FIELDS = ['template', 'legs', 'arms', 'limbs', 'pelvis', 'upperBody', 'gait'] as const
 const LEG_JOINTS = ['hip', 'knee', 'ankle', 'toe'] as const
@@ -77,7 +85,7 @@ export function validateRig (input: unknown): Validated<Rig> {
   checkKnownKeys(input, RIG_FIELDS, '', errors)
   const template = validateTemplate(input.template, errors)
   const named = input.template !== undefined
-  const limbs = validateBody(input, named, errors)
+  const { limbs, legacy } = validateBody(input, named, errors)
   if (!isNonEmptyString(input.pelvis)) errors.push({ path: 'pelvis', message: 'expected a joint name' })
   if (!Array.isArray(input.upperBody) || !input.upperBody.every(isNonEmptyString)) {
     errors.push({ path: 'upperBody', message: 'expected an array of joint names that move rigidly with the pelvis' })
@@ -88,6 +96,7 @@ export function validateRig (input: unknown): Validated<Rig> {
   if (template !== undefined) applyGaitDefaults(template, gait)
   const upperBody = structuredClone(input.upperBody as string[])
   const rig: Rig = { limbs, pelvis: input.pelvis as string, upperBody, gait }
+  if (legacy !== undefined) rig.legacy = legacy
   if (template !== undefined) rig.template = template
   return { value: rig, errors }
 }
@@ -110,7 +119,9 @@ function validateTemplate (value: unknown, errors: ValidationError[]): TemplateN
   return undefined
 }
 
-function validateBody (input: Record<string, unknown>, hasTemplate: boolean, errors: ValidationError[]): Limb[] {
+type Body = { limbs: Limb[], legacy?: LegacyRef[] }
+
+function validateBody (input: Record<string, unknown>, hasTemplate: boolean, errors: ValidationError[]): Body {
   if (input.limbs !== undefined) {
     if (input.legs !== undefined || input.arms !== undefined) {
       errors.push({
@@ -118,15 +129,21 @@ function validateBody (input: Record<string, unknown>, hasTemplate: boolean, err
         message: "'limbs' cannot be combined with 'legs' or 'arms'; describe every limb in 'limbs' " +
           "(kind 'leg' or 'arm'), or keep 'legs' and 'arms' and drop 'limbs'"
       })
-      return []
+      return { limbs: [] }
     }
-    return validateLimbList(input.limbs, !hasTemplate, errors)
+    return { limbs: validateLimbList(input.limbs, !hasTemplate, errors) }
   }
   const before = errors.length
   validateLegacy(input.legs, 'legs', LEG_FIELDS, hasTemplate, errors)
   validateLegacy(input.arms, 'arms', ARM_FIELDS, hasTemplate, errors)
-  if (errors.length > before) return []
-  return translateLegacy(input.legs as never[], input.arms as never[]).map(limb => structuredClone(limb))
+  if (errors.length > before) return { limbs: [] }
+  const legs = input.legs as never[]
+  const arms = input.arms as never[]
+  const legacy = [
+    ...legs.map((_, index): LegacyRef => ({ list: 'legs', index })),
+    ...arms.map((_, index): LegacyRef => ({ list: 'arms', index }))
+  ]
+  return { limbs: translateLegacy(legs, arms).map(limb => structuredClone(limb)), legacy }
 }
 
 function validateLegacy (
@@ -197,6 +214,24 @@ function validateGait (gait: unknown, hasTemplate: boolean, errors: ValidationEr
   }
 }
 
+const LEGACY_FIELDS = { legs: LEG_JOINTS, arms: ARM_JOINTS }
+
+/** The path of a limb in the file the rig was written in: `legs[1]` for a legs and arms rig, else `limbs[1]`. */
+export function limbPath (rig: Rig, index: number): string {
+  const ref = rig.legacy?.[index]
+  return ref === undefined ? `limbs[${index}]` : `${ref.list}[${ref.index}]`
+}
+
+function jointPath (rig: Rig, index: number, joint: number): string {
+  const ref = rig.legacy?.[index]
+  if (ref === undefined) return `limbs[${index}].joints[${joint}]`
+  return `${limbPath(rig, index)}.${LEGACY_FIELDS[ref.list][joint]}`
+}
+
+function carriedPath (rig: Rig, index: number, joint: number): string {
+  return `${limbPath(rig, index)}.carried[${joint}]`
+}
+
 export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
   const errors: ValidationError[] = []
   const known = Object.keys(mannequin.joints)
@@ -214,8 +249,8 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     used.set(joint, path)
   }
   rig.limbs.forEach((limb, i) => {
-    limb.joints.forEach((joint, j) => { use(joint, `limbs[${i}].joints[${j}]`) })
-    if (limb.kind === 'arm') limb.carried?.forEach((joint, k) => { use(joint, `limbs[${i}].carried[${k}]`) })
+    limb.joints.forEach((joint, j) => { use(joint, jointPath(rig, i, j)) })
+    if (limb.kind === 'arm') limb.carried?.forEach((joint, k) => { use(joint, carriedPath(rig, i, k)) })
   })
   use(rig.pelvis, 'pelvis')
   rig.upperBody.forEach((joint, i) => { use(joint, `upperBody[${i}]`) })
@@ -226,7 +261,7 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     errors.push({
       path: 'upperBody',
       message: `joints not moved by any group would stay at rest: ${missing.map(j => `'${j}'`).join(', ')}; ` +
-        'add them to upperBody, limbs or pelvis'
+        `add them to upperBody, ${rig.legacy === undefined ? 'limbs' : 'legs, arms'} or pelvis`
     })
   }
   return errors
@@ -234,8 +269,10 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
 
 function checkLegs (rig: Rig): ValidationError[] {
   const legs = legsOf(rig)
+  const path = rig.legacy === undefined ? 'limbs' : 'legs'
   if (legs.length === 0) {
-    return [{ path: 'limbs', message: "a rig needs at least one limb of kind 'leg': the gait plants its feet" }]
+    const need = rig.legacy === undefined ? "limb of kind 'leg'" : "entry in 'legs'"
+    return [{ path, message: `a rig needs at least one ${need}: the gait plants its feet` }]
   }
   const count = (side: Side): number => legs.filter(leg => leg.side === side).length
   const left = count('left')
@@ -243,7 +280,7 @@ function checkLegs (rig: Rig): ValidationError[] {
   const errors: ValidationError[] = []
   if (legs.length > 1 && left !== right) {
     const want = legs.length === 2 ? 'one left and one right leg' : 'as many left as right legs'
-    errors.push({ path: 'limbs', message: `expected ${want}; found ${left} left and ${right} right` })
+    errors.push({ path, message: `expected ${want}; found ${left} left and ${right} right` })
   }
   errors.push(...checkStance(rig))
   return errors
@@ -270,9 +307,10 @@ function checkBones (rig: Rig, mannequin: Mannequin, errors: ValidationError[]):
       const a = mannequin.joints[from]
       const b = mannequin.joints[to]
       if (a === undefined || b === undefined || length(sub(a, b)) >= MIN_BONE_LENGTH) continue
+      const label = rig.legacy === undefined ? `'${limb.name}'` : limbPath(rig, i)
       errors.push({
-        path: `limbs[${i}]`,
-        message: `joints '${from}' and '${to}' of '${limb.name}' are at the same position, which gives a ` +
+        path: limbPath(rig, i),
+        message: `joints '${from}' and '${to}' of ${label} are at the same position, which gives a ` +
           'zero-length bone; move them apart in the mannequin'
       })
     }

@@ -8,7 +8,7 @@ import type { Scenario, SimMaterial } from './sim.ts'
 import { checkReferences } from './references.ts'
 import { validateMannequin } from './mannequin.ts'
 import type { Mannequin } from './mannequin.ts'
-import { checkCapeAnchors, checkRig, legsOf, resolveRig, validateRig } from './rig.ts'
+import { checkCapeAnchors, checkRig, legsOf, limbPath, resolveRig, validateRig } from './rig.ts'
 import type { Rig } from './rig.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
@@ -130,7 +130,7 @@ function checkFeet (rig: Rig, mannequin: Mannequin): Errors {
     if (foot) continue
     const message = `no capsule part in the mannequin spans ankle '${leg.ankle}' to toe '${leg.toe}'; ` +
       'the foot is a capsule from the ankle joint to the toe joint, and its radii set the sole height'
-    errors.push({ path: `limbs[${leg.index}]`, message })
+    errors.push({ path: limbPath(rig, leg.index), message })
   }
   return errors
 }

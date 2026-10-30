@@ -1,6 +1,6 @@
 import { gate } from '../../pocs/p4-locomotion/gates.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { armsOf, legPhases, legsOf, stride, withLimbs } from '../formats/rig.ts'
+import { armsOf, legPhases, legsOf, limbPath, stride, withLimbs } from '../formats/rig.ts'
 import type { Leg } from '../formats/rig.ts'
 import type { Character } from '../formats/character.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../motion/ik.ts'
@@ -63,7 +63,9 @@ function legGeometry (character: Character, leg: Leg): Geometry {
 function legTitle (ctx: Context, index: number, noun = ''): string {
   const legs = legsOf(ctx.character.rig)
   const title = noun === '' ? ctx.labels[index] : `${ctx.labels[index]} ${noun}`
-  return legs.length > MAX_UNNAMED_LEGS ? `${title} (limb '${legs[index].name}')` : title
+  const { rig } = ctx.character
+  const ref = rig.legacy === undefined ? `limb '${legs[index].name}'` : limbPath(rig, legs[index].index)
+  return legs.length > MAX_UNNAMED_LEGS ? `${title} (${ref})` : title
 }
 
 function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {

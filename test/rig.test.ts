@@ -44,8 +44,9 @@ test('accepts a valid rig and copies it', () => {
   const input = rig()
   const result = validateRig(input)
   assert.deepEqual(result.errors, [])
-  const { limbs, ...rest } = result.value!
+  const { limbs, legacy, ...rest } = result.value!
   assert.deepEqual(rest, { pelvis: input.pelvis, upperBody: input.upperBody, gait: input.gait })
+  assert.deepEqual(legacy, [{ list: 'legs', index: 0 }, { list: 'legs', index: 1 }, { list: 'arms', index: 0 }])
   assert.equal(limbs.length, 3)
   result.value!.upperBody.push('x')
   result.value!.limbs[0].joints.push('x')
@@ -100,7 +101,7 @@ test('checkRig reports unknown joints with known names', () => {
   const input = rig()
   input.legs[0].knee = 'kneeX'
   const [error] = checkRig(validateRig(input).value!, mannequin())
-  assert.equal(error.path, 'limbs[0].joints[1]')
+  assert.equal(error.path, 'legs[0].knee')
   assert.match(error.message, /unknown joint 'kneeX'; known joints: hipL, /)
 })
 
@@ -109,7 +110,7 @@ test('checkRig reports joints used twice', () => {
   input.upperBody.push('hipL')
   const errors = checkRig(validateRig(input).value!, mannequin())
   assert.deepEqual(errors.map(e => e.path), ['upperBody[1]'])
-  assert.match(errors[0].message, /already used by limbs\[0\]\.joints\[0\]/)
+  assert.match(errors[0].message, /already used by legs\[0\]\.hip/)
 })
 
 test('checkRig reports mannequin joints no group moves', () => {
@@ -124,7 +125,7 @@ test('checkRig needs one left and one right leg', () => {
   const input = rig()
   input.legs[1].side = 'left'
   const errors = checkRig(validateRig(input).value!, mannequin())
-  assert.deepEqual(errors.map(e => e.path), ['limbs'])
+  assert.deepEqual(errors.map(e => e.path), ['legs'])
   assert.match(errors[0].message, /one left and one right leg; found 2 left and 0 right/)
 })
 
@@ -132,8 +133,10 @@ test('checkRig needs at least one leg', () => {
   const input = rig()
   input.legs = []
   const errors = checkRig(validateRig(input).value!, mannequin())
-  assert.deepEqual(errors.map(e => e.path), ['limbs', 'upperBody'])
-  assert.match(errors[0].message, /at least one limb of kind 'leg'/)
+  assert.deepEqual(errors.map(e => e.path), ['legs', 'upperBody'])
+  assert.match(errors[0].message, /at least one entry in 'legs'/)
+  assert.match(errors[1].message, /add them to upperBody, legs, arms or pelvis/)
+  assert.doesNotMatch(errors.map(e => e.message).join(' '), /limb/)
 })
 
 function quadrupedRig () {
@@ -168,7 +171,7 @@ test('three legs need a phase each but are no longer rejected for their number',
   three.legs.pop()
   assert.deepEqual(paths(three), [])
   const errors = checkRig(validateRig(three).value!, quadrupedMannequin())
-  assert.deepEqual(errors.map(e => e.path), ['limbs', 'upperBody'])
+  assert.deepEqual(errors.map(e => e.path), ['legs', 'upperBody'])
   assert.match(errors[0].message, /as many left as right legs; found 2 left and 1 right/)
 })
 
@@ -220,7 +223,7 @@ test('checkRig accepts two left and two right legs and rejects other splits', ()
   const input = quadrupedRig()
   input.legs[3].side = 'left'
   const errors = checkRig(validateRig(input).value!, quadrupedMannequin())
-  assert.deepEqual(errors.map(e => e.path), ['limbs'])
+  assert.deepEqual(errors.map(e => e.path), ['legs'])
   assert.match(errors[0].message, /as many left as right legs; found 3 left and 1 right/)
 })
 
@@ -283,9 +286,9 @@ test('checkRig puts each carried joint in exactly one group', () => {
   const input = rig()
   Object.assign(input.arms[0], { carried: ['chest', 'ghost'] })
   const errors = checkRig(validateRig(input).value!, mannequin())
-  assert.deepEqual(errors.map(e => e.path), ['limbs[2].carried[1]', 'upperBody[0]'])
+  assert.deepEqual(errors.map(e => e.path), ['arms[0].carried[1]', 'upperBody[0]'])
   assert.match(errors[0].message, /unknown joint 'ghost'/)
-  assert.match(errors[1].message, /already used by limbs\[2\]\.carried\[0\]/)
+  assert.match(errors[1].message, /already used by arms\[0\]\.carried\[0\]/)
 })
 
 test('checkRig rejects limb bones of zero length', () => {
@@ -293,9 +296,9 @@ test('checkRig rejects limb bones of zero length', () => {
   m.joints.wrL = [...m.joints.elL]
   m.joints.toeR = [...m.joints.ankleR]
   const errors = checkRig(validateRig(rig()).value!, m)
-  assert.deepEqual(errors.map(e => e.path), ['limbs[1]', 'limbs[2]'])
-  assert.match(errors[0].message, /'ankleR' and 'toeR' of 'leg2' are at the same position/)
-  assert.match(errors[1].message, /'elL' and 'wrL' of 'arm1' are at the same position/)
+  assert.deepEqual(errors.map(e => e.path), ['legs[1]', 'arms[0]'])
+  assert.match(errors[0].message, /'ankleR' and 'toeR' of legs\[1\] are at the same position/)
+  assert.match(errors[1].message, /'elL' and 'wrL' of arms\[0\] are at the same position/)
 })
 
 test('checkCapeAnchors accepts pelvis and upperBody joints', () => {

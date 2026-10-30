@@ -79,6 +79,19 @@ test('cross-checks name the file that has to change', () => {
   rmSync(dir, { recursive: true })
 })
 
+test('rig errors for a legs and arms rig name legs and arms, not limbs', () => {
+  const dir = variant(d => {
+    patch(d, 'mannequin.json', j => { j.parts = j.parts.filter((p: any) => p.b !== 'toeR') })
+    patch(d, 'rig.json', j => { j.legs[1].knee = 'nowhere' })
+  })
+  const lines = formatCharacterErrors(loadCharacter(dir).errors).split('\n')
+  assert.ok(lines.some(l => l.startsWith("rig.json: legs[1].knee: unknown joint 'nowhere'")), lines.join('\n'))
+  const feet = 'rig.json: legs[1]: no capsule part in the mannequin spans'
+  assert.ok(lines.some(l => l.startsWith(feet)), lines.join('\n'))
+  assert.ok(lines.every(l => !l.includes('limbs[')), lines.join('\n'))
+  rmSync(dir, { recursive: true })
+})
+
 test('a script without a steady walking window is rejected', () => {
   const dir = variant(d => {
     patch(d, 'motion.json', j => { j.script.segments = [{ action: 'hold', duration: 1 }] })

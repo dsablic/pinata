@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkScenario, validateScenario, validateSimMaterials } from '../src/formats/sim.ts'
+import { checkScenario, scenarioDuration, validateScenario, validateSimMaterials } from '../src/formats/sim.ts'
 import type { Scenario, SimMaterial } from '../src/formats/sim.ts'
 import { validateMannequin } from '../src/formats/mannequin.ts'
 
@@ -152,4 +152,91 @@ test('checkScenario reports unknown joints, parts and materials with the known n
   assert.match(errors[0].message, /unknown part 'plume'; known parts: cape/)
   assert.match(errors[1].message, /unknown joint 'hip'; known joints: base, top/)
   assert.match(errors[2].message, /unknown material 'satin'; known materials: silk/)
+})
+
+test('scenarioDuration uses durationSeconds or the script plus a 3 second tail', () => {
+  const s = validateScenario(scenario()).value as Scenario
+  assert.equal(scenarioDuration(s), 7)
+  assert.equal(scenarioDuration({ ...s, durationSeconds: 5 }), 5)
+})
+
+test('rejects a script that does not end with a hold', () => {
+  const input = scenario()
+  input.script.segments.pop()
+  const [error] = validateScenario(input).errors
+  assert.equal(error.path, 'script.segments')
+  assert.match(error.message, /last segment to be a 'hold'/)
+  input.script.segments = []
+  assert.deepEqual(paths(input), [])
+})
+
+test('echoes an unknown segment action', () => {
+  const input = scenario()
+  input.script.segments[0] = { action: 'jump', speed: 1, duration: 1 }
+  const [error] = validateScenario(input).errors
+  assert.equal(error.message, "unknown action 'jump'; expected 'move', 'turn' or 'hold'")
+})
+
+test('rejects values above the upper bounds', () => {
+  const input = scenario()
+  input.cape.columns = 65
+  input.cape.rows = 65
+  input.chains[0].links = 65
+  input.substeps = 101
+  input.fps = 121
+  input.script.segments[0].duration = 601
+  const output: Record<string, unknown> = input
+  output.durationSeconds = 601
+  assert.deepEqual(paths(input).sort(), [
+    'cape.columns', 'cape.rows', 'chains[0].links', 'durationSeconds', 'fps', 'script.segments[0].duration', 'substeps'
+  ])
+  input.cape.columns = 64
+  input.cape.rows = 64
+  input.chains[0].links = 64
+  input.substeps = 100
+  input.fps = 120
+  input.script.segments[0].duration = 600
+  output.durationSeconds = 600
+  assert.deepEqual(paths(input), [])
+})
+
+test('rejects duplicate bodyExcludeParts', () => {
+  const input = scenario()
+  input.bodyExcludeParts = ['cape', 'arm', 'cape']
+  const [error] = validateScenario(input).errors
+  assert.equal(error.path, 'bodyExcludeParts[2]')
+  assert.match(error.message, /duplicate part name 'cape'/)
+})
+
+test('rejects an empty materials array', () => {
+  assert.deepEqual(validateSimMaterials([]).errors.map(e => e.path), [''])
+})
+
+test('rejects unknown keys inside materials, cape, chain and wind', () => {
+  assert.deepEqual(validateSimMaterials([{ ...material(), shine: 1 }]).errors.map(e => e.path), ['[0].shine'])
+  const input = scenario()
+  const cape: Record<string, unknown> = input.cape
+  const chain: Record<string, unknown> = input.chains[0]
+  const wind: Record<string, unknown> = input.wind
+  cape.pleats = 2
+  chain.bead = true
+  wind.turbulence = 1
+  assert.deepEqual(paths(input), ['cape.pleats', 'chains[0].bead', 'wind.turbulence'])
+})
+
+test('checkScenario rejects a cape anchored to one joint', () => {
+  const s = validateScenario(scenario()).value as Scenario
+  s.cape!.anchorRight = 'base'
+  const errors = checkScenario(s, mannequin(), [material('silk'), material('wool')] as SimMaterial[])
+  assert.deepEqual(errors.map(e => e.path), ['cape.anchorRight'])
+  assert.match(errors[0].message, /different joint/)
+})
+
+test('checkScenario rejects distinct anchor joints at the same position', () => {
+  const s = validateScenario(scenario()).value as Scenario
+  const body = mannequin()
+  body.joints.top = [0, 0, 0]
+  const errors = checkScenario(s, body, [material('silk'), material('wool')] as SimMaterial[])
+  assert.deepEqual(errors.map(e => e.path), ['cape.anchorRight'])
+  assert.match(errors[0].message, /coincide/)
 })

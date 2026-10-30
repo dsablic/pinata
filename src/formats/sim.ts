@@ -1,4 +1,5 @@
 import type { Vec3 } from '../math/vec.ts'
+import { scriptDuration } from '../motion/script.ts'
 import type { Script } from '../motion/script.ts'
 import type { Mannequin } from './mannequin.ts'
 import {
@@ -62,8 +63,16 @@ function isNonNegative (v: unknown): v is number {
   return isFiniteNumber(v) && v >= 0
 }
 
-function isIntegerAtLeast (v: unknown, minimum: number): v is number {
-  return Number.isInteger(v) && (v as number) >= minimum
+function isIntegerBetween (v: unknown, minimum: number, maximum: number): v is number {
+  return Number.isInteger(v) && (v as number) >= minimum && (v as number) <= maximum
+}
+
+function isPositiveAtMost (v: unknown, maximum: number): v is number {
+  return isPositive(v) && v <= maximum
+}
+
+export function scenarioDuration (scenario: Scenario): number {
+  return scenario.durationSeconds ?? scriptDuration(scenario.script) + 3
 }
 
 function expect (ok: boolean, path: string, message: string, errors: ValidationError[]): void {
@@ -74,6 +83,7 @@ export function validateSimMaterials (input: unknown): Validated<SimMaterial[]> 
   if (!Array.isArray(input)) {
     return { errors: [{ path: '', message: 'expected an array of materials' }] }
   }
+  if (input.length === 0) return { errors: [{ path: '', message: 'expected at least one material' }] }
   const errors: ValidationError[] = []
   const names = new Set<string>()
   input.forEach((material, i) => {
@@ -108,12 +118,15 @@ export function validateScenario (input: unknown): Validated<Scenario> {
   expect(isNonEmptyString(input.name), 'name', 'expected a non-empty string', errors)
   expect(isNonEmptyString(input.body), 'body', 'expected a path to a mannequin JSON, relative to this file', errors)
   const exclude = input.bodyExcludeParts
-  expect(
-    Array.isArray(exclude) && exclude.every(isNonEmptyString),
-    'bodyExcludeParts',
-    'expected an array of part names (may be empty)',
-    errors
-  )
+  if (!Array.isArray(exclude) || !exclude.every(isNonEmptyString)) {
+    errors.push({ path: 'bodyExcludeParts', message: 'expected an array of part names (may be empty)' })
+  } else {
+    exclude.forEach((name, i) => {
+      if (exclude.indexOf(name) !== i) {
+        errors.push({ path: `bodyExcludeParts[${i}]`, message: `duplicate part name '${name}'` })
+      }
+    })
+  }
   validateScript(input.script, errors)
   if (input.cape !== undefined) validateCape(input.cape, errors)
   if (!Array.isArray(input.chains)) {
@@ -123,11 +136,16 @@ export function validateScenario (input: unknown): Validated<Scenario> {
   }
   if (input.wind !== undefined) validateWind(input.wind, errors)
   expect(isVec3(input.gravity), 'gravity', 'expected [x, y, z] in m/s^2, for example [0, -9.81, 0]', errors)
-  expect(isPositive(input.fps), 'fps', 'expected a positive number of output frames per second', errors)
-  expect(isIntegerAtLeast(input.substeps, 1), 'substeps', 'expected a positive integer of substeps per frame', errors)
+  expect(isPositiveAtMost(input.fps, 120), 'fps', 'expected a number of output frames per second up to 120', errors)
+  expect(isIntegerBetween(input.substeps, 1, 100), 'substeps', 'expected an integer from 1 to 100', errors)
   expect(isPositive(input.particleRadius), 'particleRadius', 'expected a positive radius in metres', errors)
   if (input.durationSeconds !== undefined) {
-    expect(isPositive(input.durationSeconds), 'durationSeconds', 'expected a positive number of seconds', errors)
+    expect(
+      isPositiveAtMost(input.durationSeconds, 600),
+      'durationSeconds',
+      'expected a number of seconds up to 600',
+      errors
+    )
   }
   if (errors.length > 0) return { errors }
   return { value: copyKnownKeys<Scenario>(input, SCENARIO_FIELDS), errors }
@@ -145,6 +163,11 @@ function validateScript (script: unknown, errors: ValidationError[]): void {
     return
   }
   script.segments.forEach((segment, i) => { validateSegment(segment, `script.segments[${i}]`, errors) })
+  const last = script.segments[script.segments.length - 1]
+  if (script.segments.length > 0 && !(isRecord(last) && last.action === 'hold')) {
+    const message = "expected the last segment to be a 'hold', so the motion ends at rest"
+    errors.push({ path: 'script.segments', message })
+  }
 }
 
 function validateSegment (segment: unknown, path: string, errors: ValidationError[]): void {
@@ -154,11 +177,12 @@ function validateSegment (segment: unknown, path: string, errors: ValidationErro
   }
   const action = segment.action
   if (action !== 'move' && action !== 'turn' && action !== 'hold') {
-    errors.push({ path: `${path}.action`, message: "expected 'move', 'turn' or 'hold'" })
+    const message = `unknown action '${String(action)}'; expected 'move', 'turn' or 'hold'`
+    errors.push({ path: `${path}.action`, message })
     return
   }
   checkKnownKeys(segment, SEGMENT_FIELDS[action], path, errors)
-  expect(isPositive(segment.duration), `${path}.duration`, 'expected a positive number of seconds', errors)
+  expect(isPositiveAtMost(segment.duration, 600), `${path}.duration`, 'expected seconds above 0 and up to 600', errors)
   if (action === 'move') {
     expect(isNonNegative(segment.speed), `${path}.speed`, 'expected a speed >= 0 in m/s', errors)
   } else if (action === 'turn') {
@@ -178,8 +202,8 @@ function validateCape (cape: unknown, errors: ValidationError[]): void {
   checkKnownKeys(cape, CAPE_FIELDS, 'cape', errors)
   expect(isNonEmptyString(cape.anchorLeft), 'cape.anchorLeft', 'expected a joint name', errors)
   expect(isNonEmptyString(cape.anchorRight), 'cape.anchorRight', 'expected a joint name', errors)
-  expect(isIntegerAtLeast(cape.columns, 2), 'cape.columns', 'expected an integer >= 2', errors)
-  expect(isIntegerAtLeast(cape.rows, 2), 'cape.rows', 'expected an integer >= 2', errors)
+  expect(isIntegerBetween(cape.columns, 2, 64), 'cape.columns', 'expected an integer from 2 to 64', errors)
+  expect(isIntegerBetween(cape.rows, 2, 64), 'cape.rows', 'expected an integer from 2 to 64', errors)
   expect(isPositive(cape.length), 'cape.length', 'expected a positive length in metres', errors)
   validateMaterialName(cape, 'cape', errors)
 }
@@ -191,7 +215,7 @@ function validateChain (chain: unknown, path: string, errors: ValidationError[])
   }
   checkKnownKeys(chain, CHAIN_FIELDS, path, errors)
   expect(isNonEmptyString(chain.anchor), `${path}.anchor`, 'expected a joint name', errors)
-  expect(isIntegerAtLeast(chain.links, 1), `${path}.links`, 'expected an integer >= 1', errors)
+  expect(isIntegerBetween(chain.links, 1, 64), `${path}.links`, 'expected an integer from 1 to 64', errors)
   expect(isPositive(chain.linkLength), `${path}.linkLength`, 'expected a positive length in metres', errors)
   expect(isDirection(chain.direction), `${path}.direction`, 'expected a non-zero [x, y, z]', errors)
   validateMaterialName(chain, path, errors)
@@ -231,10 +255,25 @@ export function checkScenario (
     check(scenario.cape.anchorLeft, jointNames, 'joint', 'cape.anchorLeft')
     check(scenario.cape.anchorRight, jointNames, 'joint', 'cape.anchorRight')
     check(scenario.cape.material, materialNames, 'material', 'cape.material')
+    checkCapeWidth(scenario.cape, mannequin, errors)
   }
   scenario.chains.forEach((chain, i) => {
     check(chain.anchor, jointNames, 'joint', `chains[${i}].anchor`)
     check(chain.material, materialNames, 'material', `chains[${i}].material`)
   })
   return errors
+}
+
+function checkCapeWidth (cape: Cape, mannequin: Mannequin, errors: ValidationError[]): void {
+  const path = 'cape.anchorRight'
+  if (cape.anchorLeft === cape.anchorRight) {
+    errors.push({ path, message: 'expected a different joint from anchorLeft, or the cape has no width' })
+    return
+  }
+  const left = mannequin.joints[cape.anchorLeft]
+  const right = mannequin.joints[cape.anchorRight]
+  if (left !== undefined && right !== undefined && left.every((value, i) => value === right[i])) {
+    const message = `joints '${cape.anchorLeft}' and '${cape.anchorRight}' coincide, so the cape has no width`
+    errors.push({ path, message })
+  }
 }

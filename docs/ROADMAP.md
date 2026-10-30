@@ -24,12 +24,18 @@ for previews, collision geometry and checks.
 ## Product definition
 
 - **Users:** AI agents first (via MCP and a CLI), and the people directing them: indie developers and small studios
-  who need many animated characters without an animator.
+  who need many animated characters without an animator, and web developers who want small reactive characters
+  ("little computer people") in their UIs for comic relief or assistance.
 - **Inputs:** a character package (text files: body, rig, materials, motion, skin, style), written by an agent.
-- **Outputs:** animated sprites for 4 or 8 directions (sprite sheets with JSON, Aseprite files), plus diagnostics.
+- **Outputs:** two delivery targets from the same engine and character files:
+  - game assets: animated sprites for 4 or 8 directions (sprite sheets with JSON, Aseprite files);
+  - a live web runtime: a small JavaScript component that animates a character in real time and reacts to page or
+    agent events (see P8).
+  Both carry the same visual bar: characters must stand up to game art. Diagnostics come with both.
 - **Core promise:** the agent says what should happen ("walk, turn, stop; the cape is heavy wool; wind from the
   left"); the tool makes it physically right and tells the agent precisely what to fix when it is not.
-- **Not in scope:** an editor GUI, 3D output, real-time game runtime (exports target existing runtimes).
+- **Not in scope:** an editor GUI, 3D output, and a full game-engine runtime (game exports target existing engines;
+  the web runtime is for small UI characters, not games).
 
 ## Body plans and rigid-body behaviours (in progress)
 
@@ -139,13 +145,18 @@ and composition rather than the art. That is still a useful product; the import 
   prompt matching) and for detecting obviously procedural art, but unreliable for facing from a pure side view and
   once the candidate became competitive. Keep ground-truth questions, add quality ratings with strong references,
   and keep one human expert review before any public claim of quality.
-- **Competition.** Rigby2D, Keyframe.it and Sprite Studio all gained MCP support in 2026. The differentiators
-  (physics from intent, actionable diagnostics, style-independent motion) need to ship before they converge.
+- **Competition.** For game assets: Rigby2D, Keyframe.it and Sprite Studio all gained MCP support in 2026. For web UI
+  characters: Rive (designer-authored interactive state machines with a web runtime) and Lottie (canned animation).
+  The differentiators (characters generated from a prompt, physics-driven reactions, composable checked behaviours,
+  style-independent motion) need to ship before these converge.
+- **Annoyance.** UI companions have a history of irritating users (Clippy, Bonzi). The web component must be quiet by
+  default, easy to dismiss, respect `prefers-reduced-motion`, and never block the page; assistance (speech bubbles,
+  hints) is an opt-in layer whose content the host app supplies.
 - **Small sizes.** 32 px is at the edge of what parts-based rendering can carry; many gates sit at their limits for
   the knight. Treat 48 px as the default and 32 px as a stretch target.
 
 ## Going public
 
 Make the repository public when Phase 1 exits and P7 passes, with a README that states the results honestly, a demo
-(an agent creating a character from a prompt, walking with a reacting cape, in several directions), the authoring
-guide, and examples.
+(an agent creating a character from a prompt, then the same character walking in several directions as game sprites
+and reacting live in a web page), the authoring guide, and examples.

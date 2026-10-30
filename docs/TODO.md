@@ -24,7 +24,13 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
-### 0. World showcase (user request, 2026-10-30)
+### 0. Physical walking (user decision, 2026-10-30)
+
+[Physical walking plan](plans/2026-10-30-physical-walking.md): bodies with mass and momentum, legs that step when the
+body needs catching; replaces the scripted root track in the live world. Batches A (body and stepping, flat), B
+(terrain, many legs, upper body), C (world integration, judge panel).
+
+### 0b. World showcase (user request, 2026-10-30)
 
 [World showcase plan](plans/2026-10-30-world-showcase.md): several characters living on procedural platforms in the
 browser (little computer people). Batches A (terrain and terrain-aware gait), B (windows and activities), C (world

@@ -184,6 +184,12 @@ function validateBox (part: Record<string, unknown>, path: string, ctx: Context,
     ctx.errors.push({ path: `${path}.b`, message: 'a box needs distinct joints a and b' })
     return
   }
+  if (isFiniteNumber(rounding) && rounding > length(segment) / 2) {
+    ctx.errors.push({
+      path: `${path}.rounding`,
+      message: `must be at most ${round(length(segment) / 2)} (half the a->b length)`
+    })
+  }
   if (length(cross(normalize(segment), normalize(widthAxis))) < 0.1) {
     ctx.errors.push({
       path: `${path}.widthAxis`,

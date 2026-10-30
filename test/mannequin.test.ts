@@ -167,3 +167,11 @@ test('capsule radius message rounds numbers and says how to fix it', () => {
   assert.match(error.message, /difference 0\.9429 must be smaller than the joint distance 0\.3333;/)
   assert.match(error.message, /reduce radiusA or radiusB, or move the joints apart$/)
 })
+
+test('rejects a box shorter than twice its rounding', () => {
+  const input = valid()
+  input.joints.top = [0, 0.03, 0]
+  const [error, ...rest] = validateMannequin(input).errors.filter(e => e.path === 'parts[1].rounding')
+  assert.equal(rest.length, 0)
+  assert.match(error.message, /at most 0\.015 \(half the a->b length\)/)
+})

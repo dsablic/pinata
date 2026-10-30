@@ -1,0 +1,151 @@
+import { createHash } from 'node:crypto'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { validateMannequin } from '../../src/formats/mannequin.ts'
+import { validateStyle } from '../../src/formats/style.ts'
+import { checkReferences } from '../../src/formats/references.ts'
+import { formatErrors } from '../../src/formats/validate.ts'
+import type { Validated } from '../../src/formats/validate.ts'
+import { fitCamera } from '../../src/raster/camera.ts'
+import type { Camera } from '../../src/raster/camera.ts'
+import { rasterize } from '../../src/raster/gbuffer.ts'
+import type { GBuffer } from '../../src/raster/gbuffer.ts'
+import { stylize } from '../../src/style/stylize.ts'
+import { imageHash, parseHex } from '../../src/image.ts'
+import type { Image } from '../../src/image.ts'
+import { encodePng } from '../../src/png/encode.ts'
+import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
+import { depthImage, normalImage, partImage, sheet } from '../../src/diagnostics/images.ts'
+import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { gate } from './gates.ts'
+import { previewHtml } from './preview.ts'
+import type { AbPair } from './preview.ts'
+
+const SIZES = [32, 48]
+const ELEVATIONS = [0, 30]
+const DIRECTIONS = 8
+const MARGIN = 4
+const SHEET_SCALE = 8
+const SHEET_BACKGROUND = 0xc8c8c8
+const MIN_PIXELS_FOR_THIN = 4
+const AB_FRAME = '48px-el30-d1'
+const FACING = ['front', 'front-left', 'left', 'back-left', 'back', 'back-right', 'right', 'front-right']
+
+const here = dirname(fileURLToPath(import.meta.url))
+const root = join(here, '..', '..')
+const outDir = join(root, 'reports', 'p1')
+const refsDir = join(root, 'refs', 'p1')
+
+type Frame = {
+  id: string
+  size: number
+  elevation: number
+  direction: number
+  camera: Camera
+  gbuffer: GBuffer
+  image: Image
+  decalMask: Uint8Array
+}
+
+function requireValid<T> (file: string, result: Validated<T>): T {
+  if (result.value === undefined || result.errors.length > 0) {
+    console.error(formatErrors(file, result.errors))
+    process.exit(2)
+  }
+  return result.value
+}
+
+function loadJson (file: string): unknown {
+  return JSON.parse(readFileSync(join(here, file), 'utf8'))
+}
+
+const mannequin = requireValid('knight.json', validateMannequin(loadJson('knight.json')))
+const style = requireValid('style.json', validateStyle(loadJson('style.json')))
+const referenceErrors = checkReferences(mannequin, style)
+if (referenceErrors.length > 0) {
+  console.error(formatErrors('knight.json', referenceErrors))
+  process.exit(2)
+}
+
+function renderFrame (size: number, elevation: number, direction: number): Frame {
+  const camera = fitCamera(mannequin, {
+    azimuthDeg: direction * 45,
+    elevationDeg: elevation,
+    targetHeightPx: size,
+    margin: MARGIN
+  })
+  const gbuffer = rasterize(mannequin, camera)
+  const { image, decalMask } = stylize(gbuffer, mannequin, camera, style)
+  return { id: `${size}px-el${elevation}-d${direction}`, size, elevation, direction, camera, gbuffer, image, decalMask }
+}
+
+const frames = SIZES.flatMap(size => ELEVATIONS.flatMap(elevation => {
+  return Array.from({ length: DIRECTIONS }, (_, direction) => renderFrame(size, elevation, direction))
+}))
+const rows = SIZES.flatMap(size => ELEVATIONS.map(elevation => {
+  return frames.filter(f => f.size === size && f.elevation === elevation)
+}))
+
+const outline = parseHex(style.outline)
+const frameMetrics = frames.map(f => {
+  const thin = thinParts(f.gbuffer, mannequin).filter(p => p.pixels >= MIN_PIXELS_FOR_THIN)
+  return {
+    id: f.id,
+    outlineGaps: outlineGaps(f.image, outline),
+    strayPixels: strayPixels(f.image, f.decalMask),
+    maxThinFraction: Math.max(0, ...thin.map(p => p.thinFraction)),
+    thinParts: thin
+  }
+})
+
+const nondeterministic = [frames[0], frames[frames.length - 1]].filter(f => {
+  return imageHash(renderFrame(f.size, f.elevation, f.direction).image) !== imageHash(f.image)
+}).length
+
+const results = evaluate([
+  gate('outlineGaps', Math.max(...frameMetrics.map(m => m.outlineGaps))),
+  gate('maxThinFraction', Math.max(...frameMetrics.map(m => m.maxThinFraction))),
+  gate('paletteSize', paletteSize(frames.map(f => f.image))),
+  gate('maxStrayPixels', Math.max(...frameMetrics.map(m => m.strayPixels))),
+  gate('nondeterministicFrames', nondeterministic)
+])
+const summary = summarize('P1 static style', results)
+
+function abPairs (): { pairs: AbPair[], key: Array<{ ref: string, ours: 'left' | 'right' }> } {
+  const refs = existsSync(refsDir) ? readdirSync(refsDir).filter(f => f.endsWith('.png')).sort() : []
+  const ours = `frames/${AB_FRAME}.png`
+  const key = refs.map(ref => {
+    const side: 'left' | 'right' = createHash('sha256').update(ref).digest()[0] % 2 === 0 ? 'left' : 'right'
+    return { ref, ours: side }
+  })
+  const pairs = key.map(({ ref, ours: side }) => {
+    const theirs = `../../refs/p1/${ref}`
+    return side === 'left' ? { left: ours, right: theirs } : { left: theirs, right: ours }
+  })
+  return { pairs, key }
+}
+
+rmSync(outDir, { recursive: true, force: true })
+for (const f of frames) writeOutput(join(outDir, 'frames', `${f.id}.png`), encodePng(f.image))
+const sheetOptions = { scale: SHEET_SCALE, gap: SHEET_SCALE, background: SHEET_BACKGROUND }
+function writeSheet (name: string, cell: (f: Frame) => Image): void {
+  const cells = rows.map(r => r.map(f => {
+    const anchor: [number, number] = [f.camera.width / 2, f.camera.baseline]
+    return { image: cell(f), anchor }
+  }))
+  writeOutput(join(outDir, name), encodePng(sheet(cells, sheetOptions)))
+}
+writeSheet('sheet.png', f => f.image)
+writeSheet('debug-parts.png', f => partImage(f.gbuffer))
+writeSheet('debug-normals.png', f => normalImage(f.gbuffer))
+writeSheet('debug-depth.png', f => depthImage(f.gbuffer))
+const { pairs, key } = abPairs()
+writeOutput(join(outDir, 'ab-key.json'), JSON.stringify({ facing: FACING, pairs: key }, null, 2))
+writeOutput(join(outDir, 'metrics.json'), JSON.stringify({ gates: results, frames: frameMetrics }, null, 2))
+writeOutput(join(outDir, 'summary.txt'), `${summary}\n`)
+writeOutput(join(outDir, 'preview.html'), previewHtml(summary, pairs))
+
+console.log(summary)
+console.log(`report: ${join(outDir, 'preview.html')}`)
+process.exitCode = results.every(r => r.pass) ? 0 : 1

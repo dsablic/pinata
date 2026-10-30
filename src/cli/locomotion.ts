@@ -1,6 +1,6 @@
 import { gate } from '../../pocs/p4-locomotion/gates.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { armsOf, legPhases, legsOf, limbPath, stride, withLimbs } from '../formats/rig.ts'
+import { armsOf, legPhases, legsOf, limbPath, minimumStance, stride, withLimbs } from '../formats/rig.ts'
 import type { Leg } from '../formats/rig.ts'
 import type { Character } from '../formats/character.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../motion/ik.ts'
@@ -144,7 +144,7 @@ function slideHint (ctx: Context): string {
     cause = `The foot is level at rest and ${where}: ${stepAdvice(ctx, worst.leg)}.`
   } else {
     cause = `The foot is level at rest, so the slide comes from the gait: ${stepAdvice(ctx, worst.leg)}; changing ` +
-      `strideLength (now ${gait.strideLength}) or footSpacing (now ${gait.footSpacing}) is less reliable.`
+      `strideLength (now ${gait.strideLength})${spacingOption(ctx, ' or ')} is less reliable.`
   }
   const drag = clamped > 0 ? ` ${clamped} frames also have an unreachable foot target (see reachViolations).` : ''
   return `the ${worst.label} moves ${worst.value.toFixed(2)} px (at ${PIXEL_HEIGHT}px) in ${at(ctx, worst.frame)} ` +
@@ -204,7 +204,7 @@ function reachHint (ctx: Context): string {
   }).join(', ')
   return `a foot target was out of the leg's reach in frames ${frames[0]} to ${frames[frames.length - 1]} (first at ` +
     `${at(ctx, frames[0])}), so the leg was straightened and clamped. Leg length hip to ankle: ${legs}. Shorten ` +
-    `rig.gait.strideLength (now ${gait.strideLength}) or footSpacing (now ${gait.footSpacing}), lower bobAmplitude ` +
+    `rig.gait.strideLength (now ${gait.strideLength})${spacingOption(ctx, ' or ')}, lower bobAmplitude ` +
     `(now ${gait.bobAmplitude}), or lengthen the legs in the mannequin.`
 }
 
@@ -243,6 +243,17 @@ function kneeLimitHint (ctx: Context): string {
     `${worst.label}, first in ${at(ctx, worst.frame)}: ${jointProblem(ctx, worst.leg, worst.frame)}.`
 }
 
+function stanceFloor (ctx: Context): string {
+  const floor = Math.max(0.5, minimumStance(ctx.character.rig))
+  return floor > 0.5 ? `${floor.toFixed(2)} with these leg phases` : '0.5'
+}
+
+/** ' or footSpacing (now x)' when the feet land by footSpacing, else '' (lateral 'rest' ignores it). */
+function spacingOption (ctx: Context, before: string): string {
+  const { gait } = ctx.character.rig
+  return gait.lateral === 'rest' ? '' : `${before}footSpacing (now ${gait.footSpacing})`
+}
+
 function kneeSpeedHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.kneeSpeedDegPerSec(r, g), 'leg')
   const { gait } = ctx.character.rig
@@ -250,7 +261,7 @@ function kneeSpeedHint (ctx: Context): string {
   const fastest = speeds.reduce((a, b) => b.value > a.value ? b : a)
   return `the ${worst.label} ${jointWord(worst.leg, fastest.joint)} flexes at ${worst.value.toFixed(0)} degrees/s in ` +
     `${at(ctx, worst.frame)}, which reads as a pop. Lower rig.gait.stanceFraction (now ${gait.stanceFraction}, ` +
-    `minimum 0.5; a smaller value gives a longer, slower swing) or lengthen strideLength (now ` +
+    `minimum ${stanceFloor(ctx)}; a smaller value gives a longer, slower swing) or lengthen strideLength (now ` +
     `${gait.strideLength}). A higher stepHeight (now ${gait.stepHeight}) raises joint speed, but lowering it can ` +
     'bring back foot slide; walking slower does not reliably help.'
 }
@@ -348,6 +359,13 @@ function plantedHint (ctx: Context, label: string): string {
     'or stepHeight.'
 }
 
+function widerFeet (ctx: Context): string {
+  const { gait } = ctx.character.rig
+  if (gait.lateral === 'rest') return 'spread the feet wider and further apart along the body in the rest pose'
+  return `spread the feet wider (raise footSpacing, now ${gait.footSpacing}, or set rig.gait.lateral to 'rest' and ` +
+    'fan the feet out in the rest pose)'
+}
+
 function balanceHint (ctx: Context): string {
   const g = geometryOf(ctx)
   const distances = metrics.balanceDistances(ctx.recording, g)
@@ -363,9 +381,8 @@ function balanceHint (ctx: Context): string {
     `of the floor; worst ${(distances[frame] ?? 0).toFixed(3)} m outside in ${at(ctx, frame)}, standing on: ` +
     `${planted.join(', ')}. A many-legged walk keeps the body over its feet. Raise rig.gait.stanceFraction (now ` +
     `${gait.stanceFraction}) so more feet are down at once; check that neighbouring legs on a side and opposite ` +
-    'legs at the same position are half a cycle apart (a tripod alternates 0 and 0.5); spread the feet wider ' +
-    `(rig.gait.lateral 'rest', or footSpacing, now ${gait.footSpacing}); or move heavy pelvis and upperBody parts ` +
-    'toward the middle of the legs in the mannequin.'
+    `legs at the same position are half a cycle apart (a tripod alternates 0 and 0.5); ${widerFeet(ctx)}; or move ` +
+    'heavy pelvis and upperBody parts toward the middle of the legs in the mannequin.'
 }
 
 type AppendageMeasure = (geometry: Geometry) => number

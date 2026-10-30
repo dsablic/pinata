@@ -286,10 +286,15 @@ function checkLegs (rig: Rig): ValidationError[] {
   return errors
 }
 
-function checkStance (rig: Rig): ValidationError[] {
+/** The smallest stanceFraction with which some foot is always planted: 1 minus the widest gap between leg phases. */
+export function minimumStance (rig: Rig): number {
   const phases = legPhases(rig).sort((a, b) => a - b)
   const widest = Math.max(...phases.map((p, i) => (phases[(i + 1) % phases.length] - p + 1) % 1 || 1))
-  const needed = 1 - widest
+  return 1 - widest
+}
+
+function checkStance (rig: Rig): ValidationError[] {
+  const needed = minimumStance(rig)
   if (rig.gait.stanceFraction >= needed - PHASE_TOLERANCE) return []
   return [{
     path: 'gait.stanceFraction',

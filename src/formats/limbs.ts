@@ -173,6 +173,7 @@ export function validateLimbList (value: unknown, phaseRequired: boolean, errors
   const counts: Record<LimbKind, number> = { leg: 0, arm: 0, appendage: 0 }
   const limbs: Limb[] = []
   const names = new Map<string, number>()
+  const taken = new Set(value.filter(l => isRecord(l) && isNonEmptyString(l.name)).map(l => l.name as string))
   value.forEach((input: unknown, i) => {
     const here = `limbs[${i}]`
     if (!isRecord(input)) {
@@ -195,7 +196,7 @@ export function validateLimbList (value: unknown, phaseRequired: boolean, errors
     if (kind === 'appendage') validateAppendage(input, here, errors)
     if (errors.length > before) return
     const limb = copyKnownKeys<Limb>(input, LIMB_FIELDS[kind])
-    if (input.name === undefined) limb.name = `${kind}${counts[kind]}`
+    if (input.name === undefined) limb.name = defaultName(kind, counts[kind], taken)
     if (limb.kind === 'appendage') {
       limb.stiffness ??= DEFAULT_STIFFNESS
       limb.damping ??= DEFAULT_DAMPING
@@ -204,6 +205,14 @@ export function validateLimbList (value: unknown, phaseRequired: boolean, errors
     limbs.push(limb)
   })
   return limbs
+}
+
+/** `leg2` for the second unnamed leg, or the next free number when a limb already uses that name. */
+function defaultName (kind: LimbKind, count: number, taken: Set<string>): string {
+  let n = count
+  while (taken.has(`${kind}${n}`)) n++
+  taken.add(`${kind}${n}`)
+  return `${kind}${n}`
 }
 
 function validateName (

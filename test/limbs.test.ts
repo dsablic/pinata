@@ -349,3 +349,15 @@ test('checkRig needs a leg and as many left legs as right legs', () => {
   assert.deepEqual(sides.map(e => e.path), ['limbs'])
   assert.match(sides[0].message, /one left and one right leg; found 2 left and 0 right/)
 })
+
+test('default limb names skip names other limbs already use', () => {
+  const named = limbsRig([
+    { ...leg('left', 'L', 4, { phase: 0 }), name: 'leg2' },
+    leg('right', 'R', 4, { phase: 0.5, name: undefined }),
+    { kind: 'appendage', joints: ['a', 'b'] },
+    { kind: 'appendage', name: 'appendage1', joints: ['c', 'd'] }
+  ])
+  const { value, errors } = validateRig(named)
+  assert.deepEqual(errors, [])
+  assert.deepEqual(value!.limbs.map(limb => limb.name), ['leg2', 'leg3', 'appendage2', 'appendage1'])
+})

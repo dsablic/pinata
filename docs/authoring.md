@@ -231,7 +231,9 @@ antennae, wings), which move rigidly with the body, and the gait.
 
 The older format, with `legs` and `arms` lists of `{ side, hip, knee, ankle, toe, phase, bend }` and
 `{ side, shoulder, elbow, wrist, hand, carried }`, still loads (the complete example below and most examples use it);
-it is translated to `limbs`. A rig uses one format or the other, not both.
+it is translated to `limbs`. A rig uses one format or the other, not both. The older format has 4-joint legs and arms
+only, with `bend` `"forward"` or `"backward"`: for appendages, longer legs, bend arrays, `"up"` or `limits`, write
+`limbs`.
 
 **Rig coverage.** Every joint in the mannequin must appear in exactly one place among: `pelvis`, `upperBody`, a
 limb's `joints`, an arm's `carried`. A joint listed twice, a joint that does not exist, or a joint that is listed
@@ -240,8 +242,8 @@ nowhere is an error. Decal anchors, cape anchors and chain anchors are joints to
 
 ### Limbs
 
-Each limb has a `kind`, a `joints` list and an optional `name` (default `leg1`, `arm1`, `appendage1`, ...; names
-must be unique and appear in hints).
+Each limb has a `kind`, a `joints` list and an optional `name` (default `leg1`, `arm1`, `appendage1`, ... counting
+limbs of that kind, skipping a name another limb already uses; names must be unique and appear in hints).
 
 | Kind | Joints | Fields |
 |---|---|---|
@@ -300,12 +302,14 @@ than four legs. Arms are `left arm`, or `left arm 1` .. `n` front to back when a
 
 - **Landing spots.** By default each foot lands under its own hip along the body and at `footSpacing` / 2 from the
   centre line. With `"lateral": "rest"` in the gait (the hexapod and octopod default) it lands where its ankle is in
-  the rest pose, relative to the body: fan the feet out in the rest pose and they plant there. Put the pelvis joint
-  (the root) between the front and hind hips.
+  the rest pose, relative to the body: fan the feet out in the rest pose and they plant there while walking
+  (`footSpacing` is then unused, though still required). When the character stops, each foot steps beside its
+  opposite partner at the rest sideways gap, level with the partner along the body, so give partners the same rest z.
+  Put the pelvis joint (the root) between the front and hind hips.
 - **Stance.** One foot is always in the air unless `stanceFraction` is at least 1 minus the largest gap between
   consecutive leg phases (0.75 for a quarter-cycle walk, 0.5 for a tripod). A smaller value is a load error.
-- **Proportions.** Each foot swings up to `strideLength` / 2 either side of its hip, so keep `strideLength` under
-  about 0.6 times the front-to-back distance between neighbouring hips (or neighbouring feet, for splayed legs). A
+- **Proportions.** Each foot swings up to `strideLength` / 2 either side of its landing spot, so keep `strideLength`
+  under about 0.6 times the front-to-back distance between neighbouring hips (or neighbouring feet, for splayed legs). A
   longer stride makes a foot reach past its neighbour, which reads as crossed legs. Shortening the stride raises the
   step rate, so lower the script speed with it.
 - **Balance.** With more than four legs the walk must be statically stable: the body centre (the volume-weighted
@@ -326,7 +330,7 @@ stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm 
 
 | Field | Range | Meaning |
 |---|---|---|
-| `strideLength` | above 0, at most 10 | Metres travelled per full cycle (two steps) at `referenceSpeed`. About 1.4 x leg length. |
+| `strideLength` | above 0, at most 10 | Metres travelled per full cycle at `referenceSpeed`. About 1.4 x leg length for two legs, 0.85 for four, 0.6 for six, 0.5 for eight. |
 | `referenceSpeed` | above 0, at most 20 | m/s at which stride equals `strideLength`. Use the speed in the walk script. |
 | `stanceFraction` | 0.5 to 0.8 | Fraction of the cycle a foot is planted. Two legs: start at 0.55, keep below 0.7; four legs: 0.75; many legs: 0.6 or more. A lower value lowers knee speed. Optional with a template. |
 | `stepHeight` | 0 to 2 | Metres of swing-foot lift. Must clearly exceed 0.02. Start at about 0.15 x leg length. A higher value raises knee speed. |
@@ -336,11 +340,12 @@ stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm 
 | `lateral` | `"spacing"` or `"rest"`, optional | Where feet land: under the hip at `footSpacing` / 2 from the centre line (default), or at each ankle's rest position relative to the body (default for the hexapod and octopod templates). |
 | `strideExponent` | 0.2 to 1, optional, default 0.5 | How fast stride grows with speed. Stride is `strideLength * clamp((speed / referenceSpeed)^strideExponent, 0.5, 1.5)`. |
 
-Leg length is hip y minus ankle y in the rest pose. Starting values: `strideLength` 1.4 x leg length, `footSpacing`
-hip distance, `stepHeight` roughly 0.15 x leg length, `stanceFraction` 0.55, `bobAmplitude` 0.015,
-`armSwingDegrees` 20. `stepHeight` and `stanceFraction` trade off: a foot that is lifted too little slides at
-lift-off and touch-down (fix: raise `stepHeight`), and a high `stepHeight` makes the knee flex fast (fix: lower
-`stanceFraction`, or lengthen the stride a little). Walking slower does not reliably lower knee speed.
+Leg length is hip y minus ankle y in the rest pose. Starting values for two legs: `strideLength` 1.4 x leg length,
+`footSpacing` hip distance, `stepHeight` roughly 0.15 x leg length, `stanceFraction` 0.55, `bobAmplitude` 0.015,
+`armSwingDegrees` 20. For more legs, start from `npm run new` with the matching template, whose gait is scaled from leg
+length, or from the dog values above. `stepHeight` and `stanceFraction` trade off: a foot that is lifted too little
+slides at lift-off and touch-down (fix: raise `stepHeight`), and a high `stepHeight` makes the knee flex fast (fix:
+lower `stanceFraction`, or lengthen the stride a little). Walking slower does not reliably lower knee speed.
 
 ## materials.json
 
@@ -498,7 +503,7 @@ The walk is simulated with your rig, then measured at 48 px (one pixel is `heigh
 | `groundPenetrationPx` | <= 0.5 | Deepest the sole goes below y = 0. |
 | `partGroundPenetrationPx` | <= 0.5 | Deepest any non-foot part goes below y = 0. |
 | `reachViolations` | = 0 | Frames where a foot target was beyond the leg's reach and the leg was clamped straight. |
-| `kneeLimitViolations` | = 0 | Joint-frames, counted over every bending joint of every leg, with flexion outside the leg's limits (default 0 to 150 degrees) or the joint pointing away from its `bend` side. |
+| `kneeLimitViolations` | = 0 | Joint-frames, counted over every bending joint of every leg, with flexion outside the leg's limits (default 0 to 150 degrees) or the joint pointing away from its `bend` side. The wrong-way test is skipped when `limits.min` is negative. |
 | `kneeSpeedDegPerSec` | <= 600 | Peak bending speed of any bending joint of any leg. |
 | `boneLengthError` | <= 0.01 | Relative change of leg and arm bone lengths. |
 | `rootSpeedError` | <= 0.05 | Relative difference between foot-measured speed and the script speed in steady windows. |
@@ -519,12 +524,13 @@ Usual fixes:
   `bobAmplitude` or `stepHeight`.
 - **partGroundPenetrationPx.** A part (a dragged sword tip, a low hand, a hem) reaches the floor. Raise its joints in
   the mannequin, or reduce `bobAmplitude` and `armSwingDegrees`.
-- **reachViolations.** The stride asks the legs to reach too far. Shorten `strideLength`, `footSpacing` or
-  `bobAmplitude`, or lengthen the legs.
+- **reachViolations.** The stride asks the legs to reach too far. Shorten `strideLength`, `footSpacing` (not with
+  `lateral: "rest"`, which ignores it: bring the rest feet in instead) or `bobAmplitude`, or lengthen the legs.
 - **kneeLimitViolations.** The value counts joint-frames over all legs. The hint names the joint: if it bends the
   wrong way, its `bend` does not match the rest pose; otherwise it is overbent: lower `stepHeight` or lengthen the
   legs.
-- **kneeSpeedDegPerSec.** Lower `stanceFraction` (longer, slower swing; 0.5 is the minimum) or lengthen the stride a
+- **kneeSpeedDegPerSec.** Lower `stanceFraction` (longer, slower swing; the minimum is 0.5, or 1 minus the widest
+  phase gap if higher: 0.75 for a four-legged walk, so there it cannot go lower) or lengthen the stride a
   little. A higher `stepHeight` raises knee speed; lower it only if the slide and alternation gates still pass.
   Walking slower does not reliably help. Short legs with a high step height are the usual cause.
 - **boneLengthError.** A joint of a limb is also listed elsewhere (for example in `upperBody` or `carried`), or two

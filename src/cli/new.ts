@@ -13,9 +13,10 @@ function parseArgs (argv: string[]): Args | string {
   let template: string | undefined
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--template') {
+      if (template !== undefined) return `--template given twice\n${USAGE}`
       template = argv[++i]
       if (template === undefined) return `--template needs a name\n${USAGE}`
-    } else if (argv[i].startsWith('--')) return `unknown option '${argv[i]}'\n${USAGE}`
+    } else if (argv[i].startsWith('-')) return `unknown option '${argv[i]}'\n${USAGE}`
     else positional.push(argv[i])
   }
   if (template === undefined || positional.length !== 1) return USAGE
@@ -44,9 +45,14 @@ function main (): number {
     console.error(`'${args.dir}' already exists and is not an empty directory; choose a new directory`)
     return 2
   }
-  mkdirSync(args.dir, { recursive: true })
-  for (const [name, value] of Object.entries(starterPackage(args.template))) {
-    writeFileSync(join(args.dir, name), `${JSON.stringify(value, null, 2)}\n`)
+  try {
+    mkdirSync(args.dir, { recursive: true })
+    for (const [name, value] of Object.entries(starterPackage(args.template))) {
+      writeFileSync(join(args.dir, name), `${JSON.stringify(value, null, 2)}\n`)
+    }
+  } catch (err) {
+    console.error(`could not write the starter to '${args.dir}': ${err instanceof Error ? err.message : err}`)
+    return 2
   }
   console.log(`wrote the ${args.template} starter to ${args.dir}; check it with: npm run check -- ${args.dir}`)
   return 0

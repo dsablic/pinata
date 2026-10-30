@@ -75,7 +75,8 @@ export type Segment =
   | { action: 'hold', duration: number }                  // decelerate to 0, then stand
 export type Script = { segments: Segment[], accelSeconds: number }
 export type RootState = { position: Vec3, yaw: number, velocity: Vec3, angularVelocity: number }
-export function rootAt (script: Script, t: number): RootState
+export function rootAt (script: Script, t: number): RootState   // reference; integrates from 0 on every call
+export function createRootTrack (script: Script): (t: number) => RootState   // precomputed, for the simulation
 export function scriptDuration (script: Script): number
 ```
 
@@ -84,7 +85,9 @@ Behaviour:
   finite.
 - `turn` eases yaw with smoothstep over its duration; speed carries over from the previous segment.
 - Position is the integral of speed along the facing direction. Integrate numerically with a fixed internal step
-  (1/960 s) from t = 0, and cache nothing between calls, so results are pure functions of `t`.
+  (1/960 s) from t = 0. `createRootTrack` precomputes positions on that grid once, so sampling at 240 Hz is cheap,
+  and both it and `rootAt` stay pure functions of `t`.
+- Scenario scripts must end with a `hold` (enforced in A2), so the velocity never drops to zero abruptly.
 - After the last segment the root stays at its final state with zero velocity.
 
 Tests: zero-length script stays at the origin; `move 1 m/s for 2 s` with `accelSeconds 0` ends at z = 2; with
@@ -179,13 +182,14 @@ and nothing else is; merging offsets indices correctly.
 export type Environment = { gravity: Vec3, wind?: Wind, particleRadius: number }
 export function windAt (wind: Wind | undefined, t: number): Vec3
 export function step (system: System, env: Environment, body: Mannequin, exclude: string[],
-  root: RootState, t: number, dt: number): void
+  track: (t: number) => RootState, t: number, dt: number): void
 ```
 
 (`step` has more than 5 parameters; group them in an options object per the conventions.)
 
 Per substep:
-1. Move pinned particles to their anchor positions in world space for this root state.
+1. Sample `track(t)` (from `createRootTrack`, never `rootAt`) and move pinned particles to their anchor positions
+   in world space for that root state.
 2. For free particles: `v = (x - previous) / dt`; apply gravity; apply drag toward the wind velocity
    (`a += drag * inverseMass * (wind - v)`); apply damping (`v *= max(0, 1 - damping * dt)`); `previous = x`;
    `x += v * dt`.

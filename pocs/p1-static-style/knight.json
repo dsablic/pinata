@@ -7,6 +7,10 @@
     "chest": [0, 1.22, 0],
     "head": [0, 1.5, 0],
     "visor": [0, 1.52, 0.27],
+    "visorL": [0.22, 1.52, 0.16],
+    "visorR": [-0.22, 1.52, 0.16],
+    "buckle": [0, 0.74, 0.145],
+    "emblem": [0, 1.06, 0.165],
     "plumeFront": [0, 1.78, 0.08],
     "plumeBack": [0, 1.7, -0.24],
     "capeTopL": [0.14, 1.2, -0.2],
@@ -70,6 +74,10 @@
     }
   ],
   "decals": [
-    { "name": "visor", "anchor": "visor", "normal": [0, 0, 1], "pattern": ["xxx"] }
+    { "name": "visor", "anchor": "visor", "normal": [0, 0, 1], "pattern": ["xxx"] },
+    { "name": "visorL", "anchor": "visorL", "normal": [1, 0, 0.7], "pattern": ["xx"] },
+    { "name": "visorR", "anchor": "visorR", "normal": [-1, 0, 0.7], "pattern": ["xx"] },
+    { "name": "buckle", "anchor": "buckle", "normal": [0, 0, 1], "pattern": ["g"] },
+    { "name": "emblem", "anchor": "emblem", "normal": [0, 0, 1], "pattern": [".r.", "rrr", ".r."] }
   ]
 }

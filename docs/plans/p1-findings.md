@@ -103,3 +103,11 @@ If A/B still fails, move to the skins fallback.
 - Gates: all pass (maxThinFraction 0.250, paletteSize 14, maxStrayPixels 2 at the limit).
 - Observed: softer, coloured edges instead of a uniform black cut-out line. The sword's outline is now its own
   blue-grey shadow, so it is a little less prominent.
+
+## Run 7 (P1b)
+
+- Change: accent decals: gold belt buckle, red chest cross, visor slits on both sides of the helmet; one new
+  colour (gold).
+- Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 2).
+- Observed: the cross and buckle read clearly in front and 3/4 views and separate front from back. The side
+  visor slits barely register at 32px.

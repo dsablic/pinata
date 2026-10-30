@@ -13,5 +13,5 @@
     "cloth-red": ["#3e1030", "#9a2a36", "#e0704a"],
     "blade": ["#5a6580", "#aebccc", "#fffbe8"]
   },
-  "decalColors": { "x": "#221f36" }
+  "decalColors": { "x": "#221f36", "g": "#f2c14e", "r": "#9a2a36" }
 }

@@ -5,19 +5,19 @@
     { "action": "move", "speed": 0.5, "duration": 3 },
     { "action": "hold", "duration": 1 } ] },
   "chains": [
-    { "anchor": "hatTip", "links": 7, "linkLength": 0.06, "direction": [0.4, 0.6, -0.5], "material": "ribbon",
+    { "anchor": "hatTip", "links": 9, "linkLength": 0.065, "direction": [0.4, 0.6, -0.5], "material": "ribbon",
       "render": { "material": "pink", "radius": 0.016 } },
-    { "anchor": "hatTip", "links": 6, "linkLength": 0.06, "direction": [-0.4, 0.6, -0.5], "material": "ribbon",
+    { "anchor": "hatTip", "links": 8, "linkLength": 0.065, "direction": [-0.4, 0.6, -0.5], "material": "ribbon",
       "render": { "material": "turquoise", "radius": 0.016 } },
-    { "anchor": "tailA", "links": 6, "linkLength": 0.06, "direction": [0.6, -0.1, -0.8], "material": "ribbon",
+    { "anchor": "tailA", "links": 9, "linkLength": 0.065, "direction": [0.8, -0.1, -0.5], "material": "ribbon",
       "render": { "material": "yellow", "radius": 0.016 } },
-    { "anchor": "tailB", "links": 6, "linkLength": 0.06, "direction": [-0.6, -0.1, -0.8], "material": "ribbon",
+    { "anchor": "tailB", "links": 9, "linkLength": 0.065, "direction": [-0.8, -0.1, -0.5], "material": "ribbon",
       "render": { "material": "pink", "radius": 0.016 } },
-    { "anchor": "tailC", "links": 5, "linkLength": 0.06, "direction": [0.4, -0.3, -0.8], "material": "ribbon",
+    { "anchor": "tailC", "links": 8, "linkLength": 0.065, "direction": [0.7, -0.2, -0.6], "material": "ribbon",
       "render": { "material": "turquoise", "radius": 0.016 } },
-    { "anchor": "tailD", "links": 5, "linkLength": 0.06, "direction": [-0.4, -0.2, -0.8], "material": "ribbon",
+    { "anchor": "tailD", "links": 8, "linkLength": 0.065, "direction": [-0.7, -0.1, -0.6], "material": "ribbon",
       "render": { "material": "orange", "radius": 0.016 } }
   ],
-  "wind": { "direction": [0.6, 0, -0.4], "speed": 1.5, "gust": 0.4 },
+  "wind": { "direction": [1, 0, -0.3], "speed": 1.8, "gust": 0.5 },
   "gravity": [0, -9.81, 0], "fps": 24, "substeps": 30, "particleRadius": 0.012
 }

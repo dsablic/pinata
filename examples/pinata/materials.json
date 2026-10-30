@@ -1,1 +1,1 @@
-[ { "name": "ribbon", "particleMass": 0.006, "stretchCompliance": 1e-6, "bendCompliance": 1e-3, "damping": 0.5, "drag": 0.03 } ]
+[ { "name": "ribbon", "particleMass": 0.006, "stretchCompliance": 1e-6, "bendCompliance": 1e-3, "damping": 0.5, "drag": 0.035 } ]

@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { EMPTY, rasterize } from '../src/raster/gbuffer.ts'
 import { fitCamera, makeCamera } from '../src/raster/camera.ts'
-import type { Mannequin } from '../src/formats/mannequin.ts'
+import type { Mannequin, Part } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
 
 const sphere: Mannequin = {
@@ -99,4 +99,34 @@ test('a fitted frame leaves the margin empty for a wide pose and a part below th
     }
     assert.ok(filled > 0)
   }
+})
+
+function ball (radius: number): Mannequin {
+  const part = { ...sphere.parts[0], radiusA: radius, radiusB: radius } as Part
+  return { ...sphere, parts: [part] }
+}
+
+const countFilled = (g: { part: Int16Array }): number => g.part.filter(p => p !== EMPTY).length
+
+test('a previous buffer keeps edge pixels that were in and are marginally out', () => {
+  const big = rasterize(ball(0.5), camera)
+  const small = ball(0.46)
+  const plain = countFilled(rasterize(small, camera))
+  const held = countFilled(rasterize(small, camera, 4, big))
+  assert.ok(held > plain, `expected more than ${plain} pixels, got ${held}`)
+  assert.ok(held <= countFilled(big))
+})
+
+test('a previous buffer keeps edge pixels that were out and are marginally in', () => {
+  const small = rasterize(ball(0.46), camera)
+  const big = ball(0.5)
+  const plain = countFilled(rasterize(big, camera))
+  const held = countFilled(rasterize(big, camera, 4, small))
+  assert.ok(held < plain, `expected fewer than ${plain} pixels, got ${held}`)
+  assert.ok(held >= countFilled(small))
+})
+
+test('a previous buffer of the same frame changes nothing', () => {
+  const g = rasterize(sphere, camera)
+  assert.deepEqual(rasterize(sphere, camera, 4, g).part, g.part)
 })

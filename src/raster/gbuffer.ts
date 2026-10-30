@@ -24,6 +24,9 @@ type Accumulator = { hits: Float64Array, depth: Float64Array, normal: Float64Arr
 const HIT_EPSILON = 1e-4
 const MAX_STEPS = 256
 const NORMAL_STEP = 1e-4
+const COVERAGE_THRESHOLD = 0.5
+const COVERAGE_HYSTERESIS = 0.1
+const STICKY_SAMPLES = 2
 
 export function compile (m: Mannequin, part: Part): Primitive {
   const a = m.joints[part.a]
@@ -81,7 +84,12 @@ function sample (prims: Primitive[], cam: Camera, origin: Vec3, acc: Accumulator
   acc.normal[best * 3 + 2] += n[2]
 }
 
-export function rasterize (m: Mannequin, cam: Camera, samples = 4): GBuffer {
+/**
+ * With the previous frame's buffer, a pixel keeps its state while the coverage is within a hysteresis band of the
+ * threshold and keeps its part while that part is within a couple of samples of the winner, so edges and part
+ * boundaries do not flip back and forth as a slow motion hovers on them.
+ */
+export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GBuffer): GBuffer {
   const prims = m.parts.map(part => compile(m, part))
   const count = cam.width * cam.height
   const g: GBuffer = {
@@ -109,18 +117,26 @@ export function rasterize (m: Mannequin, cam: Camera, samples = 4): GBuffer {
           sample(prims, cam, rayOrigin(cam, px + (sx + 0.5) / samples, py + (sy + 0.5) / samples), acc)
         }
       }
-      resolvePixel(g, py * cam.width + px, acc, samples * samples)
+      resolvePixel(g, py * cam.width + px, acc, { samples: samples * samples, previous })
     }
   }
   return g
 }
 
-function resolvePixel (g: GBuffer, i: number, acc: Accumulator, sampleCount: number): void {
-  g.coverage[i] = acc.total / sampleCount
-  if (g.coverage[i] < 0.5) return
+type Resolve = { samples: number, previous?: GBuffer }
+
+function resolvePixel (g: GBuffer, i: number, acc: Accumulator, resolve: Resolve): void {
+  const { previous } = resolve
+  g.coverage[i] = acc.total / resolve.samples
+  const before = previous === undefined ? EMPTY : previous.part[i]
+  const bias = before === EMPTY ? COVERAGE_HYSTERESIS : -COVERAGE_HYSTERESIS
+  if (g.coverage[i] < COVERAGE_THRESHOLD + (previous === undefined ? 0 : bias)) return
   let winner = 0
   for (let p = 1; p < acc.hits.length; p++) {
     if (acc.hits[p] > acc.hits[winner]) winner = p
+  }
+  if (before !== EMPTY && acc.hits[before] > 0 && acc.hits[before] + STICKY_SAMPLES >= acc.hits[winner]) {
+    winner = before
   }
   g.part[i] = winner
   g.depth[i] = acc.depth[winner] / acc.hits[winner]

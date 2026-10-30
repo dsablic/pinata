@@ -98,16 +98,27 @@ Exit: all proof suites pass from the library; cloth is visible in rendered frame
 Exit: an agent, from a prompt, produces an 8-direction walking, idling and jumping character with a cape, skinned,
 exported as a sprite sheet, and it passes every gate.
 
-### P7 (next proof): multi-direction skins and quality
+### P7 (runs in parallel with P8): skins to a game-art bar
 
-Before investing in skins v1, prove that an AI artist can draw skins for 8 directions (or 4 plus mirroring) that
-stay consistent across views and survive walking, at 48 px and 32 px. Gates to fix before building it:
+**Visual bar:** characters must stand up to game art, wherever they are used (game sprites or characters in a web
+UI). A mascot that looks hand-made beats one that looks procedural in any context, so this bar applies to the whole
+product. P8 settles delivery and performance; P7 settles visual quality; neither waits on the other, and the skins
+compositor is also the fastest real-time renderer, so a P7 pass helps P8.
+
+Prove that an AI artist can draw skins for 8 directions (or 4 plus mirroring) that stay consistent across views,
+survive walking and reactions, and read at 32, 48 and 64 px. Scope beyond the skins spike: clean rotation (pre-drawn
+angle variants for limbs, or a RotSprite-style algorithm instead of nearest-neighbour 22.5 degree steps) and a first
+readability layer (exaggerated contact and passing poses, holds). Gates to fix before building it:
 - Artist finishes a full directional skin set within a small budget of runs.
 - Blind judges, using references of known high quality and both a detection and a 1-5 quality-rating question
   (the detection-only control rule broke down once the candidate was competitive), rate the skinned character at
   least as high as the references on average.
 - A walk strip in every direction is preferred over the procedural renderer by a majority.
 - One human pixel artist reviews the results (the only human check kept in the plan).
+
+**Honest risk:** game-quality art is where the evidence is thinnest. If P7 cannot reach strong references even with
+clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics
+and composition rather than the art. That is still a useful product; the import path below makes it work either way.
 
 ## Phase 2: depth (after the MVP)
 
@@ -116,7 +127,8 @@ stay consistent across views and survive walking, at 48 px and 32 px. Gates to f
   exaggeration and timing layer on top of the physics, with judge-checked readability.
 - **Environment.** Slopes and stairs (foot IK to terrain), wind fields and obstacles for cloth, water drag.
 - **Body variety.** Non-humanoid rigs (quadrupeds, tails, wings) and props with constraints (two-handed weapons).
-- **Import.** Bring in hand-made part sprites from Aseprite so human artists can supply skins directly.
+- **Import.** Bring in hand-made part sprites from Aseprite so human artists can supply skins directly, plugging into
+  the same rig. AI skins become a starting point, not a ceiling. Pull this forward if P7 falls short of the bar.
 - **Runtime exports.** Godot and Unity importers; Rigby2D/Spine interop.
 
 ## Risks and open questions

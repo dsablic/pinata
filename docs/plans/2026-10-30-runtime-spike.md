@@ -8,6 +8,13 @@ runtime?
 exporting sprite sheets, and it tests two things the roadmap needs anyway: incremental (online) motion, and a renderer
 fast enough for real time.
 
+## Use case
+
+The target use is small reactive characters in web UIs ("little computer people"): a mascot that reacts to the app
+or to an AI agent's work (loading, thinking, tool calls, errors, success), can be poked or dragged, and otherwise stays
+out of the way. A UI character must still look as good as game art (see P7 in the roadmap); the spike tests delivery,
+reactivity and performance, not the art.
+
 ## Scope
 
 One character (the hanging unicorn piñata from the logo), one page, tested headlessly with Playwright. Not in scope:
@@ -41,6 +48,12 @@ walking characters, skins, multiple characters, a public API commitment.
    (default 4 instead of 16 per pixel); report the quality difference.
 6. **Demo page** `pocs/runtime-spike/`: the canvas, buttons for each behaviour, click on the character to hit it, an
    FPS and frame-time readout. `npm run runtime` serves it locally for manual viewing.
+7. **Web-character integration (minimal):** the character as a custom element
+   (`<pinata-character src="unicorn.json">`) that can be attached to a page element (hanging from a header or a
+   button); an event bridge mapping page events to behaviours (`loading`, `error`, `success`, `idle` and fake
+   agent events such as `toolStart`); poke (click) and drag (pull the rope and let go); `prefers-reduced-motion`
+   respected (behaviours reduced to gentle, slower motion); the element never blocks clicks on the page outside its own
+   area.
 
 ## Tests (Playwright, headless Chromium)
 
@@ -55,6 +68,10 @@ server is started by the test; nothing is deployed.
 | Determinism | The same seeded event sequence gives identical frame hashes in Chromium and in Node. |
 | No console errors | Zero errors or warnings in the page console. |
 | Composition gates | Mask ownership, additive bounds and physics continuity from the composable behaviours spec hold for every behaviour. |
+| Event bridge | Dispatching `loading`, `toolStart`, `error`, `success` on the page drives the matching behaviours, in order, with no errors. |
+| Poke and drag | A click on the character triggers a hit; dragging the body and releasing makes it swing from where it was let go. |
+| Reduced motion | With `prefers-reduced-motion: reduce` emulated, peak swing and spin stay below half of the normal values. |
+| Page unaffected | Clicks on page elements outside the character's box still reach them. |
 | Stills | Screenshots and an 8-frame strip of each behaviour saved for review. |
 
 Headless Chromium timings are an estimate of a real browser tab; the report says so and gives the manual command.

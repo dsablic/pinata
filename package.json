@@ -1,6 +1,21 @@
 {
   "name": "pinata",
   "private": true,
+  "description": "AI-driven pixel-art character animation: scripted physics, IK and secondary motion with machine-checkable diagnostics",
+  "license": "MIT",
+  "author": "Denis Sablic",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/dsablic/pinata.git"
+  },
+  "keywords": [
+    "pixel-art",
+    "animation",
+    "inverse-kinematics",
+    "cloth-simulation",
+    "procedural-animation",
+    "ai-agents"
+  ],
   "type": "module",
   "engines": {
     "node": ">=24"

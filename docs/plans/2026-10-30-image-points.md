@@ -31,8 +31,8 @@ them).
   group" rule: the hierarchy is the coverage.
 - **Rotation.** Each point carries a frame (position and rotation), so children, pins, cloth anchors and image regions
   turn with their parent, not only move with it.
-- **Coordinates.** 3D for the mannequin renderer; the image renderer uses the projection onto the image plane, with
-  an optional depth per point for draw order (front and back legs).
+- **Coordinates.** Always 3D (see "3D core, 2D views"). An image's points give x and y on the image plane plus a
+  depth; renderers project the posed 3D points into their view.
 
 ### Drivers
 
@@ -61,6 +61,41 @@ win; nothing requires a template.
 Today's packages translate on load, as `legs`/`arms` translate to `limbs` now: `pelvis` becomes the root,
 `upperBody` and `carried` become children of the root and the hand, each limb becomes a chain with its driver, and
 mannequin parts attach to their two joints. The translated model must reproduce today's poses exactly.
+
+## 3D core, 2D views
+
+The motion core is 3D and stays 3D: points carry full 3D rest transforms (position and rotation) and a depth even
+when the art is flat, and every driver (root, gait and IK, swing, spring, cloth, behaviours) works in world space.
+2D is one way of showing it, never an assumption of the core. This keeps a later move to 3D open and lets 3D effects
+show up on 2D art.
+
+**Renderer interface.** A renderer takes the posed points (world transforms per frame) and a camera and returns a
+frame; nothing in the motion code knows about pixels, meshes or images. Renderers:
+
+| Renderer | When | Notes |
+|---|---|---|
+| Capsule mannequin | today | 3D primitives rasterised and stylised to pixel art (P1, P6) |
+| Image warp | this plan, batch C | the author's image deformed by the projected points |
+| Skinned 3D model | later | a 3D mesh on the same skeleton and drivers |
+| Export | later | skeleton and animation as glTF for game engines; frames as sprite sheets (today) |
+
+Gates that measure motion (foot slide, reach, balance, joint speed, bone lengths) are computed in world space, so they
+hold for every renderer; renderer gates (palette, outlines, stray pixels, flicker, fold-overs) are per renderer.
+
+**Depth.** Every point has a depth: from the template, from the helper, or set by the author. It gives draw order for
+near and far parts, foreshortening as a part swings toward or away from the camera, and slight parallax between
+layers.
+
+**3D effects on 2D art** (later batches, each with its own gates, fixed in a plan before it is built):
+- Lighting: a normal map for the image (drawn by the author or estimated from the art) lit by a 3D light through the
+  existing banded style, so shading follows turns and bends.
+- Shadows and contact: a ground shadow from the 3D pose; feet visibly meet it.
+- Camera: small camera moves and other elevations re-project the same motion.
+- Physics: cloth, chains and springs simulate in 3D and are projected, so they wrap around the body.
+- Turning: one image per major view with the same point names, switched or cross-faded at the right angles as the
+  3D yaw passes them, and Live2D-style keyed shapes (for example a head at -25, 0 and +25 degrees) blended by the
+  actual 3D angle within a view. A single image covers turns of about 20-30 degrees convincingly; a full turn needs
+  one image per major view (4 or 8 directions, as game sprites ship).
 
 ## Image renderer
 
@@ -111,6 +146,8 @@ ordinary `points.json` the author edits. `check` validates any points file the s
 - **D. Point helper and proof:** proposals from template and skeleton; three characters from three images (a biped,
   a quadruped, something with no legs that only springs and sways); the judge panel. Findings, then a go/no-go on
   making image and points the default authoring path.
+- **Later (separate plans):** turning between views and keyed turn shapes; lighting from normal maps; ground
+  shadows; camera moves; a skinned 3D renderer and glTF export.
 
 ## Open questions
 

@@ -64,6 +64,11 @@ export const P4_GATES = {
     threshold: 0,
     rationale: 'During steady walking, the same foot planting twice in a row.'
   },
+  plantedFrames: {
+    op: '>=',
+    threshold: 1,
+    rationale: 'The foot must be planted at least once or the foot-slide gate measures nothing.'
+  },
   skatingControlFails: {
     op: '>=',
     threshold: 1,

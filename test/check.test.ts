@@ -1,4 +1,4 @@
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -9,15 +9,27 @@ const ok = new URL('./fixtures/character-ok', import.meta.url).pathname
 const invalid = new URL('./fixtures/character-invalid', import.meta.url).pathname
 const cli = new URL('../src/cli/check.ts', import.meta.url).pathname
 
+const scratch: string[] = []
+
+after(() => {
+  for (const dir of scratch) rmSync(dir, { recursive: true, force: true })
+})
+
+function tmp (prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix))
+  scratch.push(dir)
+  return dir
+}
+
 type Run = { status: number | null, stdout: string, stderr: string, out: string }
 
-function check (dir: string, out = mkdtempSync(join(tmpdir(), 'pinata-report-'))): Run {
+function check (dir: string, out = tmp('pinata-report-')): Run {
   const run = spawnSync(process.execPath, [cli, dir, '--out', out], { encoding: 'utf8' })
   return { status: run.status, stdout: run.stdout, stderr: run.stderr, out }
 }
 
 function variant (edit: (dir: string) => void): string {
-  const dir = mkdtempSync(join(tmpdir(), 'pinata-character-'))
+  const dir = tmp('pinata-character-')
   cpSync(ok, dir, { recursive: true })
   edit(dir)
   return dir
@@ -39,7 +51,6 @@ test('a valid character passes every gate and writes the summary and stills', ()
   for (const file of ['sheet.png', 'walk.png', 'footprints.png', 'cloth.png', 'metrics.json']) {
     assert.ok(existsSync(join(run.out, file)), file)
   }
-  rmSync(run.out, { recursive: true })
 })
 
 test('an invalid package exits 2 and lists every error with its file name', () => {
@@ -49,7 +60,6 @@ test('an invalid package exits 2 and lists every error with its file name', () =
   assert.match(run.stderr, /^motion\.json: name: unknown field/m)
   assert.match(run.stderr, /^motion\.json: fps: /m)
   assert.match(readFileSync(join(run.out, 'summary.txt'), 'utf8'), /automated gates: ERROR/)
-  rmSync(run.out, { recursive: true })
 })
 
 test('a missing directory and missing arguments exit 2', () => {
@@ -67,9 +77,9 @@ test('a thin part fails maxThinFraction with a hint naming the part and the widt
   assert.equal(run.status, 1, run.stdout + run.stderr)
   const summary = readFileSync(join(run.out, 'summary.txt'), 'utf8')
   assert.match(summary, /^FAIL {2}maxThinFraction: /m)
-  assert.match(summary, /hint: thin parts at \d+px.*'forearmL'.*at least 0\.\d\d m across.*allowThin/)
-  rmSync(dir, { recursive: true })
-  rmSync(run.out, { recursive: true })
+  assert.match(summary, /hint: thin parts at \d+px.*'forearmL'.* is 0\.024 m across and needs at least 0\.075 m/)
+  assert.match(summary, /\(2 px at 32 px\)/)
+  assert.match(summary, /allowThin/)
 })
 
 test('a window with too few plants makes rootSpeedError non-finite and the hint says why', () => {
@@ -80,8 +90,6 @@ test('a window with too few plants makes rootSpeedError non-finite and the hint 
   const summary = readFileSync(join(run.out, 'summary.txt'), 'utf8')
   assert.match(summary, /^FAIL {2}rootSpeedError: Infinity /m)
   assert.match(summary, /hint: the metric is not finite.*neither foot has two plants.*longer/)
-  rmSync(dir, { recursive: true })
-  rmSync(run.out, { recursive: true })
 })
 
 test('a character without cloth skips the cloth gates and the cloth still', () => {
@@ -91,6 +99,80 @@ test('a character without cloth skips the cloth gates and the cloth still', () =
   const summary = readFileSync(join(run.out, 'summary.txt'), 'utf8')
   assert.doesNotMatch(summary, /nonFinite/)
   assert.ok(!existsSync(join(run.out, 'cloth.png')))
-  rmSync(dir, { recursive: true })
-  rmSync(run.out, { recursive: true })
+})
+
+const OUTPUTS = ['sheet.png', 'walk.png', 'footprints.png', 'cloth.png', 'metrics.json']
+
+test('an exit 2 run leaves no report files from an earlier run', () => {
+  const first = check(ok)
+  assert.equal(first.status, 0, first.stdout + first.stderr)
+  const dir = variant(d => { patch(d, 'rig.json', j => { j.pelvis = 'nowhere' }) })
+  const run = check(dir, first.out)
+  assert.equal(run.status, 2)
+  for (const file of OUTPUTS) assert.ok(!existsSync(join(run.out, file)), file)
+  assert.match(readFileSync(join(run.out, 'summary.txt'), 'utf8'), /automated gates: ERROR/)
+})
+
+test('an exit 1 run leaves no cloth still from an earlier run', () => {
+  const first = check(ok)
+  const dir = variant(d => {
+    patch(d, 'motion.json', j => { delete j.cape })
+    patch(d, 'rig.json', j => { j.gait.stepHeight = 0.001 })
+  })
+  const run = check(dir, first.out)
+  assert.equal(run.status, 1, run.stdout + run.stderr)
+  assert.ok(!existsSync(join(run.out, 'cloth.png')))
+  assert.ok(existsSync(join(run.out, 'metrics.json')))
+})
+
+test('a file instead of a directory exits 2 with a clear message', () => {
+  const run = check(join(ok, 'rig.json'))
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /is not a directory/)
+  assert.doesNotMatch(run.stderr, /at .*\.ts:\d+/)
+})
+
+test('a missing manifest is reported once', () => {
+  const dir = variant(d => { rmSync(join(d, 'character.json')) })
+  const run = check(dir)
+  assert.equal(run.status, 2)
+  assert.equal(run.stderr.trim().split('\n').length, 1, run.stderr)
+})
+
+function summaryOf (run: Run): string {
+  return readFileSync(join(run.out, 'summary.txt'), 'utf8')
+}
+
+test('a low stepHeight makes the slide and root-speed hints say to raise it', () => {
+  const run = check(variant(d => { patch(d, 'rig.json', j => { j.gait.stepHeight = 0.01 }) }))
+  assert.equal(run.status, 1, run.stdout + run.stderr)
+  const summary = summaryOf(run)
+  assert.match(summary, /stepHeight is below 0\.1 x the leg length: raise rig\.gait\.stepHeight/)
+  assert.match(summary, /Raising it raises knee speed, which a lower stanceFraction offsets/)
+  assert.match(summary, /window is long enough.*the feet never rise above 2 cm.*Raise rig\.gait\.stepHeight/)
+})
+
+test('a tilted foot is diagnosed by the difference of its sole points, not their height', () => {
+  const run = check(variant(d => {
+    patch(d, 'mannequin.json', j => { j.joints.toeL[1] = 0.12; j.joints.toeR[1] = 0.12 })
+    patch(d, 'rig.json', j => { j.gait.stepHeight = 0.01 })
+  }))
+  const summary = summaryOf(run)
+  assert.match(summary, /the foot is tilted by 0\.070 m.*absolute height does not matter/)
+  assert.match(summary, /Set the 'toeL' joint y to 0\.050/)
+})
+
+test('a cape that starts inside the body gets a start-inside maxSpeed hint', () => {
+  const run = check(variant(d => {
+    patch(d, 'mannequin.json', j => { j.joints.capeL = [0.1, 0.9, -0.02]; j.joints.capeR = [-0.1, 0.9, -0.02] })
+  }))
+  assert.match(summaryOf(run), /FAIL {2}maxSpeed: [^]*starts inside part 'torso'[^]*Move the cape anchors outward/)
+})
+
+test('a cape whose bottom rows hang into a foot is told to shorten length', () => {
+  const run = check(variant(d => {
+    patch(d, 'mannequin.json', j => { j.joints.capeL = [0.1, 0.5, -0.03]; j.joints.capeR = [-0.1, 0.5, -0.03] })
+    patch(d, 'motion.json', j => { j.exclude = ['torso'] })
+  }))
+  assert.match(summaryOf(run), /bottom rows of the cape hang into 'footL'.*shorten cape\.length \(now 0\.4\)/)
 })

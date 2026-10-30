@@ -8,6 +8,9 @@ import type { Recording } from '../sim/metrics.ts'
 import type { Check } from './summary.ts'
 
 const PIXEL_HEIGHT = 48
+const START_FRAMES = 5
+const BOTTOM_ROWS = 2
+const LEG_JOINTS = ['knee', 'ankle', 'toe'] as const
 
 type Context = { character: Character, run: CharacterRun }
 
@@ -77,6 +80,15 @@ function nonFiniteHint (ctx: Context): string {
     `less stiff. Materials in use: ${materialsOf(ctx.character)}.`
 }
 
+function startsInside (ctx: Context, frame: number): string | undefined {
+  const [first] = ctx.run.recording.frames
+  const inside = first.penetration.some(d => d > 0) || first.linkPenetration.some(d => d > 0)
+  if (!inside || frame >= START_FRAMES) return undefined
+  const worst = deepest(ctx, 0)
+  return `${worst.where} starts inside part '${nearestPart(ctx, 0, worst.point)}' ` +
+    `(${(worst.depth * 1000).toFixed(0)} mm deep at frame 0), so the solver pushes it out violently`
+}
+
 function maxSpeedHint (ctx: Context): string {
   const { recording } = ctx.run
   const frame = firstWorstFrame(recording, r => metrics.maxSpeed(r), 1)
@@ -92,6 +104,11 @@ function maxSpeedHint (ctx: Context): string {
       speed = d
       worst = k
     }
+  }
+  const inside = startsInside(ctx, frame)
+  if (inside !== undefined) {
+    return `${particleName(ctx.character, worst)} moves at ${speed.toFixed(1)} m/s in ${at(ctx, frame)}: ` +
+      `${inside}. Move the cape anchors outward (away from the body) so the cloth starts clear of it.${anchorsOf(ctx)}`
   }
   return `${particleName(ctx.character, worst)} moves at ${speed.toFixed(1)} m/s in ${at(ctx, frame)}: the solver ` +
     `is injecting energy. Raise motion.json substeps (now ${ctx.character.scenario.substeps}), raise the material ` +
@@ -111,6 +128,11 @@ function maxStrainHint (ctx: Context): string {
     `Materials in use: ${materialsOf(ctx.character)}.`
 }
 
+function anchorsOf (ctx: Context): string {
+  const { cape } = ctx.character.scenario
+  return cape === undefined ? '' : ` Cape anchors: '${cape.anchorLeft}' and '${cape.anchorRight}'.`
+}
+
 function nearestPart (ctx: Context, frame: number, point: Vec3): string {
   const { mannequin, scenario } = ctx.character
   const root = ctx.run.frames[frame].root
@@ -125,16 +147,23 @@ function nearestPart (ctx: Context, frame: number, point: Vec3): string {
     .reduce((a, b) => b.d < a.d ? b : a).name
 }
 
-type Deepest = { frame: number, depth: number, point: Vec3, where: string }
+type Deepest = { frame: number, depth: number, point: Vec3, where: string, row: number }
 
-function deepest (ctx: Context): Deepest {
+function capeRow (character: Character, index: number): number {
+  const { cape } = character.scenario
+  return cape !== undefined && index < cape.columns * cape.rows ? Math.floor(index / cape.columns) : -1
+}
+
+function deepest (ctx: Context, lastFrame = Infinity): Deepest {
   const { recording } = ctx.run
-  let best: Deepest = { frame: 0, depth: -Infinity, point: [0, 0, 0], where: '' }
+  let best: Deepest = { frame: 0, depth: -Infinity, point: [0, 0, 0], where: '', row: -1 }
   recording.frames.forEach((f, frame) => {
+    if (frame > lastFrame) return
     f.penetration.forEach((depth, i) => {
       if (depth <= best.depth) return
       const p = f.positions
-      best = { frame, depth, point: [p[3 * i], p[3 * i + 1], p[3 * i + 2]], where: particleName(ctx.character, i) }
+      const point: Vec3 = [p[3 * i], p[3 * i + 1], p[3 * i + 2]]
+      best = { frame, depth, point, where: particleName(ctx.character, i), row: capeRow(ctx.character, i) }
     })
     f.linkPenetration.forEach((depth, i) => {
       if (depth <= best.depth) return
@@ -142,10 +171,23 @@ function deepest (ctx: Context): Deepest {
       const p = f.positions
       const mid = [0, 1, 2].map(k => (p[3 * a + k] + p[3 * b + k]) / 2) as Vec3
       const where = `the link between ${particleName(ctx.character, a)} and ${particleName(ctx.character, b)}`
-      best = { frame, depth, point: mid, where }
+      best = { frame, depth, point: mid, where, row: Math.max(capeRow(ctx.character, a), capeRow(ctx.character, b)) }
     })
   })
   return best
+}
+
+function isLegPart (ctx: Context, name: string): boolean {
+  const part = ctx.character.mannequin.parts.find(p => p.name === name)
+  const joints = ctx.character.rig.legs.flatMap(leg => LEG_JOINTS.map(f => leg[f]))
+  return part !== undefined && (joints.includes(part.a) || joints.includes(part.b))
+}
+
+function legHit (ctx: Context, worst: Deepest, part: string): string {
+  const { cape } = ctx.character.scenario
+  if (cape === undefined || worst.row < cape.rows - BOTTOM_ROWS || !isLegPart(ctx, part)) return ''
+  return `The bottom rows of the cape hang into '${part}': the cloth has no floor or leg-sweep collision of its ` +
+    `own, so shorten cape.length (now ${cape.length}) until the hem stays above the legs. `
 }
 
 function penetrationHint (ctx: Context, limit: number): string {
@@ -156,8 +198,9 @@ function penetrationHint (ctx: Context, limit: number): string {
   const worst = deepest(ctx)
   const part = nearestPart(ctx, worst.frame, worst.point)
   const { cape, bodyExcludeParts } = ctx.character.scenario
-  const anchors = cape === undefined ? '' : ` Cape anchors: '${cape.anchorLeft}' and '${cape.anchorRight}'.`
-  return `${hits.length} of ${recording.frames.length} frames have cloth inside the body (first ${at(ctx, hits[0])}, ` +
+  const anchors = anchorsOf(ctx)
+  return `${legHit(ctx, worst, part)}${hits.length} of ${recording.frames.length} frames have cloth inside the ` +
+    `body (first ${at(ctx, hits[0])}, ` +
     `last frame ${hits[hits.length - 1]}); deepest is ${worst.where} at ${at(ctx, worst.frame)}, ` +
     `${(worst.depth * 1000).toFixed(0)} mm in part '${part}'. If '${part}' is a stand-in for the cloth, list it ` +
     'in motion.json exclude ' +

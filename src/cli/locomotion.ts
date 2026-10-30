@@ -10,14 +10,17 @@ import type { Geometry, LocomotionRecording, SteadySegment } from '../motion/met
 import { footRadii, restPose } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { CharacterRun } from '../motion/character.ts'
-import type { Gate } from '../diagnostics/report.ts'
 import type { Check } from './summary.ts'
 
 const PIXEL_HEIGHT = 48
 const PLANT_METRES = 0.02
+const STEP_HEIGHT_FACTOR = 0.15
+const MIN_STEP_FACTOR = 0.1
+const TILT_METRES = 0.01
 
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
+type Limb = 'foot' | 'leg'
 type Context = { character: Character, recording: LocomotionRecording, windows: SteadySegment[], mpp: number }
 
 export function locomotionRecording (character: Character, run: CharacterRun): LocomotionRecording {
@@ -50,58 +53,96 @@ function legGeometry (character: Character, leg: Leg): Geometry {
   return { rig: { ...character.rig, legs: [leg] }, mannequin: character.mannequin }
 }
 
-function worstLeg (ctx: Context, measure: Measure): Worst {
+function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {
   const found = ctx.character.rig.legs.map(leg => {
     const geometry = legGeometry(ctx.character, leg)
     return { leg, geometry, value: measure(geometry, ctx.recording) }
   }).reduce((a, b) => b.value > a.value ? b : a)
   const frame = firstWorstFrame(ctx.recording, r => measure(found.geometry, r))
-  return { leg: found.leg, label: `${found.leg.side} foot`, frame, value: found.value }
+  return { leg: found.leg, label: `${found.leg.side} ${limb}`, frame, value: found.value }
 }
 
 function at (ctx: Context, frame: number): string {
   return `frame ${frame} (t = ${(frame / ctx.recording.fps).toFixed(2)} s)`
 }
 
-function restSoles (character: Character, leg: Leg): string {
+function legLength (character: Character, leg: Leg): number {
+  const rest = restPose(character.mannequin)
+  return rest[leg.hip][1] - rest[leg.ankle][1]
+}
+
+function tiltOf (character: Character, leg: Leg): { ankle: number, toe: number, tilt: number, toeY: number } {
   const rest = restPose(character.mannequin)
   const radii = footRadii(leg, character.mannequin)
   const ankle = rest[leg.ankle][1] - radii.ankle
   const toe = rest[leg.toe][1] - radii.toe
-  return `at rest the ankle sole point is at y = ${ankle.toFixed(3)} m and the toe sole point at ` +
-    `y = ${toe.toFixed(3)} m`
+  return { ankle, toe, tilt: toe - ankle, toeY: ankle + radii.toe }
+}
+
+function isTilted (character: Character, leg: Leg): boolean {
+  return Math.abs(tiltOf(character, leg).tilt) > TILT_METRES
 }
 
 function soleAdvice (ctx: Context, leg: Leg): string {
-  const { ankle, toe } = leg
-  return `${restSoles(ctx.character, leg)}; both should be 0. Set the '${ankle}' joint y to the foot capsule's ` +
-    `radiusA and the '${toe}' joint y to its radiusB`
+  const { ankle, toe, tilt, toeY } = tiltOf(ctx.character, leg)
+  return `at rest the ankle sole point (ankle y - radiusA) is at y = ${ankle.toFixed(3)} m and the toe sole point ` +
+    `(toe y - radiusB) at y = ${toe.toFixed(3)} m, so the foot is tilted by ${Math.abs(tilt).toFixed(3)} m; the two ` +
+    `must be equal (the absolute height does not matter, the gait grounds the lowest point). Set the '${leg.toe}' ` +
+    `joint y to ${toeY.toFixed(3)}, or change the foot capsule radii or the '${leg.ankle}' joint y to match`
 }
 
-function soleOffsets (ctx: Context, leg: Leg): number {
-  const rest = restPose(ctx.character.mannequin)
-  const radii = footRadii(leg, ctx.character.mannequin)
-  return Math.max(Math.abs(rest[leg.ankle][1] - radii.ankle), Math.abs(rest[leg.toe][1] - radii.toe))
+function stepAdvice (ctx: Context, leg: Leg): string {
+  const { stepHeight } = ctx.character.rig.gait
+  const length = legLength(ctx.character, leg)
+  const suggested = Math.max(STEP_HEIGHT_FACTOR * length, 1.25 * stepHeight)
+  return `raise rig.gait.stepHeight (now ${stepHeight}, try ${suggested.toFixed(3)}; the usual start is ` +
+    `${STEP_HEIGHT_FACTOR} x the ${length.toFixed(2)} m leg length). Raising it raises knee speed, which a lower ` +
+    'stanceFraction offsets'
+}
+
+function capitalise (text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+function nearTransition (ctx: Context, worst: Worst): boolean {
+  const geometry = legGeometry(ctx.character, worst.leg)
+  return metrics.plantedRuns(ctx.recording, geometry).some(run => {
+    return run.start <= worst.frame && worst.frame <= run.end &&
+      (worst.frame - run.start <= 1 || run.end - worst.frame <= 1)
+  })
 }
 
 function slideHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.footSlidePx(r, g, ctx.mpp))
   const clamped = metrics.reachViolations(ctx.recording)
   const { gait } = ctx.character.rig
-  const cause = soleOffsets(ctx, worst.leg) > PLANT_METRES / 2
-    ? `The foot does not lie flat at rest, so the heel or toe rolls and moves: ${soleAdvice(ctx, worst.leg)}.`
-    : `The foot is flat at rest, so the slide comes from the gait: shorten rig.gait.strideLength (now ` +
-      `${gait.strideLength}) or footSpacing (now ${gait.footSpacing}), or lower stepHeight (now ${gait.stepHeight}).`
+  const low = gait.stepHeight < MIN_STEP_FACTOR * legLength(ctx.character, worst.leg)
+  let cause: string
+  if (isTilted(ctx.character, worst.leg)) {
+    cause = `The foot is not level at rest, so the heel or toe rolls and moves: ${soleAdvice(ctx, worst.leg)}.`
+  } else if (low || nearTransition(ctx, worst)) {
+    const where = low
+      ? `stepHeight is below ${MIN_STEP_FACTOR} x the leg length`
+      : 'the slide happens within a frame of lift-off or touch-down, where the foot is still close to the floor'
+    cause = `The foot is level at rest and ${where}: ${stepAdvice(ctx, worst.leg)}.`
+  } else {
+    cause = `The foot is level at rest, so the slide comes from the gait: ${stepAdvice(ctx, worst.leg)}; changing ` +
+      `strideLength (now ${gait.strideLength}) or footSpacing (now ${gait.footSpacing}) is less reliable.`
+  }
   const drag = clamped > 0 ? ` ${clamped} frames also have an unreachable foot target (see reachViolations).` : ''
   return `the ${worst.label} moves ${worst.value.toFixed(2)} px (at ${PIXEL_HEIGHT}px) in ${at(ctx, worst.frame)} ` +
     `while its sole is within 2 cm of the floor. A planted foot must not move. ${cause}${drag}`
+}
+
+function groundCause (ctx: Context, leg: Leg): string {
+  return isTilted(ctx.character, leg) ? `The foot is not level: ${soleAdvice(ctx, leg)}. ` : ''
 }
 
 function groundHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.groundPenetrationPx(r, g, ctx.mpp))
   const metresDeep = worst.value * ctx.mpp
   return `the ${worst.label} sole goes ${worst.value.toFixed(2)} px (${metresDeep.toFixed(3)} m) below the floor in ` +
-    `${at(ctx, worst.frame)}. ${soleAdvice(ctx, worst.leg)}, or reduce rig.gait.bobAmplitude ` +
+    `${at(ctx, worst.frame)}. ${groundCause(ctx, worst.leg)}Otherwise reduce rig.gait.bobAmplitude ` +
     `(now ${ctx.character.rig.gait.bobAmplitude}).`
 }
 
@@ -127,10 +168,11 @@ function partGroundHint (ctx: Context): string {
   const atRest = metrics.partGroundPenetrationPx({ fps: ctx.recording.fps, frames: [restFrame] }, {
     mannequin: single, rig: character.rig, metresPerPixel: ctx.mpp
   })
-  const where = atRest > 0 ? `it is already ${(atRest * ctx.mpp).toFixed(3)} m below y = 0 at rest: raise its joints ` +
-    `'${worst.part.a}' and '${worst.part.b}' in the mannequin` : 'it reaches the floor only while posed: raise its ' +
-    `joints '${worst.part.a}' and '${worst.part.b}' in the mannequin, or reduce rig.gait.bobAmplitude and ` +
-    'armSwingDegrees'
+  const ends = [...new Set([worst.part.a, worst.part.b])].map(j => `'${j}'`).join(' and ')
+  const joints = `${worst.part.a === worst.part.b ? 'joint' : 'joints'} ${ends}`
+  const where = atRest > 0 ? `it is already ${(atRest * ctx.mpp).toFixed(3)} m below y = 0 at rest: raise its ` +
+    `${joints} in the mannequin` : `it reaches the floor only while posed: raise its ${joints} in the mannequin, or ` +
+    'reduce rig.gait.bobAmplitude and armSwingDegrees'
   return `part '${worst.part.name}' goes ${worst.value.toFixed(2)} px (${(worst.value * ctx.mpp).toFixed(3)} m) ` +
     `through the floor in ${at(ctx, frame)}; ${where}. Parts other than the feet must stay above y = 0.`
 }
@@ -154,8 +196,8 @@ function kneeProblem (ctx: Context, leg: Leg, frame: number): string {
   const [hip, knee, ankle] = [f.joints[leg.hip], f.joints[leg.knee], f.joints[leg.ankle]]
   const forward: [number, number, number] = [Math.sin(f.root.yaw), 0, Math.cos(f.root.yaw)]
   if (kneeBendsBackward(hip, knee, ankle, forward)) {
-    return `the knee bends backwards there. In the mannequin the '${leg.knee}' joint must sit in front of (larger z ` +
-      `than) the straight line from '${leg.hip}' to '${leg.ankle}' at rest`
+    return 'the knee bends backwards there, although the knee always bends forward; check that ' +
+      `'${leg.hip}', '${leg.knee}' and '${leg.ankle}' are three distinct joints and the leg is not folded`
   }
   const flexion = kneeFlexionDegrees(hip, knee, ankle)
   return `the knee flexion there is ${flexion.toFixed(0)} degrees, outside 0 to ${metrics.MAX_KNEE_FLEXION}. ` +
@@ -163,17 +205,20 @@ function kneeProblem (ctx: Context, leg: Leg, frame: number): string {
 }
 
 function kneeLimitHint (ctx: Context): string {
-  const worst = worstLeg(ctx, (g, r) => metrics.kneeLimitViolations(r, g))
-  return `${worst.value} frames of the ${worst.label} violate the knee limits, first in ${at(ctx, worst.frame)}: ` +
-    `${kneeProblem(ctx, worst.leg, worst.frame)}.`
+  const worst = worstLeg(ctx, (g, r) => metrics.kneeLimitViolations(r, g), 'leg')
+  const total = metrics.kneeLimitViolations(ctx.recording, geometryOf(ctx))
+  return `${total} knee-frames over both legs violate the knee limits, ${worst.value} of them in the ${worst.label}, ` +
+    `first in ${at(ctx, worst.frame)}: ${kneeProblem(ctx, worst.leg, worst.frame)}.`
 }
 
 function kneeSpeedHint (ctx: Context): string {
-  const worst = worstLeg(ctx, (g, r) => metrics.kneeSpeedDegPerSec(r, g))
+  const worst = worstLeg(ctx, (g, r) => metrics.kneeSpeedDegPerSec(r, g), 'leg')
   const { gait } = ctx.character.rig
   return `the ${worst.label} knee flexes at ${worst.value.toFixed(0)} degrees/s in ${at(ctx, worst.frame)}, which ` +
-    `reads as a pop. Lower rig.gait.stepHeight (now ${gait.stepHeight}) or lower stanceFraction (now ` +
-    `${gait.stanceFraction}; a smaller value gives a longer, slower swing), or walk slower.`
+    `reads as a pop. Lower rig.gait.stanceFraction (now ${gait.stanceFraction}, minimum 0.5; a smaller value gives a ` +
+    `longer, slower swing) or lengthen strideLength (now ${gait.strideLength}). A higher stepHeight (now ` +
+    `${gait.stepHeight}) raises knee speed, but lowering it can bring back foot slide; walking slower does not ` +
+    'reliably help.'
 }
 
 function limbGeometries (character: Character): Array<{ label: string, geometry: Geometry }> {
@@ -208,14 +253,20 @@ function rootSpeedHint (ctx: Context): string {
     .reduce((a, b) => b.value > a.value ? b : a)
   const cycle = stride(gait, bad.w.speed) / bad.w.speed
   const seconds = bad.w.end - bad.w.start
+  const accel = ctx.character.scenario.script.accelSeconds
+  const head = `steady walking window ${windowText(bad.w)} (${seconds.toFixed(2)} s long)`
+  if (!Number.isFinite(bad.value) && seconds >= 2.5 * cycle) {
+    return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but a foot has fewer ` +
+      'than two plants in it: the feet never rise above 2 cm, so each counts as planted the whole time. ' +
+      `${capitalise(stepAdvice(ctx, ctx.character.rig.legs[0]))}.`
+  }
   const why = Number.isFinite(bad.value)
     ? `the feet advance ${(bad.value * 100).toFixed(1)}% differently from the script speed`
     : 'neither foot has two plants in it, so the speed cannot be measured'
-  return `steady walking window ${windowText(bad.w)} (${seconds.toFixed(2)} s long): ${why}. One step cycle at ` +
-    `this speed takes ${cycle.toFixed(2)} s (stride ${stride(gait, bad.w.speed).toFixed(2)} m), and the window needs ` +
-    `at least two plants per foot: make this 'move' segment longer (at least ${(2.5 * cycle).toFixed(1)} s ` +
-    `after accelSeconds ${ctx.character.scenario.script.accelSeconds}), or reduce rig.gait.strideLength ` +
-    `(now ${gait.strideLength}).`
+  return `${head}: ${why}. One step cycle at this speed takes ${cycle.toFixed(2)} s (stride ` +
+    `${stride(gait, bad.w.speed).toFixed(2)} m), and the window needs at least two plants per foot: make this ` +
+    `'move' segment longer (at least ${(accel + 2.5 * cycle).toFixed(1)} s in total: accelSeconds ${accel} plus 2.5 ` +
+    `cycles), or reduce rig.gait.strideLength (now ${gait.strideLength}).`
 }
 
 function geometryOf (ctx: Context): Geometry {
@@ -239,19 +290,8 @@ function unsupportedHint (ctx: Context): string {
   const [first] = frames
   const leg = ctx.character.rig.legs[0]
   return `neither foot has a sole point within 2 cm of the floor in ${frames.length} frames, first in ` +
-    `${at(ctx, first)}: the character hovers. Check the sole heights (${restSoles(ctx.character, leg)}), ` +
-    `and lower rig.gait.stepHeight (now ${ctx.character.rig.gait.stepHeight}) or bobAmplitude (now ` +
-    `${ctx.character.rig.gait.bobAmplitude}).`
-}
-
-function plantedGate (side: string, value: number): Gate {
-  return {
-    name: `plantedFrames.${side}`,
-    value,
-    op: '>=',
-    threshold: 1,
-    rationale: 'The foot must be planted at least once or the foot-slide gate measures nothing.'
-  }
+    `${at(ctx, first)}: the character hovers. ${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ` +
+    `${ctx.character.rig.gait.bobAmplitude}) or stepHeight (now ${ctx.character.rig.gait.stepHeight}).`
 }
 
 function plantedHint (ctx: Context, side: string): string {
@@ -260,7 +300,8 @@ function plantedHint (ctx: Context, side: string): string {
     return metrics.solePoints(f.joints, leg, ctx.character.mannequin).map(p => p[1])
   }))
   return `the ${side} foot never has a sole point within ${PLANT_METRES * 100} cm of the floor for two frames in a ` +
-    `row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ${soleAdvice(ctx, leg)}.`
+    `row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ${groundCause(ctx, leg)}Otherwise ` +
+    `lower rig.gait.bobAmplitude (now ${ctx.character.rig.gait.bobAmplitude}) or stepHeight.`
 }
 
 export function locomotionChecks (character: Character, recording: LocomotionRecording): Check[] {
@@ -294,7 +335,7 @@ export function locomotionChecks (character: Character, recording: LocomotionRec
     }
   ]
   for (const side of ['left', 'right'] as const) {
-    checks.push({ gate: plantedGate(side, planted[side]), hint: () => plantedHint(ctx, side) })
+    checks.push({ gate: gate('plantedFrames', planted[side], side), hint: () => plantedHint(ctx, side) })
   }
   return checks
 }

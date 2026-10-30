@@ -1,4 +1,4 @@
-import { existsSync, rmSync } from 'node:fs'
+import { rmSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { formatCharacterErrors, loadCharacter } from '../formats/character.ts'
 import type { Character } from '../formats/character.ts'
@@ -35,9 +35,30 @@ function finite (key: string, value: unknown): unknown {
   return typeof value === 'number' && !Number.isFinite(value) ? String(value) : value
 }
 
+function pathKind (path: string): 'directory' | 'other' | 'missing' {
+  try {
+    return statSync(path).isDirectory() ? 'directory' : 'other'
+  } catch {
+    return 'missing'
+  }
+}
+
 function writeError (args: Args, message: string): void {
   console.error(message)
-  if (existsSync(args.dir)) writeOutput(join(args.out, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
+  if (pathKind(args.dir) !== 'directory') return
+  try {
+    writeOutput(join(args.out, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
+  } catch (err) {
+    console.error(`could not write ${join(args.out, 'summary.txt')}: ${err instanceof Error ? err.message : err}`)
+  }
+}
+
+function clearReport (out: string): void {
+  try {
+    for (const name of OUTPUTS) rmSync(join(out, name), { force: true })
+  } catch {
+    return
+  }
 }
 
 function analyse (character: Character, out: string): number {
@@ -75,13 +96,17 @@ function main (): number {
     console.error(args)
     return 2
   }
+  if (pathKind(args.dir) === 'other') {
+    console.error(`'${args.dir}' is not a directory; pass the directory that holds character.json`)
+    return 2
+  }
+  clearReport(args.out)
   try {
     const loaded = loadCharacter(args.dir)
     if (loaded.value === undefined || loaded.errors.length > 0) {
       writeError(args, formatCharacterErrors(loaded.errors))
       return 2
     }
-    for (const name of OUTPUTS) rmSync(join(args.out, name), { force: true })
     return analyse(loaded.value, args.out)
   } catch (err) {
     writeError(args, err instanceof Error ? (err.stack ?? err.message) : String(err))

@@ -202,3 +202,15 @@ Tests: sizes, ground line present, planted footprints counted.
   contact sheet of one mid-stride frame; determinism via a child process.
 
 Review batch C, then run the judge panel (controller) and log findings in `docs/plans/p4-findings.md`.
+
+## Amendment after batch B (before batch C)
+
+- Foot points for `footSlidePx` and `groundPenetrationPx` are measured at the sole: the ankle and toe joints
+  lowered by the radius of the foot part that spans them (`radiusA` at the ankle, `radiusB` at the toe, from the
+  mannequin). Measured at the joints, the knight's feet are never within 2 cm of the ground (its toe joint sits at
+  6 cm, at the centre of the foot capsule), so the slide gate would pass without measuring anything. The runner must
+  also report how many frames each foot counted as planted; a planted-frame count of zero is a harness error
+  (exit 2), not a pass.
+- Starting gait in Task C4: `strideLength` 1.0 instead of 1.3. At 1.3 the knight's short, straight legs need a
+  0.39 m pelvis drop and the knee peaks at 645 degrees/s (gate 600); at 1.0 it measured 556 degrees/s. This is a rig
+  parameter, not a gate.

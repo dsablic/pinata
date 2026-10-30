@@ -1,0 +1,32 @@
+[
+  {
+    "file": "image-1.png",
+    "character": "dwarf",
+    "style": "default"
+  },
+  {
+    "file": "image-2.png",
+    "character": "knight",
+    "style": "default"
+  },
+  {
+    "file": "image-3.png",
+    "character": "dwarf",
+    "style": "vivid"
+  },
+  {
+    "file": "image-4.png",
+    "character": "knight",
+    "style": "vivid"
+  },
+  {
+    "file": "image-5.png",
+    "character": "dwarf",
+    "style": "muted"
+  },
+  {
+    "file": "image-6.png",
+    "character": "knight",
+    "style": "muted"
+  }
+]

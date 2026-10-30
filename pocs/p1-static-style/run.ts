@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { createHash } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -20,6 +19,8 @@ import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diag
 import { depthImage, normalImage, partImage, sheet } from '../../src/diagnostics/images.ts'
 import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
 import { gate } from './gates.ts'
+import { pngHeight, planAb } from './ab.ts'
+import type { AbPlan } from './ab.ts'
 import { previewHtml } from './preview.ts'
 import type { AbPair } from './preview.ts'
 
@@ -31,7 +32,6 @@ const SHEET_SCALE = 8
 const SHEET_BACKGROUND = 0xc8c8c8
 const MIN_PIXELS_FOR_THIN = 4
 const CHILD_TIMEOUT_MS = 60000
-const AB_FRAME = '48px-el30-d1'
 const FACING = ['front', 'front-left', 'left', 'back-left', 'back', 'back-right', 'right', 'front-right']
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -160,16 +160,17 @@ const results = evaluate([
 ])
 const summary = summarize('P1 static style', results)
 
-function abPairs (): { pairs: AbPair[], key: Array<{ ref: string, ours: 'left' | 'right' }> } {
-  const refs = existsSync(refsDir) ? readdirSync(refsDir).filter(f => f.endsWith('.png')).sort() : []
-  const ours = `frames/${AB_FRAME}.png`
-  const key = refs.map(ref => {
-    const side: 'left' | 'right' = createHash('sha256').update(ref).digest()[0] % 2 === 0 ? 'left' : 'right'
-    return { ref, ours: side }
-  })
-  const pairs = key.map(({ ref, ours: side }) => {
-    const theirs = `../../refs/p1/${encodeURIComponent(ref)}`
-    return side === 'left' ? { left: ours, right: theirs } : { left: theirs, right: ours }
+function abPairs (): { pairs: AbPair[], key: AbPlan[] } {
+  const names = existsSync(refsDir) ? readdirSync(refsDir).filter(f => f.endsWith('.png')).sort() : []
+  const bytes = new Map(names.map(name => [name, readFileSync(join(refsDir, name))]))
+  const key = planAb(names.map(name => ({ name, height: pngHeight(bytes.get(name) as Uint8Array) })))
+  const pairs = key.map(p => {
+    const frame = frames.find(f => f.id === p.frame) as Frame
+    const files = [encodePng(frame.image), bytes.get(p.ref) as Uint8Array]
+    const [left, right] = p.ours === 'left' ? files : [files[1], files[0]]
+    writeOutput(join(outDir, 'ab', `pair${p.pair}-a.png`), left)
+    writeOutput(join(outDir, 'ab', `pair${p.pair}-b.png`), right)
+    return { left: `ab/pair${p.pair}-a.png`, right: `ab/pair${p.pair}-b.png` }
   })
   return { pairs, key }
 }

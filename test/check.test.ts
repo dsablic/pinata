@@ -187,7 +187,8 @@ test('a low stepHeight makes the slide and root-speed hints say to raise it', ()
   const summary = summaryOf(run)
   assert.match(summary, /stepHeight is below 0\.1 x the leg length: raise rig\.gait\.stepHeight/)
   assert.match(summary, /Raising it raises knee speed, which a lower stanceFraction offsets/)
-  assert.match(summary, /window is long enough.*the feet never rise above 2 cm.*Raise rig\.gait\.stepHeight/)
+  const noPlants = /window is long enough.*the (left|right) foot has fewer than two plants.*never rises above 2 cm/
+  assert.match(summary, new RegExp(`${noPlants.source}.*Raise rig\\.gait\\.stepHeight`))
 })
 
 test('a tilted foot is diagnosed by the difference of its sole points, not their height', () => {
@@ -213,4 +214,34 @@ test('a cape whose bottom rows hang into a foot is told to shorten length', () =
     patch(d, 'motion.json', j => { j.exclude = ['torso'] })
   }))
   assert.match(summaryOf(run), /bottom rows of the cape hang into 'footL'.*shorten cape\.length \(now 0\.4\)/)
+})
+
+test('an appendage adds its gates and passes; balance is not gated for two legs', () => {
+  const run = check(variant(d => {
+    patch(d, 'mannequin.json', j => {
+      j.joints.tail1 = [0, 0.6, -0.1]
+      j.joints.tail2 = [0, 0.55, -0.25]
+      j.joints.tail3 = [0, 0.5, -0.38]
+    })
+    patch(d, 'rig.json', j => {
+      const legs = j.legs.map((l: any) => ({ kind: 'leg', side: l.side, joints: [l.hip, l.knee, l.ankle, l.toe] }))
+      const arms = j.arms.map((a: any) => {
+        return { kind: 'arm', side: a.side, joints: [a.shoulder, a.elbow, a.wrist, a.hand] }
+      })
+      const oscillate = { axis: [0, 1, 0], degrees: 20, period: 0.8 }
+      const tail = { kind: 'appendage', name: 'tail', joints: ['tail1', 'tail2', 'tail3'], stiffness: 0.3, oscillate }
+      j.limbs = [...legs, ...arms, tail]
+      delete j.legs
+      delete j.arms
+    })
+  }))
+  assert.equal(run.status, 0, run.stdout + run.stderr)
+  const summary = summaryOf(run)
+  assert.match(summary, /^PASS {2}appendageBoneLengthError: 0\.000 <= 0\.01$/m)
+  assert.match(summary, /^PASS {2}appendageNonFinite: 0 <= 0$/m)
+  assert.doesNotMatch(summary, /unbalancedFrames/)
+})
+
+test('the ok character has no appendage gates', () => {
+  assert.doesNotMatch(summaryOf(check(ok)), /appendage/)
 })

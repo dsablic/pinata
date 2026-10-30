@@ -69,3 +69,20 @@ export function legLabels (rig: Rig, rest: Pose): string[] {
   }
   return legs.map(leg => labels[leg.index])
 }
+
+/**
+ * Arm names for messages: the side for one arm per side, and side and a number from the front (larger rest shoulder
+ * z) for several per side.
+ */
+export function armLabels (rig: Rig, rest: Pose): string[] {
+  const arms = armsOf(rig)
+  const labels: string[] = []
+  for (const side of ['left', 'right']) {
+    const mine = arms.map((arm, i) => ({ arm, i })).filter(({ arm }) => arm.side === side)
+    const ranks = rankFromFront(mine.map(({ arm }) => rest[arm.shoulder][2]))
+    mine.forEach(({ i }, k) => {
+      labels[i] = mine.length === 1 ? `${side} arm` : `${side} arm ${ranks[k] + 1}`
+    })
+  }
+  return labels
+}

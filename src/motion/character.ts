@@ -8,6 +8,7 @@ import { partsCollider, posedParts } from '../sim/body.ts'
 import { createRecording, recordFrame } from '../sim/metrics.ts'
 import type { Recording } from '../sim/metrics.ts'
 import { step } from '../sim/solver.ts'
+import { animateAppendages } from './appendages.ts'
 import { planGait } from './gait.ts'
 import type { GaitFrame } from './gait.ts'
 import { poseAt } from './locomotion.ts'
@@ -52,8 +53,8 @@ function buildSystem (options: CharacterOptions): System {
 /**
  * Plans the gait for the scenario's script, poses every frame and simulates the scenario's cape and chains on the
  * posed body with the P3 conventions: `substeps` substeps per frame, frame 0 recorded before stepping. Frame i's
- * pose is held for the substeps that end in frame i. Poses are body-local; joints the rig does not move keep their
- * rest positions.
+ * pose is held for the substeps that end in frame i. Appendages swing at the same substep rate. Poses are body-local;
+ * joints the rig does not move keep their rest positions.
  */
 export function simulateCharacter (options: CharacterOptions): CharacterRun {
   const { mannequin, rig, scenario } = options
@@ -63,7 +64,8 @@ export function simulateCharacter (options: CharacterOptions): CharacterRun {
   const rest = restPose(mannequin)
   const duration = scenarioDuration(scenario)
   const frames = planGait({ track, rig, rest, mannequin, duration, fps })
-  const poses = frames.map(frame => ({ ...rest, ...poseAt({ frame, rig, rest, mannequin }).pose }))
+  const posed = frames.map(frame => ({ ...rest, ...poseAt({ frame, rig, rest, mannequin }).pose }))
+  const poses = animateAppendages(frames, posed, { rig, rest, fps, substeps: scenario.substeps })
   const simulateStart = performance.now()
 
   const system = buildSystem(options)

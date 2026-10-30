@@ -64,6 +64,25 @@ export const P4_GATES = {
     threshold: 0,
     rationale: 'During steady walking, the same foot planting twice in a row.'
   },
+  unbalancedFrames: {
+    op: '<=',
+    threshold: 0,
+    rationale: 'Characters with more than four legs: frames in which the body centre (volume-weighted centroid of ' +
+      'the pelvis and upperBody parts, projected on the ground) lies more than 2 cm outside the convex hull of the ' +
+      'sole points within 2 cm of the ground. Many-legged gaits are statically stable; two- and four-legged walks ' +
+      'balance dynamically and are not gated.'
+  },
+  appendageBoneLengthError: {
+    op: '<=',
+    threshold: 0.01,
+    rationale: 'Construction check: max relative change of any appendage bone (tail, ears, wings) from the rest ' +
+      'pose. The spring keeps every segment at its length, so this catches a broken rig or solver.'
+  },
+  appendageNonFinite: {
+    op: '<=',
+    threshold: 0,
+    rationale: 'Joint-frames in which an appendage joint position is not a finite number: the spring blew up.'
+  },
   plantedFrames: {
     op: '>=',
     threshold: 1,

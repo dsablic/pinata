@@ -75,7 +75,8 @@ function render (): Image[] {
     mannequin: character.mannequin, rig: character.rig, scenario: character.scenario, materials: character.materials
   })
   const locomotion = recordLocomotion(run.frames, {
-    rig: character.rig, rest: restPose(character.mannequin), mannequin: character.mannequin, fps: FPS
+    rig: character.rig, rest: restPose(character.mannequin), mannequin: character.mannequin, fps: FPS,
+    substeps: character.scenario.substeps
   })
   const joints = locomotion.frames.map(f => f.joints)
   const cam = camera(character.mannequin)

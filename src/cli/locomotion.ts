@@ -6,7 +6,7 @@ import type { Character } from '../formats/character.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../motion/ik.ts'
 import * as metrics from '../motion/metrics.ts'
 import type { Geometry, LocomotionRecording, SteadySegment } from '../motion/metrics.ts'
-import { bendingJoints, chainLength, footRadii, legLabels, restPose } from '../motion/pose.ts'
+import { armLabels, bendingJoints, chainLength, footRadii, legLabels, restPose } from '../motion/pose.ts'
 import type { JointTriple, Pose } from '../motion/pose.ts'
 import type { CharacterRun } from '../motion/character.ts'
 import type { Check } from './summary.ts'
@@ -17,6 +17,7 @@ const STEP_HEIGHT_FACTOR = 0.15
 const MIN_STEP_FACTOR = 0.1
 const TILT_METRES = 0.01
 const MAX_UNNAMED_LEGS = 4
+const MIN_BALANCED_LEGS = 5
 
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
@@ -31,7 +32,8 @@ type Context = {
 
 export function locomotionRecording (character: Character, run: CharacterRun): LocomotionRecording {
   const { mannequin, rig, scenario } = character
-  return metrics.recordLocomotion(run.frames, { rig, rest: restPose(mannequin), mannequin, fps: scenario.fps })
+  const { fps, substeps } = scenario
+  return metrics.recordLocomotion(run.frames, { rig, rest: restPose(mannequin), mannequin, fps, substeps })
 }
 
 export function walkingWindows (character: Character): SteadySegment[] {
@@ -260,8 +262,9 @@ function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometr
     ...legsOf(rig).map((leg, index) => {
       return { label: legTitle(ctx, index, 'leg'), geometry: { rig: withLimbs(rig, [leg.limb]), mannequin } }
     }),
-    ...armsOf(rig).map(arm => {
-      return { label: `${arm.side} arm`, geometry: { rig: withLimbs(rig, [arm.limb]), mannequin } }
+    ...armsOf(rig).map((arm, index) => {
+      const label = armLabels(rig, restPose(mannequin))[index]
+      return { label, geometry: { rig: withLimbs(rig, [arm.limb]), mannequin } }
     })
   ]
 }
@@ -280,6 +283,15 @@ function windowText (w: SteadySegment): string {
   return `${w.start.toFixed(2)}-${w.end.toFixed(2)} s at ${w.speed} m/s`
 }
 
+function fewestPlants (ctx: Context, window: SteadySegment): number {
+  const runs = metrics.plantedRuns(ctx.recording, geometryOf(ctx)).filter(run => {
+    const time = ctx.recording.frames[run.start].time
+    return time >= window.start && time <= window.end
+  })
+  const counts = legsOf(ctx.character.rig).map((_, leg) => runs.filter(run => run.leg === leg).length)
+  return counts.indexOf(Math.min(...counts))
+}
+
 function rootSpeedHint (ctx: Context): string {
   const { gait } = ctx.character.rig
   const bad = ctx.windows.map(w => ({ w, value: metrics.rootSpeedError(ctx.recording, geometryOf(ctx), [w]) }))
@@ -289,9 +301,10 @@ function rootSpeedHint (ctx: Context): string {
   const accel = ctx.character.scenario.script.accelSeconds
   const head = `steady walking window ${windowText(bad.w)} (${seconds.toFixed(2)} s long)`
   if (!Number.isFinite(bad.value) && seconds >= 2.5 * cycle) {
-    return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but a foot has fewer ` +
-      'than two plants in it: the feet never rise above 2 cm, so each counts as planted the whole time. ' +
-      `${capitalise(stepAdvice(ctx, legsOf(ctx.character.rig)[0]))}.`
+    const leg = fewestPlants(ctx, bad.w)
+    return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but the ` +
+      `${legTitle(ctx, leg, 'foot')} has fewer than two plants in it: it never rises above 2 cm, so it counts as ` +
+      `planted the whole time. ${capitalise(stepAdvice(ctx, legsOf(ctx.character.rig)[leg]))}.`
   }
   const why = Number.isFinite(bad.value)
     ? `the feet advance ${(bad.value * 100).toFixed(1)}% differently from the script speed`
@@ -326,7 +339,8 @@ function unsupportedHint (ctx: Context): string {
     return metrics.unsupportedFrames({ fps: ctx.recording.fps, frames: [ctx.recording.frames[i]] }, geometryOf(ctx)) > 0
   })
   const [first] = frames
-  const leg = legsOf(ctx.character.rig)[0]
+  const legs = legsOf(ctx.character.rig)
+  const leg = legs.find(l => isTilted(ctx.character, l)) ?? legs[0]
   return `no foot has a sole point within 2 cm of the floor in ${frames.length} frames, first in ` +
     `${at(ctx, first)}: the character hovers. ${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ` +
     `${ctx.character.rig.gait.bobAmplitude}) or stepHeight (now ${ctx.character.rig.gait.stepHeight}).`
@@ -342,6 +356,58 @@ function plantedHint (ctx: Context, label: string): string {
     `for two frames in a row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ` +
     `${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ${ctx.character.rig.gait.bobAmplitude}) ` +
     'or stepHeight.'
+}
+
+function balanceHint (ctx: Context): string {
+  const g = geometryOf(ctx)
+  const distances = metrics.balanceDistances(ctx.recording, g)
+  const outside = distances.map(d => d ?? -Infinity)
+  const frame = outside.indexOf(Math.max(...outside))
+  const { joints } = ctx.recording.frames[frame]
+  const planted = legsOf(ctx.character.rig).map((leg, i) => ({ leg, i })).filter(({ leg }) => {
+    return metrics.solePoints(joints, leg, ctx.character.mannequin).some(p => p[1] <= PLANT_METRES)
+  }).map(({ i }) => legTitle(ctx, i))
+  const { gait } = ctx.character.rig
+  const total = metrics.unbalancedFrames(ctx.recording, g)
+  return `in ${total} frames the body centre is more than 2 cm outside the area the planted feet enclose on the ` +
+    `ground; worst ${(distances[frame] ?? 0).toFixed(3)} m outside in ${at(ctx, frame)}, standing on: ` +
+    `${planted.join(', ')}. A many-legged walk keeps the body over its feet. Raise rig.gait.stanceFraction (now ` +
+    `${gait.stanceFraction}) so more feet are down at once; check that neighbouring legs on a side and opposite ` +
+    'legs at the same position are half a cycle apart (a tripod alternates 0 and 0.5); spread the feet wider ' +
+    `(rig.gait.lateral 'rest', or footSpacing, now ${gait.footSpacing}); or move heavy pelvis and upperBody parts ` +
+    'toward the middle of the legs in the mannequin.'
+}
+
+type AppendageMeasure = (geometry: Geometry) => number
+
+function worstAppendage (ctx: Context, measure: AppendageMeasure): { name: string, value: number } {
+  const { rig, mannequin } = ctx.character
+  return rig.limbs.filter(limb => limb.kind === 'appendage').map(limb => {
+    return { name: limb.name, value: measure({ rig: withLimbs(rig, [limb]), mannequin }) }
+  }).reduce((a, b) => b.value > a.value ? b : a)
+}
+
+function substepAdvice (ctx: Context): string {
+  return `raise motion.json substeps (now ${ctx.character.scenario.substeps}), or lower the appendage's oscillate ` +
+    'degrees'
+}
+
+function appendageBoneHint (ctx: Context): string {
+  const rest = restPose(ctx.character.mannequin)
+  const worst = worstAppendage(ctx, g => metrics.appendageBoneLengthError(ctx.recording, g, rest))
+  return `the bones of appendage '${worst.name}' change length by ${(worst.value * 100).toFixed(1)}%. The spring ` +
+    'keeps every segment at its rest length, so a joint of this appendage is also moved by something else ' +
+    '(listed again in upperBody, another limb or carried), two of its joints coincide in the mannequin, or the ' +
+    `motion blew up (see appendageNonFinite): ${substepAdvice(ctx)}.`
+}
+
+function appendageNonFiniteHint (ctx: Context): string {
+  const worst = worstAppendage(ctx, g => metrics.appendageNonFinite(ctx.recording, g))
+  const limb = ctx.character.rig.limbs.find(l => l.name === worst.name)!
+  const frame = ctx.recording.frames.findIndex(f => limb.joints.some(j => !f.joints[j].every(Number.isFinite)))
+  return `appendage '${worst.name}' has ${worst.value} joint positions that are not finite numbers, first in ` +
+    `${at(ctx, frame)}: its spring blew up. ${capitalise(substepAdvice(ctx))}; also check that no two of its ` +
+    'joints coincide in the mannequin.'
 }
 
 export function locomotionChecks (character: Character, recording: LocomotionRecording): Check[] {
@@ -377,6 +443,22 @@ export function locomotionChecks (character: Character, recording: LocomotionRec
   ]
   for (const label of labels) {
     checks.push({ gate: gate('plantedFrames', planted[label], label), hint: () => plantedHint(ctx, label) })
+  }
+  if (labels.length >= MIN_BALANCED_LEGS) {
+    const unbalanced = metrics.unbalancedFrames(recording, g)
+    checks.push({ gate: gate('unbalancedFrames', unbalanced), hint: () => balanceHint(ctx) })
+  }
+  if (character.rig.limbs.some(limb => limb.kind === 'appendage')) {
+    checks.push(
+      {
+        gate: gate('appendageBoneLengthError', metrics.appendageBoneLengthError(recording, g, rest)),
+        hint: () => appendageBoneHint(ctx)
+      },
+      {
+        gate: gate('appendageNonFinite', metrics.appendageNonFinite(recording, g)),
+        hint: () => appendageNonFiniteHint(ctx)
+      }
+    )
   }
   return checks
 }

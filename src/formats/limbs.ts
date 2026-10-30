@@ -15,7 +15,7 @@ export type LegLimb = {
   limits?: Limits
 }
 export type ArmLimb = { kind: 'arm', name: string, joints: string[], side: Side, carried?: string[] }
-export type Oscillator = { axis: Vec3, degrees: number, phase: number }
+export type Oscillator = { axis: Vec3, degrees: number, phase: number, period?: number }
 export type AppendageLimb = {
   kind: 'appendage'
   name: string
@@ -71,6 +71,7 @@ export const MIN_JOINTS: Record<LimbKind, number> = { leg: 4, arm: 2, appendage:
 export const DEFAULT_STIFFNESS = 0.6
 export const DEFAULT_DAMPING = 0.4
 const MAX_OSCILLATION_DEGREES = 180
+const MAX_PERIOD_SECONDS = 60
 const LIMIT_RANGE = 180
 const LIMB_FIELDS: Record<LimbKind, readonly string[]> = {
   leg: ['name', 'kind', 'joints', 'side', 'phase', 'bend', 'limits'],
@@ -82,7 +83,7 @@ const JOINT_NOTE: Record<LimbKind, string> = {
   arm: 'from the shoulder outward',
   appendage: 'from the root outward'
 }
-const OSCILLATE_FIELDS = ['axis', 'degrees', 'phase'] as const
+const OSCILLATE_FIELDS = ['axis', 'degrees', 'phase', 'period'] as const
 
 export function legsOf ({ limbs }: Source): Leg[] {
   const legs: Leg[] = []
@@ -332,16 +333,24 @@ function validateAppendage (limb: Record<string, unknown>, here: string, errors:
   if (oscillate === undefined) return
   const path = `${here}.oscillate`
   if (!isRecord(oscillate)) {
-    errors.push({ path, message: 'expected an object with axis, degrees and phase' })
+    errors.push({ path, message: 'expected an object with axis, degrees, period and phase' })
     return
   }
   checkKnownKeys(oscillate, OSCILLATE_FIELDS, path, errors)
   if (!isDirection(oscillate.axis)) {
     errors.push({ path: `${path}.axis`, message: 'expected a direction [x, y, z] that is not the zero vector' })
   }
-  const { degrees, phase } = oscillate
+  const { degrees, phase, period } = oscillate
   if (!(isFiniteNumber(degrees) && degrees >= 0 && degrees <= MAX_OSCILLATION_DEGREES)) {
     errors.push({ path: `${path}.degrees`, message: `expected a number of degrees, 0 to ${MAX_OSCILLATION_DEGREES}` })
+  }
+  const swings = isFiniteNumber(degrees) && degrees > 0
+  if (period === undefined ? swings : !(isFiniteNumber(period) && period > 0 && period <= MAX_PERIOD_SECONDS)) {
+    const note = period === undefined ? ': an oscillator that swings (degrees above 0) needs one' : ''
+    errors.push({
+      path: `${path}.period`,
+      message: `expected seconds per full swing, above 0 and at most ${MAX_PERIOD_SECONDS}${note}`
+    })
   }
   if (phase !== undefined && !(isFiniteNumber(phase) && phase >= 0 && phase < 1)) {
     errors.push({ path: `${path}.phase`, message: 'expected a number from 0 up to 1: the offset in the cycle' })

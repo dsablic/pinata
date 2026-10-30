@@ -93,3 +93,25 @@ rig, style, materials, motion) that passes `check`.
   and octopod templates); bipeds and quadruped files keep `footSpacing / 2`, so existing output is unchanged.
 - IK reports the miss distance; any miss above 1e-4 m counts as a reach violation. Joint limits apply to two-bone legs
   too when given.
+
+## Decisions during batch C
+
+- Appendage spring: each segment tip is integrated in world space with an implicit spring-damper toward its target
+  (the rest direction relative to the parent segment; the first segment's parent is the body), then projected back to
+  its bone length, so bone lengths hold exactly. Natural frequency 0.3 Hz at stiffness 0 up to 3 Hz just below 1;
+  stiffness 1 is rigid. `damping` is the damping ratio (1 = critical). No gravity. The root joint, pelvis offset and
+  yaw are interpolated linearly between frames; `check` and the cloth run use the scenario's `substeps`, other
+  recordings 8. The oscillator rotates the first segment's rest direction about `axis` (body space) by
+  `degrees * sin(2 pi (t / period + phase))`; later segments follow relative to it.
+- Balance gate changed before it was ever applied: the plan said 3+ legs, but the `examples/dog` walk (stance 0.75)
+  has the body centre up to 5 cm outside the support triangle in 25 frames even with a volume-weighted centre (88 mm
+  and 107 frames with a plain joint mean, which the head and ears pull forward). A four-legged walk balances
+  dynamically, so `unbalancedFrames` is gated for **more than four legs** only; bipeds and quadrupeds show no line.
+  Needs the user's confirmation.
+- Body centre: volume-weighted centroid of the parts whose joints are all pelvis or upperBody joints (each part at its
+  midpoint), falling back to the mean of those joints when no part qualifies. Support: the convex hull of sole points
+  within 2 cm of the ground in that frame; frames without support are left to `unsupportedFrames`.
+- The hexapod fixture's tripod at stanceFraction 0.6 passes, but its worst frame puts the centre on the hull edge
+  (0 m, the 2 cm tolerance unused; its chest sits forward of the middle legs); at 0.7 it stays more than 2 cm inside,
+  at 0.5 it is 1.2 cm outside. Starter hexapods should use a centred body or stanceFraction 0.65 or more.
+- Arms are labelled `left arm` for one per side and `left arm 1` .. `n` front to back for several.

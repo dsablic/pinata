@@ -5,6 +5,7 @@ import type { Bend, Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
+import { animateAppendages, DEFAULT_APPENDAGE_SUBSTEPS } from './appendages.ts'
 import type { GaitFrame } from './gait.ts'
 import { kneeBendsBackward, kneeFlexionDegrees, MAX_FLEXION_DEGREES } from './ik.ts'
 import { verticalExtent } from './extent.ts'
@@ -36,14 +37,18 @@ const TIME_EPSILON = 1e-9
 
 export function recordLocomotion (
   frames: GaitFrame[],
-  options: { rig: Rig, rest: Pose, mannequin: Mannequin, fps: number }
+  options: { rig: Rig, rest: Pose, mannequin: Mannequin, fps: number, substeps?: number }
 ): LocomotionRecording {
   const { rig, rest, mannequin, fps } = options
   const labels = legLabels(rig, rest)
+  const posed = frames.map(frame => poseAt({ frame, rig, rest, mannequin }))
+  const substeps = options.substeps ?? DEFAULT_APPENDAGE_SUBSTEPS
+  const poses = animateAppendages(frames, posed.map(p => p.pose), { rig, rest, fps, substeps })
   return {
     fps,
     frames: frames.map((frame, i) => {
-      const { pose, clamped } = poseAt({ frame, rig, rest, mannequin })
+      const pose = poses[i]
+      const { clamped } = posed[i]
       const joints: Pose = {}
       for (const [name, local] of Object.entries(pose)) joints[name] = toWorld(local, frame.root)
       const planted = Object.fromEntries(labels.map((label, k) => [label, frame.feet[k]?.planted ?? false]))
@@ -336,4 +341,126 @@ export function frameHashes (recording: LocomotionRecording): string[] {
     const bytes = new Uint8Array(values.buffer, values.byteOffset, values.byteLength)
     return createHash('sha256').update(names.join(',')).update(bytes).digest('hex')
   })
+}
+
+const BALANCE_TOLERANCE = 0.02
+
+type Point = [number, number]
+
+function cross2 (o: Point, a: Point, b: Point): number {
+  return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+}
+
+/** Convex hull in counter-clockwise order (Andrew's monotone chain), without collinear points. */
+export function convexHull (points: readonly Point[]): Point[] {
+  const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  if (sorted.length <= 2) return sorted
+  const half = (list: Point[]): Point[] => {
+    const hull: Point[] = []
+    for (const p of list) {
+      while (hull.length >= 2 && cross2(hull[hull.length - 2], hull[hull.length - 1], p) <= 0) hull.pop()
+      hull.push(p)
+    }
+    hull.pop()
+    return hull
+  }
+  return [...half(sorted), ...half([...sorted].reverse())]
+}
+
+function segmentDistance (p: Point, a: Point, b: Point): number {
+  const dx = b[0] - a[0]
+  const dy = b[1] - a[1]
+  const span = dx * dx + dy * dy
+  const t = span === 0 ? 0 : Math.min(1, Math.max(0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / span))
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
+}
+
+/**
+ * Signed distance from p to a convex hull (counter-clockwise): positive outside, negative inside (minus the distance
+ * to the nearest edge). A hull of one or two points has no inside.
+ */
+export function hullDistance (p: Point, hull: readonly Point[]): number {
+  if (hull.length === 1) return Math.hypot(p[0] - hull[0][0], p[1] - hull[0][1])
+  const edges = hull.map((a, i): [Point, Point] => [a, hull[(i + 1) % hull.length]])
+  const nearest = Math.min(...edges.map(([a, b]) => segmentDistance(p, a, b)))
+  if (hull.length === 2) return nearest
+  return edges.every(([a, b]) => cross2(a, b, p) >= 0) ? -nearest : nearest
+}
+
+function partVolume (part: Part, joints: Pose): number {
+  const span = length(sub(joints[part.a], joints[part.b]))
+  if (part.shape === 'box') return part.width * part.thickness * span
+  const radius = (part.radiusA + part.radiusB) / 2
+  return Math.PI * radius * radius * (span + 4 / 3 * radius)
+}
+
+/**
+ * Ground projection of the body centre: the volume-weighted centroid of the parts whose joints are all pelvis or
+ * upperBody joints (each part's volume at its midpoint), or the mean of those joints when no part qualifies.
+ */
+export function bodyCentre (joints: Pose, geometry: Geometry): Point {
+  const group = new Set([geometry.rig.pelvis, ...geometry.rig.upperBody])
+  const parts = geometry.mannequin.parts.filter(part => group.has(part.a) && group.has(part.b))
+  let weight = 0
+  let x = 0
+  let z = 0
+  for (const part of parts) {
+    const volume = partVolume(part, joints)
+    weight += volume
+    x += volume * (joints[part.a][0] + joints[part.b][0]) / 2
+    z += volume * (joints[part.a][2] + joints[part.b][2]) / 2
+  }
+  if (weight > 0) return [x / weight, z / weight]
+  const names = [...group]
+  const sum = names.reduce((s, name) => [s[0] + joints[name][0], s[1] + joints[name][2]], [0, 0])
+  return [sum[0] / names.length, sum[1] / names.length]
+}
+
+/**
+ * Per frame, the signed ground distance (metres, positive outside) from the body centre to the convex hull of the
+ * sole points within 2 cm of the ground, or undefined in frames with no such point (see unsupportedFrames).
+ */
+export function balanceDistances (recording: LocomotionRecording, geometry: Geometry): Array<number | undefined> {
+  const legs = legsOf(geometry.rig)
+  return recording.frames.map(({ joints }) => {
+    const support: Point[] = legs.flatMap(leg => solePoints(joints, leg, geometry.mannequin))
+      .filter(p => p[1] <= PLANT_HEIGHT).map(p => [p[0], p[2]])
+    if (support.length === 0) return undefined
+    return hullDistance(bodyCentre(joints, geometry), convexHull(support))
+  })
+}
+
+/**
+ * Frames in which the body centre lies more than 2 cm outside the convex hull of the sole points within 2 cm of the
+ * ground. Frames without any support count under unsupportedFrames instead.
+ */
+export function unbalancedFrames (recording: LocomotionRecording, geometry: Geometry): number {
+  return balanceDistances(recording, geometry).filter(d => d !== undefined && d > BALANCE_TOLERANCE).length
+}
+
+function appendageBones (rig: Rig): Array<{ limb: string, a: string, b: string }> {
+  return rig.limbs.filter(limb => limb.kind === 'appendage').flatMap(limb => {
+    return limb.joints.slice(1).map((b, i) => ({ limb: limb.name, a: limb.joints[i], b }))
+  })
+}
+
+/** Largest relative change of any appendage bone from the rest pose; non-finite lengths count as Infinity. */
+export function appendageBoneLengthError (recording: LocomotionRecording, geometry: Geometry, rest: Pose): number {
+  let worst = 0
+  for (const { a, b } of appendageBones(geometry.rig)) {
+    const expected = length(sub(rest[a], rest[b]))
+    for (const { joints } of recording.frames) {
+      const error = Math.abs(length(sub(joints[a], joints[b])) - expected) / expected
+      worst = Math.max(worst, Number.isFinite(error) ? error : Infinity)
+    }
+  }
+  return worst
+}
+
+/** Joint-frames in which an appendage joint has a coordinate that is not a finite number. */
+export function appendageNonFinite (recording: LocomotionRecording, geometry: Geometry): number {
+  const names = geometry.rig.limbs.filter(limb => limb.kind === 'appendage').flatMap(limb => limb.joints)
+  return recording.frames.reduce((count, { joints }) => {
+    return count + names.filter(name => !joints[name].every(Number.isFinite)).length
+  }, 0)
 }

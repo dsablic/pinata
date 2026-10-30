@@ -177,22 +177,28 @@ test('appendage stiffness and damping are from 0 to 1 and default when omitted',
   ])
 })
 
-test('oscillate needs a non-zero axis and degrees, and its phase defaults to 0', () => {
-  const oscillate = { axis: [1, 0, 0], degrees: 20 }
+test('oscillate needs a non-zero axis, degrees and a period when it swings, and its phase defaults to 0', () => {
+  const oscillate = { axis: [1, 0, 0], degrees: 20, period: 0.8 }
   const ok = limbsRig([...twoLegs(), { kind: 'appendage', joints: ['a', 'b'], oscillate }])
   const appendage = validateRig(ok).value!.limbs[2]
-  assert.deepEqual(appendage.kind === 'appendage' && appendage.oscillate, { axis: [1, 0, 0], degrees: 20, phase: 0 })
+  assert.deepEqual(appendage.kind === 'appendage' && appendage.oscillate, {
+    axis: [1, 0, 0], degrees: 20, period: 0.8, phase: 0
+  })
   assert.equal((oscillate as Input).phase, undefined)
   const bad = limbsRig([
     ...twoLegs(),
     { kind: 'appendage', joints: ['a', 'b'], oscillate: { axis: [0, 0, 0], degrees: 200, phase: 1, rate: 2 } },
     { kind: 'appendage', joints: ['c', 'd'], oscillate: { axis: [1, 0], degrees: -1 } },
-    { kind: 'appendage', joints: ['e', 'f'], oscillate: 'wag' }
+    { kind: 'appendage', joints: ['e', 'f'], oscillate: 'wag' },
+    { kind: 'appendage', joints: ['g', 'h'], oscillate: { axis: [1, 0, 0], degrees: 10, period: 0 } },
+    { kind: 'appendage', joints: ['i', 'j'], oscillate: { axis: [1, 0, 0], degrees: 0 } }
   ])
   assert.deepEqual(pathsOf(bad), [
-    'limbs[2].oscillate.rate', 'limbs[2].oscillate.axis', 'limbs[2].oscillate.degrees', 'limbs[2].oscillate.phase',
-    'limbs[3].oscillate.axis', 'limbs[3].oscillate.degrees', 'limbs[4].oscillate'
+    'limbs[2].oscillate.rate', 'limbs[2].oscillate.axis', 'limbs[2].oscillate.degrees', 'limbs[2].oscillate.period',
+    'limbs[2].oscillate.phase', 'limbs[3].oscillate.axis', 'limbs[3].oscillate.degrees', 'limbs[4].oscillate',
+    'limbs[5].oscillate.period'
   ])
+  assert.match(errorsOf(bad).find(([path]) => path === 'limbs[2].oscillate.period')![1], /degrees above 0/)
 })
 
 test('arm carried joints are validated', () => {

@@ -251,3 +251,23 @@ previous amendment with `strideExponent` 0.75 and `stepHeight` 0.08 (keep it at 
 The first run passed every gate, but the walk strip shows the knight's sword tip swinging below the floor: only the
 feet were checked against the ground. New gate `partGroundPenetrationPx <= 0.5` per scenario: the lowest point of
 any part other than the feet (capsule end spheres; box corners) below y = 0, at 48px scale.
+
+## Amendment after the batch C review (stricter; the judge panel is re-run)
+
+A first judge panel ran before this review; its results are kept in `docs/plans/p4-judge/` but superseded, because
+the review found the stills and the control unfair:
+- `rootSpeedError` compared the root with the track it came from (always 0). It now measures the gait: the forward
+  advance of the planted feet over each steady window (first to last plant, projected on the path) divided by the
+  window's duration, against the script speed.
+- New gate `unsupportedFrames == 0`: frames in which no sole point of either foot is within 2 cm of the ground
+  (walking never leaves the ground). Together with footSlidePx it closes the gap where a foot hovering just above
+  2 cm escapes the slide check.
+- The skating control's foot cycle is shifted by a quarter cycle so it matches the pelvis bob; the runner requires
+  the control to pass every gate except footSlidePx (a fair control differs only in sliding), and a control with zero
+  planted frames is a harness error.
+- The P4 knight's toe joint is raised so the foot rests flat (ankle and toe sole points both near the ground)
+  instead of toe-down with the heel 3 cm up, so both sole points are measured. The sword tip was raised earlier
+  (it swung through the floor); both are asset changes, logged in the findings.
+- `boneLengthError` is reported as a construction check (two-bone IK preserves lengths exactly), not as evidence.
+- Footprint traces are drawn as seen from above (they were mirrored), with a heel-to-toe mark per footprint and a
+  start marker.

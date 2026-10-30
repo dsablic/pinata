@@ -1,5 +1,9 @@
 # Piñata
 
+<p align="center">
+  <img src="docs/assets/pinata.gif" alt="A pixel-art piñata walking, its ribbon streamers swinging with simulated cloth physics" width="416">
+</p>
+
 Piñata is an experiment in AI-driven character animation. An AI agent describes a character as text (a mannequin of
 simple volumes, materials, a behaviour script), and the tooling does what an AI finds hard to do by hand: physics,
 inverse kinematics and secondary motion such as a cape swinging after a turn. Output is rendered as pixel art, with

@@ -115,3 +115,12 @@ test('knees stay at least 25 degrees bent while walking at the reference speed',
   const walking = kneeFlexions(1.2).slice(0, 96).flat()
   assert.ok(Math.min(...walking) >= 25, `knee reached ${Math.min(...walking)} degrees`)
 })
+
+test('knee flexion speed stays under 600 degrees per second at 24 fps in a brisk walk', () => {
+  const flexions = kneeFlexions(1.6)
+  let peak = 0
+  for (let i = 1; i < flexions.length; i++) {
+    for (let k = 0; k < 2; k++) peak = Math.max(peak, Math.abs(flexions[i][k] - flexions[i - 1][k]) * 24)
+  }
+  assert.ok(peak <= 600, `knee peaked at ${peak.toFixed(0)} degrees per second`)
+})

@@ -41,14 +41,19 @@ const PHASE_EPSILON = 1e-9
 const REST_REACH_FRACTION = 0.99
 const WALK_REACH_FRACTION = 0.96
 const DROP_SMOOTHING_SECONDS = 0.04
-const SWING_EDGE = 0.1
+const CLEARANCE = 0.01
+const MAX_SWING_EDGE = 0.25
 
 function smoothstep (x: number): number {
   return x * x * (3 - 2 * x)
 }
 
-function swingEase (s: number): number {
-  return Math.min(1, Math.max(0, (s - SWING_EDGE) / (1 - 2 * SWING_EDGE)))
+function swingEdge (stepHeight: number): number {
+  return Math.min(MAX_SWING_EDGE, Math.asin(Math.min(1, CLEARANCE / stepHeight)) / Math.PI)
+}
+
+function swingEase (s: number, edge: number): number {
+  return Math.min(1, Math.max(0, (s - edge) / (1 - 2 * edge)))
 }
 
 function lateral (yaw: number): Vec3 {
@@ -170,7 +175,7 @@ function footAt (foot: Foot, phase: number, options: Options): FootState {
     return { side: foot.side, ankle: plant.ankle, toeYaw: plant.yaw, planted: true, lift: 0, toePitch: 0 }
   }
   const s = Math.min(1, (phase - liftOff) / (1 - stanceFraction))
-  const e = swingEase(s)
+  const e = swingEase(s, swingEdge(stepHeight))
   const h = smoothstep(e)
   const lift = Math.sin(Math.PI * s)
   const ankle: Vec3 = [

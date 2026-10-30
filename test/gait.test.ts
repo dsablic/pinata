@@ -175,9 +175,10 @@ test('planted feet put the lowest sole point on the ground', () => {
   assert.ok(planted > 100)
 })
 
-test('a swing foot moves only vertically during the first and last tenth of the swing', () => {
+test('a swing foot moves only vertically until it is 1 cm off the ground and after it is back within 1 cm', () => {
   const frames = plan(walkTrack(1, 4), 6)
-  const { stanceFraction } = rig.gait
+  const { stanceFraction, stepHeight } = rig.gait
+  const edge = Math.asin(0.01 / stepHeight) / Math.PI
   let edges = 0
   for (const [k, offset] of [0, 0.5].entries()) {
     let start: Vec3 | undefined
@@ -191,7 +192,7 @@ test('a swing foot moves only vertically during the first and last tenth of the 
       if (run.length > 0 && start !== undefined) {
         for (const j of run) {
           const s = (((frames[j].phase + offset) % 1) - stanceFraction) / (1 - stanceFraction)
-          const expected = s < 0.1 ? start : s > 0.9 ? foot.ankle : undefined
+          const expected = s < edge ? start : s > 1 - edge ? foot.ankle : undefined
           if (expected === undefined) continue
           edges++
           assertClose(frames[j].feet[k].ankle[0], expected[0], 1e-9)

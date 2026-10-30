@@ -85,3 +85,22 @@ agent wiring stays out of it.
 - All of it is skipped without `ground`, so every existing output stays byte-identical (checked on all 167 files).
 - The quadruped test fixture slides 0.51 px at 0.6 m/s even on flat ground (it is tuned for slower walking), so the
   terrain gates run at 0.4 m/s for both bodies.
+
+## Decisions during batch B
+
+- Planning in windows: `planGait` takes `initial` (each foot's current plant); every step of an activity becomes one
+  plan from where the feet stand, ending with 0.7 s of standing so the feet settle; root tracks come from simple moves
+  (turn in place, walk along x with eased speed, stand) instead of motion scripts.
+- Activities are a small composition format (`site/activities.json`): steps `walk` (to `random`, `far`, `friend`,
+  `away`, at a multiple of the character's walking speed), `face` (friend or camera), `turn`, `stand` (with an
+  optional glyph shown above the head), chosen by weight; a poke replaces the current activity with the `poke`
+  reaction once the feet are next all planted. Walks are limited by time at the character's own speed (8 s for a
+  wander, 14 s for a dash), so slow creatures do as many things as fast ones. Layers (lookAt, wave) wait for upper-body
+  drivers, which the joint hierarchy now allows.
+- Characters walk in separate depth lanes, so they pass in front of and behind each other instead of colliding.
+- **Liveliness gate restated (needs the user's confirmation):** "at least 3 different activities and 10 m in 60 s"
+  could not hold for the beetle (0.14 m/s: 10 m is 71 s of non-stop walking) and depended on luck (three wanders count
+  as one activity). It now reads: every character starts at least 4 activities, at least 2 of them different, and
+  covers at least 25% of the distance non-stop walking at its own reference speed would cover; at least one visit
+  happens; no two characters stand within 0.3 m of each other.
+- The walkable graph from item 1 is not built: the terrain is one profile along x; stacked platforms come with batch E.

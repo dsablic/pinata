@@ -37,6 +37,11 @@ type Options = {
   fps: number
   /** Height of the walking surface under a point; absent, the ground is the plane y = 0. */
   ground?: (x: number, z: number) => number
+  /**
+   * Where each foot stands at the start, in legsOf order (a previous plan's last plants); absent, the feet start at
+   * the rest pose under the root.
+   */
+  initial?: Array<{ ankle: Vec3, yaw: number, pitch?: number }>
 }
 type Plant = { phase: number, ankle: Vec3, yaw: number, pitch?: number }
 type Foot = {
@@ -217,9 +222,15 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
     const length = Math.hypot(toe[0], toe[1], toe[2])
     const radii = footRadii(leg, mannequin)
     const shape: FootShape = { behind: radii.ankle / length, ahead: radii.toe / length }
-    const initial: Plant = {
-      phase: cycle.initial[index], yaw: start.yaw, ...support(toWorld(planted, start), start.yaw, toe, shape)
-    }
+    const given = options.initial?.[index]
+    const initial: Plant = given === undefined
+      ? { phase: cycle.initial[index], yaw: start.yaw, ...support(toWorld(planted, start), start.yaw, toe, shape) }
+      : {
+          phase: cycle.initial[index],
+          ankle: given.ankle,
+          yaw: given.yaw,
+          ...(given.pitch === undefined ? {} : { pitch: given.pitch })
+        }
     return {
       side: leg.side,
       sign: leg.side === 'left' ? 1 : -1,

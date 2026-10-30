@@ -7,7 +7,7 @@ import { kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
 import * as metrics from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
-import { toWorld } from '../src/sim/body.ts'
+import { toLocal, toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
@@ -222,4 +222,23 @@ test('without lateral rest the feet plant footSpacing / 2 from the centre line',
       if (foot.planted) assertClose(Math.abs(foot.ankle[0]), spacing / 2, 1e-9)
     })
   }
+})
+
+test('with lateral rest, feet plant at their rest ankle offset along the body as well as sideways', () => {
+  const fanned = structuredClone(mannequin)
+  for (const tag of ['LF', 'RF']) {
+    fanned.joints[`ankle${tag}`][2] += 0.08
+    fanned.joints[`toe${tag}`][2] += 0.08
+  }
+  const fannedRest = restPose(fanned)
+  const restRig = { ...rig, gait: { ...rig.gait, lateral: 'rest' as const } }
+  const track = walkTrack(0.5, 5)
+  const frames = planGait({ track, rig: restRig, rest: fannedRest, mannequin: fanned, duration: 7, fps: FPS })
+  legsOf(restRig).forEach((leg, k) => {
+    const planted = frames.filter(f => f.root.position[2] > 1 && f.feet[k].planted)
+      .map(f => toLocal(f.feet[k].ankle, f.root)[2])
+    const mean = planted.reduce((a, b) => a + b, 0) / planted.length
+    const expected = fannedRest[leg.ankle][2]
+    assert.ok(Math.abs(mean - expected) < 0.03, `${leg.name}: mean ${mean} vs ${expected}`)
+  })
 })

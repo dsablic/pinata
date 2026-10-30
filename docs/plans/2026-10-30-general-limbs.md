@@ -127,4 +127,7 @@ rig, style, materials, motion) that passes `check`.
 - The batch C reviewer agreed with the more-than-four-legs rule and suggested, if quadrupeds should be covered, gating
   them only at stanceFraction 0.75 or more (the statically stable walk); not done, since the dog example (0.75)
   fails it.
+- `lateral: 'rest'` now plants each walking foot at its rest ankle's offset along the body as well as sideways
+  (batch D: the spider's fanned legs bunched under the body because feet planted level with their hips). Stopping
+  still places a foot beside its partner. Only `rest` rigs change; no earlier example uses it.
 - Arms are labelled `left arm` for one per side and `left arm 1` .. `n` front to back for several.

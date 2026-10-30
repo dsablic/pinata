@@ -206,7 +206,7 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
       const middle = track(timeAtPhase(phase, fps, landing + gait.stanceFraction / 2))
       const side = lateral(middle.yaw)
       const offset = rested ? foot.planted[0] : foot.sign * gait.footSpacing / 2
-      const forward = ahead(middle.yaw, foot.restHip[2])
+      const forward = ahead(middle.yaw, rested ? foot.planted[2] : foot.restHip[2])
       ankle = [
         middle.position[0] + side[0] * offset + forward[0],
         middle.position[1] + foot.planted[1],

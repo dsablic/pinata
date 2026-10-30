@@ -1,13 +1,13 @@
 import { gate } from '../../pocs/p4-locomotion/gates.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { stride } from '../formats/rig.ts'
+import { legBend, legPhases, stride } from '../formats/rig.ts'
 import type { Leg } from '../formats/rig.ts'
 import type { Character } from '../formats/character.ts'
 import { length, sub } from '../math/vec.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../motion/ik.ts'
 import * as metrics from '../motion/metrics.ts'
 import type { Geometry, LocomotionRecording, SteadySegment } from '../motion/metrics.ts'
-import { footRadii, restPose } from '../motion/pose.ts'
+import { footRadii, legLabels, restPose } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { CharacterRun } from '../motion/character.ts'
 import type { Check } from './summary.ts'
@@ -21,7 +21,13 @@ const TILT_METRES = 0.01
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
 type Limb = 'foot' | 'leg'
-type Context = { character: Character, recording: LocomotionRecording, windows: SteadySegment[], mpp: number }
+type Context = {
+  character: Character
+  recording: LocomotionRecording
+  windows: SteadySegment[]
+  mpp: number
+  labels: string[]
+}
 
 export function locomotionRecording (character: Character, run: CharacterRun): LocomotionRecording {
   const { mannequin, rig, scenario } = character
@@ -54,12 +60,12 @@ function legGeometry (character: Character, leg: Leg): Geometry {
 }
 
 function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {
-  const found = ctx.character.rig.legs.map(leg => {
+  const found = ctx.character.rig.legs.map((leg, index) => {
     const geometry = legGeometry(ctx.character, leg)
-    return { leg, geometry, value: measure(geometry, ctx.recording) }
+    return { leg, index, geometry, value: measure(geometry, ctx.recording) }
   }).reduce((a, b) => b.value > a.value ? b : a)
   const frame = firstWorstFrame(ctx.recording, r => measure(found.geometry, r))
-  return { leg: found.leg, label: `${found.leg.side} ${limb}`, frame, value: found.value }
+  return { leg: found.leg, label: `${ctx.labels[found.index]} ${limb}`, frame, value: found.value }
 }
 
 function at (ctx: Context, frame: number): string {
@@ -180,10 +186,10 @@ function partGroundHint (ctx: Context): string {
 function reachHint (ctx: Context): string {
   const frames = ctx.recording.frames.map((f, i) => f.clamped > 0 ? i : -1).filter(i => i >= 0)
   const { gait } = ctx.character.rig
-  const legs = ctx.character.rig.legs.map(leg => {
+  const legs = ctx.character.rig.legs.map((leg, index) => {
     const rest = restPose(ctx.character.mannequin)
     const total = length(sub(rest[leg.hip], rest[leg.knee])) + length(sub(rest[leg.knee], rest[leg.ankle]))
-    return `${leg.side} ${total.toFixed(2)} m`
+    return `${ctx.labels[index]} ${total.toFixed(2)} m`
   }).join(', ')
   return `a foot target was out of the leg's reach in frames ${frames[0]} to ${frames[frames.length - 1]} (first at ` +
     `${at(ctx, frames[0])}), so the leg was straightened and clamped. Leg length hip to ankle: ${legs}. Shorten ` +
@@ -194,10 +200,13 @@ function reachHint (ctx: Context): string {
 function kneeProblem (ctx: Context, leg: Leg, frame: number): string {
   const f = ctx.recording.frames[frame]
   const [hip, knee, ankle] = [f.joints[leg.hip], f.joints[leg.knee], f.joints[leg.ankle]]
-  const forward: [number, number, number] = [Math.sin(f.root.yaw), 0, Math.cos(f.root.yaw)]
-  if (kneeBendsBackward(hip, knee, ankle, forward)) {
-    return 'the knee bends backwards there, although the knee always bends forward; check that ' +
-      `'${leg.hip}', '${leg.knee}' and '${leg.ankle}' are three distinct joints and the leg is not folded`
+  const sign = legBend(leg) === 'backward' ? -1 : 1
+  const direction: [number, number, number] = [sign * Math.sin(f.root.yaw), 0, sign * Math.cos(f.root.yaw)]
+  if (kneeBendsBackward(hip, knee, ankle, direction)) {
+    return `the knee bends the wrong way there: this leg has bend '${legBend(leg)}', so its knee must point ` +
+      `${legBend(leg)}; check that '${leg.hip}', '${leg.knee}' and '${leg.ankle}' are three distinct joints, that ` +
+      `the rest pose has the knee on that side of the hip-ankle line (or set the leg's bend to match it), and ` +
+      'that the leg is not folded'
   }
   const flexion = kneeFlexionDegrees(hip, knee, ankle)
   return `the knee flexion there is ${flexion.toFixed(0)} degrees, outside 0 to ${metrics.MAX_KNEE_FLEXION}. ` +
@@ -207,7 +216,7 @@ function kneeProblem (ctx: Context, leg: Leg, frame: number): string {
 function kneeLimitHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.kneeLimitViolations(r, g), 'leg')
   const total = metrics.kneeLimitViolations(ctx.recording, geometryOf(ctx))
-  return `${total} knee-frames over both legs violate the knee limits, ${worst.value} of them in the ${worst.label}, ` +
+  return `${total} knee-frames over all legs violate the knee limits, ${worst.value} of them in the ${worst.label}, ` +
     `first in ${at(ctx, worst.frame)}: ${kneeProblem(ctx, worst.leg, worst.frame)}.`
 }
 
@@ -221,11 +230,12 @@ function kneeSpeedHint (ctx: Context): string {
     'reliably help.'
 }
 
-function limbGeometries (character: Character): Array<{ label: string, geometry: Geometry }> {
+function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometry }> {
+  const { character } = ctx
   const { rig, mannequin } = character
   return [
-    ...rig.legs.map(leg => {
-      return { label: `${leg.side} leg`, geometry: { rig: { ...rig, legs: [leg], arms: [] }, mannequin } }
+    ...rig.legs.map((leg, index) => {
+      return { label: `${ctx.labels[index]} leg`, geometry: { rig: { ...rig, legs: [leg], arms: [] }, mannequin } }
     }),
     ...rig.arms.map(arm => {
       return { label: `${arm.side} arm`, geometry: { rig: { ...rig, legs: [], arms: [arm] }, mannequin } }
@@ -235,7 +245,7 @@ function limbGeometries (character: Character): Array<{ label: string, geometry:
 
 function boneHint (ctx: Context): string {
   const rest: Pose = restPose(ctx.character.mannequin)
-  const worst = limbGeometries(ctx.character).map(l => {
+  const worst = limbGeometries(ctx).map(l => {
     return { ...l, value: metrics.boneLengthError(ctx.recording, l.geometry, rest) }
   }).reduce((a, b) => b.value > a.value ? b : a)
   return `the ${worst.label} bones change length by ${(worst.value * 100).toFixed(1)}%. Two-bone IK preserves bone ` +
@@ -277,10 +287,15 @@ function alternationHint (ctx: Context): string {
   const g = geometryOf(ctx)
   const bad = ctx.windows.map(w => ({ w, value: metrics.alternationViolations(ctx.recording, g, [w]) }))
     .reduce((a, b) => b.value > a.value ? b : a)
-  return `the same foot plants twice in a row ${bad.value} time(s) in steady window ${windowText(bad.w)}. A swing ` +
-    `foot that rises less than ${PLANT_METRES * 100} cm still counts as planted: raise rig.gait.stepHeight (now ` +
+  const phases = legPhases(ctx.character.rig)
+  const order = phases.map((_, i) => i).sort((a, b) => phases[a] - phases[b] || a - b).map(i => ctx.labels[i])
+  return `${bad.value} plant(s) in steady window ${windowText(bad.w)} did not belong to the leg whose phase comes ` +
+    `next after the previous plant's leg (phase order: ${order.join(', ')}); with two legs, the same foot planted ` +
+    'twice in a row. A swing foot that rises less than ' +
+    `${PLANT_METRES * 100} cm still counts as planted: raise rig.gait.stepHeight (now ` +
     `${ctx.character.rig.gait.stepHeight}, it must clearly exceed ${PLANT_METRES} m) and keep stanceFraction (now ` +
-    `${ctx.character.rig.gait.stanceFraction}) below 0.7.`
+    `${ctx.character.rig.gait.stanceFraction}) below 0.7 for two legs; for four legs check the leg phases ` +
+    'against the walk order.'
 }
 
 function unsupportedHint (ctx: Context): string {
@@ -289,17 +304,17 @@ function unsupportedHint (ctx: Context): string {
   })
   const [first] = frames
   const leg = ctx.character.rig.legs[0]
-  return `neither foot has a sole point within 2 cm of the floor in ${frames.length} frames, first in ` +
+  return `no foot has a sole point within 2 cm of the floor in ${frames.length} frames, first in ` +
     `${at(ctx, first)}: the character hovers. ${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ` +
     `${ctx.character.rig.gait.bobAmplitude}) or stepHeight (now ${ctx.character.rig.gait.stepHeight}).`
 }
 
-function plantedHint (ctx: Context, side: string): string {
-  const leg = ctx.character.rig.legs.find(l => l.side === side) as Leg
+function plantedHint (ctx: Context, label: string): string {
+  const leg = ctx.character.rig.legs[ctx.labels.indexOf(label)]
   const lowest = Math.min(...ctx.recording.frames.flatMap(f => {
     return metrics.solePoints(f.joints, leg, ctx.character.mannequin).map(p => p[1])
   }))
-  return `the ${side} foot never has a sole point within ${PLANT_METRES * 100} cm of the floor for two frames in a ` +
+  return `the ${label} foot never has a sole point within ${PLANT_METRES * 100} cm of the floor for two frames in a ` +
     `row; its lowest sole point is ${lowest.toFixed(3)} m above y = 0. ${groundCause(ctx, leg)}Otherwise ` +
     `lower rig.gait.bobAmplitude (now ${ctx.character.rig.gait.bobAmplitude}) or stepHeight.`
 }
@@ -307,7 +322,8 @@ function plantedHint (ctx: Context, side: string): string {
 export function locomotionChecks (character: Character, recording: LocomotionRecording): Check[] {
   const mpp = character.mannequin.height / PIXEL_HEIGHT
   const windows = walkingWindows(character)
-  const ctx: Context = { character, recording, windows, mpp }
+  const labels = legLabels(character.rig, restPose(character.mannequin))
+  const ctx: Context = { character, recording, windows, mpp, labels }
   const g = geometryOf(ctx)
   const rest = restPose(character.mannequin)
   const planted = metrics.plantedFrames(recording, g)
@@ -334,8 +350,8 @@ export function locomotionChecks (character: Character, recording: LocomotionRec
       hint: () => alternationHint(ctx)
     }
   ]
-  for (const side of ['left', 'right'] as const) {
-    checks.push({ gate: gate('plantedFrames', planted[side], side), hint: () => plantedHint(ctx, side) })
+  for (const label of labels) {
+    checks.push({ gate: gate('plantedFrames', planted[label], label), hint: () => plantedHint(ctx, label) })
   }
   return checks
 }

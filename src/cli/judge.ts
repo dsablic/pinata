@@ -1,7 +1,7 @@
-import { readFileSync } from 'node:fs'
-import { dirname, join, relative, resolve } from 'node:path'
+import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { writeOutput } from '../diagnostics/report.ts'
-import { formatErrors } from '../formats/validate.ts'
+import { formatErrors, isRecord } from '../formats/validate.ts'
 import { buildPacket, validatePanelSpec } from '../judge/packet.ts'
 import type { PanelKey } from '../judge/packet.ts'
 import { answerProblems, formatScore, scorePanel } from '../judge/score.ts'
@@ -16,13 +16,20 @@ function readJson (path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+const CASE_INSENSITIVE = process.platform === 'darwin' || process.platform === 'win32'
+const PACKET_FILE = /^(item-\d+\.png|questions\.md)$/
+
+/** Whether the file at `path` would land inside `dir`, after following symlinks (both folders must exist). */
 function isInside (path: string, dir: string): boolean {
-  const rel = relative(dir, path)
-  return rel === '' || (!rel.startsWith('..') && !rel.startsWith('/'))
+  const fold = (p: string): string => CASE_INSENSITIVE ? p.toLowerCase() : p
+  const rel = relative(fold(realpathSync(dir)), fold(join(realpathSync(dirname(path)), basename(path))))
+  return rel === '' || !(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
 }
 
 function build (specPath: string, packetDir: string, keyPath: string): number {
   const [spec, packet, key] = [specPath, packetDir, keyPath].map(p => resolve(p))
+  mkdirSync(packet, { recursive: true })
+  mkdirSync(dirname(key), { recursive: true })
   if (isInside(key, packet)) {
     console.error(`the key '${key}' must not be inside the packet folder '${packet}': judges would see it`)
     return 2
@@ -33,6 +40,7 @@ function build (specPath: string, packetDir: string, keyPath: string): number {
     return 2
   }
   const built = buildPacket(validated.value, path => decodePng(readFileSync(resolve(dirname(spec), path))))
+  for (const name of readdirSync(packet)) if (PACKET_FILE.test(name)) rmSync(join(packet, name))
   for (const [name, image] of Object.entries(built.images)) writeOutput(join(packet, name), encodePng(image))
   writeOutput(join(packet, 'questions.md'), built.questions)
   writeOutput(key, `${JSON.stringify(built.key, null, 2)}\n`)
@@ -45,7 +53,12 @@ function score (keyPath: string, answerPaths: string[]): number {
     console.error(USAGE)
     return 2
   }
-  const key = readJson(keyPath) as PanelKey
+  const read = readJson(keyPath)
+  if (!isRecord(read) || typeof read.name !== 'string' || !isRecord(read.items)) {
+    console.error(`${keyPath}: not a panel key written by 'npm run judge -- build'`)
+    return 2
+  }
+  const key = read as PanelKey
   const judges: JudgeAnswers[] = []
   let broken = false
   for (const path of answerPaths) {

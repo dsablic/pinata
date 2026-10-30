@@ -10,8 +10,10 @@ export type PairScore = {
   a: number
   b: number
   cantTell: number
-  /** Judges who picked the same image in both orders, out of judges who answered both. */
+  /** Judges who picked the same image (not cant_tell) in both orders, out of judges who answered both. */
   consistent: number
+  /** Judges who answered cant_tell in both orders, or picked the same side (so a different image) in each. */
+  neutral: number
   judges: number
   ratingA?: number
   ratingB?: number
@@ -22,12 +24,16 @@ export type PanelScore = {
   aShare: number
   /** Share of picks for the left image over all pairs: 0.5 means no position bias. */
   leftShare: number
-  /** Share of control answers that were cant_tell, or picks that split evenly across the two orders. */
+  /** Share of judges, over control pairs, who did not separate the two images (see PairScore.neutral). */
   controlNeutral: number
   missing: string[]
 }
 
 const CHOICES: ReadonlySet<string> = new Set(['left', 'right', 'cant_tell'])
+
+function isRating (v: unknown): boolean {
+  return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5
+}
 
 /** Checks one judge's answers against the key; returns problems as text. */
 export function answerProblems (answers: unknown, key: PanelKey): string[] {
@@ -35,9 +41,18 @@ export function answerProblems (answers: unknown, key: PanelKey): string[] {
   const problems: string[] = []
   for (const item of Object.keys(key.items)) {
     const answer = answers[item]
-    if (answer === undefined) problems.push(`${item}: missing`)
-    else if (!isRecord(answer) || typeof answer.choice !== 'string' || !CHOICES.has(answer.choice)) {
+    if (answer === undefined) {
+      problems.push(`${item}: missing`)
+      continue
+    }
+    if (!isRecord(answer) || typeof answer.choice !== 'string' || !CHOICES.has(answer.choice)) {
       problems.push(`${item}: expected { "choice": "left" | "right" | "cant_tell" }`)
+      continue
+    }
+    const { rating } = answer
+    if (rating === undefined && key.rating === true) problems.push(`${item}: missing rating`)
+    if (rating !== undefined && !(isRecord(rating) && isRating(rating.left) && isRating(rating.right))) {
+      problems.push(`${item}: expected "rating": { "left": 1-5, "right": 1-5 } with whole numbers`)
     }
   }
   for (const item of Object.keys(answers)) if (key.items[item] === undefined) problems.push(`${item}: not in the panel`)
@@ -56,7 +71,7 @@ export function scorePanel (key: PanelKey, judges: JudgeAnswers[]): PanelScore {
   let picks = 0
   for (const [item, entry] of Object.entries(key.items)) {
     const score = byPair.get(entry.pair) ?? {
-      pair: entry.pair, control: entry.control, a: 0, b: 0, cantTell: 0, consistent: 0, judges: 0,
+      pair: entry.pair, control: entry.control, a: 0, b: 0, cantTell: 0, consistent: 0, neutral: 0, judges: 0,
       ratings: { a: [], b: [] }
     }
     byPair.set(entry.pair, score)
@@ -90,7 +105,9 @@ export function scorePanel (key: PanelKey, judges: JudgeAnswers[]): PanelScore {
       })
       if (resolved.some(r => r === undefined)) return
       score.judges++
-      if (resolved.every(r => r === resolved[0])) score.consistent++
+      const same = resolved.every(r => r === resolved[0])
+      if (same && resolved[0] !== 'cant_tell') score.consistent++
+      if (same ? resolved[0] === 'cant_tell' : !resolved.includes('cant_tell')) score.neutral++
     })
   }
   const mean = (values: number[]): number | undefined => {
@@ -103,8 +120,8 @@ export function scorePanel (key: PanelKey, judges: JudgeAnswers[]): PanelScore {
   })
   const real = pairs.filter(p => !p.control)
   const controls = pairs.filter(p => p.control)
-  const neutral = controls.reduce((sum, p) => sum + p.cantTell + 2 * Math.min(p.a, p.b), 0)
-  const answered = controls.reduce((sum, p) => sum + p.cantTell + p.a + p.b, 0)
+  const neutral = controls.reduce((sum, p) => sum + p.neutral, 0)
+  const answered = controls.reduce((sum, p) => sum + p.judges, 0)
   return {
     pairs,
     aShare: share(real.reduce((s, p) => s + p.a, 0), real.reduce((s, p) => s + p.a + p.b, 0)),
@@ -123,12 +140,13 @@ export function formatScore (key: PanelKey, score: PanelScore): string {
     `panel: ${key.name}`,
     ...score.pairs.map(p => {
       const kind = p.control ? 'control' : 'pair'
-      return `${kind} ${p.pair}: a ${p.a}, b ${p.b}, cant_tell ${p.cantTell}; same pick in both orders ` +
-        `${p.consistent}/${p.judges}${rating(p)}`
+      return `${kind} ${p.pair}: a ${p.a}, b ${p.b}, cant_tell ${p.cantTell}; same image picked in ` +
+        `both orders by ${p.consistent}/${p.judges} judges, not separated by ${p.neutral}/${p.judges}${rating(p)}`
     }),
     `a picked in ${percent(score.aShare)} of picks on real pairs`,
     `left picked in ${percent(score.leftShare)} of all picks (50% = no position bias)`,
-    `controls answered neutrally (cant_tell, or an even split across orders) in ${percent(score.controlNeutral)}`,
+    `controls left unseparated (cant_tell in both orders, or the same side picked in both) by ` +
+      `${percent(score.controlNeutral)} of judges`,
     ...(score.missing.length > 0 ? [`missing answers: ${score.missing.join(', ')}`] : [])
   ].join('\n')
 }

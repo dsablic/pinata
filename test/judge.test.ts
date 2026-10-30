@@ -1,7 +1,7 @@
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../src/image.ts'
@@ -100,6 +100,36 @@ test('scoring resolves left and right back to a and b and measures position bias
   assert.deepEqual(score.missing, [])
 })
 
+test('judges who each separate a control, in opposite directions, do not count as neutral', () => {
+  const { key } = buildPacket(spec, name => IMAGES[name])
+  const forA = answersFor((pair, aSide) => pair === 'control' ? aSide : 'cant_tell')
+  const forB = answersFor((pair, aSide) => pair === 'control' ? (aSide === 'left' ? 'right' : 'left') : 'cant_tell')
+  const score = scorePanel(key, [forA, forB])
+  const control = score.pairs.find(p => p.pair === 'control')!
+  assert.deepEqual([control.a, control.b, control.consistent, control.neutral, control.judges], [2, 2, 2, 0, 2])
+  assert.equal(score.controlNeutral, 0)
+  const ours = score.pairs.find(p => p.pair === 'ours')!
+  assert.deepEqual([ours.consistent, ours.neutral], [0, 2], 'cant_tell in both orders is not a consistent pick')
+})
+
+test('ratings are checked and averaged per side', () => {
+  const rated = { ...spec, rating: 'Rate each 1-5.' }
+  const { key } = buildPacket(rated, name => IMAGES[name])
+  assert.equal(key.rating, true)
+  const items = Object.keys(key.items)
+  const unrated = Object.fromEntries(items.map(item => [item, { choice: 'cant_tell' }]))
+  assert.match(answerProblems(unrated, key)[0], /missing rating/)
+  const bad = { ...unrated, [items[0]]: { choice: 'left', rating: { left: '5', right: 9 } } }
+  assert.match(answerProblems(bad, key).join(), /expected "rating": \{ "left": 1-5, "right": 1-5 \}/)
+  const answers: JudgeAnswers = Object.fromEntries(items.map(item => {
+    const aSide = key.items[item].aSide
+    return [item, { choice: aSide, rating: aSide === 'left' ? { left: 4, right: 2 } : { left: 2, right: 4 } }]
+  }))
+  assert.deepEqual(answerProblems(answers, key), [])
+  const ours = scorePanel(key, [answers]).pairs.find(p => p.pair === 'ours')!
+  assert.deepEqual([ours.ratingA, ours.ratingB], [4, 2])
+})
+
 test('answerProblems lists missing, malformed and unknown items', () => {
   const { key } = buildPacket(spec, name => IMAGES[name])
   const problems = answerProblems({ 'item-01': { choice: 'maybe' }, 'item-09': { choice: 'left' } }, key)
@@ -118,7 +148,15 @@ test('the CLI builds a packet from PNG files and refuses a key inside the packet
   const inside = judge('build', join(scratch, 'panel.json'), packet, join(packet, 'key.json'))
   assert.equal(inside.status, 2)
   assert.match(inside.stderr, /must not be inside the packet folder/)
-  assert.equal(existsSync(packet), false)
+  assert.equal(existsSync(join(packet, 'key.json')), false)
+  symlinkSync(packet, join(scratch, 'keys'))
+  const sneaky = [join(packet, '..key.json'), join(scratch, 'keys', 'key.json'), join(scratch, 'PACKET', 'key.json')]
+  for (const key of process.platform === 'darwin' ? sneaky : sneaky.slice(0, 2)) {
+    const refused = judge('build', join(scratch, 'panel.json'), packet, key)
+    assert.equal(refused.status, 2, key)
+  }
+  assert.deepEqual(readdirSync(packet), [])
+  writeFileSync(join(packet, 'item-09.png'), 'stale')
   const built = judge('build', join(scratch, 'panel.json'), packet, join(scratch, 'key.json'))
   assert.equal(built.status, 0, built.stderr)
   const files = ['item-01.png', 'item-02.png', 'item-03.png', 'item-04.png', 'questions.md']
@@ -126,5 +164,5 @@ test('the CLI builds a packet from PNG files and refuses a key inside the packet
   writeFileSync(join(scratch, 'judge1.json'), JSON.stringify(answersFor(() => 'cant_tell')))
   const scored = judge('score', join(scratch, 'key.json'), join(scratch, 'judge1.json'))
   assert.equal(scored.status, 0, scored.stderr)
-  assert.match(scored.stdout, /controls answered neutrally .* in 100%/)
+  assert.match(scored.stdout, /controls left unseparated .* by 100% of judges/)
 })

@@ -231,18 +231,50 @@ test('selective mode ignores decal colours when choosing the outline colour', ()
   assert.equal(getPixel(image, 0, 2), DARK)
 })
 
+const RED_OUTLINE = 0x100000
+
+/** A width x 5 buffer, filled with part 0 inside a one-pixel margin, with part 1 at the given top-row columns. */
+function strip (width: number, columns: number[]): GBuffer {
+  const g: GBuffer = {
+    width,
+    height: 5,
+    part: new Int16Array(width * 5).fill(EMPTY),
+    depth: new Float32Array(width * 5).fill(1),
+    normal: new Float32Array(width * 15),
+    coverage: new Float32Array(width * 5)
+  }
+  for (let y = 1; y <= 3; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x
+      g.part[i] = y === 1 && columns.includes(x) ? 1 : 0
+      g.normal.set([0, 0, 1], i * 3)
+    }
+  }
+  return g
+}
+
 test('a selective outline gives a one pixel change of bordering part the colour of the outline around it', () => {
-  const g = block([0, 0, 1])
-  g.part[1 * 5 + 2] = 1
-  const two: Mannequin = {
-    ...mannequin,
-    parts: [...mannequin.parts, { name: 'q', shape: 'capsule', a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'n' }]
-  }
-  const selective: Style = {
-    ...style, outlineMode: 'selective', materials: { m: ['#000010', '#0000ff'], n: ['#300000', '#ff0000'] }
-  }
-  const { image, outlineMask } = stylize(g, two, camera, selective)
+  const { image, outlineMask } = stylize(strip(5, [2]), twoParts, camera, selective)
   assert.equal(outlineMask[2], 1)
   assert.equal(getPixel(image, 2, 0), DARK)
   assert.equal(getPixel(image, 1, 0), DARK)
+})
+
+test('a selective outline keeps a run of two pixels bordering another part', () => {
+  const { image } = stylize(strip(6, [2, 3]), twoParts, camera, selective)
+  assert.equal(getPixel(image, 2, 0), RED_OUTLINE)
+  assert.equal(getPixel(image, 3, 0), RED_OUTLINE)
+  assert.equal(getPixel(image, 1, 0), DARK)
+})
+
+test('outline smoothing gives mirrored results for a mirrored boundary', () => {
+  const width = 11
+  const columns = [1, 3, 5, 7]
+  const { image } = stylize(strip(width, columns), twoParts, camera, selective)
+  const { image: mirrored } = stylize(strip(width, columns.map(x => width - 1 - x)), twoParts, camera, selective)
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x < width; x++) {
+      assert.equal(getPixel(mirrored, width - 1 - x, y), getPixel(image, x, y), `${x},${y}`)
+    }
+  }
 })

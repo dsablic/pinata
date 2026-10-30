@@ -183,28 +183,42 @@ function drawOutline (image: Image, g: GBuffer, m: Mannequin, style: Style): Uin
 
 /**
  * Recolours each outline pixel whose colour no neighbouring outline pixel shares with the most common colour of its
- * outline neighbours: a selective outline otherwise leaves single pixels where the bordering part changes for one
- * pixel. Returns whether anything changed.
+ * outline neighbours (ties go to the lowest colour value): a selective outline otherwise leaves single pixels where
+ * the bordering part changes for one pixel. Reads from a copy, so the result does not depend on scan order. Returns
+ * whether anything changed.
  */
 function outlinePass (image: Image, mask: Uint8Array): boolean {
+  const source: Image = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.data) }
   let changed = false
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
       if (mask[y * image.width + x] !== 1) continue
-      const c = getPixel(image, x, y)
+      const c = getPixel(source, x, y)
       const around: number[] = []
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const nx = x + dx
           const ny = y + dy
           if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= image.width || ny >= image.height) continue
-          if (mask[ny * image.width + nx] === 1) around.push(getPixel(image, nx, ny))
+          if (mask[ny * image.width + nx] === 1) around.push(getPixel(source, nx, ny))
         }
       }
       if (around.length === 0 || around.includes(c)) continue
-      setPixel(image, x, y, mostCommon(around))
+      setPixel(image, x, y, modeColour(around))
       changed = true
     }
   }
   return changed
+}
+
+/** The most common value; ties go to the lowest, so the order of the values does not matter. */
+function modeColour (values: number[]): number {
+  const counts = new Map<number, number>()
+  for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)
+  let best = values[0]
+  for (const [v, n] of counts) {
+    const top = counts.get(best) ?? 0
+    if (n > top || (n === top && v < best)) best = v
+  }
+  return best
 }

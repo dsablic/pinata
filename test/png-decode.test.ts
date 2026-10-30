@@ -32,7 +32,16 @@ test('decodePng reads palette PNGs with 8-bit and 4-bit indices and palette tran
   }
 })
 
-test('decodePng matches ImageMagick on a palette reference, pixel for pixel', (t) => {
+const FORMATS: Array<[string, string[]]> = [
+  ['palette', ['-define', 'png:color-type=3']],
+  ['RGB with tRNS', ['-define', 'png:color-type=2', '-define', 'png:bit-depth=8']],
+  ['grey with tRNS', ['-colorspace', 'Gray', '-define', 'png:color-type=0', '-define', 'png:bit-depth=8']],
+  ['grey 2-bit', ['-colorspace', 'Gray', '-alpha', 'off', '-depth', '2']],
+  ['grey and alpha', ['-colorspace', 'Gray', '-define', 'png:color-type=4']],
+  ['RGBA 16-bit', ['-define', 'png:color-type=6', '-define', 'png:bit-depth=16']]
+]
+
+test('decodePng matches ImageMagick on every colour type, pixel for pixel', (t) => {
   try {
     execFileSync('magick', ['-version'])
   } catch {
@@ -42,9 +51,19 @@ test('decodePng matches ImageMagick on a palette reference, pixel for pixel', (t
   const dir = mkdtempSync(join(tmpdir(), 'pinata-png-'))
   try {
     const source = new URL('../refs/p1/marqueeplier-knight-64.png', import.meta.url).pathname
-    const rgba = join(dir, 'knight.png')
-    execFileSync('magick', [source, '-define', 'png:color-type=6', `PNG32:${rgba}`])
-    assert.equal(imageHash(decodePng(readFileSync(source))), imageHash(decodePng(readFileSync(rgba))))
+    FORMATS.forEach(([name, options], i) => {
+      const file = join(dir, `${i}.png`)
+      const truth = join(dir, `${i}-rgba.png`)
+      execFileSync('magick', [source, ...options, file])
+      execFileSync('magick', [file, '-define', 'png:color-type=6', '-define', 'png:bit-depth=8', `PNG32:${truth}`])
+      const ours = decodePng(readFileSync(file))
+      const theirs = decodePng(readFileSync(truth))
+      const opaque = (img: typeof ours): number[] => {
+        const { width, height } = img
+        return Array.from({ length: width * height }, (_, k) => getPixel(img, k % width, Math.floor(k / width)))
+      }
+      assert.deepEqual(opaque(ours), opaque(theirs), name)
+    })
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }

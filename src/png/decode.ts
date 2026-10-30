@@ -42,7 +42,8 @@ function sample (raw: Uint8Array, header: Header, x: number, y: number, channel:
   const channels = CHANNELS[header.colour]
   const stride = Math.ceil(header.width * channels * header.depth / 8)
   if (header.depth === 8) return raw[y * stride + x * channels + channel]
-  if (header.depth === 16) return raw[y * stride + (x * channels + channel) * 2]
+  const at = y * stride + (x * channels + channel) * 2
+  if (header.depth === 16) return raw[at] * 256 + raw[at + 1]
   const perByte = 8 / header.depth
   const byte = raw[y * stride + Math.floor(x / perByte)]
   const shift = 8 - header.depth * (x % perByte + 1)
@@ -50,8 +51,8 @@ function sample (raw: Uint8Array, header: Header, x: number, y: number, channel:
 }
 
 /**
- * Decodes a non-interlaced PNG of any colour type and bit depth (16-bit samples keep their high byte; palette
- * transparency from tRNS is applied) into an RGBA image.
+ * Decodes a non-interlaced PNG of any colour type and bit depth into an RGBA image, scaling samples to 8 bits and
+ * applying tRNS transparency (palette alpha, or the transparent grey or RGB colour).
  */
 export function decodePng (bytes: Uint8Array): Image {
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -79,7 +80,12 @@ export function decodePng (bytes: Uint8Array): Image {
   if (CHANNELS[header.colour] === undefined) throw new Error(`unknown PNG colour type ${header.colour}`)
   const raw = unfilter(inflateSync(Buffer.concat(parts)), header)
   const image = createImage(header.width, header.height)
-  const scaleGrey = (v: number): number => header.depth >= 8 ? v : Math.round(v * 255 / ((1 << header.depth) - 1))
+  const max = (1 << header.depth) - 1
+  const to8 = (v: number): number => header.depth === 8 ? v : Math.round(v * 255 / max)
+  const keyed = header.colour === 0 || header.colour === 2
+  const key = keyed && alpha.length >= (header.colour === 0 ? 2 : 6)
+    ? Array.from({ length: header.colour === 0 ? 1 : 3 }, (_, k) => alpha[2 * k] * 256 + alpha[2 * k + 1])
+    : undefined
   for (let y = 0; y < header.height; y++) {
     for (let x = 0; x < header.width; x++) {
       const s = (channel: number): number => sample(raw, header, x, y, channel)
@@ -88,9 +94,13 @@ export function decodePng (bytes: Uint8Array): Image {
         const index = s(0)
         rgba = [palette[index * 3], palette[index * 3 + 1], palette[index * 3 + 2], alpha[index] ?? 255]
       } else if (header.colour === 0 || header.colour === 4) {
-        const grey = scaleGrey(s(0))
-        rgba = [grey, grey, grey, header.colour === 4 ? s(1) : 255]
-      } else rgba = [s(0), s(1), s(2), header.colour === 6 ? s(3) : 255]
+        const grey = to8(s(0))
+        const opaque = key === undefined || s(0) !== key[0]
+        rgba = [grey, grey, grey, header.colour === 4 ? to8(s(1)) : opaque ? 255 : 0]
+      } else {
+        const opaque = key === undefined || [0, 1, 2].some(k => s(k) !== key[k])
+        rgba = [to8(s(0)), to8(s(1)), to8(s(2)), header.colour === 6 ? to8(s(3)) : opaque ? 255 : 0]
+      }
       image.data.set(rgba, (y * header.width + x) * 4)
     }
   }

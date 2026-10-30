@@ -21,7 +21,7 @@ export type PanelSpec = {
   pairs: PairSpec[]
 }
 export type KeyEntry = { pair: string, control: boolean, aSide: 'left' | 'right' }
-export type PanelKey = { name: string, items: Record<string, KeyEntry> }
+export type PanelKey = { name: string, rating?: boolean, items: Record<string, KeyEntry> }
 export type Packet = { images: Record<string, Image>, questions: string, key: PanelKey }
 
 const SPEC_FIELDS = ['name', 'seed', 'question', 'rating', 'scale', 'gap', 'background', 'pairs'] as const
@@ -145,7 +145,7 @@ export function buildPacket (spec: PanelSpec, load: (path: string) => Image): Pa
     .sort((x, y) => x.rank.localeCompare(y.rank))
   const width = String(ordered.length).length < 2 ? 2 : String(ordered.length).length
   const images: Record<string, Image> = {}
-  const key: PanelKey = { name: spec.name, items: {} }
+  const key: PanelKey = { name: spec.name, ...(spec.rating === undefined ? {} : { rating: true }), items: {} }
   ordered.forEach(({ pair, aSide }, i) => {
     const name = `item-${String(i + 1).padStart(width, '0')}.png`
     const [a, b] = [load(pair.a), load(pair.b)]

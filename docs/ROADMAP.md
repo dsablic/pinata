@@ -80,7 +80,7 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
    intersection, fewer sub-samples.
 6. Stray pixels (done for outlines): almost all strays in selective-outline characters (182 of 197 across the ten
    examples) were outline pixels coloured by a different bordering part than their outline neighbours. The renderer
-   now smooths those after drawing the outline, leaving 5; the rest are single pixels of `allowThin` parts.
+   now smooths those after drawing the outline, leaving 8; the rest are single pixels of `allowThin` parts.
 7. Quadruped gaits are fragile: short legs exceed the knee-speed gate at ordinary speeds (the unicorn), and turning
    broke the dragon's walk until it slowed to 0.1 m/s. Tune the planner for short-legged and many-legged bodies as
    part of the general limbs work.

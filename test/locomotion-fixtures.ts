@@ -79,3 +79,59 @@ export function turnTrack (rate: number, turnSeconds: number): (t: number) => Ro
     }
   }
 }
+
+const QUAD_LEGS = [
+  { name: 'LH', x: 0.08, z: -0.2, knee: -0.32, toe: -0.1 },
+  { name: 'LF', x: 0.08, z: 0.2, knee: 0.22, toe: 0.3 },
+  { name: 'RH', x: -0.08, z: -0.2, knee: -0.32, toe: -0.1 },
+  { name: 'RF', x: -0.08, z: 0.2, knee: 0.22, toe: 0.3 }
+]
+
+export const quadMannequin: Mannequin = {
+  name: 'quad',
+  height: 0.8,
+  joints: {
+    pelvis: [0, 0.6, 0],
+    chest: [0, 0.62, 0.3],
+    ...Object.fromEntries(QUAD_LEGS.flatMap(({ name, x, z, knee, toe }) => [
+      [`hip${name}`, [x, 0.6, z]],
+      [`knee${name}`, [x, 0.32, knee]],
+      [`ankle${name}`, [x, 0.06, z]],
+      [`toe${name}`, [x, 0.03, toe]]
+    ]))
+  },
+  parts: QUAD_LEGS.map(({ name }) => ({
+    name: `foot${name}`,
+    shape: 'capsule',
+    a: `ankle${name}`,
+    b: `toe${name}`,
+    radiusA: 0.06,
+    radiusB: 0.03,
+    material: 'm'
+  })),
+  decals: []
+}
+
+export const quadRig: Rig = {
+  legs: QUAD_LEGS.map(({ name, x }, i) => ({
+    side: x > 0 ? 'left' : 'right',
+    hip: `hip${name}`,
+    knee: `knee${name}`,
+    ankle: `ankle${name}`,
+    toe: `toe${name}`,
+    phase: [0, 0.25, 0.5, 0.75][i],
+    bend: name.endsWith('H') ? 'backward' : 'forward'
+  })),
+  arms: [],
+  pelvis: 'pelvis',
+  upperBody: ['chest'],
+  gait: {
+    strideLength: 0.6,
+    referenceSpeed: 0.9,
+    stanceFraction: 0.75,
+    stepHeight: 0.05,
+    bobAmplitude: 0.01,
+    armSwingDegrees: 0,
+    footSpacing: 0.16
+  }
+}

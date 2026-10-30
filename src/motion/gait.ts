@@ -1,4 +1,4 @@
-import { stride } from '../formats/rig.ts'
+import { legPhases, stride } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Rig } from '../formats/rig.ts'
 import { toWorld } from '../sim/body.ts'
@@ -33,7 +33,16 @@ type Options = {
   fps: number
 }
 type Plant = { phase: number, ankle: Vec3, yaw: number }
-type Foot = { side: 'left' | 'right', sign: number, planted: Vec3, restHip: Vec3, reach: number, plants: Plant[] }
+type Foot = {
+  side: 'left' | 'right'
+  sign: number
+  planted: Vec3
+  restHip: Vec3
+  reach: number
+  partner: number
+  plants: Plant[]
+}
+type Cycle = { initial: number[], delay: number[], settled: boolean[], partner: number[], start: number }
 
 const TURN_CYCLES_PER_RADIAN = 2 / Math.PI
 const REST_EPSILON = 1e-9
@@ -68,11 +77,54 @@ function isAtRest (root: RootState): boolean {
   return horizontalSpeed(root) < REST_EPSILON && Math.abs(root.angularVelocity) < REST_EPSILON
 }
 
-function samplePhase (options: Options, count: number): number[] {
+function partnerOf (rig: Rig, rest: Pose, leg: number): number {
+  const mine = rig.legs[leg]
+  const across = rig.legs.map((_, i) => i).filter(i => rig.legs[i].side !== mine.side)
+  const gap = (i: number): number => Math.abs(rest[rig.legs[i].hip][2] - rest[mine.hip][2])
+  return across.reduce((a, b) => gap(b) < gap(a) ? b : a)
+}
+
+function cycleOf (rig: Rig, rest: Pose): Cycle {
+  const phases = legPhases(rig)
+  const { stanceFraction } = rig.gait
+  const behind = (from: number, to: number): number => from === to ? 0 : (phases[from] - phases[to] + 1) % 1
+  const delay = phases.map((_, f) => Math.min(...phases.map((__, g) => stanceFraction - behind(f, g))))
+  const settled = delay.map(d => d >= -PHASE_EPSILON)
+  const candidates = phases.map((_, f) => f).filter(f => settled[f] || !settled.some(Boolean))
+  const first = candidates.reduce((a, b) => phases[b] < phases[a] ? b : a)
+  return {
+    initial: phases.map((_, g) => phases[first] - behind(first, g)),
+    delay: delay.map(d => Math.max(0, d)),
+    settled,
+    partner: phases.map((_, f) => partnerOf(rig, rest, f)),
+    start: phases[first] + Math.max(0, delay[first])
+  }
+}
+
+/**
+ * The phase at which a stopped walker stands still: once every left-right pair of feet has had a landing, at the
+ * first landing after which no foot has lifted off yet.
+ */
+function standingPhase (cycle: Cycle, phase: number): number {
+  const events = cycle.initial.flatMap((first, foot) => {
+    const next = first + Math.floor(phase + PHASE_EPSILON / 2 - first) + 1
+    return [0, 1, 2].map(cycles => ({ foot, landing: next + cycles }))
+  }).sort((a, b) => a.landing - b.landing || a.foot - b.foot)
+  const pairs = new Set(cycle.partner.map((partner, foot) => Math.min(foot, partner)))
+  const seen = new Set<number>()
+  for (const { foot, landing } of events) {
+    seen.add(Math.min(foot, cycle.partner[foot]))
+    if (seen.size === pairs.size && (cycle.settled[foot] || !cycle.settled.some(Boolean))) {
+      return landing + cycle.delay[foot]
+    }
+  }
+  return events[events.length - 1].landing
+}
+
+function samplePhase (options: Options, count: number, cycle: Cycle): number[] {
   const { track, rig, fps } = options
   const settleRate = rig.gait.referenceSpeed / rig.gait.strideLength
-  const restOffset = rig.gait.stanceFraction - 0.5
-  const phase = [restOffset]
+  const phase = [cycle.start]
   let previous = track(0)
   let dirty = false
   let target = 0
@@ -86,7 +138,7 @@ function samplePhase (options: Options, count: number): number[] {
       dirty = true
       target = -1
     } else if (dirty) {
-      if (target < 0) target = (Math.floor(2 * p + PHASE_EPSILON) + 1) / 2 + restOffset
+      if (target < 0) target = standingPhase(cycle, p)
       p = Math.min(target, p + settleRate / fps)
       if (p === target) dirty = false
     }
@@ -110,41 +162,44 @@ function timeAtPhase (phase: number[], fps: number, target: number): number {
   return (lo + (target - phase[lo]) / (phase[hi] - phase[lo])) / fps
 }
 
-function buildFeet (options: Options, phase: number[]): Foot[] {
+function ahead (yaw: number, distance: number): Vec3 {
+  return distance === 0 ? [0, 0, 0] : [Math.sin(yaw) * distance, 0, Math.cos(yaw) * distance]
+}
+
+function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
   const { track, rig, rest, mannequin, fps } = options
   const { gait } = rig
   const start = track(0)
-  const feet = rig.legs.map((leg): Foot => {
+  const feet = rig.legs.map((leg, index): Foot => {
     const restAnkle = rest[leg.ankle]
     const planted: Vec3 = [restAnkle[0], restAnkle[1] - soleHeight(leg, rest, mannequin), restAnkle[2]]
     const upper = length(sub(rest[leg.knee], rest[leg.hip]))
     const lower = length(sub(rest[leg.ankle], rest[leg.knee]))
-    const initial: Plant = {
-      phase: leg.side === 'left' ? 0 : -0.5,
-      ankle: toWorld(planted, start),
-      yaw: start.yaw
-    }
+    const initial: Plant = { phase: cycle.initial[index], ankle: toWorld(planted, start), yaw: start.yaw }
     return {
       side: leg.side,
       sign: leg.side === 'left' ? 1 : -1,
       planted,
       restHip: rest[leg.hip],
       reach: upper + lower,
+      partner: cycle.partner[index],
       plants: [initial]
     }
   })
-  const left = feet.findIndex(f => f.side === 'left')
-  const landings = Math.floor(2 * phase[phase.length - 1] + PHASE_EPSILON) + 2
-  for (let m = 1; m <= landings; m++) {
-    const foot = feet[m % 2 === 0 ? left : 1 - left]
-    const other = feet[m % 2 === 0 ? 1 - left : left]
-    const landing = m / 2
+  const last = phase[phase.length - 1] + 1 + PHASE_EPSILON
+  const landings = cycle.initial.flatMap((first, index) => {
+    const found: Array<{ index: number, landing: number }> = []
+    for (let cycles = 1; first + cycles <= last; cycles++) found.push({ index, landing: first + cycles })
+    return found
+  }).sort((a, b) => a.landing - b.landing || a.index - b.index)
+  for (const { index, landing } of landings) {
+    const foot = feet[index]
     const landed = track(timeAtPhase(phase, fps, landing))
     let ankle: Vec3
     let yaw: number
     if (isAtRest(landed)) {
       const side = lateral(landed.yaw)
-      const beside = other.plants[other.plants.length - 1].ankle
+      const beside = feet[foot.partner].plants[feet[foot.partner].plants.length - 1].ankle
       const gap = foot.sign * gait.footSpacing
       ankle = [beside[0] + side[0] * gap, beside[1], beside[2] + side[2] * gap]
       yaw = landed.yaw
@@ -152,10 +207,11 @@ function buildFeet (options: Options, phase: number[]): Foot[] {
       const middle = track(timeAtPhase(phase, fps, landing + gait.stanceFraction / 2))
       const side = lateral(middle.yaw)
       const offset = foot.sign * gait.footSpacing / 2
+      const forward = ahead(middle.yaw, foot.restHip[2])
       ankle = [
-        middle.position[0] + side[0] * offset,
+        middle.position[0] + side[0] * offset + forward[0],
         middle.position[1] + foot.planted[1],
-        middle.position[2] + side[2] * offset
+        middle.position[2] + side[2] * offset + forward[2]
       ]
       yaw = middle.yaw
     }
@@ -214,8 +270,9 @@ export function planGait (options: Options): GaitFrame[] {
   const { track, rig, fps } = options
   const { gait } = rig
   const count = Math.round(options.duration * fps) + 1
-  const phase = samplePhase(options, count)
-  const feet = buildFeet(options, phase)
+  const cycle = cycleOf(rig, options.rest)
+  const phase = samplePhase(options, count, cycle)
+  const feet = buildFeet(options, phase, cycle)
   const roots = phase.map((_, i) => track(i / fps))
   const stances = phase.map(p => feet.map(foot => footAt(foot, p, options)))
   const referenceCadence = gait.referenceSpeed / gait.strideLength

@@ -10,7 +10,7 @@ import { kneeBendsBackward, kneeFlexionDegrees } from './ik.ts'
 import { poseAt } from './locomotion.ts'
 import { footRadii } from './pose.ts'
 import type { Pose } from './pose.ts'
-import type { RootState } from './script.ts'
+import type { RootState, Script } from './script.ts'
 
 type Side = 'left' | 'right'
 export type Sides<T> = Record<Side, T>
@@ -29,7 +29,7 @@ export type SteadySegment = Window & { speed: number }
 export type PlantedRun = { side: Side, start: number, end: number }
 
 const PLANT_HEIGHT = 0.02
-const MAX_KNEE_FLEXION = 150
+export const MAX_KNEE_FLEXION = 150
 const FLEXION_EPSILON = 1e-6
 const TIME_EPSILON = 1e-9
 
@@ -268,6 +268,23 @@ export function rootSpeedError (recording: LocomotionRecording, geometry: Geomet
     worst = Math.max(worst, measured.length === 0 ? Infinity : Math.max(...measured))
   }
   return worst
+}
+
+/**
+ * Windows in which the script walks steadily: each 'move' segment after its first accelSeconds, minus any that
+ * overlap a 'turn'.
+ */
+export function steadySegments (script: Script): SteadySegment[] {
+  const turns: Array<[number, number]> = []
+  const moves: SteadySegment[] = []
+  let t = 0
+  for (const segment of script.segments) {
+    const end = t + segment.duration
+    if (segment.action === 'turn') turns.push([t, end])
+    if (segment.action === 'move') moves.push({ start: t + script.accelSeconds, end, speed: segment.speed })
+    t = end
+  }
+  return moves.filter(m => m.end > m.start && !turns.some(([a, b]) => m.start < b && m.end > a))
 }
 
 /** Frames in which no sole point of either foot is within 2 cm of the ground. */

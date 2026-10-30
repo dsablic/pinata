@@ -1,0 +1,15 @@
+{
+  "script": {
+    "accelSeconds": 0.4,
+    "segments": [
+      { "action": "move", "speed": 1, "duration": 3 },
+      { "action": "hold", "duration": 1 }
+    ]
+  },
+  "cape": { "anchorLeft": "capeL", "anchorRight": "capeR", "columns": 4, "rows": 5, "length": 0.4, "material": "cloth" },
+  "gravity": [0, -9.81, 0],
+  "fps": 24,
+  "substeps": 20,
+  "particleRadius": 0.02,
+  "durationSeconds": 4
+}

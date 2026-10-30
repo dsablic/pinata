@@ -1,0 +1,227 @@
+{
+  "name": "imp",
+  "height": 1.2,
+  "joints": {
+    "pelvis": [
+      0,
+      0.55,
+      0
+    ],
+    "chest": [
+      0,
+      0.86,
+      0
+    ],
+    "head": [
+      0,
+      1.04,
+      0
+    ],
+    "headTop": [
+      0,
+      1.1,
+      0
+    ],
+    "capeL": [
+      0.12,
+      0.96,
+      -0.2
+    ],
+    "capeR": [
+      -0.12,
+      0.96,
+      -0.2
+    ],
+    "hipL": [
+      0.08,
+      0.55,
+      0
+    ],
+    "kneeL": [
+      0.08,
+      0.3,
+      0.03
+    ],
+    "ankleL": [
+      0.08,
+      0.07,
+      0
+    ],
+    "toeL": [
+      0.08,
+      0.05,
+      0.13
+    ],
+    "hipR": [
+      -0.08,
+      0.55,
+      0
+    ],
+    "kneeR": [
+      -0.08,
+      0.3,
+      0.03
+    ],
+    "ankleR": [
+      -0.08,
+      0.07,
+      0
+    ],
+    "toeR": [
+      -0.08,
+      0.05,
+      0.13
+    ],
+    "shoulderL": [
+      0.18,
+      0.95,
+      0
+    ],
+    "elbowL": [
+      0.2,
+      0.75,
+      0.02
+    ],
+    "wristL": [
+      0.2,
+      0.58,
+      0.04
+    ],
+    "handL": [
+      0.2,
+      0.52,
+      0.05
+    ],
+    "shoulderR": [
+      -0.18,
+      0.95,
+      0
+    ],
+    "elbowR": [
+      -0.2,
+      0.75,
+      0.02
+    ],
+    "wristR": [
+      -0.2,
+      0.58,
+      0.04
+    ],
+    "handR": [
+      -0.2,
+      0.52,
+      0.05
+    ]
+  },
+  "parts": [
+    {
+      "name": "torso",
+      "shape": "capsule",
+      "a": "pelvis",
+      "b": "chest",
+      "radiusA": -0.1,
+      "radiusB": 0.12,
+      "material": "tunic"
+    },
+    {
+      "name": "head",
+      "shape": "capsule",
+      "a": "head",
+      "b": "headTop",
+      "radiusA": 0.13,
+      "radiusB": 0.1,
+      "material": "skin"
+    },
+    {
+      "name": "thighL",
+      "shape": "capsule",
+      "a": "hipL",
+      "b": "kneeL",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "trousers"
+    },
+    {
+      "name": "shinL",
+      "shape": "capsule",
+      "a": "kneeL",
+      "b": "ankleL",
+      "radiusA": 0.06,
+      "radiusB": 0.055,
+      "material": "trousers"
+    },
+    {
+      "name": "footL",
+      "shape": "capsule",
+      "a": "ankleL",
+      "b": "toeL",
+      "radiusA": 0.07,
+      "radiusB": 0.05,
+      "material": "boots"
+    },
+    {
+      "name": "thighR",
+      "shape": "capsule",
+      "a": "hipR",
+      "b": "kneeR",
+      "radiusA": 0.07,
+      "radiusB": 0.06,
+      "material": "trousers"
+    },
+    {
+      "name": "shinR",
+      "shape": "capsule",
+      "a": "kneeR",
+      "b": "ankleR",
+      "radiusA": 0.06,
+      "radiusB": 0.055,
+      "material": "trousers"
+    },
+    {
+      "name": "footR",
+      "shape": "capsule",
+      "a": "ankleR",
+      "b": "toeR",
+      "radiusA": 0.07,
+      "radiusB": 0.05,
+      "material": "boots"
+    },
+    {
+      "name": "upperArmL",
+      "shape": "capsule",
+      "a": "shoulderL",
+      "b": "elbowL",
+      "radiusA": 0.06,
+      "radiusB": 0.055,
+      "material": "tunic"
+    },
+    {
+      "name": "forearmL",
+      "shape": "capsule",
+      "a": "elbowL",
+      "b": "wristL",
+      "radiusA": 0.055,
+      "radiusB": 0.05,
+      "material": "skin"
+    },
+    {
+      "name": "upperArmR",
+      "shape": "capsule",
+      "a": "shoulderR",
+      "b": "elbowR",
+      "radiusA": 0.06,
+      "radiusB": 0.055,
+      "material": "tunic"
+    },
+    {
+      "name": "forearmR",
+      "shape": "capsule",
+      "a": "elbowR",
+      "b": "wristR",
+      "radiusA": 0.055,
+      "radiusB": 0.05,
+      "material": "skin"
+    }
+  ],
+  "decals": []
+}

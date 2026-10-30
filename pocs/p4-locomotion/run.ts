@@ -14,7 +14,7 @@ import type { Validated } from '../../src/formats/validate.ts'
 import { planGait } from '../../src/motion/gait.ts'
 import type { GaitFrame } from '../../src/motion/gait.ts'
 import * as metrics from '../../src/motion/metrics.ts'
-import type { LocomotionRecording, SteadySegment } from '../../src/motion/metrics.ts'
+import type { LocomotionRecording } from '../../src/motion/metrics.ts'
 import { posedMannequin, restPose } from '../../src/motion/pose.ts'
 import type { Pose } from '../../src/motion/pose.ts'
 import { createRootTrack, scriptDuration } from '../../src/motion/script.ts'
@@ -113,26 +113,12 @@ function childHashes (): Map<string, string> {
   return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
 }
 
-function steadySegments (scenario: Scenario): SteadySegment[] {
-  const { segments, accelSeconds } = scenario.script
-  const turns: Array<[number, number]> = []
-  const moves: SteadySegment[] = []
-  let t = 0
-  for (const segment of segments) {
-    const end = t + segment.duration
-    if (segment.action === 'turn') turns.push([t, end])
-    if (segment.action === 'move') moves.push({ start: t + accelSeconds, end, speed: segment.speed })
-    t = end
-  }
-  return moves.filter(m => m.end > m.start && !turns.some(([a, b]) => m.start < b && m.end > a))
-}
-
 function frameOf (run: Run, time: number): number {
   return Math.min(run.recording.frames.length - 1, Math.max(0, Math.round(time * run.scenario.fps)))
 }
 
 function steadyMiddle (run: Run): number {
-  const [first] = steadySegments(run.scenario)
+  const [first] = metrics.steadySegments(run.scenario.script)
   if (first === undefined) return fail(`${run.scenario.name}.json: the script has no steady move segment`)
   return (first.start + first.end) / 2
 }
@@ -142,7 +128,7 @@ const geometry = (run: Run): metrics.Geometry => ({ rig, mannequin: run.mannequi
 function evaluateRun (run: Run): Record<string, number> {
   const rest = restPose(run.mannequin)
   const g = geometry(run)
-  const steady = steadySegments(run.scenario)
+  const steady = metrics.steadySegments(run.scenario.script)
   return {
     footSlidePx: metrics.footSlidePx(run.recording, g, METRES_PER_PIXEL),
     groundPenetrationPx: metrics.groundPenetrationPx(run.recording, g, METRES_PER_PIXEL),

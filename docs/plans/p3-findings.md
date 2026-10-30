@@ -22,7 +22,7 @@ Gate thresholds are locked (see `pocs/p3-secondary-motion/gates.ts`). Material v
 
 - Change: wind direction [1, 0, 0] -> [0, 0, -1]. Blowing along +X hit the cape edge-on: windAlignment was 0.99 but
   the hem barely moved, because the gate checks direction, not magnitude. Wind from the front now streams the cape
-  backward. Added `windDisplacementMetres` (mean horizontal hem drift) to metrics.json as information, not a gate.
+  backward. Added mean horizontal hem drift to metrics.json (later gated as `windDriftMetres`).
   Added body-frame stills (side, plus front for wind).
 - Gates: all pass; windAlignment 0.995. Wind drift silk 0.52 m, wool 0.25 m, leather 0.08 m.
 - Observed: body-frame stills separate the materials clearly (silk fans widest, leather a narrow wedge) and the
@@ -43,3 +43,23 @@ Packet: body-frame stills from `reports/p3/`, renamed and shuffled. Key and answ
 Caveat: simulated vs rigid is an easy question (the rigid cape does not move), so it shows the motion is visible,
 not that it looks natural. The material rankings are the stronger evidence: judges told silk, wool and leather
 apart from motion alone, in both scenarios.
+
+## Gate amendment and re-run
+
+The batch C review found several gates also passed for a rigid cape (settle clock started during deceleration, no
+lag floor, wind alignment insensitive to drift size, penetration blind to cloth passing through). Gates were
+tightened (see "Gate amendment" in the plan); nothing was loosened.
+
+- All gates pass. settle (from root rest, cape only) silk 2.30 s, wool 1.47 s, leather 0.93 s; overshoot silk
+  8.9, wool 8.6 degrees (leather 7.8, not gated); lag silk 12, wool 11, leather 2 frames; wind drift silk 0.52 m,
+  wool 0.25 m, leather 0.08 m; maxStrain 0.041; no penetration including link midpoints; deterministic.
+- Rigid control, same gates: settle 0.008 s, overshoot 0, lag -1. It fails every motion gate, for all materials.
+- Thin margins: leather lag rests on a 0.69 degree sideways peak (floor 0.5), and leather drift is 8.4 cm
+  (floor 5 cm). Leather is meant to move least, but these are the first gates to watch when anything changes.
+
+## Verdict
+
+P3 passes. Automated gates pass under the tightened set, the rigid control fails them, and the blind judge panel
+answered every ground-truth question correctly (material ranking in two scenarios, wind side with a mirrored
+control, simulated over rigid). Secondary motion driven by body motion, materials and wind is viable with this
+approach.

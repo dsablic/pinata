@@ -1,0 +1,45 @@
+{
+  "name": "pinata",
+  "height": 1.16,
+  "joints": {
+    "pelvis": [0, 0.33, 0],
+    "hipL": [0.09, 0.27, 0], "kneeL": [0.09, 0.16, 0.02], "ankleL": [0.09, 0.06, 0], "toeL": [0.09, 0.06, 0.1],
+    "hipR": [-0.09, 0.27, 0], "kneeR": [-0.09, 0.16, 0.02], "ankleR": [-0.09, 0.06, 0], "toeR": [-0.09, 0.06, 0.1],
+    "purpleA": [0, 0.31, 0], "purpleB": [0, 0.34, 0],
+    "turquoiseA": [0, 0.44, 0], "turquoiseB": [0, 0.47, 0],
+    "yellowA": [0, 0.57, 0], "yellowB": [0, 0.6, 0],
+    "pinkA": [0, 0.7, 0], "pinkB": [0, 0.73, 0],
+    "orangeA": [0, 0.83, 0], "orangeB": [0, 0.86, 0],
+    "hatBase": [0, 0.97, 0], "hatTip": [0, 1.15, -0.03],
+    "earBaseL": [0.12, 0.92, 0], "earTipL": [0.2, 1.03, 0],
+    "earBaseR": [-0.12, 0.92, 0], "earTipR": [-0.2, 1.03, 0],
+    "eyeL": [0.065, 0.9, 0.15], "eyeR": [-0.065, 0.9, 0.15],
+    "cheekL": [0.1, 0.84, 0.13], "cheekR": [-0.1, 0.84, 0.13],
+    "mouth": [0, 0.82, 0.17],
+    "tailA": [0.16, 0.6, -0.12], "tailB": [-0.16, 0.73, -0.12],
+    "tailC": [0.1, 0.46, -0.15], "tailD": [-0.09, 0.85, -0.15]
+  },
+  "parts": [
+    { "name": "bandPurple", "shape": "capsule", "a": "purpleA", "b": "purpleB", "radiusA": 0.15, "radiusB": 0.15, "material": "purple" },
+    { "name": "bandTurquoise", "shape": "capsule", "a": "turquoiseA", "b": "turquoiseB", "radiusA": 0.185, "radiusB": 0.185, "material": "turquoise" },
+    { "name": "bandYellow", "shape": "capsule", "a": "yellowA", "b": "yellowB", "radiusA": 0.2, "radiusB": 0.2, "material": "yellow" },
+    { "name": "bandPink", "shape": "capsule", "a": "pinkA", "b": "pinkB", "radiusA": 0.2, "radiusB": 0.2, "material": "pink" },
+    { "name": "bandOrange", "shape": "capsule", "a": "orangeA", "b": "orangeB", "radiusA": 0.17, "radiusB": 0.17, "material": "orange" },
+    { "name": "hat", "shape": "capsule", "a": "hatBase", "b": "hatTip", "radiusA": 0.085, "radiusB": 0.012, "material": "purple" },
+    { "name": "earL", "shape": "capsule", "a": "earBaseL", "b": "earTipL", "radiusA": 0.045, "radiusB": 0.03, "material": "pink" },
+    { "name": "earR", "shape": "capsule", "a": "earBaseR", "b": "earTipR", "radiusA": 0.045, "radiusB": 0.03, "material": "pink" },
+    { "name": "thighL", "shape": "capsule", "a": "hipL", "b": "kneeL", "radiusA": 0.05, "radiusB": 0.05, "material": "orange" },
+    { "name": "shinL", "shape": "capsule", "a": "kneeL", "b": "ankleL", "radiusA": 0.045, "radiusB": 0.045, "material": "orange" },
+    { "name": "footL", "shape": "capsule", "a": "ankleL", "b": "toeL", "radiusA": 0.06, "radiusB": 0.06, "material": "orange" },
+    { "name": "thighR", "shape": "capsule", "a": "hipR", "b": "kneeR", "radiusA": 0.05, "radiusB": 0.05, "material": "orange" },
+    { "name": "shinR", "shape": "capsule", "a": "kneeR", "b": "ankleR", "radiusA": 0.045, "radiusB": 0.045, "material": "orange" },
+    { "name": "footR", "shape": "capsule", "a": "ankleR", "b": "toeR", "radiusA": 0.06, "radiusB": 0.06, "material": "orange" }
+  ],
+  "decals": [
+    { "name": "eyeL", "anchor": "eyeL", "normal": [0.3, 0, 1], "pattern": ["ew", "ee", "ee"] },
+    { "name": "eyeR", "anchor": "eyeR", "normal": [-0.3, 0, 1], "pattern": ["ew", "ee", "ee"] },
+    { "name": "cheekL", "anchor": "cheekL", "normal": [0.6, 0, 1], "pattern": ["pp"] },
+    { "name": "cheekR", "anchor": "cheekR", "normal": [-0.6, 0, 1], "pattern": ["pp"] },
+    { "name": "mouth", "anchor": "mouth", "normal": [0, 0, 1], "pattern": ["e.e", ".e."] }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "script": { "accelSeconds": 0.4, "segments": [
+    { "action": "move", "speed": 0.5, "duration": 3 },
+    { "action": "turn", "degrees": 90, "duration": 3 },
+    { "action": "move", "speed": 0.5, "duration": 3 },
+    { "action": "hold", "duration": 1 } ] },
+  "chains": [
+    { "anchor": "hatTip", "links": 7, "linkLength": 0.06, "direction": [0.4, 0.6, -0.5], "material": "ribbon",
+      "render": { "material": "pink", "radius": 0.016 } },
+    { "anchor": "hatTip", "links": 6, "linkLength": 0.06, "direction": [-0.4, 0.6, -0.5], "material": "ribbon",
+      "render": { "material": "turquoise", "radius": 0.016 } },
+    { "anchor": "tailA", "links": 6, "linkLength": 0.06, "direction": [0.6, -0.1, -0.8], "material": "ribbon",
+      "render": { "material": "yellow", "radius": 0.016 } },
+    { "anchor": "tailB", "links": 6, "linkLength": 0.06, "direction": [-0.6, -0.1, -0.8], "material": "ribbon",
+      "render": { "material": "pink", "radius": 0.016 } },
+    { "anchor": "tailC", "links": 5, "linkLength": 0.06, "direction": [0.4, -0.3, -0.8], "material": "ribbon",
+      "render": { "material": "turquoise", "radius": 0.016 } },
+    { "anchor": "tailD", "links": 5, "linkLength": 0.06, "direction": [-0.4, -0.2, -0.8], "material": "ribbon",
+      "render": { "material": "orange", "radius": 0.016 } }
+  ],
+  "wind": { "direction": [0.6, 0, -0.4], "speed": 1.5, "gust": 0.4 },
+  "gravity": [0, -9.81, 0], "fps": 24, "substeps": 30, "particleRadius": 0.012
+}

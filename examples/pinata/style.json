@@ -1,0 +1,12 @@
+{
+  "name": "party", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#2a1050",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "pink": ["#b0246f", "#ff4fa3", "#ffb3d9"],
+    "yellow": ["#c98a00", "#ffd21f", "#fff3a0"],
+    "turquoise": ["#0b7d86", "#18d0c4", "#9ff5e6"],
+    "orange": ["#c2410c", "#ff8a1f", "#ffc27a"],
+    "purple": ["#4a1f8c", "#8a4fe0", "#c9a6ff"]
+  },
+  "decalColors": { "e": "#4a1f8c", "w": "#ffffff", "p": "#ff4fa3" }
+}

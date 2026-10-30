@@ -46,8 +46,11 @@ export function step (system: System, options: StepOptions): void {
     if (w === 0) continue
     const material = system.material[materialIndex[i]]
     const keep = Math.max(0, 1 - material.damping * dt)
-    const k = material.drag * w
     const o = 3 * i
+    const k = material.drag * w
+    const bx = root.velocity[0] + root.angularVelocity * (position[o + 2] - root.position[2])
+    const bz = root.velocity[2] - root.angularVelocity * (position[o] - root.position[0])
+    const by = root.velocity[1]
     let vx = (position[o] - previous[o]) / dt
     let vy = (position[o + 1] - previous[o + 1]) / dt
     let vz = (position[o + 2] - previous[o + 2]) / dt
@@ -57,9 +60,9 @@ export function step (system: System, options: StepOptions): void {
     previous[o] = position[o]
     previous[o + 1] = position[o + 1]
     previous[o + 2] = position[o + 2]
-    position[o] += vx * keep * dt
-    position[o + 1] += vy * keep * dt
-    position[o + 2] += vz * keep * dt
+    position[o] += (bx + (vx - bx) * keep) * dt
+    position[o + 1] += (by + (vy - by) * keep) * dt
+    position[o + 2] += (bz + (vz - bz) * keep) * dt
   }
   solveConstraints(system, dt)
   collide(system, options, root)

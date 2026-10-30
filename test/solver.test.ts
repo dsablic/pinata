@@ -149,7 +149,7 @@ test('pinned particles follow a moving root', () => {
 function freeParticle (mass: number, material: Partial<SimMaterial>): System {
   const system = chain(1, [0, 1, 0], { ...rope, particleMass: mass, ...material })
   system.pins.length = 0
-  system.particles.inverseMass[0] = 1 / mass
+  system.particles.inverseMass.fill(1 / mass)
   system.constraints.length = 0
   system.particles.position.set([2, 5, 0, 3, 5, 0])
   system.particles.previous.set(system.particles.position)
@@ -164,4 +164,17 @@ test('drag on a very light particle stays stable and approaches the wind speed',
   const speed = Math.hypot(p.position[0] - p.previous[0], p.position[1] - p.previous[1]) / DT
   assert.ok(Number.isFinite(speed))
   assertClose(speed, 5, 0.1)
+})
+
+test('damping acts on the velocity relative to the moving body only', () => {
+  const moving: RootState = { position: [0, 0, 0], yaw: 0, velocity: [1, 0, 0], angularVelocity: 0.5 }
+  const system = freeParticle(0.05, { damping: 120, drag: 0 })
+  system.particles.position.set([2, 5, 0, 2, 5, 0])
+  system.particles.previous.set([2 - DT, 5, DT, 2, 5, 0])
+  step(system, { env: { ...env, gravity: [0, 0, 0] }, body, exclude: [], track: () => moving, t: DT, dt: DT })
+  const p = system.particles.position
+  assertClose((p[0] - 2) / DT, 1, 1e-9)
+  assertClose(p[2] / DT, -1, 1e-9)
+  assertClose((p[3] - 2) / DT, 0.5, 1e-9)
+  assertClose(p[5] / DT, -0.5, 1e-9)
 })

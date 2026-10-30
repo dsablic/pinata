@@ -51,6 +51,9 @@ file) and are referenced by name from motion scripts and from the runtime.
 Motion scripts gain a segment that plays a behaviour for a duration (`{ "action": "behave", "name": "wave",
 "duration": 2 }`) and can run layers in parallel with `move`/`turn` segments.
 
+Masks are sets of joints in the point hierarchy (a joint name covers its whole subtree; limb names and `body` are
+shorthands), per [`docs/plans/2026-10-30-image-points.md`](2026-10-30-image-points.md), "Decisions during batch A".
+
 ## Evaluation order (per frame)
 
 1. Base motion (blended if two are active): root, body orientation and the default pose of every limb.

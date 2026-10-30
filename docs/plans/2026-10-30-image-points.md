@@ -176,3 +176,10 @@ ordinary `points.json` the author edits. `check` validates any points file the s
   about a single axis, and the joints attached below are placed again after each appendage.
 - Cloth and chain pins turn with their joint's rotation. Cape anchors must still be rigid with the body (upperBody,
   or attached joints whose parents lead to the pelvis through upperBody).
+- Behaviours meet the point model as follows (decided before P8 builds on either): a mask is a set of joints, written
+  as joint names, where a name stands for that joint and everything below it in the hierarchy (`"mask":
+  ["shoulderL"]` is the whole left arm with what it carries and anything attached to it); limb names and `body` (the
+  pelvis and upperBody) stay as shorthands. A layer writes transforms for the joints in its mask, and joints below
+  them that no layer or driver owns follow by inheritance. Evaluation per frame: base drivers (root, gait and IK,
+  swing), layers, constraints, inheritance, additive overlays, events, then the sequence-level springs and cloth,
+  which matches the behaviours spec's order with inheritance placed after constraints.

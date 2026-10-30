@@ -51,31 +51,49 @@ type Frame = {
 
 function requireValid<T> (file: string, result: Validated<T>): T {
   if (result.value === undefined || result.errors.length > 0) {
-    console.error(formatErrors(file, result.errors))
-    process.exit(2)
+    fail(formatErrors(file, result.errors))
   }
   return result.value
 }
 
+function fail (message: string): never {
+  console.error(message)
+  process.exit(2)
+}
+
 function loadJson (file: string): unknown {
-  return JSON.parse(readFileSync(join(here, file), 'utf8'))
+  try {
+    return JSON.parse(readFileSync(join(here, file), 'utf8'))
+  } catch (err) {
+    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
+    throw err
+  }
+}
+
+function frameCamera (size: number, elevation: number, direction: number): Camera {
+  try {
+    return fitCamera(mannequin, {
+      azimuthDeg: direction * 45,
+      elevationDeg: elevation,
+      targetHeightPx: size,
+      margin: MARGIN
+    })
+  } catch (err) {
+    if (err instanceof RangeError) fail(`camera for ${size}px elevation ${elevation}: ${err.message}`)
+    throw err
+  }
 }
 
 const mannequin = requireValid('knight.json', validateMannequin(loadJson('knight.json')))
 const style = requireValid('style.json', validateStyle(loadJson('style.json')))
 const referenceErrors = checkReferences(mannequin, style)
 if (referenceErrors.length > 0) {
-  console.error(formatErrors('knight.json', referenceErrors))
-  process.exit(2)
+  fail(formatErrors('knight.json', referenceErrors))
 }
 
 function renderFrame (size: number, elevation: number, direction: number): Frame {
-  const camera = fitCamera(mannequin, {
-    azimuthDeg: direction * 45,
-    elevationDeg: elevation,
-    targetHeightPx: size,
-    margin: MARGIN
-  })
+  const camera = frameCamera(size, elevation, direction)
   const gbuffer = rasterize(mannequin, camera)
   const { image, decalMask } = stylize(gbuffer, mannequin, camera, style)
   return { id: `${size}px-el${elevation}-d${direction}`, size, elevation, direction, camera, gbuffer, image, decalMask }

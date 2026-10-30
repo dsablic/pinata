@@ -45,9 +45,9 @@ test('a rig with limbs validates and keeps joints, names and kinds', () => {
   assert.equal(input.limbs[0].joints.length, 4)
 })
 
-test('legs may have three joints or more and arms and appendages two or more', () => {
+test('legs may have four joints or more and arms and appendages two or more', () => {
   const input = limbsRig([
-    leg('left', 'L', 3, { phase: 0 }), leg('right', 'R', 6, { phase: 0.5 }),
+    leg('left', 'L', 4, { phase: 0 }), leg('right', 'R', 6, { phase: 0.5 }),
     { kind: 'arm', joints: ['a', 'b'], side: 'left' },
     { kind: 'appendage', joints: ['c', 'd'] }
   ])
@@ -56,16 +56,17 @@ test('legs may have three joints or more and arms and appendages two or more', (
 
 test('joint counts below the minimum name the kind and the count found', () => {
   const input = limbsRig([
-    leg('left', 'L', 2), leg('right', 'R'),
+    leg('left', 'L', 2), leg('right', 'R', 3, { phase: 0.5 }),
     { kind: 'arm', joints: ['a'], side: 'left' },
     { kind: 'appendage', joints: [] },
     { kind: 'appendage', joints: 'tail' }
   ])
   const errors = errorsOf(input)
-  assert.deepEqual(errors.map(e => e[0]), ['limbs[0].joints', 'limbs[2].joints', 'limbs[3].joints', 'limbs[4].joints'])
-  assert.match(errors[0][1], /3 or more joint names from the hip to the toe; found 2/)
-  assert.match(errors[1][1], /2 or more joint names from the shoulder outward; found 1/)
-  assert.match(errors[3][1], /from the root outward$/)
+  assert.deepEqual(errors.map(e => e[0]), ['limbs[0].joints', 'limbs[1].joints', 'limbs[2].joints', 'limbs[3].joints', 'limbs[4].joints'])
+  assert.match(errors[0][1], /4 or more joint names from the hip to the toe; found 2/)
+  assert.match(errors[1][1], /found 3: a leg needs a hip, at least one bending joint, an ankle and a toe/)
+  assert.match(errors[2][1], /2 or more joint names from the shoulder outward; found 1/)
+  assert.match(errors[4][1], /from the root outward$/)
 })
 
 test('joint names must be non-empty strings', () => {
@@ -93,7 +94,7 @@ test('unknown keys are rejected per kind', () => {
 
 test('legs and arms need a side, appendages may have one', () => {
   const input = limbsRig([
-    { kind: 'leg', joints: ['a', 'b', 'c'], side: 'middle', phase: 0 },
+    { kind: 'leg', joints: ['a', 'b', 'c', 'x'], side: 'middle', phase: 0 },
     { kind: 'arm', joints: ['a', 'b'] },
     { kind: 'appendage', joints: ['a', 'b'], side: 'up' },
     { kind: 'appendage', joints: ['c', 'd'], side: 'left' },
@@ -108,8 +109,8 @@ test('names must be unique non-empty strings and default to the kind and its cou
   assert.match(errorsOf(dup)[0][1], /name 'x' is already used by limbs\[0\]/)
   assert.deepEqual(pathsOf(limbsRig([{ kind: 'arm', joints: ['a', 'b'], side: 'left', name: '' }])), ['limbs[0].name'])
   const unnamed = limbsRig([
-    { kind: 'leg', joints: ['a', 'b', 'c'], side: 'left', phase: 0 },
-    { kind: 'leg', joints: ['d', 'e', 'f'], side: 'right', phase: 0.5 },
+    { kind: 'leg', joints: ['a', 'b', 'c', 'x'], side: 'left', phase: 0 },
+    { kind: 'leg', joints: ['d', 'e', 'f', 'y'], side: 'right', phase: 0.5 },
     { kind: 'appendage', joints: ['g', 'h'] }
   ])
   assert.deepEqual(validateRig(unnamed).value!.limbs.map(l => l.name), ['leg1', 'leg2', 'appendage1'])

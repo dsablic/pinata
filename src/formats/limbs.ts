@@ -67,7 +67,7 @@ export type Arm = {
 
 type Source = { limbs: readonly Limb[] }
 
-export const MIN_JOINTS: Record<LimbKind, number> = { leg: 3, arm: 2, appendage: 2 }
+export const MIN_JOINTS: Record<LimbKind, number> = { leg: 4, arm: 2, appendage: 2 }
 export const DEFAULT_STIFFNESS = 0.6
 export const DEFAULT_DAMPING = 0.4
 const MAX_OSCILLATION_DEGREES = 180
@@ -223,9 +223,10 @@ function validateJoints (limb: Record<string, unknown>, kind: LimbKind, here: st
   const min = MIN_JOINTS[kind]
   if (!Array.isArray(joints) || joints.length < min) {
     const found = Array.isArray(joints) ? `; found ${joints.length}` : ''
+    const note = kind === 'leg' ? ': a leg needs a hip, at least one bending joint, an ankle and a toe' : ''
     errors.push({
       path: `${here}.joints`,
-      message: `expected an array of ${min} or more joint names ${JOINT_NOTE[kind]}${found}`
+      message: `expected an array of ${min} or more joint names ${JOINT_NOTE[kind]}${found}${note}`
     })
     return
   }

@@ -64,6 +64,7 @@ type Actor = {
 }
 
 const LANE_SPACING = 0.45
+const TREAD_MARGIN = 1.15
 const SPRING_SUBSTEPS = 4
 const SETTLE_SECONDS = 0.7
 const TURN_SECONDS_PER_RADIAN = 0.45
@@ -83,6 +84,17 @@ function legLength (member: CastMember): number {
   return Math.min(...legsOf(member.rig).map(leg => rest[leg.hip][1] - rest[leg.ankle][1]))
 }
 
+/** Length of the longest foot, heel capsule to toe capsule, at rest. */
+function footLength (member: CastMember): number {
+  const rest = restPose(member.mannequin)
+  return Math.max(...legsOf(member.rig).map(leg => {
+    const foot = member.mannequin.parts.find(p => p.shape === 'capsule' && p.a === leg.ankle && p.b === leg.toe)
+    const radii = foot?.shape === 'capsule' ? foot.radiusA + foot.radiusB : 0
+    const [a, t] = [rest[leg.ankle], rest[leg.toe]]
+    return Math.hypot(t[0] - a[0], t[2] - a[2]) + radii
+  }))
+}
+
 /** Half the character's size along x at rest, for spacing visits. */
 function halfLength (member: CastMember): number {
   const zs = Object.values(member.mannequin.joints).map(p => p[2])
@@ -99,7 +111,8 @@ export function createWorld (options: WorldOptions): World {
   const next = random(options.seed)
   const maxRise = 0.3 * Math.min(...cast.map(legLength))
   const terrain = generateTerrain(options.seed, {
-    length: options.length, maxRise, maxSlopeDegrees: 16, maxHeight: Math.min(1.2, 8 * maxRise)
+    length: options.length, maxRise, maxSlopeDegrees: 16, maxHeight: Math.min(1.2, 8 * maxRise),
+    minTread: TREAD_MARGIN * Math.max(...cast.map(footLength))
   })
   const ground = terrain.ground
   const span: [number, number] = [terrain.from + EDGE, Math.min(terrain.to, options.length) - EDGE]

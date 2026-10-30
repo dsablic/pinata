@@ -117,3 +117,67 @@ test('generated terrain is contiguous, seeded, and keeps rises and slopes within
     assert.ok(Math.abs(terrain.ground(x + 0.01, 0) - terrain.ground(x, 0)) <= options.maxRise + 1e-9)
   }
 })
+
+function walkAlong (from: number, to: number): (t: number) => RootState {
+  const sign = Math.sign(to - from)
+  const seconds = Math.abs(to - from) / SPEED
+  return (t: number) => ({
+    position: [from + sign * SPEED * Math.min(t, seconds), 0, 0],
+    yaw: sign * Math.PI / 2,
+    velocity: [t < seconds ? sign * SPEED : 0, 0, 0],
+    angularVelocity: 0
+  })
+}
+
+for (const seed of [3, 8, 15]) {
+  test(`generated course ${seed}: both bodies walk it both ways with regular steps and a bounded lean`, () => {
+    for (const [body, bodyRig] of [[mannequin, rig], [quadMannequin, quadRig]] as const) {
+      const leg = legLength(body, bodyRig)
+      const terrain = generateTerrain(seed, {
+        length: 12, maxRise: 0.3 * leg, maxSlopeDegrees: 18, maxHeight: 4 * 0.3 * leg, minTread: 0.4
+      })
+      const rest = restPose(body)
+      for (const [from, to] of [[0.5, 11], [11, 0.5]]) {
+        const track = walkAlong(from, to)
+        const duration = Math.abs(to - from) / SPEED + 2
+        const ground = terrain.ground
+        const frames = planGait({ track, rig: bodyRig, rest, mannequin: body, duration, fps: FPS, ground })
+        const recording = metrics.recordLocomotion(frames, { rig: bodyRig, rest, mannequin: body, fps: FPS })
+        const relative = aboveGround(recording, terrain)
+        const geometry = { rig: bodyRig, mannequin: body }
+        const mpp = body.height / 48
+        const where = `seed ${seed}, ${from} to ${to}`
+        assert.ok(metrics.footSlidePx(relative, geometry, mpp) <= 0.25, `${where}: slide`)
+        assert.ok(metrics.groundPenetrationPx(relative, geometry, mpp) <= 0.5, `${where}: penetration`)
+        assert.equal(metrics.reachViolations(recording), 0, `${where}: reach`)
+        assert.ok(frames.every(f => Math.abs(f.pelvisPitch ?? 0) <= 35 * Math.PI / 180), `${where}: lean`)
+        const nominal = bodyRig.gait.strideLength / 2
+        const steps: number[] = []
+        frames.forEach((frame, i) => {
+          frame.feet.forEach((foot, k) => {
+            if (i === 0 || !foot.planted || frames[i - 1].feet[k].planted) return
+            const lifted = frames[i - 1].feet[k]
+            steps.push(Math.hypot(foot.ankle[0] - lifted.ankle[0], foot.ankle[2] - lifted.ankle[2]))
+          })
+        })
+        const walking = steps.slice(1, -2)
+        assert.ok(walking.every(d => d <= 2.2 * nominal), `${where}: longest step ${Math.max(...walking)} m`)
+      }
+    }
+  })
+}
+
+test('the generator copes with tight limits and refuses broken spans', () => {
+  const flat = generateTerrain(1, { length: 10, maxRise: 0.12, maxSlopeDegrees: 15, maxHeight: 0.02 })
+  assert.deepEqual(flat.spans.map(s => s.kind), ['flat'])
+  const low = generateTerrain(2, { length: 30, maxRise: 0.12, maxSlopeDegrees: 15, maxHeight: 0.1 })
+  assert.ok(low.spans.every(s => s.kind !== 'flat' || s.height <= 0.1 + 1e-9))
+  const steep = generateTerrain(3, { length: 30, maxRise: 0.12, maxSlopeDegrees: 0, maxHeight: 0.6, minTread: 0.5 })
+  assert.ok(steep.spans.every(s => s.kind !== 'ramp'))
+  assert.ok(steep.spans.every(s => s.kind !== 'stairs' || (s.to - s.from) / s.steps >= 0.5))
+  assert.throws(() => terrainOf([]), /at least one span/)
+  assert.throws(() => terrainOf([{ kind: 'ramp', from: 1, to: 1, start: 0, end: 1 }]), /positive length/)
+  const stairs = terrainOf([{ kind: 'stairs', from: 0, to: 1, start: 0, end: 0.4, steps: 2 }])
+  assert.equal(stairs.ground(-1, 0), 0)
+  assert.equal(stairs.ground(2, 0), 0.4)
+})

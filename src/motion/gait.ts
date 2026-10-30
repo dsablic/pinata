@@ -187,19 +187,16 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
   const { track, rig, rest, mannequin, fps, ground } = options
   const support = (ankle: Vec3, yaw: number, toe: Vec3, shape: FootShape): { ankle: Vec3, pitch?: number } => {
     if (ground === undefined) return { ankle }
-    const samples = footprint(ankle, toe, shape, yaw, ground)
-    const heel = ground(ankle[0], ankle[2])
-    const first = samples[0]
-    const last = samples[samples.length - 1]
-    const slope = (last.height - first.height) / (last.u - first.u)
-    const straight = samples.every(s => Math.abs(s.height - (first.height + slope * (s.u - first.u))) < SURFACE_EPSILON)
     const run = Math.hypot(toe[0], toe[2])
-    if (straight && run > 0) {
-      return { ankle: [ankle[0], ankle[1] + heel, ankle[2]], pitch: Math.atan2(slope, run) }
-    }
+    const samples = footprint(ankle, toe, shape, yaw, ground)
+    const spacing = (samples[1].u - samples[0].u) * run
+    const jump = samples.some((s, i) => {
+      return i > 0 && Math.abs(s.height - samples[i - 1].height) > MAX_SURFACE_GRADE * spacing
+    })
+    if (!jump && run > 0) return { ankle: onLine(ankle, samples), pitch: Math.atan2(lineSlope(samples), run) }
     const along = toWorld(toe, { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 })
     const length = Math.hypot(along[0], along[2])
-    const limit = length * (1 + shape.behind + shape.ahead)
+    const limit = NUDGE_FRACTION * length * (1 + shape.behind + shape.ahead)
     for (let i = 1; i * TREAD_NUDGE <= limit; i++) {
       for (const sign of [1, -1]) {
         const d = sign * i * TREAD_NUDGE / length
@@ -290,18 +287,20 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
 }
 
 /**
- * The lowest the swinging ankle may be: its sole above the highest ground under the foot by as much as the swing
- * rises over flat ground (stepHeight scaled by the lift, none at lift-off and touch-down).
+ * The lowest the swinging ankle may be: its sole, pitched like the foot, above the ground under every footprint sample
+ * by as much as the swing rises over flat ground (stepHeight scaled by the lift, none at lift-off and touch-down).
  */
 function clearance (
   foot: Foot,
   ankle: Vec3,
-  yaw: number,
+  swing: { yaw: number, pitch: number },
   ground: (x: number, z: number) => number,
   stepHeight: number,
   lift: number
 ): number {
-  const highest = Math.max(...footprint(ankle, foot.toe, foot.shape, yaw, ground).map(s => s.height))
+  const run = Math.hypot(foot.toe[0], foot.toe[2])
+  const rise = Math.tan(swing.pitch) * run
+  const highest = Math.max(...footprint(ankle, foot.toe, foot.shape, swing.yaw, ground).map(s => s.height - rise * s.u))
   return highest + foot.planted[1] + stepHeight * lift
 }
 
@@ -330,7 +329,11 @@ function footAt (foot: Foot, phase: number, options: Options): FootState {
   ]
   const toeYaw = plant.yaw + (next.yaw - plant.yaw) * h
   const { ground } = options
-  if (ground !== undefined) ankle[1] = Math.max(ankle[1], clearance(foot, ankle, toeYaw, ground, stepHeight, lift))
+  const surfacePitch = plant.pitch === undefined ? undefined : plant.pitch + ((next.pitch ?? 0) - plant.pitch) * h
+  if (ground !== undefined) {
+    const swing = { yaw: toeYaw, pitch: surfacePitch ?? 0 }
+    ankle[1] = Math.max(ankle[1], clearance(foot, ankle, swing, ground, stepHeight, lift))
+  }
   return {
     side: foot.side,
     ankle,
@@ -338,7 +341,7 @@ function footAt (foot: Foot, phase: number, options: Options): FootState {
     planted: false,
     lift,
     toePitch: Math.sin(Math.PI * e),
-    ...(plant.pitch === undefined ? {} : { surfacePitch: plant.pitch + ((next.pitch ?? 0) - plant.pitch) * h })
+    ...(surfacePitch === undefined ? {} : { surfacePitch })
   }
 }
 
@@ -362,6 +365,24 @@ function smoothDrops (needed: number[], radius: number): number[] {
 
 const FOOTPRINT_SAMPLES = 9
 
+/** Height change per unit of u along the line through the first and last footprint samples. */
+function lineSlope (samples: Array<{ u: number, height: number }>): number {
+  const first = samples[0]
+  const last = samples[samples.length - 1]
+  return (last.height - first.height) / (last.u - first.u)
+}
+
+/**
+ * The ankle raised onto a sole along the line through the footprint's ends, lifted further by however much any sample
+ * stands above that line (a convex kink where a ramp meets a flat run).
+ */
+function onLine (ankle: Vec3, samples: Array<{ u: number, height: number }>): Vec3 {
+  const slope = lineSlope(samples)
+  const line = (u: number): number => samples[0].height + slope * (u - samples[0].u)
+  const above = Math.max(0, ...samples.map(s => s.height - line(s.u)))
+  return [ankle[0], ankle[1] + line(0) + above, ankle[2]]
+}
+
 /** Ground heights under a foot, from the back of the heel to the front of the toe, evenly spaced. */
 function footprint (
   ankle: Vec3,
@@ -379,8 +400,11 @@ function footprint (
 
 const GROUND_SMOOTHING_SECONDS = 0.15
 const SURFACE_EPSILON = 1e-6
-/** Step, in metres, of the search that moves a plant onto a single stair tread. */
+/** Step, in metres, of the search that moves a plant onto a single stair tread, and its reach (foot lengths). */
 const TREAD_NUDGE = 0.01
+const NUDGE_FRACTION = 0.4
+/** Steepest ground under a foot that still counts as one surface (tan 60 degrees); steeper is a stair edge. */
+const MAX_SURFACE_GRADE = Math.tan(60 * Math.PI / 180)
 
 type Lean = { base: number, pitch: number }
 
@@ -392,26 +416,35 @@ function smoothed (values: number[], radius: number): number[] {
 }
 
 /**
- * The body's lean on terrain per frame, smoothed: its base height (the mean ground under the hips) and its nose-up
- * pitch (from the ground under the front and the hind hips over their distance); undefined without ground or with
- * hips all at one depth.
+ * The body's lean on terrain per frame, smoothed: its base height (the mean height of the planted feet's soles) and
+ * its nose-up pitch (the front feet's soles against the hind feet's, over the distance between their hips); a frame
+ * without a planted foot at either end keeps the previous value. Undefined without ground.
  */
-function groundLeans (options: Options, roots: RootState[]): Lean[] | undefined {
-  const { ground } = options
-  if (ground === undefined) return undefined
-  const hips = legsOf(options.rig).map(leg => options.rest[leg.hip])
-  const depths = hips.map(hip => hip[2])
-  const [front, hind] = [Math.max(...depths), Math.min(...depths)]
+function groundLeans (options: Options, feet: Foot[], stances: FootState[][]): Lean[] | undefined {
+  if (options.ground === undefined) return undefined
+  const depths = legsOf(options.rig).map(leg => options.rest[leg.hip][2])
+  const middle = (Math.max(...depths) + Math.min(...depths)) / 2
+  const span = Math.max(...depths) - Math.min(...depths)
+  const front = depths.map(d => d > middle)
+  const hind = depths.map(d => d < middle)
+  const mean = (values: number[]): number | undefined => {
+    return values.length === 0 ? undefined : values.reduce((sum, v) => sum + v, 0) / values.length
+  }
+  let base = 0
+  let pitch = 0
+  const raw = stances.map(states => {
+    const soles = states.map((state, k) => state.planted ? state.ankle[1] - feet[k].planted[1] : undefined)
+    const planted = soles.filter((v): v is number => v !== undefined)
+    base = mean(planted) ?? base
+    const ahead = mean(soles.filter((v, k): v is number => v !== undefined && front[k]))
+    const behind = mean(soles.filter((v, k): v is number => v !== undefined && hind[k]))
+    if (span > SURFACE_EPSILON && ahead !== undefined && behind !== undefined) pitch = Math.atan2(ahead - behind, span)
+    return { base, pitch }
+  })
   const radius = Math.round(GROUND_SMOOTHING_SECONDS * options.fps)
-  const under = roots.map(root => hips.map(hip => toWorld(hip, root)).map(p => ground(p[0], p[2])))
-  const mean = (values: number[]): number => values.reduce((sum, v) => sum + v, 0) / values.length
-  const bases = smoothed(under.map(mean), radius)
-  const pitches = smoothed(under.map(heights => {
-    if (front - hind < SURFACE_EPSILON) return 0
-    const at = (depth: number): number => mean(heights.filter((_, k) => depths[k] === depth))
-    return Math.atan2(at(front) - at(hind), front - hind)
-  }), radius)
-  return bases.map((base, i) => ({ base, pitch: pitches[i] }))
+  const bases = smoothed(raw.map(r => r.base), radius)
+  const pitches = smoothed(raw.map(r => r.pitch), radius)
+  return bases.map((b, i) => ({ base: b, pitch: pitches[i] }))
 }
 
 /** How much a body pitch lifts a rest point, rotating it about the pelvis (nose up for a positive pitch). */
@@ -435,7 +468,7 @@ export function planGait (options: Options): GaitFrame[] {
   const steps = roots.map((root, i) => {
     return Math.max(eases[i], Math.min(1, Math.abs(root.angularVelocity) * TURN_CYCLES_PER_RADIAN / referenceCadence))
   })
-  const leans = groundLeans(options, roots)
+  const leans = groundLeans(options, feet, stances)
   const pelvis = options.rest[rig.pelvis]
   const needed = stances.map((states, i) => {
     const fraction = REST_REACH_FRACTION + (WALK_REACH_FRACTION - REST_REACH_FRACTION) * steps[i]

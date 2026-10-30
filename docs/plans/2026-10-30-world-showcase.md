@@ -104,3 +104,21 @@ agent wiring stays out of it.
   covers at least 25% of the distance non-stop walking at its own reference speed would cover; at least one visit
   happens; no two characters stand within 0.3 m of each other.
 - The walkable graph from item 1 is not built: the terrain is one profile along x; stacked platforms come with batch E.
+
+## Batch A review fixes
+
+- The tread nudge fired at every ramp-to-flat kink and could move a plant a whole foot length (feet planting behind
+  their partner, zero-length steps). Now a continuous surface (no rise steeper than 60 degrees between footprint
+  samples) pitches the foot along its heel-to-toe line and lifts it over any convex kink; only a real height jump
+  nudges, by at most 40% of the foot length.
+- The swing clearance measured against a level foot, so on ramps the ankle popped up 2-4 px at lift-off; it now
+  measures against the foot's pitched sole, and the one-frame vertical jumps match flat ground (0.56 px biped,
+  1.50 px quadruped).
+- The body's base and pitch came from the ground under the hips, so on stairs the pitch swung with where the hips
+  fell over risers (43 degrees on a 25-degree flight). Both now come from the planted feet: the front feet's soles
+  against the hind feet's.
+- Generator: no endless loop when maxHeight is below a quarter rise (one flat run), heights never exceed maxHeight,
+  no ramps with a zero slope, a `minTread` (the world passes its longest foot plus 15%), and `terrainOf` refuses empty,
+  backward and zero-length spans; heights outside the course continue the end spans.
+- New tests: generated courses walked both ways by both bodies with regular steps (at most 2.2x the nominal step)
+  and a lean under 35 degrees, and the generator's edge cases.

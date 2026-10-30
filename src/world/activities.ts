@@ -61,7 +61,8 @@ function validateSteps (input: unknown, path: string, errors: ValidationError[])
         const ok = Array.isArray(seconds) && seconds.length === 2 && seconds.every(isFiniteNumber) &&
           seconds[0] > 0 && seconds[0] <= seconds[1] && seconds[1] <= MAX_SECONDS
         if (!ok) {
-          errors.push({ path: `${here}.seconds`, message: `expected [min, max] seconds, above 0, at most ${MAX_SECONDS}` })
+          const message = `expected [min, max] seconds, above 0, at most ${MAX_SECONDS}`
+          errors.push({ path: `${here}.seconds`, message })
         }
         if (step.say !== undefined && !(isNonEmptyString(step.say) && [...step.say].length <= MAX_GLYPH)) {
           errors.push({ path: `${here}.say`, message: `expected a short glyph, at most ${MAX_GLYPH} characters` })

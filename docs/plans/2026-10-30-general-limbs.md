@@ -70,3 +70,12 @@ rig, style, materials, motion) that passes `check`.
   and hint per limb; knee speed per bending joint. Review.
 - **D. Starter command, examples, guide:** `pinata new`, the three new examples, `docs/authoring.md` updated (templates,
   limbs, appendages). Final review, then a lineup render.
+
+## Decisions after batch A
+
+- A leg has at least 4 joints: hip, at least one intermediate joint, ankle, toe (at least two bones before the foot).
+  4 joints is the classic two-bone leg and keeps the exact analytic IK; 5 or more use FABRIK.
+- `bend` takes a single value or an array with one entry per intermediate joint (`joints.length - 2`).
+- Template phases are side-aware (position among legs of the same side), so leg order in the file does not matter.
+- Appendage oscillators take `period` in seconds, required when `degrees > 0`.
+- Arms may have any number of joints (2 or more); swing rotates the whole chain about the first joint.

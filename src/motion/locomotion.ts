@@ -69,7 +69,10 @@ function placeLeg (leg: Leg, options: PoseOptions, foot: FootState): { placed: P
   const { frame, rest } = options
   const result = chainIk({
     joints: leg.chain.map(name => rest[name]),
-    root: add(rest[leg.hip], frame.pelvisOffset),
+    root: frame.pelvisPitch === undefined
+      ? add(rest[leg.hip], frame.pelvisOffset)
+      : add(add(rest[options.rig.pelvis], pitchUp(sub(rest[leg.hip], rest[options.rig.pelvis]), frame.pelvisPitch)),
+        frame.pelvisOffset),
     target: toLocal(foot.ankle, frame),
     pole: leg.bends.includes('up') ? UP : FORWARD,
     bends: leg.bends.map(bend => bend === 'backward' ? -1 : 1),
@@ -77,7 +80,9 @@ function placeLeg (leg: Leg, options: PoseOptions, foot: FootState): { placed: P
   })
   const placed: Pose = Object.fromEntries(leg.chain.map((name, i) => [name, result.joints[i]]))
   const flat = sub(rest[leg.toe], rest[leg.ankle])
-  const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.toePitch), foot.toeYaw - frame.root.yaw)
+  const pitch = MAX_TOE_PITCH * foot.toePitch
+  const tilt = foot.surfacePitch === undefined ? pitch : pitch + foot.surfacePitch
+  const toe = rotateY(pitchUp(flat, tilt), foot.toeYaw - frame.root.yaw)
   placed[leg.toe] = add(result.joints[leg.chain.length - 1], toe)
   return { placed, clamped: result.clamped || result.missed > MISS_TOLERANCE }
 }
@@ -93,8 +98,15 @@ export function poseAt (options: PoseOptions): Posed {
   const { frame, rig, rest } = options
   const pose: Pose = {}
   const transforms: Transforms = {}
-  const body: Transform = { translation: frame.pelvisOffset }
-  const shift = (name: string): Vec3 => add(rest[name], frame.pelvisOffset)
+  const pitch = frame.pelvisPitch
+  const pelvis = rest[rig.pelvis]
+  const shift = (name: string): Vec3 => {
+    if (pitch === undefined) return add(rest[name], frame.pelvisOffset)
+    return add(add(pelvis, pitchUp(sub(rest[name], pelvis), pitch)), frame.pelvisOffset)
+  }
+  const body: Transform = pitch === undefined
+    ? { translation: frame.pelvisOffset }
+    : transformTo(xRotation(-pitch), pelvis, shift(rig.pelvis))
   for (const name of [rig.pelvis, ...rig.upperBody]) {
     pose[name] = shift(name)
     transforms[name] = body
@@ -111,7 +123,8 @@ export function poseAt (options: PoseOptions): Posed {
   const followed = nearestLegs(rig, rest)
   for (const [index, arm] of armsOf(rig).entries()) {
     const shoulder = shift(arm.shoulder)
-    const angle = frame.armSwings[followed[index]] * Math.PI / 180
+    const swing = frame.armSwings[followed[index]] * Math.PI / 180
+    const angle = pitch === undefined ? swing : swing - pitch
     const rotation = xRotation(angle)
     pose[arm.shoulder] = shoulder
     transforms[arm.shoulder] = transformTo(rotation, rest[arm.shoulder], shoulder)

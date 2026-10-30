@@ -24,7 +24,12 @@ agent wiring stays out of it.
 3. **Planning in windows:** a character's next activity becomes a short root script (walk or run to a point, turn,
    stand) planned from its current feet (`initialPlants`), so successive windows join without a snap. Windows join at
    standing moments.
-4. **Activities** (`src/world/life.ts`): a per-character, seeded, deterministic chooser: wander to a reachable spot,
+4. **Activities as behaviour compositions** (`src/world/life.ts`): the world is the test bed and showcase for phase 2
+   of [composable behaviours](2026-10-30-composable-behaviours.md) (user, 2026-10-30): `stand`, `walk` and `run` as
+   bases, layers while moving (`lookAt` another character, `wave`), interactions between characters (visit, face,
+   chat, follow, flee), blending between bases, and events with consequences (a poke startles one character and a
+   neighbour turns to look). Activities are written as compositions in that format, not hard-coded, and pass its gates
+   (masks, continuity, determinism) plus the locomotion gates on terrain. The chooser: a per-character, seeded, deterministic chooser: wander to a reachable spot,
    look around (turn in place, pause), visit another character (walk up, face each other, a small speech-bubble glyph
    above each), run to a far spot, rest (stand a while); a poke interrupts with a startle and a run away. Characters
    avoid walking through each other (a reserved spot per character, waiting when a path is blocked).
@@ -52,3 +57,31 @@ agent wiring stays out of it.
 - **B. Windows and activities** (Node): `initialPlants`, the activity chooser, liveliness and join gates. Review.
 - **C. World rendering and page** (browser): compositing, terrain tiles, the page, budget and poke gates in Chrome.
   Review, then tag a release to deploy.
+- **D. Later: a physics engine spike** (user, 2026-10-30): props, character-to-character bumps and ragdoll falls
+  (knocked off a platform) through a rigid-body engine behind a narrow interface, with characters staying kinematic.
+  Candidates: Box3D, Rapier, Jolt (WebAssembly builds); judged on bundle size, frame cost and Node-browser
+  determinism, installed through the safe-install scan. Gates fixed in its own plan before building.
+- **E. Later: the page as the world** (user, 2026-10-30): characters live on an existing web page. Elements marked by
+  CSS (`--pinata: platform | wall | ledge`, read with getComputedStyle) or attributes (`data-pinata`) become
+  platforms (top edges) and walls (sides), rebuilt by ResizeObserver, MutationObserver and scroll; characters draw on
+  a transparent overlay that only takes clicks on themselves; a perception layer tells behaviours which elements are
+  near and their hints (`--pinata-attract`, `data-pinata-say`), so characters can walk to a hovered button, sit on a
+  heading, peek over a card or flee a click. Needs the terrain as a graph of stacked surfaces joined by drops and
+  climbs (later jumps) instead of one profile. Its own plan and gates before building.
+
+## Decisions during batch A
+
+- Plants rest on the surface under the whole foot, from the back of the heel capsule to the front of the toe capsule
+  (nine samples). On a straight surface (flat or ramp) the foot plants at the ground under the ankle and pitches to
+  the slope; where a stair edge lies under it, the plant moves along the foot by the smallest amount (1 cm steps)
+  that puts the whole foot on one tread, and only rests on the highest point when no tread is long enough.
+- The swinging foot stays above the highest ground under it by as much as it rises over flat ground (step height
+  times the swing's lift), so it clears stair noses going up and down; the earlier extra rise by half the height
+  difference was dropped as redundant once this held.
+- The body's base is the mean ground under the hips, and on terrain the body pitches nose-up by the ground under the
+  front hips against the hind hips (both smoothed over 0.15 s). Without the pitch a quadruped's front knee folded past
+  150 degrees on stairs rising 0.35 leg lengths. The pitch rotates the pelvis group, hips, shoulders and arm swing
+  about the pelvis; attached joints and spring chains follow through their transforms.
+- All of it is skipped without `ground`, so every existing output stays byte-identical (checked on all 167 files).
+- The quadruped test fixture slides 0.51 px at 0.6 m/s even on flat ground (it is tuned for slower walking), so the
+  terrain gates run at 0.4 m/s for both bodies.

@@ -78,9 +78,9 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
    faster (P2 5.6 min to 7 s, demo 1.7 s to 0.12 s per frame); the determinism re-run is behind `--verify`. Next
    options that keep pixels: faster PNG compression and sheet assembly. Options that change pixels: analytic ray
    intersection, fewer sub-samples.
-6. Stray pixels from mostly hidden parts: every four-legged piñata failed `maxStrayPixels` on single pixels of bands
-   peeking past other parts at 32 px. Clean these up in the renderer (or exclude them from the metric with a
-   principled rule) rather than leaving each author to chase them.
+6. Stray pixels (done for outlines): almost all strays in selective-outline characters (182 of 197 across the ten
+   examples) were outline pixels coloured by a different bordering part than their outline neighbours. The renderer
+   now smooths those after drawing the outline, leaving 5; the rest are single pixels of `allowThin` parts.
 7. Quadruped gaits are fragile: short legs exceed the knee-speed gate at ordinary speeds (the unicorn), and turning
    broke the dragon's walk until it slowed to 0.1 m/s. Tune the planner for short-legged and many-legged bodies as
    part of the general limbs work.

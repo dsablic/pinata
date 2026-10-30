@@ -173,5 +173,38 @@ function drawOutline (image: Image, g: GBuffer, m: Mannequin, style: Style): Uin
     setPixel(image, x, y, colour)
     mask[y * image.width + x] = 1
   }
+  if (style.outlineMode === 'selective') {
+    for (let pass = 0; pass < MAX_STRAY_PASSES; pass++) {
+      if (!outlinePass(image, mask)) break
+    }
+  }
   return mask
+}
+
+/**
+ * Recolours each outline pixel whose colour no neighbouring outline pixel shares with the most common colour of its
+ * outline neighbours: a selective outline otherwise leaves single pixels where the bordering part changes for one
+ * pixel. Returns whether anything changed.
+ */
+function outlinePass (image: Image, mask: Uint8Array): boolean {
+  let changed = false
+  for (let y = 0; y < image.height; y++) {
+    for (let x = 0; x < image.width; x++) {
+      if (mask[y * image.width + x] !== 1) continue
+      const c = getPixel(image, x, y)
+      const around: number[] = []
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx
+          const ny = y + dy
+          if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= image.width || ny >= image.height) continue
+          if (mask[ny * image.width + nx] === 1) around.push(getPixel(image, nx, ny))
+        }
+      }
+      if (around.length === 0 || around.includes(c)) continue
+      setPixel(image, x, y, mostCommon(around))
+      changed = true
+    }
+  }
+  return changed
 }

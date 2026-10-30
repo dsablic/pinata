@@ -230,3 +230,19 @@ test('selective mode ignores decal colours when choosing the outline colour', ()
   assert.equal(decalMask[3 * 5 + 2], 1)
   assert.equal(getPixel(image, 0, 2), DARK)
 })
+
+test('a selective outline gives a one pixel change of bordering part the colour of the outline around it', () => {
+  const g = block([0, 0, 1])
+  g.part[1 * 5 + 2] = 1
+  const two: Mannequin = {
+    ...mannequin,
+    parts: [...mannequin.parts, { name: 'q', shape: 'capsule', a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'n' }]
+  }
+  const selective: Style = {
+    ...style, outlineMode: 'selective', materials: { m: ['#000010', '#0000ff'], n: ['#300000', '#ff0000'] }
+  }
+  const { image, outlineMask } = stylize(g, two, camera, selective)
+  assert.equal(outlineMask[2], 1)
+  assert.equal(getPixel(image, 2, 0), DARK)
+  assert.equal(getPixel(image, 1, 0), DARK)
+})

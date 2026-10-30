@@ -25,8 +25,7 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ### 1. Leftovers from general limbs
 
-- [ ] Several new examples sit exactly on `maxStrayPixels` (2) and `maxThinFraction` (0.25); see "Stray-pixel
-      cleanup" below.
+- [ ] Several new examples sit exactly on `maxThinFraction` (0.25).
 - [ ] Appendages: a very soft appendage on a very fast spin flails (swing frames are singular near 180 degrees); no
       script does that today.
 
@@ -58,7 +57,9 @@ before building.
 - [ ] Judge tooling in TypeScript: replace `docs/plans/p1-judge/build.mjs` and `score.mjs` and the ad hoc
       ImageMagick packet building with a `judge` module (correct spacing between images; neutral names; keys;
       controls).
-- [ ] Stray-pixel cleanup for mostly hidden parts (every four-legged piñata failed `maxStrayPixels` at 32 px).
+- [ ] Stray pixels left after the outline fix: single pixels of `allowThin` parts peeking past their neighbours
+      (the unicorn's mane and ears; the author opted into thin parts, so they are left alone) and a few isolated
+      outline pixels (knight, spider).
 - [ ] Quadruped gait tuning for short legs (knee speed) and turning (the dragon only passed at 0.1 m/s, no turn).
 - [ ] P2 gate `partAreaJump` counts occlusion as instability; redefine on unoccluded footprints in a future version.
 - [ ] `bobAmplitude` is hidden when the planner lowers the pelvis for reach: the unicorn drops 3.2 cm, so any bob

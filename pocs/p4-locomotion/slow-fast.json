@@ -1,0 +1,33 @@
+{
+  "name": "slow-fast",
+  "body": "knight.json",
+  "bodyExcludeParts": [],
+  "script": {
+    "accelSeconds": 0.5,
+    "segments": [
+      {
+        "action": "move",
+        "speed": 0.6,
+        "duration": 3
+      },
+      {
+        "action": "move",
+        "speed": 1.6,
+        "duration": 3
+      },
+      {
+        "action": "hold",
+        "duration": 2
+      }
+    ]
+  },
+  "chains": [],
+  "gravity": [
+    0,
+    -9.81,
+    0
+  ],
+  "fps": 24,
+  "substeps": 1,
+  "particleRadius": 0.02
+}

@@ -1,0 +1,67 @@
+{
+  "legs": [
+    {
+      "side": "left",
+      "hip": "hipL",
+      "knee": "kneeL",
+      "ankle": "ankleL",
+      "toe": "toeL"
+    },
+    {
+      "side": "right",
+      "hip": "hipR",
+      "knee": "kneeR",
+      "ankle": "ankleR",
+      "toe": "toeR"
+    }
+  ],
+  "arms": [
+    {
+      "side": "left",
+      "shoulder": "shoulderL",
+      "elbow": "elbowL",
+      "wrist": "wristL",
+      "hand": "handL"
+    },
+    {
+      "side": "right",
+      "shoulder": "shoulderR",
+      "elbow": "elbowR",
+      "wrist": "wristR",
+      "hand": "handR",
+      "carried": [
+        "swordTip"
+      ]
+    }
+  ],
+  "pelvis": "pelvis",
+  "upperBody": [
+    "hipsBottom",
+    "chest",
+    "head",
+    "visor",
+    "visorL",
+    "visorR",
+    "buckle",
+    "emblem",
+    "plumeFront",
+    "plumeBack",
+    "capeTopL",
+    "capeHemL",
+    "capeTopR",
+    "capeHemR",
+    "capeAnchorL",
+    "capeAnchorR",
+    "plumeBase"
+  ],
+  "gait": {
+    "strideLength": 1.0,
+    "referenceSpeed": 1.2,
+    "strideExponent": 0.75,
+    "stanceFraction": 0.62,
+    "stepHeight": 0.08,
+    "bobAmplitude": 0.025,
+    "armSwingDegrees": 20,
+    "footSpacing": 0.26
+  }
+}

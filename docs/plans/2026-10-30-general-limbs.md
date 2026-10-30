@@ -75,7 +75,21 @@ rig, style, materials, motion) that passes `check`.
 
 - A leg has at least 4 joints: hip, at least one intermediate joint, ankle, toe (at least two bones before the foot).
   4 joints is the classic two-bone leg and keeps the exact analytic IK; 5 or more use FABRIK.
-- `bend` takes a single value or an array with one entry per intermediate joint (`joints.length - 2`).
+- `bend` takes a single value or an array with one entry per bending joint, the joints strictly between the hip and
+  the ankle (`joints.length - 3`; corrected after the batch A/B review, which found `joints.length - 2` counted the
+  ankle, which does not bend). `bend` may also be `up` (for splayed legs such as a spider's, whose knees rise above the
+  hip).
 - Template phases are side-aware (position among legs of the same side), so leg order in the file does not matter.
 - Appendage oscillators take `period` in seconds, required when `degrees > 0`.
 - Arms may have any number of joints (2 or more); swing rotates the whole chain about the first joint.
+
+## Decisions after the batch A/B review
+
+- Template defaults (phases, bends) are resolved after the mannequin loads, ordering each side's legs front to back by
+  rest hip position, so file order never matters.
+- Leg labels: `left`/`right` for two legs, `left front`/`left hind` for two per side, and `left 1` .. `left n` (front
+  to back) for three or more per side; the limb `name` is shown alongside.
+- Lateral foot placement: a leg plants at its rest ankle's sideways offset when the rig says so (default for hexapod
+  and octopod templates); bipeds and quadruped files keep `footSpacing / 2`, so existing output is unchanged.
+- IK reports the miss distance; any miss above 1e-4 m counts as a reach violation. Joint limits apply to two-bone legs
+  too when given.

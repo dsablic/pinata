@@ -1,8 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import {
-  createImage, getPixel, imageHash, neighbours4, parseHex, setPixel, TRANSPARENT, upscale
-} from '../src/image.ts'
+import { createImage, getPixel, neighbours4, parseHex, setPixel, TRANSPARENT, upscale } from '../src/image.ts'
+import { imageHash } from '../src/image-hash.ts'
 
 test('pixels round-trip as packed RGB and start transparent', () => {
   const img = createImage(2, 2)

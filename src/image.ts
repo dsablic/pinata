@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto'
-
 export type Image = { width: number, height: number, data: Uint8ClampedArray }
 
 export const TRANSPARENT = -1
@@ -41,10 +39,6 @@ export function neighbours4 (img: Image, x: number, y: number): number[] {
 
 export function neighbours8 (img: Image, x: number, y: number): number[] {
   return OFFSETS_8.map(([dx, dy]) => getPixel(img, x + dx, y + dy))
-}
-
-export function imageHash (img: Image): string {
-  return createHash('sha256').update(`${img.width}x${img.height}`).update(img.data).digest('hex')
 }
 
 export function upscale (img: Image, factor: number): Image {

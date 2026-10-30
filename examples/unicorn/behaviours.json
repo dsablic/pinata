@@ -1,0 +1,39 @@
+{
+  "hang": {
+    "joint": "pelvis", "offset": [0, 0.2, 0.02], "rope": 0.7,
+    "swingDamping": 0.55, "twistStiffness": 5, "twistDamping": 1.1,
+    "limbStiffness": 0.15, "limbDamping": 0.3
+  },
+  "behaviours": {
+    "idle": { "base": "hang", "additive": [{ "do": "breathe", "mask": ["body"], "amplitude": 0.006, "period": 3 }] },
+    "think": {
+      "base": "hang",
+      "layers": [{ "do": "sway", "mask": ["body"], "amplitude": 0.8, "period": 3 }],
+      "additive": [{ "do": "breathe", "mask": ["body"], "amplitude": 0.006, "period": 3 }]
+    },
+    "busy": { "base": "hang", "additive": [{ "do": "bounce", "amplitude": 0.03, "period": 0.6 }] },
+    "celebrate": {
+      "base": "hang",
+      "layers": [{ "do": "spin", "mask": ["body"], "turns": 1, "duration": 1.2 }],
+      "additive": [{ "do": "bounce", "amplitude": 0.04, "period": 0.4 }],
+      "then": "idle", "duration": 1.6
+    },
+    "fail": {
+      "base": "hang",
+      "events": [{ "at": 0, "do": "hit", "impulse": [1.4, 0, 0.3], "spin": 2.5 }],
+      "then": "idle", "duration": 2.5
+    }
+  },
+  "states": {
+    "initial": "idle",
+    "transitions": [
+      { "on": "loading", "to": "think", "blend": 0.5 },
+      { "on": "thinking", "to": "think", "blend": 0.5 },
+      { "on": "toolStart", "to": "busy", "blend": 0.3 },
+      { "on": "success", "to": "celebrate", "blend": 0.1 },
+      { "on": "error", "to": "fail", "blend": 0 },
+      { "on": "failure", "to": "fail", "blend": 0 },
+      { "on": "idle", "to": "idle", "blend": 0.5 }
+    ]
+  }
+}

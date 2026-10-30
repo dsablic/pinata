@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { getPixel, imageHash, neighbours4, parseHex, TRANSPARENT } from '../src/image.ts'
+import { getPixel, neighbours4, parseHex, TRANSPARENT } from '../src/image.ts'
+import { imageHash } from '../src/image-hash.ts'
 import type { Image } from '../src/image.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Skin } from '../src/formats/skin.ts'

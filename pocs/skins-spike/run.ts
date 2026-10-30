@@ -20,7 +20,7 @@ import { renderSkinned } from '../../src/style/skins.ts'
 import { sheet } from '../../src/diagnostics/images.ts'
 import type { SheetCell } from '../../src/diagnostics/images.ts'
 import { writeOutput } from '../../src/diagnostics/report.ts'
-import { imageHash } from '../../src/image.ts'
+import { imageHash } from '../../src/image-hash.ts'
 import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
 

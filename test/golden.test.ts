@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { fitCamera } from '../src/raster/camera.ts'
 import { rasterize } from '../src/raster/gbuffer.ts'
 import { stylize } from '../src/style/stylize.ts'
-import { imageHash } from '../src/image.ts'
+import { imageHash } from '../src/image-hash.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Style } from '../src/formats/style.ts'
 

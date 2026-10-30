@@ -120,7 +120,7 @@ function buildFeet (options: Options, phase: number[]): Foot[] {
     }
     return {
       side: leg.side,
-      sign: restAnkle[0] >= 0 ? 1 : -1,
+      sign: leg.side === 'left' ? 1 : -1,
       planted,
       restHip: rest[leg.hip],
       reach: upper + lower,
@@ -211,7 +211,7 @@ export function planGait (options: Options): GaitFrame[] {
   const phase = samplePhase(options, count)
   const feet = buildFeet(options, phase)
   const roots = phase.map((_, i) => track(i / fps))
-  const stances = phase.map((p, i) => feet.map(foot => footAt(foot, p, options)))
+  const stances = phase.map(p => feet.map(foot => footAt(foot, p, options)))
   const needed = stances.map((states, i) => {
     return Math.min(0, ...feet.map((foot, k) => neededOffset(foot, states[k], roots[i])))
   })

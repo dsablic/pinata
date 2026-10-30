@@ -24,8 +24,10 @@ export type Gait = {
 export type Rig = { legs: Leg[], arms: Arm[], pelvis: string, upperBody: string[], gait: Gait }
 
 const RIG_FIELDS = ['legs', 'arms', 'pelvis', 'upperBody', 'gait'] as const
-const LEG_FIELDS = ['side', 'hip', 'knee', 'ankle', 'toe'] as const
-const ARM_FIELDS = ['side', 'shoulder', 'elbow', 'wrist', 'hand', 'carried'] as const
+const LEG_JOINTS = ['hip', 'knee', 'ankle', 'toe'] as const
+const ARM_JOINTS = ['shoulder', 'elbow', 'wrist', 'hand'] as const
+const LEG_FIELDS = ['side', ...LEG_JOINTS] as const
+const ARM_FIELDS = ['side', ...ARM_JOINTS, 'carried'] as const
 const GAIT_FIELDS = [
   'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing',
   'strideExponent'
@@ -129,10 +131,10 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     used.set(joint, path)
   }
   rig.legs.forEach((leg, i) => {
-    for (const f of LEG_FIELDS.filter(f => f !== 'side')) use(leg[f as 'hip'], `legs[${i}].${f}`)
+    for (const f of LEG_JOINTS) use(leg[f], `legs[${i}].${f}`)
   })
   rig.arms.forEach((arm, i) => {
-    for (const f of ARM_FIELDS.filter(f => f !== 'side' && f !== 'carried')) use(arm[f as 'hand'], `arms[${i}].${f}`)
+    for (const f of ARM_JOINTS) use(arm[f], `arms[${i}].${f}`)
     arm.carried?.forEach((joint, k) => { use(joint, `arms[${i}].carried[${k}]`) })
   })
   use(rig.pelvis, 'pelvis')

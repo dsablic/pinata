@@ -205,3 +205,22 @@ test('a swing foot moves only vertically during the first and last tenth of the 
   }
   assert.ok(edges >= 6, `edge frames: ${edges}`)
 })
+
+test('the side of each foot comes from the leg, not from the rest ankle position', () => {
+  const centred: Mannequin = {
+    ...mannequin,
+    joints: {
+      ...mannequin.joints,
+      ankleL: [0, 0.1, 0],
+      toeL: [0, 0.05, 0.15],
+      ankleR: [0, 0.1, 0],
+      toeR: [0, 0.05, 0.15]
+    }
+  }
+  const frames = planGait({
+    track: walkTrack(1, 8), rig, rest: restPose(centred), mannequin: centred, duration: 10, fps: FPS
+  })
+  const found = landings(frames).filter(l => l.frame > FPS && l.frame < 7 * FPS)
+  assert.ok(found.length >= 6)
+  for (const l of found) assertClose(l.ankle[0], (l.side === 'left' ? 1 : -1) * rig.gait.footSpacing / 2, 1e-9)
+})

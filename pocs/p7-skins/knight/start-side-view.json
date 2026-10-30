@@ -1,0 +1,391 @@
+{
+ "name": "steel-knight",
+ "view": "side-right",
+ "palette": {
+  "o": "#1b1421",
+  "k": "#2c3148",
+  "d": "#444c6c",
+  "m": "#5f6c8f",
+  "s": "#8997b8",
+  "h": "#c5d0e2",
+  "w": "#f2f4ea",
+  "r": "#c23a3c",
+  "R": "#8a2339",
+  "c": "#5c1a30",
+  "q": "#ea6c50",
+  "g": "#ecbb3e",
+  "G": "#a97a2c",
+  "l": "#8b5a3b",
+  "L": "#573528",
+  "t": "#b98255"
+ },
+ "parts": {
+  "helmet": {
+   "rows": [
+    "....whhhsm....",
+    "..whhhsssmm...",
+    ".hhhsssssmmm..",
+    ".hhsssssssmmd.",
+    "hhssssssssmmdd",
+    "hsssssssssmmdd",
+    "hsssssssssmmdd",
+    "hsssssoooooodd",
+    "hsssskmmmmmmdd",
+    "hhsssskssmmkdd",
+    ".hssssskmmmkdd",
+    ".mssssskmmkdd.",
+    "..mmsssmmmdd..",
+    "...mmmmmddd..."
+   ],
+   "pivotA": [
+    7,
+    7
+   ]
+  },
+  "plume": {
+   "rows": [
+    "..RRRRRRR....",
+    ".RRrrrrrrRR..",
+    "RRrrrrrrrrrRR",
+    ".rrqrrrrrrr..",
+    "..qqqqqqq...."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    11,
+    2
+   ]
+  },
+  "torso": {
+   "rows": [
+    "lLsshhhhhhhs",
+    "lLsssshhhhss",
+    "lLssssssssss",
+    "lLsssssssshm",
+    "lLssssssrrhm",
+    "gGsssssrqqrm",
+    "gGssssrqqrmd",
+    "gGsssssrrmdd",
+    "kLmmmmmmmmdd"
+   ],
+   "pivotA": [
+    1,
+    4
+   ],
+   "pivotB": [
+    11,
+    4
+   ]
+  },
+  "hips": {
+   "rows": [
+    ".ttlll",
+    "ttlllL",
+    "tlllll",
+    "llllLL",
+    "lllLLL",
+    "lllLLL",
+    ".llLLL",
+    ".lLLL."
+   ],
+   "pivotA": [
+    1,
+    4
+   ],
+   "pivotB": [
+    5,
+    4
+   ]
+  },
+  "capeR": {
+   "rows": [
+    "..qqqqqqqrrrrrrrrrrrrrrr.",
+    ".qrrrrrrrrrrrrrrrrrrrrrrr",
+    "qrrrrrrrrrrrrrrrrrrrrrrrr",
+    "RrrrRRRRRRRRRRRRRRRRRRRRr",
+    "RRRRRRRRRRRRRRRRRRRRRRRRR",
+    ".rrrrrrrrrrrrrrrrrrrrrrrr",
+    "..RRRRRRRRRRRRRRRRRRRRRRR"
+   ],
+   "pivotA": [
+    1,
+    3
+   ],
+   "pivotB": [
+    24,
+    3
+   ]
+  },
+  "capeL": {
+   "rows": [
+    "..rrrrrrrRRRRRRRRRRRRRRR.",
+    ".rRRRRRRRRRRRRRRRRRRRRRRR",
+    "rRRRRRRRRRRRRRRRRRRRRRRRR",
+    "cRRRccccccccccccccccccccR",
+    "ccccccccccccccccccccccccc",
+    ".RRRRRRRRRRRRRRRRRRRRRRRR",
+    "..ccccccccccccccccccccccc"
+   ],
+   "pivotA": [
+    1,
+    3
+   ],
+   "pivotB": [
+    24,
+    3
+   ]
+  },
+  "thighR": {
+   "rows": [
+    "..mmmmmmmmmm...",
+    ".smmmmmmmmmmmm.",
+    "smmdddddddddddd",
+    "mdddddddddddddk",
+    ".dddddddkkkkkk.",
+    "..kkkkkkkkkkk.."
+   ],
+   "pivotA": [
+    3,
+    2
+   ],
+   "pivotB": [
+    12,
+    2
+   ]
+  },
+  "thighL": {
+   "rows": [
+    "..dddddddddd...",
+    ".mdddddddddddd.",
+    "mddkkkkkkkkkkkk",
+    "dkkkkkkkkkkkkkk",
+    ".kkkkkkkkkkkkk.",
+    "..kkkkkkkkkkk.."
+   ],
+   "pivotA": [
+    3,
+    2
+   ],
+   "pivotB": [
+    12,
+    2
+   ]
+  },
+  "shinR": {
+   "rows": [
+    ".smmmmmmmmm...",
+    "smmmmmmmmmmmm.",
+    "mmddddddddddd.",
+    "ddddddddddddkk",
+    ".dddddddkkkk..",
+    "..kkkkkkkk...."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    11,
+    2
+   ]
+  },
+  "shinL": {
+   "rows": [
+    ".mddddddddd...",
+    "mdddddddddddd.",
+    "ddkkkkkkkkkkk.",
+    "kkkkkkkkkkkkkk",
+    ".kkkkkkkkkkk..",
+    "..kkkkkkkk...."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    11,
+    2
+   ]
+  },
+  "footR": {
+   "rows": [
+    ".tllllll.",
+    "ttlllllll",
+    "tllllllLL",
+    "llllllLLL",
+    "LLLLLLLL."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    6,
+    2
+   ]
+  },
+  "footL": {
+   "rows": [
+    ".lLLLLLL.",
+    "llLLLLLLL",
+    "lLLLLLLkk",
+    "LLLLLLkkk",
+    "kkkkkkkk."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    6,
+    2
+   ]
+  },
+  "pauldronR": {
+   "rows": [
+    ".whsss.",
+    "hhsssmm",
+    "hsssmmd",
+    "hssmmmd",
+    "ssmmmdd",
+    ".mmmmdd",
+    "..mddd."
+   ],
+   "pivotA": [
+    3,
+    3
+   ]
+  },
+  "pauldronL": {
+   "rows": [
+    ".hsmmm.",
+    "ssmmmdd",
+    "smmmddk",
+    "smmdddk",
+    "mmdddkk",
+    ".ddddkk",
+    "..dkkk."
+   ],
+   "pivotA": [
+    3,
+    3
+   ]
+  },
+  "upperArmR": {
+   "rows": [
+    "..mmmmmmmm..",
+    ".smmmmmmmmm.",
+    "smmddddddddd",
+    "mddddddddddk",
+    ".ddddkkkkkk.",
+    "..kkkkkkkk.."
+   ],
+   "pivotA": [
+    3,
+    2
+   ],
+   "pivotB": [
+    9,
+    2
+   ]
+  },
+  "upperArmL": {
+   "rows": [
+    "..dddddddd..",
+    ".mddddddddd.",
+    "mddkkkkkkkkk",
+    "dkkkkkkkkkkk",
+    ".kkkkkkkkkk.",
+    "..kkkkkkkk.."
+   ],
+   "pivotA": [
+    3,
+    2
+   ],
+   "pivotB": [
+    9,
+    2
+   ]
+  },
+  "forearmR": {
+   "rows": [
+    ".smmmmmmm.",
+    "smmddddddm",
+    "mddddddddk",
+    ".dddkkkkk.",
+    "..kkkkkk.."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    8,
+    2
+   ]
+  },
+  "forearmL": {
+   "rows": [
+    ".mddddddd.",
+    "mddkkkkkkd",
+    "dkkkkkkkkk",
+    ".kkkkkkkk.",
+    "..kkkkkk.."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    8,
+    2
+   ]
+  },
+  "handR": {
+   "rows": [
+    ".ttl.",
+    "ttlll",
+    "tllll",
+    "llLLL",
+    ".LLL."
+   ],
+   "pivotA": [
+    2,
+    2
+   ]
+  },
+  "handL": {
+   "rows": [
+    ".lLL.",
+    "llLLL",
+    "lLLLL",
+    "LLkkk",
+    ".kkk."
+   ],
+   "pivotA": [
+    2,
+    2
+   ]
+  },
+  "sword": {
+   "rows": [
+    "...gG...............",
+    "gllgGwwwwwwwwwww....",
+    "gllgGhhhhhhhhhhhhhhh",
+    "gLLgGmmmmmmmmmmm....",
+    "...gG..............."
+   ],
+   "pivotA": [
+    2,
+    2
+   ],
+   "pivotB": [
+    19,
+    2
+   ]
+  }
+ }
+}

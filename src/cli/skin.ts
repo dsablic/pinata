@@ -2,6 +2,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { loadCharacter } from '../formats/character.ts'
 import type { Character } from '../formats/character.ts'
+import type { Part } from '../formats/mannequin.ts'
+import { cross, dot, normalize, sub } from '../math/vec.ts'
+import type { Vec3 } from '../math/vec.ts'
 import { checkSkin, validateSkin, VIEWS } from '../formats/skin.ts'
 import type { Skin } from '../formats/skin.ts'
 import { formatErrors } from '../formats/validate.ts'
@@ -60,6 +63,21 @@ function compass (dx: number, dy: number): string {
   return names[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8]
 }
 
+/** How wide a box part looks across its bone on screen, px: its width and thickness axes projected across the bone. */
+function boxAcross (camera: Camera, pose: Pose, part: Extract<Part, { shape: 'box' }>, yaw: number): number {
+  const bone = normalize(sub(pose[part.b], pose[part.a]))
+  const facing: RootState = { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
+  const widthAxis = normalize(toWorld(part.widthAxis, facing))
+  const thicknessAxis = normalize(cross(bone, widthAxis))
+  const screenBone = normalize([dot(bone, camera.right), dot(bone, camera.up), 0])
+  const across = (v: Vec3, size: number): number => {
+    const x = dot(v, camera.right)
+    const y = dot(v, camera.up)
+    return Math.abs(x * screenBone[1] - y * screenBone[0]) * size * camera.pixelsPerUnit
+  }
+  return across(widthAxis, part.width) + across(thicknessAxis, part.thickness)
+}
+
 /** Guide images and a table for the artist: the character's mannequin in each drawn view, and every part's numbers. */
 function guide (character: Character, out: string): void {
   const rest = restPose(character.mannequin)
@@ -83,15 +101,14 @@ function guide (character: Character, out: string): void {
       const a = project(camera, pose[part.a])
       const b = project(camera, pose[part.b])
       const at = (p: { x: number, y: number }): string => `${p.x.toFixed(1)}, ${p.y.toFixed(1)}`
-      if (part.shape !== 'capsule') {
-        lines.push(`| ${part.name} | ${part.a} (${part.shape}) | ${at(a)} | - | - | - | upright |`)
-        continue
-      }
-      const width = `${(2 * part.radiusA * k).toFixed(1)}, ${(2 * part.radiusB * k).toFixed(1)}`
       if (part.a === part.b) {
-        lines.push(`| ${part.name} | ${part.a} | ${at(a)} | - | - | ${width} | upright |`)
+        const size = part.shape === 'capsule' ? `${(2 * part.radiusA * k).toFixed(1)}` : '-'
+        lines.push(`| ${part.name} | ${part.a} | ${at(a)} | - | - | ${size} | upright |`)
         continue
       }
+      const width = part.shape === 'capsule'
+        ? `${(2 * part.radiusA * k).toFixed(1)}, ${(2 * part.radiusB * k).toFixed(1)}`
+        : `${boxAcross(camera, pose, part, yaw).toFixed(1)} (box)`
       const dx = b.x - a.x
       const dy = b.y - a.y
       const bone = Math.hypot(dx, dy)

@@ -1,3 +1,4 @@
+import { rankFromFront } from './limbs.ts'
 import type { Bend, Limb, LegLimb } from './limbs.ts'
 
 export type TemplateName = 'biped' | 'quadruped' | 'hexapod' | 'octopod'
@@ -81,20 +82,23 @@ export function listTemplates (): TemplateDefaults[] {
   return TEMPLATE_NAMES.map(name => structuredClone(TEMPLATES[name]))
 }
 
-/**
- * Fills what the limbs and gait leave out. A leg's position counts the legs of its side before it in the file
- * (hind to front): a left leg gets phase position * phaseStep, a right leg half a cycle later. Explicit values win.
- */
-export function applyTemplate (name: TemplateName, limbs: Limb[], gait: TemplateGait): void {
+export function applyGaitDefaults (name: TemplateName, gait: TemplateGait): void {
   const defaults = TEMPLATES[name]
-  const seen = { left: 0, right: 0 }
-  for (const limb of limbs) {
-    if (limb.kind !== 'leg') continue
-    const position = seen[limb.side]++
-    fillLeg(limb, defaults, position)
-  }
   gait.stanceFraction ??= defaults.stanceFraction
   gait.armSwingDegrees ??= defaults.armSwingDegrees
+}
+
+/**
+ * Fills the phase and bend a leg leaves out. A leg's position counts the legs of its side behind it by rest hip z
+ * (hind first): a left leg gets phase position * phaseStep, a right leg half a cycle later. Explicit values win.
+ */
+export function applyLegDefaults (name: TemplateName, limbs: Limb[], hipZ: (leg: LegLimb) => number): void {
+  const defaults = TEMPLATES[name]
+  for (const side of ['left', 'right']) {
+    const legs = limbs.filter((limb): limb is LegLimb => limb.kind === 'leg' && limb.side === side)
+    const ranks = rankFromFront(legs.map(hipZ))
+    legs.forEach((leg, i) => { fillLeg(leg, defaults, legs.length - 1 - ranks[i]) })
+  }
 }
 
 function fillLeg (leg: LegLimb, defaults: TemplateDefaults, position: number): void {

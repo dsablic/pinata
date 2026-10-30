@@ -3,7 +3,7 @@ import type { Mannequin } from './mannequin.ts'
 import type { Cape } from './sim.ts'
 import { legsOf, translateLegacy, validateLegPhase, validateLimbList } from './limbs.ts'
 import type { Bend, Leg, Limb, Side } from './limbs.ts'
-import { applyTemplate, isTemplateName, TEMPLATE_NAMES } from './templates.ts'
+import { applyGaitDefaults, applyLegDefaults, isTemplateName, TEMPLATE_NAMES } from './templates.ts'
 import type { TemplateName } from './templates.ts'
 import { checkKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
@@ -83,11 +83,22 @@ export function validateRig (input: unknown): Validated<Rig> {
   validateGait(input.gait, named, errors)
   if (errors.length > 0) return { errors }
   const gait = structuredClone(input.gait) as Gait
-  if (template !== undefined) applyTemplate(template, limbs, gait)
+  if (template !== undefined) applyGaitDefaults(template, gait)
   const upperBody = structuredClone(input.upperBody as string[])
   const rig: Rig = { limbs, pelvis: input.pelvis as string, upperBody, gait }
   if (template !== undefined) rig.template = template
   return { value: rig, errors }
+}
+
+/**
+ * Fills each leg's phase and bend from the rig's template, ordering the legs of a side by the rest hip z of the
+ * mannequin so the order of the file does not matter. A rig without a template is returned unchanged.
+ */
+export function resolveRig (rig: Rig, mannequin: Pick<Mannequin, 'joints'>): Rig {
+  if (rig.template === undefined) return rig
+  const limbs = structuredClone(rig.limbs)
+  applyLegDefaults(rig.template, limbs, leg => mannequin.joints[leg.joints[0]]?.[2] ?? 0)
+  return withLimbs(rig, limbs)
 }
 
 function validateTemplate (value: unknown, errors: ValidationError[]): TemplateName | undefined {

@@ -8,7 +8,7 @@ import type { Scenario, SimMaterial } from './sim.ts'
 import { checkReferences } from './references.ts'
 import { validateMannequin } from './mannequin.ts'
 import type { Mannequin } from './mannequin.ts'
-import { checkCapeAnchors, checkRig, legsOf, validateRig } from './rig.ts'
+import { checkCapeAnchors, checkRig, legsOf, resolveRig, validateRig } from './rig.ts'
 import type { Rig } from './rig.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
@@ -188,7 +188,8 @@ export function loadCharacter (dir: string): Validated<Character> {
   const name = isNonEmptyString(manifest.name) ? manifest.name : 'character'
   const mannequin = load(dir, files.mannequin, validateMannequin, errors)
   const style = load(dir, files.style, validateStyle, errors)
-  const rig = load(dir, files.rig, validateRig, errors)
+  const loadedRig = load(dir, files.rig, validateRig, errors)
+  const rig = loadedRig !== undefined && mannequin !== undefined ? resolveRig(loadedRig, mannequin) : loadedRig
   const materials = load(dir, files.materials, validateSimMaterials, errors)
   const scenario = load(dir, files.motion, validateMotion(name, files.mannequin), errors)
   if (mannequin !== undefined && style !== undefined && rig !== undefined &&

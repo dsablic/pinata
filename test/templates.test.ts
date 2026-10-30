@@ -1,9 +1,10 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRig, legBend, legPhases, legsOf, validateRig } from '../src/formats/rig.ts'
+import { checkRig, legBend, legPhases, legsOf, resolveRig, validateRig } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { listTemplates } from '../src/formats/templates.ts'
 import { validateMannequin } from '../src/formats/mannequin.ts'
+import type { Vec3 } from '../src/math/vec.ts'
 
 type Input = Record<string, any>
 
@@ -17,10 +18,10 @@ function templated (template: string, legs: Input[], gait: Input = GAIT, extra: 
   return { template, limbs: legs, pelvis: 'pelvis', upperBody: ['chest'], gait, ...extra }
 }
 
-function expand (input: Input): Rig {
+function expand (input: Input, joints: Record<string, Vec3> = {}): Rig {
   const result = validateRig(input)
   assert.deepEqual(result.errors, [])
-  return result.value!
+  return resolveRig(result.value!, { joints })
 }
 
 const BIPED = (): Input[] => [leg('left', 'L'), leg('right', 'R')]
@@ -157,4 +158,72 @@ test('expanded templates pass checkRig stance and side rules', () => {
     const mannequin = validateMannequin({ name: 'm', height: 2, joints, parts }).value!
     assert.deepEqual(checkRig(expand(templated(name, legs)), mannequin), [], name)
   }
+})
+
+type Spot = { tag: string, side: string, z: number }
+
+function spots (zs: number[]): Spot[] {
+  return ['left', 'right'].flatMap(side => zs.map((z, i) => ({ tag: `${side[0].toUpperCase()}${i}`, side, z })))
+}
+
+function orders (all: Spot[]): Array<[string, Spot[]]> {
+  const side = (name: string): Spot[] => all.filter(spot => spot.side === name)
+  const [left, right] = [side('left'), side('right')]
+  return [
+    ['hind first', [...left, ...right]],
+    ['front first', [...left].reverse().concat([...right].reverse())],
+    ['mixed', [...left, ...[...right].reverse()]],
+    ['interleaved', left.flatMap((spot, i) => [[...right].reverse()[i], spot]).reverse()]
+  ]
+}
+
+function resolved (template: string, order: Spot[], all: Spot[]): Map<string, [number | undefined, string]> {
+  const joints: Record<string, Vec3> = {}
+  for (const { tag, z } of all) {
+    joints[`hip${tag}`] = [0.1, 1, z]
+    joints[`knee${tag}`] = [0.1, 0.5, z]
+    joints[`ankle${tag}`] = [0.1, 0.1, z]
+    joints[`toe${tag}`] = [0.1, 0, z]
+  }
+  const rig = expand(templated(template, order.map(spot => leg(spot.side, spot.tag))), joints)
+  return new Map(legsOf(rig).map(l => [l.joints[0].slice(3), [l.phase, legBend(l)]]))
+}
+
+const EXPECTED: Record<string, { zs: number[], phases: Record<string, number>, bends?: Record<string, string> }> = {
+  quadruped: {
+    zs: [-0.3, 0.3],
+    phases: { L0: 0, L1: 0.25, R0: 0.5, R1: 0.75 },
+    bends: { L0: 'backward', L1: 'forward', R0: 'backward', R1: 'forward' }
+  },
+  hexapod: { zs: [-0.3, 0, 0.3], phases: { L0: 0, L1: 0.5, L2: 0, R0: 0.5, R1: 0, R2: 0.5 } },
+  octopod: {
+    zs: [-0.3, -0.1, 0.1, 0.3],
+    phases: { L0: 0, L1: 0.5, L2: 0, L3: 0.5, R0: 0.5, R1: 0, R2: 0.5, R3: 0 }
+  }
+}
+
+test('template phases and bends follow the rest hip positions, not the order of legs in the file', () => {
+  for (const [template, { zs, phases, bends }] of Object.entries(EXPECTED)) {
+    const all = spots(zs)
+    for (const [name, order] of orders(all)) {
+      const found = resolved(template, order, all)
+      for (const { tag } of all) {
+        assert.equal(found.get(tag)![0], phases[tag], `${template} ${name} ${tag} phase`)
+        assert.equal(found.get(tag)![1], bends?.[tag] ?? 'forward', `${template} ${name} ${tag} bend`)
+      }
+    }
+  }
+})
+
+test('without rest hip positions a template falls back to the file order', () => {
+  const rig = expand(templated('quadruped', QUAD()))
+  assert.deepEqual(legPhases(rig), [0, 0.25, 0.5, 0.75])
+})
+
+test('resolveRig leaves a rig without a template as it is', () => {
+  const plain = validateRig(templated('quadruped', QUAD().map((l, i) => ({ ...l, phase: i / 4 })), {
+    ...GAIT, stanceFraction: 0.75, armSwingDegrees: 0
+  })).value!
+  delete plain.template
+  assert.deepEqual(resolveRig(plain, { joints: {} }), plain)
 })

@@ -249,7 +249,8 @@ function quadPattern (rows: string[]): LocomotionRecording {
 test('legLabels name two legs by side and four legs by side and front or hind', () => {
   assert.deepEqual(legLabels(rig, rest), ['left', 'right'])
   assert.deepEqual(legLabels(quadRig, quadRest), ['left hind', 'left front', 'right hind', 'right front'])
-  const shuffled = { ...quadRig, legs: [quadRig.legs[3], quadRig.legs[0], quadRig.legs[1], quadRig.legs[2]] }
+  const [lh, lf, rh, rf] = quadRig.limbs
+  const shuffled = { ...quadRig, limbs: [rf, lh, lf, rh] }
   assert.deepEqual(legLabels(shuffled, quadRest), ['right front', 'left hind', 'left front', 'right hind'])
 })
 
@@ -290,7 +291,8 @@ test('alternationViolations counts a leg planting out of phase order and a leg r
 })
 
 test('alternationViolations honours explicit phases on two legs', () => {
-  const swappedRig = { ...rig, legs: [{ ...rig.legs[0], phase: 0.5 }, { ...rig.legs[1], phase: 0 }] }
+  const [left, right, ...others] = rig.limbs
+  const swappedRig = { ...rig, limbs: [{ ...left, phase: 0.5 }, { ...right, phase: 0 }, ...others] }
   const fine = pattern('11100011100011', '00011100011100')
   assert.equal(alternationViolations(fine, { rig: swappedRig, mannequin }, [{ start: 0, end: 1 }]), 0)
 })
@@ -298,7 +300,7 @@ test('alternationViolations honours explicit phases on two legs', () => {
 test('kneeLimitViolations uses each leg bend as its forward', () => {
   const rec = recording([frame(0, quadRest)])
   assert.equal(kneeLimitViolations(rec, quadGeometry), 0)
-  const wrong = { ...quadRig, legs: quadRig.legs.map(leg => ({ ...leg, bend: 'forward' as const })) }
+  const wrong = { ...quadRig, limbs: quadRig.limbs.map(leg => ({ ...leg, bend: 'forward' as const })) }
   assert.equal(kneeLimitViolations(rec, { rig: wrong, mannequin: quadMannequin }), 2)
 })
 

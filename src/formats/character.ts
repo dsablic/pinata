@@ -8,7 +8,7 @@ import type { Scenario, SimMaterial } from './sim.ts'
 import { checkReferences } from './references.ts'
 import { validateMannequin } from './mannequin.ts'
 import type { Mannequin } from './mannequin.ts'
-import { checkCapeAnchors, checkRig, validateRig } from './rig.ts'
+import { checkCapeAnchors, checkRig, legsOf, validateRig } from './rig.ts'
 import type { Rig } from './rig.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
@@ -125,13 +125,13 @@ function validateMotion (name: string, body: string): (input: unknown) => Valida
 
 function checkFeet (rig: Rig, mannequin: Mannequin): Errors {
   const errors: Errors = []
-  rig.legs.forEach((leg, i) => {
+  for (const leg of legsOf(rig)) {
     const foot = mannequin.parts.some(p => p.shape === 'capsule' && p.a === leg.ankle && p.b === leg.toe)
-    if (foot) return
+    if (foot) continue
     const message = `no capsule part in the mannequin spans ankle '${leg.ankle}' to toe '${leg.toe}'; ` +
       'the foot is a capsule from the ankle joint to the toe joint, and its radii set the sole height'
-    errors.push({ path: `legs[${i}]`, message })
-  })
+    errors.push({ path: `limbs[${leg.index}]`, message })
+  }
   return errors
 }
 
@@ -139,7 +139,7 @@ const HEIGHT_TOLERANCE = 0.1
 
 function checkHeight (rig: Rig, mannequin: Mannequin): Errors {
   const rest = restPose(mannequin)
-  const lowest = Math.min(...rig.legs.map(leg => soleHeight(leg, rest, mannequin)))
+  const lowest = Math.min(...legsOf(rig).map(leg => soleHeight(leg, rest, mannequin)))
   const top = Math.max(...mannequin.parts.map(part => verticalExtent(part, rest).high))
   const span = top - lowest
   if (Math.abs(mannequin.height - span) <= HEIGHT_TOLERANCE * span) return []

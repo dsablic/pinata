@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
-import { stride } from '../src/formats/rig.ts'
+import { legsOf, stride } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { planGait } from '../src/motion/gait.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
@@ -256,7 +256,7 @@ test('four legs start planted at the rest pose', () => {
   const rest = restPose(quadMannequin)
   for (const frame of frames) {
     assert.equal(frame.phase, 0)
-    quadRig.legs.forEach((leg, k) => {
+    legsOf(quadRig).forEach((leg, k) => {
       assert.deepEqual(frame.feet[k].ankle, rest[leg.ankle])
       assert.ok(frame.feet[k].planted)
     })
@@ -271,7 +271,7 @@ test('each foot is planted under its own hip at mid-stance and on its own latera
   for (const { frame, leg } of found) {
     let end = frame
     while (frames[end + 1].feet[leg].planted) end++
-    const hip = rest[quadRig.legs[leg].hip]
+    const hip = rest[legsOf(quadRig)[leg].hip]
     const ankle = frames[frame].feet[leg].ankle
     const middle = (frame + end) / 2
     const lower = frames[Math.floor(middle)].root.position[2]
@@ -296,13 +296,13 @@ test('the pelvis drops so all four feet stay within reach of their hips', () => 
   const long: Rig = { ...quadRig, gait: { ...quadRig.gait, strideLength: 0.7 } }
   const rest = restPose(quadMannequin)
   const frames = planQuad(walkTrack(0.9, 6), 6, long)
-  const reach = long.legs.map(leg => {
+  const reach = legsOf(long).map(leg => {
     return length(sub(rest[leg.hip], rest[leg.knee])) + length(sub(rest[leg.knee], rest[leg.ankle]))
   })
   let dropped = 0
   for (const frame of frames) {
     if (frame.pelvisOffset[1] < -long.gait.bobAmplitude - 1e-9) dropped++
-    long.legs.forEach((leg, k) => {
+    legsOf(long).forEach((leg, k) => {
       const hip = rest[leg.hip]
       const hipWorld: Vec3 = [hip[0], hip[1] + frame.pelvisOffset[1], hip[2] + frame.root.position[2]]
       assert.ok(length(sub(frame.feet[k].ankle, hipWorld)) <= reach[k], 'foot out of reach')
@@ -318,7 +318,8 @@ test('a longer quadruped stance still ends with all four feet planted', () => {
 })
 
 test('explicit phases on two legs set the time between landings', () => {
-  const skewed: Rig = { ...rig, legs: [rig.legs[0], { ...rig.legs[1], phase: 0.4 }] }
+  const [, second] = legsOf(rig)
+  const skewed: Rig = { ...rig, limbs: rig.limbs.map(l => (l === second.limb ? { ...second.limb, phase: 0.4 } : l)) }
   const found = landings(plan(walkTrack(1, 8), 10, skewed)).filter(l => l.frame > 2 * FPS && l.frame < 7 * FPS)
   const cycleFrames = (stride(rig.gait, 1) / 1) * FPS
   assert.ok(found.length >= 6)

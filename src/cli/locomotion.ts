@@ -1,6 +1,6 @@
 import { gate } from '../../pocs/p4-locomotion/gates.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { legBend, legPhases, stride } from '../formats/rig.ts'
+import { armsOf, legBend, legPhases, legsOf, stride, withLimbs } from '../formats/rig.ts'
 import type { Leg } from '../formats/rig.ts'
 import type { Character } from '../formats/character.ts'
 import { length, sub } from '../math/vec.ts'
@@ -56,11 +56,12 @@ function firstWorstFrame (recording: LocomotionRecording, measure: (r: Locomotio
 }
 
 function legGeometry (character: Character, leg: Leg): Geometry {
-  return { rig: { ...character.rig, legs: [leg] }, mannequin: character.mannequin }
+  const { rig, mannequin } = character
+  return { rig: withLimbs(rig, rig.limbs.filter(l => l.kind !== 'leg' || l === leg.limb)), mannequin }
 }
 
 function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {
-  const found = ctx.character.rig.legs.map((leg, index) => {
+  const found = legsOf(ctx.character.rig).map((leg, index) => {
     const geometry = legGeometry(ctx.character, leg)
     return { leg, index, geometry, value: measure(geometry, ctx.recording) }
   }).reduce((a, b) => b.value > a.value ? b : a)
@@ -154,7 +155,8 @@ function groundHint (ctx: Context): string {
 
 function nonFootParts (character: Character): Part[] {
   const { rig, mannequin } = character
-  return mannequin.parts.filter(p => !(p.shape === 'capsule' && rig.legs.some(l => p.a === l.ankle && p.b === l.toe)))
+  const legs = legsOf(rig)
+  return mannequin.parts.filter(p => !(p.shape === 'capsule' && legs.some(l => p.a === l.ankle && p.b === l.toe)))
 }
 
 function partGround (ctx: Context, mannequin: Mannequin): number {
@@ -186,7 +188,7 @@ function partGroundHint (ctx: Context): string {
 function reachHint (ctx: Context): string {
   const frames = ctx.recording.frames.map((f, i) => f.clamped > 0 ? i : -1).filter(i => i >= 0)
   const { gait } = ctx.character.rig
-  const legs = ctx.character.rig.legs.map((leg, index) => {
+  const legs = legsOf(ctx.character.rig).map((leg, index) => {
     const rest = restPose(ctx.character.mannequin)
     const total = length(sub(rest[leg.hip], rest[leg.knee])) + length(sub(rest[leg.knee], rest[leg.ankle]))
     return `${ctx.labels[index]} ${total.toFixed(2)} m`
@@ -234,11 +236,11 @@ function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometr
   const { character } = ctx
   const { rig, mannequin } = character
   return [
-    ...rig.legs.map((leg, index) => {
-      return { label: `${ctx.labels[index]} leg`, geometry: { rig: { ...rig, legs: [leg], arms: [] }, mannequin } }
+    ...legsOf(rig).map((leg, index) => {
+      return { label: `${ctx.labels[index]} leg`, geometry: { rig: withLimbs(rig, [leg.limb]), mannequin } }
     }),
-    ...rig.arms.map(arm => {
-      return { label: `${arm.side} arm`, geometry: { rig: { ...rig, legs: [], arms: [arm] }, mannequin } }
+    ...armsOf(rig).map(arm => {
+      return { label: `${arm.side} arm`, geometry: { rig: withLimbs(rig, [arm.limb]), mannequin } }
     })
   ]
 }
@@ -268,7 +270,7 @@ function rootSpeedHint (ctx: Context): string {
   if (!Number.isFinite(bad.value) && seconds >= 2.5 * cycle) {
     return `${head}: the window is long enough (one step cycle takes ${cycle.toFixed(2)} s), but a foot has fewer ` +
       'than two plants in it: the feet never rise above 2 cm, so each counts as planted the whole time. ' +
-      `${capitalise(stepAdvice(ctx, ctx.character.rig.legs[0]))}.`
+      `${capitalise(stepAdvice(ctx, legsOf(ctx.character.rig)[0]))}.`
   }
   const why = Number.isFinite(bad.value)
     ? `the feet advance ${(bad.value * 100).toFixed(1)}% differently from the script speed`
@@ -303,14 +305,14 @@ function unsupportedHint (ctx: Context): string {
     return metrics.unsupportedFrames({ fps: ctx.recording.fps, frames: [ctx.recording.frames[i]] }, geometryOf(ctx)) > 0
   })
   const [first] = frames
-  const leg = ctx.character.rig.legs[0]
+  const leg = legsOf(ctx.character.rig)[0]
   return `no foot has a sole point within 2 cm of the floor in ${frames.length} frames, first in ` +
     `${at(ctx, first)}: the character hovers. ${groundCause(ctx, leg)}Otherwise lower rig.gait.bobAmplitude (now ` +
     `${ctx.character.rig.gait.bobAmplitude}) or stepHeight (now ${ctx.character.rig.gait.stepHeight}).`
 }
 
 function plantedHint (ctx: Context, label: string): string {
-  const leg = ctx.character.rig.legs[ctx.labels.indexOf(label)]
+  const leg = legsOf(ctx.character.rig)[ctx.labels.indexOf(label)]
   const lowest = Math.min(...ctx.recording.frames.flatMap(f => {
     return metrics.solePoints(f.joints, leg, ctx.character.mannequin).map(p => p[1])
   }))

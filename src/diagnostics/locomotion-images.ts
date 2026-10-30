@@ -1,4 +1,5 @@
 import type { Mannequin } from '../formats/mannequin.ts'
+import { legsOf } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import type { Style } from '../formats/style.ts'
 import { createImage, setPixel } from '../image.ts'
@@ -53,7 +54,7 @@ type Footprint = { side: string, heel: [number, number], toe: [number, number] }
 function footprints (recording: LocomotionRecording, options: Geometry): Footprint[] {
   const { rig, mannequin } = options
   return plantedRuns(recording, { rig, mannequin }).map(run => {
-    const leg = rig.legs[run.leg]
+    const leg = legsOf(rig)[run.leg]
     const sums = [[0, 0], [0, 0]]
     for (let i = run.start; i <= run.end; i++) {
       solePoints(recording.frames[i].joints, leg, mannequin).forEach((p, k) => {
@@ -123,7 +124,7 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
     const soles = solePoints(joints, leg, options.mannequin).map((p): [number, number] => [p[axis], p[1]])
     return [joint(leg.hip), joint(leg.knee), joint(leg.ankle), ...soles]
   }
-  const all = shown.flatMap(i => rig.legs.flatMap(l => chain(i, l)))
+  const all = shown.flatMap(i => legsOf(rig).flatMap(l => chain(i, l)))
   const minA = Math.min(...all.map(p => p[0]))
   const maxA = Math.max(...all.map(p => p[0]))
   const maxUp = Math.max(...all.map(p => p[1]))
@@ -137,7 +138,7 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
   line(img, 0, ground + 1, width - 1, ground + 1, GROUND)
   shown.forEach((index, order) => {
     const t = shown.length === 1 ? 1 : order / (shown.length - 1)
-    for (const leg of rig.legs) {
+    for (const leg of legsOf(rig)) {
       const rgb = leg.side === 'left' ? mix(LEFT_OLD, LEFT_FOOT, t) : mix(RIGHT_OLD, RIGHT_FOOT, t)
       const pixels = chain(index, leg).map(toPixel)
       for (let k = 1; k < pixels.length; k++) {

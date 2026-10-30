@@ -1,4 +1,4 @@
-import { legPhases, stride } from '../formats/rig.ts'
+import { legPhases, legsOf, stride } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
@@ -25,7 +25,7 @@ export function planSkating (options: Options): GaitFrame[] {
   return planGait(options).map(frame => {
     const speed = Math.hypot(frame.root.velocity[0], frame.root.velocity[2])
     const amplitude = stride(gait, speed) / 4
-    const feet = rig.legs.map((leg, index): FootState => {
+    const feet = legsOf(rig).map((leg, index): FootState => {
       const phase = frame.phase + phases[index] + PHASE_SHIFT
       const wave = Math.sin(2 * Math.PI * phase)
       const lift = Math.max(0, Math.cos(2 * Math.PI * phase))

@@ -1,5 +1,6 @@
 import { gate } from '../../pocs/p3-secondary-motion/gates.ts'
 import type { Character } from '../formats/character.ts'
+import { legsOf } from '../formats/rig.ts'
 import type { Vec3 } from '../math/vec.ts'
 import type { CharacterRun } from '../motion/character.ts'
 import { compile } from '../raster/gbuffer.ts'
@@ -179,7 +180,7 @@ function deepest (ctx: Context, lastFrame = Infinity): Deepest {
 
 function isLegPart (ctx: Context, name: string): boolean {
   const part = ctx.character.mannequin.parts.find(p => p.name === name)
-  const joints = ctx.character.rig.legs.flatMap(leg => LEG_JOINTS.map(f => leg[f]))
+  const joints = legsOf(ctx.character.rig).flatMap(leg => LEG_JOINTS.map(f => leg[f]))
   return part !== undefined && (joints.includes(part.a) || joints.includes(part.b))
 }
 

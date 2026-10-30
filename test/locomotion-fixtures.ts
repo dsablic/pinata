@@ -1,5 +1,7 @@
 import type { Mannequin } from '../src/formats/mannequin.ts'
-import type { Rig } from '../src/formats/rig.ts'
+import { translateLegacy } from '../src/formats/limbs.ts'
+import type { LegacyArm, LegacyLeg } from '../src/formats/limbs.ts'
+import type { Gait, Rig } from '../src/formats/rig.ts'
 import type { RootState } from '../src/motion/script.ts'
 
 export const mannequin: Mannequin = {
@@ -33,7 +35,13 @@ export const mannequin: Mannequin = {
   decals: []
 }
 
-export const rig: Rig = {
+type LegacyRig = { legs: LegacyLeg[], arms: LegacyArm[], pelvis: string, upperBody: string[], gait: Gait }
+
+function legacyRig ({ legs, arms, ...rest }: LegacyRig): Rig {
+  return { ...rest, limbs: translateLegacy(legs, arms) }
+}
+
+export const rig: Rig = legacyRig({
   legs: [
     { side: 'left', hip: 'hipL', knee: 'kneeL', ankle: 'ankleL', toe: 'toeL' },
     { side: 'right', hip: 'hipR', knee: 'kneeR', ankle: 'ankleR', toe: 'toeR' }
@@ -53,7 +61,7 @@ export const rig: Rig = {
     armSwingDegrees: 20,
     footSpacing: 0.2
   }
-}
+})
 
 export function walkTrack (speed: number, walkSeconds: number): (t: number) => RootState {
   return (t: number): RootState => {
@@ -112,8 +120,8 @@ export const quadMannequin: Mannequin = {
   decals: []
 }
 
-export const quadRig: Rig = {
-  legs: QUAD_LEGS.map(({ name, x }, i) => ({
+export const quadRig: Rig = legacyRig({
+  legs: QUAD_LEGS.map(({ name, x }, i): LegacyLeg => ({
     side: x > 0 ? 'left' : 'right',
     hip: `hip${name}`,
     knee: `knee${name}`,
@@ -134,4 +142,4 @@ export const quadRig: Rig = {
     armSwingDegrees: 0,
     footSpacing: 0.16
   }
-}
+})

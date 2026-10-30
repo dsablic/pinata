@@ -1,5 +1,5 @@
 import type { Mannequin } from '../formats/mannequin.ts'
-import { legBend } from '../formats/rig.ts'
+import { armsOf, legBend, legsOf } from '../formats/rig.ts'
 import type { Rig } from '../formats/rig.ts'
 import { add, length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -44,7 +44,7 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
   const shift = (name: string): Vec3 => add(rest[name], frame.pelvisOffset)
   for (const name of [rig.pelvis, ...rig.upperBody]) pose[name] = shift(name)
   let clamped = 0
-  for (const [index, leg] of rig.legs.entries()) {
+  for (const [index, leg] of legsOf(rig).entries()) {
     const foot = frame.feet[index]
     if (foot === undefined) throw new Error(`gait frame has no foot for leg ${index}`)
     const hip = shift(leg.hip)
@@ -63,7 +63,7 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
     pose[leg.ankle] = result.end
     pose[leg.toe] = add(result.end, toe)
   }
-  for (const arm of rig.arms) {
+  for (const arm of armsOf(rig)) {
     const shoulder = shift(arm.shoulder)
     const angle = (arm.side === 'left' ? 1 : -1) * frame.armSwing * Math.PI / 180
     pose[arm.shoulder] = shoulder

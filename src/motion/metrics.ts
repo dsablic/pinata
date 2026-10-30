@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { legBend, legPhases } from '../formats/rig.ts'
+import { armsOf, legBend, legPhases, legsOf } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -80,7 +80,7 @@ function footPlanted (recording: LocomotionRecording, leg: Leg, mannequin: Manne
 export function plantedFrames (recording: LocomotionRecording, geometry: Geometry): Record<string, number> {
   const labels = legLabels(geometry.rig, restPose(geometry.mannequin))
   const counts: Record<string, number> = {}
-  geometry.rig.legs.forEach((leg, i) => {
+  legsOf(geometry.rig).forEach((leg, i) => {
     counts[labels[i]] = footPlanted(recording, leg, geometry.mannequin).filter(Boolean).length
   })
   return counts
@@ -89,7 +89,7 @@ export function plantedFrames (recording: LocomotionRecording, geometry: Geometr
 /** Runs of consecutive planted frames per foot, as inclusive frame indices. */
 export function plantedRuns (recording: LocomotionRecording, geometry: Geometry): PlantedRun[] {
   const runs: PlantedRun[] = []
-  for (const [index, leg] of geometry.rig.legs.entries()) {
+  for (const [index, leg] of legsOf(geometry.rig).entries()) {
     const flags = footPlanted(recording, leg, geometry.mannequin)
     let start = -1
     flags.forEach((planted, i) => {
@@ -107,7 +107,7 @@ export function plantedRuns (recording: LocomotionRecording, geometry: Geometry)
 /** Largest horizontal movement of a planted sole point between consecutive frames, in pixels. */
 export function footSlidePx (recording: LocomotionRecording, geometry: Geometry, metresPerPixel: number): number {
   let worst = 0
-  for (const leg of geometry.rig.legs) {
+  for (const leg of legsOf(geometry.rig)) {
     const points = soles(recording, leg, geometry.mannequin)
     const planted = plantedPairs(points)
     for (let i = 1; i < points.length; i++) {
@@ -128,7 +128,7 @@ export function groundPenetrationPx (
   metresPerPixel: number
 ): number {
   let lowest = 0
-  for (const leg of geometry.rig.legs) {
+  for (const leg of legsOf(geometry.rig)) {
     for (const points of soles(recording, leg, geometry.mannequin)) {
       for (const p of points) lowest = Math.min(lowest, p[1])
     }
@@ -137,7 +137,7 @@ export function groundPenetrationPx (
 }
 
 function isFoot (part: Part, rig: Rig): boolean {
-  return part.shape === 'capsule' && rig.legs.some(leg => part.a === leg.ankle && part.b === leg.toe)
+  return part.shape === 'capsule' && legsOf(rig).some(leg => part.a === leg.ankle && part.b === leg.toe)
 }
 
 /** Deepest any non-foot part (capsule end spheres, box corners) goes below y = 0 in any frame, in pixels. */
@@ -170,7 +170,7 @@ function flexions (recording: LocomotionRecording, leg: Leg): number[] {
 /** Knee-frames with flexion outside [0, 150] degrees or a knee on the wrong side of its leg's bend direction. */
 export function kneeLimitViolations (recording: LocomotionRecording, geometry: Geometry): number {
   let count = 0
-  for (const leg of geometry.rig.legs) {
+  for (const leg of legsOf(geometry.rig)) {
     flexions(recording, leg).forEach((flexion, i) => {
       const { joints, root } = recording.frames[i]
       const backward = kneeBendsBackward(joints[leg.hip], joints[leg.knee], joints[leg.ankle], kneeDirection(root, leg))
@@ -183,7 +183,7 @@ export function kneeLimitViolations (recording: LocomotionRecording, geometry: G
 /** Largest knee flexion change between consecutive frames, in degrees per second at the recording's frame rate. */
 export function kneeSpeedDegPerSec (recording: LocomotionRecording, geometry: Geometry): number {
   let peak = 0
-  for (const leg of geometry.rig.legs) {
+  for (const leg of legsOf(geometry.rig)) {
     const values = flexions(recording, leg)
     for (let i = 1; i < values.length; i++) peak = Math.max(peak, Math.abs(values[i] - values[i - 1]))
   }
@@ -192,8 +192,8 @@ export function kneeSpeedDegPerSec (recording: LocomotionRecording, geometry: Ge
 
 function bones (rig: Rig): Array<[string, string]> {
   return [
-    ...rig.legs.flatMap((l): Array<[string, string]> => [[l.hip, l.knee], [l.knee, l.ankle], [l.ankle, l.toe]]),
-    ...rig.arms.flatMap((a): Array<[string, string]> => [[a.shoulder, a.elbow], [a.elbow, a.wrist]])
+    ...legsOf(rig).flatMap((l): Array<[string, string]> => [[l.hip, l.knee], [l.knee, l.ankle], [l.ankle, l.toe]]),
+    ...armsOf(rig).flatMap((a): Array<[string, string]> => [[a.shoulder, a.elbow], [a.elbow, a.wrist]])
   ]
 }
 
@@ -243,7 +243,7 @@ export function rootSpeedError (recording: LocomotionRecording, geometry: Geomet
     const to = at(end)
     const travelled = Math.hypot(to[0] - from[0], to[2] - from[2])
     const measured: number[] = []
-    for (const [index, leg] of geometry.rig.legs.entries()) {
+    for (const [index, leg] of legsOf(geometry.rig).entries()) {
       const plants = runs.filter(run => run.leg === index)
         .map(run => plantCentre(recording, leg, geometry.mannequin, run))
         .filter(c => c.time >= start - TIME_EPSILON && c.time <= end + TIME_EPSILON)
@@ -278,7 +278,7 @@ export function steadySegments (script: Script): SteadySegment[] {
 /** Frames in which no sole point of either foot is within 2 cm of the ground. */
 export function unsupportedFrames (recording: LocomotionRecording, geometry: Geometry): number {
   return recording.frames.filter(({ joints }) => {
-    return !geometry.rig.legs.some(leg => {
+    return !legsOf(geometry.rig).some(leg => {
       return solePoints(joints, leg, geometry.mannequin).some(p => p[1] <= PLANT_HEIGHT)
     })
   }).length

@@ -1,4 +1,4 @@
-import { legPhases, stride } from '../formats/rig.ts'
+import { legPhases, legsOf, stride } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Rig } from '../formats/rig.ts'
 import { toWorld } from '../sim/body.ts'
@@ -78,9 +78,9 @@ function isAtRest (root: RootState): boolean {
 }
 
 function partnerOf (rig: Rig, rest: Pose, leg: number): number {
-  const mine = rig.legs[leg]
-  const across = rig.legs.map((_, i) => i).filter(i => rig.legs[i].side !== mine.side)
-  const gap = (i: number): number => Math.abs(rest[rig.legs[i].hip][2] - rest[mine.hip][2])
+  const mine = legsOf(rig)[leg]
+  const across = legsOf(rig).map((_, i) => i).filter(i => legsOf(rig)[i].side !== mine.side)
+  const gap = (i: number): number => Math.abs(rest[legsOf(rig)[i].hip][2] - rest[mine.hip][2])
   return across.reduce((a, b) => gap(b) < gap(a) ? b : a)
 }
 
@@ -170,7 +170,7 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
   const { track, rig, rest, mannequin, fps } = options
   const { gait } = rig
   const start = track(0)
-  const feet = rig.legs.map((leg, index): Foot => {
+  const feet = legsOf(rig).map((leg, index): Foot => {
     const restAnkle = rest[leg.ankle]
     const planted: Vec3 = [restAnkle[0], restAnkle[1] - soleHeight(leg, rest, mannequin), restAnkle[2]]
     const upper = length(sub(rest[leg.knee], rest[leg.hip]))

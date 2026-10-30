@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
+import { legsOf } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { planGait } from '../src/motion/gait.ts'
@@ -96,7 +97,10 @@ test('a straight-legged rig at rest stays within 1 cm of its rest pose', () => {
 
 test('a carried joint keeps its distance to the hand during an arm swing', () => {
   const sword: Mannequin = { ...mannequin, joints: { ...mannequin.joints, tip: [-0.27, 0.82, 0.5] } }
-  const carrying: Rig = { ...rig, arms: rig.arms.map(a => (a.side === 'right' ? { ...a, carried: ['tip'] } : a)) }
+  const carrying: Rig = {
+    ...rig,
+    limbs: rig.limbs.map(l => (l.kind === 'arm' && l.side === 'right' ? { ...l, carried: ['tip'] } : l))
+  }
   const swordRest = restPose(sword)
   const track = walkTrack(1.2, 4)
   const walk = planGait({ track, rig: carrying, rest: swordRest, mannequin: sword, duration: 7, fps: 24 })
@@ -148,7 +152,7 @@ test('each leg bends toward its own side: forward legs and backward legs of a qu
   for (const frame of gait) {
     const { pose, clamped } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
     assert.equal(clamped, 0)
-    for (const leg of quadRig.legs) {
+    for (const leg of legsOf(quadRig)) {
       const forward: Vec3 = leg.bend === 'backward' ? [0, 0, -1] : [0, 0, 1]
       assert.equal(kneeBendsBackward(pose[leg.hip], pose[leg.knee], pose[leg.ankle], forward), false)
       const chord = sub(pose[leg.ankle], pose[leg.hip])
@@ -168,7 +172,7 @@ test('four feet are assigned to the legs by index, not by side', () => {
     track: walkTrack(0, 0), rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 1, fps: 24
   })
   const { pose } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
-  for (const leg of quadRig.legs) {
+  for (const leg of legsOf(quadRig)) {
     for (let k = 0; k < 3; k++) assertClose(pose[leg.ankle][k], quadRest[leg.ankle][k], 1e-6)
   }
 })

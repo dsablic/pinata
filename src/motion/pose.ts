@@ -1,3 +1,4 @@
+import { legsOf } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -29,10 +30,10 @@ export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number 
 
 /** Leg names for messages and keys: the side for two legs, side and front or hind (by hip z) for more. */
 export function legLabels (rig: Rig, rest: Pose): string[] {
-  if (rig.legs.length <= 2) return rig.legs.map(leg => leg.side)
-  return rig.legs.map((leg, i) => {
+  if (legsOf(rig).length <= 2) return legsOf(rig).map(leg => leg.side)
+  return legsOf(rig).map((leg, i) => {
     const z = rest[leg.hip][2]
-    const behind = rig.legs.filter((other, k) => {
+    const behind = legsOf(rig).filter((other, k) => {
       const otherZ = rest[other.hip][2]
       return other.side === leg.side && (otherZ < z || (otherZ === z && k < i))
     })

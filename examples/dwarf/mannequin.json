@@ -1,0 +1,48 @@
+{
+  "name": "dwarf",
+  "height": 1.15,
+  "joints": {
+    "pelvis": [0, 0.42, 0],
+    "hipL": [0.1, 0.4, 0], "kneeL": [0.1, 0.23, 0.03], "ankleL": [0.1, 0.07, 0], "toeL": [0.1, 0.07, 0.13],
+    "hipR": [-0.1, 0.4, 0], "kneeR": [-0.1, 0.23, 0.03], "ankleR": [-0.1, 0.07, 0], "toeR": [-0.1, 0.07, 0.13],
+    "chest": [0, 0.75, 0],
+    "head": [0, 0.94, 0],
+    "helmet": [0, 1.0, 0],
+    "chin": [0, 0.85, 0.08],
+    "eyeL": [0.06, 0.95, 0.151], "eyeR": [-0.06, 0.95, 0.151],
+    "shoulderL": [0.24, 0.72, 0], "elbowL": [0.28, 0.56, 0.02], "wristL": [0.28, 0.43, 0.06], "handL": [0.28, 0.38, 0.07],
+    "shoulderR": [-0.24, 0.72, 0], "elbowR": [-0.28, 0.56, 0.02], "wristR": [-0.28, 0.43, 0.06], "handR": [-0.28, 0.38, 0.07],
+    "axeBottom": [-0.28, 0.22, 0.07], "axeTop": [-0.28, 1.0, 0.07],
+    "bladeA": [-0.37, 0.76, 0.07], "bladeB": [-0.37, 0.98, 0.07],
+    "cloakL": [0.24, 0.74, -0.17], "cloakR": [-0.24, 0.74, -0.17],
+    "cloakTop": [0, 0.72, -0.16], "cloakBot": [0, 0.38, -0.16]
+  },
+  "parts": [
+    { "name": "torso", "shape": "box", "a": "pelvis", "b": "chest", "width": 0.36, "thickness": 0.26, "rounding": 0.08, "widthAxis": [1, 0, 0], "material": "leather" },
+    { "name": "head", "shape": "capsule", "a": "head", "b": "head", "radiusA": 0.17, "radiusB": 0.17, "material": "skin" },
+    { "name": "helmet", "shape": "capsule", "a": "helmet", "b": "helmet", "radiusA": 0.15, "radiusB": 0.15, "material": "steel" },
+    { "name": "beard", "shape": "capsule", "a": "chin", "b": "chin", "radiusA": 0.11, "radiusB": 0.11, "material": "beard" },
+    { "name": "cloakBack", "shape": "box", "a": "cloakTop", "b": "cloakBot", "width": 0.5, "thickness": 0.08, "rounding": 0.03, "widthAxis": [1, 0, 0], "material": "fur" },
+    { "name": "mantle", "shape": "capsule", "a": "shoulderL", "b": "shoulderR", "radiusA": 0.09, "radiusB": 0.09, "material": "fur" },
+    { "name": "thighL", "shape": "capsule", "a": "hipL", "b": "kneeL", "radiusA": 0.075, "radiusB": 0.065, "material": "leather" },
+    { "name": "shinL", "shape": "capsule", "a": "kneeL", "b": "ankleL", "radiusA": 0.065, "radiusB": 0.065, "material": "leather" },
+    { "name": "footL", "shape": "capsule", "a": "ankleL", "b": "toeL", "radiusA": 0.07, "radiusB": 0.07, "material": "leather" },
+    { "name": "thighR", "shape": "capsule", "a": "hipR", "b": "kneeR", "radiusA": 0.075, "radiusB": 0.065, "material": "leather" },
+    { "name": "shinR", "shape": "capsule", "a": "kneeR", "b": "ankleR", "radiusA": 0.065, "radiusB": 0.065, "material": "leather" },
+    { "name": "footR", "shape": "capsule", "a": "ankleR", "b": "toeR", "radiusA": 0.07, "radiusB": 0.07, "material": "leather" },
+    { "name": "shoulderL", "shape": "capsule", "a": "shoulderL", "b": "shoulderL", "radiusA": 0.1, "radiusB": 0.1, "material": "fur" },
+    { "name": "upperArmL", "shape": "capsule", "a": "shoulderL", "b": "elbowL", "radiusA": 0.06, "radiusB": 0.055, "material": "leather" },
+    { "name": "forearmL", "shape": "capsule", "a": "elbowL", "b": "wristL", "radiusA": 0.055, "radiusB": 0.055, "material": "leather" },
+    { "name": "handL", "shape": "capsule", "a": "handL", "b": "handL", "radiusA": 0.065, "radiusB": 0.065, "material": "skin" },
+    { "name": "shoulderR", "shape": "capsule", "a": "shoulderR", "b": "shoulderR", "radiusA": 0.1, "radiusB": 0.1, "material": "fur" },
+    { "name": "upperArmR", "shape": "capsule", "a": "shoulderR", "b": "elbowR", "radiusA": 0.06, "radiusB": 0.055, "material": "leather" },
+    { "name": "forearmR", "shape": "capsule", "a": "elbowR", "b": "wristR", "radiusA": 0.055, "radiusB": 0.055, "material": "leather" },
+    { "name": "handR", "shape": "capsule", "a": "handR", "b": "handR", "radiusA": 0.065, "radiusB": 0.065, "material": "skin" },
+    { "name": "handle", "shape": "capsule", "a": "axeBottom", "b": "axeTop", "radiusA": 0.04, "radiusB": 0.04, "material": "leather", "allowThin": true },
+    { "name": "blade", "shape": "box", "a": "bladeA", "b": "bladeB", "width": 0.24, "thickness": 0.075, "rounding": 0.03, "widthAxis": [1, 0, 0], "material": "steel" }
+  ],
+  "decals": [
+    { "name": "eyeL", "anchor": "eyeL", "normal": [0.4, 0, 1], "pattern": ["e"] },
+    { "name": "eyeR", "anchor": "eyeR", "normal": [-0.4, 0, 1], "pattern": ["e"] }
+  ]
+}

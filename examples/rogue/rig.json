@@ -1,0 +1,14 @@
+{
+  "legs": [
+    { "side": "left", "hip": "hipL", "knee": "kneeL", "ankle": "ankleL", "toe": "toeL" },
+    { "side": "right", "hip": "hipR", "knee": "kneeR", "ankle": "ankleR", "toe": "toeR" }
+  ],
+  "arms": [
+    { "side": "left", "shoulder": "shoulderL", "elbow": "elbowL", "wrist": "wristL", "hand": "handL" },
+    { "side": "right", "shoulder": "shoulderR", "elbow": "elbowR", "wrist": "wristR", "hand": "handR" }
+  ],
+  "pelvis": "pelvis",
+  "upperBody": ["chest", "head", "hoodPeak", "face", "eyeL", "eyeR", "scarfL", "scarfR", "scarfAnchor", "scarfEnd"],
+  "gait": { "strideLength": 0.6, "referenceSpeed": 0.9, "stanceFraction": 0.55, "stepHeight": 0.055,
+            "bobAmplitude": 0.015, "armSwingDegrees": 20, "footSpacing": 0.16 }
+}

@@ -1,0 +1,13 @@
+{
+  "exclude": ["scarfTail"],
+  "script": { "accelSeconds": 0.4, "segments": [
+    { "action": "move", "speed": 0.9, "duration": 3 },
+    { "action": "turn", "degrees": 90, "duration": 1 },
+    { "action": "move", "speed": 0.9, "duration": 2.5 },
+    { "action": "hold", "duration": 1 } ] },
+  "chains": [
+    { "anchor": "scarfAnchor", "links": 8, "linkLength": 0.05, "direction": [0, -0.3, -1], "material": "wool" }
+  ],
+  "wind": { "direction": [0, 0, -1], "speed": 3, "gust": 0.3 },
+  "gravity": [0, -9.81, 0], "fps": 24, "substeps": 40, "particleRadius": 0.01
+}

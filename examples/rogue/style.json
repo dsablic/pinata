@@ -1,0 +1,11 @@
+{
+  "name": "rogue", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#14121a",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "cloth": ["#1c2b2a", "#3b5a50", "#6f9486"],
+    "leather": ["#2a1f1a", "#5a4332", "#8c6c4f"],
+    "scarf": ["#6b1420", "#c42f3a", "#ff7a6b"],
+    "shadow": ["#0a0a10", "#14121a", "#242233"]
+  },
+  "decalColors": { "e": "#ffe36b" }
+}

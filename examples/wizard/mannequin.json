@@ -1,0 +1,41 @@
+{
+  "name": "wizard",
+  "height": 2.0,
+  "joints": {
+    "pelvis": [0, 0.9, 0],
+    "hipL": [0.08, 0.85, 0], "kneeL": [0.08, 0.45, 0.03], "ankleL": [0.08, 0.06, 0], "toeL": [0.08, 0.06, 0.15],
+    "hipR": [-0.08, 0.85, 0], "kneeR": [-0.08, 0.45, 0.03], "ankleR": [-0.08, 0.06, 0], "toeR": [-0.08, 0.06, 0.15],
+    "hem": [0, 0.4, 0],
+    "chest": [0, 1.4, 0],
+    "head": [0, 1.58, 0],
+    "hatBase": [0, 1.72, 0], "hatTip": [0, 1.97, 0],
+    "brimA": [0, 1.66, 0], "brimB": [0, 1.74, 0],
+    "eyeL": [0.04, 1.6, 0.095], "eyeR": [-0.04, 1.6, 0.095],
+    "beardTop": [0, 1.4, 0.14], "beardTip": [0, 1.28, 0.14],
+    "shoulderL": [0.17, 1.38, 0], "elbowL": [0.2, 1.1, 0.03], "wristL": [0.21, 0.85, 0.06], "handL": [0.21, 0.8, 0.08],
+    "shoulderR": [-0.17, 1.38, 0], "elbowR": [-0.2, 1.1, 0.03], "wristR": [-0.21, 0.85, 0.06], "handR": [-0.21, 0.8, 0.08]
+  },
+  "parts": [
+    { "name": "robe", "shape": "capsule", "a": "chest", "b": "hem", "radiusA": 0.14, "radiusB": 0.18, "material": "robe" },
+    { "name": "head", "shape": "capsule", "a": "head", "b": "head", "radiusA": 0.1, "radiusB": 0.1, "material": "skin" },
+    { "name": "hatCone", "shape": "capsule", "a": "hatBase", "b": "hatTip", "radiusA": 0.11, "radiusB": 0.03, "material": "robe" },
+    { "name": "brim", "shape": "box", "a": "brimA", "b": "brimB", "width": 0.4, "thickness": 0.4, "rounding": 0.04, "widthAxis": [1, 0, 0], "material": "robe" },
+    { "name": "thighL", "shape": "capsule", "a": "hipL", "b": "kneeL", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "shinL", "shape": "capsule", "a": "kneeL", "b": "ankleL", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "footL", "shape": "capsule", "a": "ankleL", "b": "toeL", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "thighR", "shape": "capsule", "a": "hipR", "b": "kneeR", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "shinR", "shape": "capsule", "a": "kneeR", "b": "ankleR", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "footR", "shape": "capsule", "a": "ankleR", "b": "toeR", "radiusA": 0.06, "radiusB": 0.06, "material": "boot" },
+    { "name": "upperArmL", "shape": "capsule", "a": "shoulderL", "b": "elbowL", "radiusA": 0.065, "radiusB": 0.07, "material": "robe" },
+    { "name": "forearmL", "shape": "capsule", "a": "elbowL", "b": "wristL", "radiusA": 0.07, "radiusB": 0.075, "material": "robe" },
+    { "name": "handL", "shape": "capsule", "a": "handL", "b": "handL", "radiusA": 0.055, "radiusB": 0.055, "material": "skin" },
+    { "name": "upperArmR", "shape": "capsule", "a": "shoulderR", "b": "elbowR", "radiusA": 0.065, "radiusB": 0.07, "material": "robe" },
+    { "name": "forearmR", "shape": "capsule", "a": "elbowR", "b": "wristR", "radiusA": 0.07, "radiusB": 0.075, "material": "robe" },
+    { "name": "handR", "shape": "capsule", "a": "handR", "b": "handR", "radiusA": 0.055, "radiusB": 0.055, "material": "skin" }
+  ],
+  "decals": [
+    { "name": "beard", "anchor": "beardTop", "normal": [0, 0, 1], "pattern": ["www", "www", "www", ".w.", ".w."] },
+    { "name": "eyeL", "anchor": "eyeL", "normal": [0.3, 0, 1], "pattern": ["e"] },
+    { "name": "eyeR", "anchor": "eyeR", "normal": [-0.3, 0, 1], "pattern": ["e"] }
+  ]
+}

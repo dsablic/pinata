@@ -1,0 +1,10 @@
+{
+  "name": "wizard", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#14102a",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "robe": ["#1e2a6b", "#3b55c4", "#7f9bf0"],
+    "skin": ["#9a6a50", "#e0a886", "#ffd9bd"],
+    "boot": ["#2a1a14", "#5a3a28", "#8a5e42"]
+  },
+  "decalColors": { "e": "#2a1a14", "w": "#e8ecf5" }
+}

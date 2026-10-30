@@ -1,0 +1,10 @@
+{
+  "exclude": ["cloakBack"],
+  "script": { "accelSeconds": 0.4, "segments": [
+    { "action": "move", "speed": 0.7, "duration": 3 },
+    { "action": "turn", "degrees": 90, "duration": 1 },
+    { "action": "move", "speed": 0.7, "duration": 2.5 },
+    { "action": "hold", "duration": 1 } ] },
+  "cape": { "anchorLeft": "cloakL", "anchorRight": "cloakR", "columns": 6, "rows": 6, "length": 0.4, "material": "wool" },
+  "gravity": [0, -9.81, 0], "fps": 24, "substeps": 40, "particleRadius": 0.01
+}

@@ -1,0 +1,12 @@
+{
+  "name": "dwarf", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#1b1421",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "fur": ["#4a3326", "#8a6240", "#c9a273"],
+    "skin": ["#9a5a44", "#d98f6b", "#f5c29a"],
+    "steel": ["#3b4256", "#8592ad", "#dde4ee"],
+    "beard": ["#7a2e1d", "#c8501f", "#f08a3c"],
+    "leather": ["#2b2a3a", "#4c4a66", "#7a7899"]
+  },
+  "decalColors": { "e": "#1b1421" }
+}

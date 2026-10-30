@@ -37,6 +37,9 @@ const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')
 const outDir = join(root, 'reports', 'p1')
 const refsDir = join(root, 'refs', 'p1')
+const hashesMode = process.argv.includes('--hashes')
+
+if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
 type Frame = {
   id: string
@@ -58,6 +61,7 @@ function requireValid<T> (file: string, result: Validated<T>): T {
 
 function fail (message: string): never {
   console.error(message)
+  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
   process.exit(2)
 }
 
@@ -103,7 +107,7 @@ const frames = SIZES.flatMap(size => ELEVATIONS.flatMap(elevation => {
   return Array.from({ length: DIRECTIONS }, (_, direction) => renderFrame(size, elevation, direction))
 }))
 
-if (process.argv.includes('--hashes')) {
+if (hashesMode) {
   for (const f of frames) console.log(`${f.id} ${imageHash(f.image)}`)
   process.exit(0)
 }
@@ -160,7 +164,6 @@ function abPairs (): { pairs: AbPair[], key: Array<{ ref: string, ours: 'left' |
   return { pairs, key }
 }
 
-rmSync(outDir, { recursive: true, force: true })
 for (const f of frames) writeOutput(join(outDir, 'frames', `${f.id}.png`), encodePng(f.image))
 const sheetOptions = { scale: SHEET_SCALE, gap: SHEET_SCALE, background: SHEET_BACKGROUND }
 function writeSheet (name: string, cell: (f: Frame) => Image): void {

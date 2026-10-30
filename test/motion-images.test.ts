@@ -22,7 +22,8 @@ function walk (): Recording {
       time: i / 24,
       root: { position: [x, 0, 0] as Vec3, yaw: i * 0.1, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 },
       positions: Float64Array.from([x, 1.5, -0.3, x - 0.3, 0.6, -0.3 + 0.05 * i]),
-      penetration: new Float64Array(2)
+      penetration: new Float64Array(2),
+      linkPenetration: new Float64Array(0)
     })
   }
   return { constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }], frames }
@@ -69,7 +70,8 @@ function fixedInBody (): Recording {
       time: i / 24,
       root: { position, yaw, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 },
       positions,
-      penetration: new Float64Array(2)
+      penetration: new Float64Array(2),
+      linkPenetration: new Float64Array(0)
     })
   }
   return { constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }], frames }
@@ -94,7 +96,7 @@ test('bodyFrameOnionSkin front view puts the body-local +X side on the right', (
   const root = { position: [0, 0, 0] as Vec3, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
   const rec: Recording = {
     constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }],
-    frames: [{ time: 0, root, positions, penetration: new Float64Array(2) }]
+    frames: [{ time: 0, root, positions, penetration: new Float64Array(2), linkPenetration: new Float64Array(0) }]
   }
   const img = bodyFrameOnionSkin(rec, { size: 128, frames: [0], body, exclude: [], horizontal: 'x' })
   let left = 0

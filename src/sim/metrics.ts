@@ -4,7 +4,7 @@ import type { RootState } from '../motion/script.ts'
 import { toWorld } from './body.ts'
 import type { DistanceConstraint, Particles, System } from './cloth.ts'
 
-export type Frame = { time: number, root: RootState, positions: Float64Array, penetration: Float64Array }
+export type Frame = { time: number, root: RootState, positions: Float64Array, penetration: Float64Array, linkPenetration: Float64Array }
 export type Recording = { constraints: DistanceConstraint[], frames: Frame[] }
 
 /** Hem particle indices and the cape's top-centre anchor in body-local space (joint position plus offset). */
@@ -23,8 +23,9 @@ export type RecordOptions = {
 }
 
 /**
- * Copies the particle positions and stores per-particle penetration depth, max(0, particleRadius - distance).
- * Pinned particles (inverse mass 0) are placed by the root, not simulated, so their depth is recorded as 0.
+ * Copies the particle positions and stores per-particle penetration depth, max(0, particleRadius - distance), and
+ * the same depth at the midpoint of each constraint. Pinned particles (inverse mass 0) are placed by the root, not
+ * simulated, so their depth, and that of their constraints, is recorded as 0.
  */
 export function recordFrame (recording: Recording, options: RecordOptions): void {
   const { particles, distance, particleRadius } = options
@@ -35,11 +36,19 @@ export function recordFrame (recording: Recording, options: RecordOptions): void
     const d = distance([p[3 * i], p[3 * i + 1], p[3 * i + 2]])
     penetration[i] = Math.max(0, particleRadius - d)
   }
+  const p = particles.position
+  const linkPenetration = new Float64Array(recording.constraints.length)
+  recording.constraints.forEach(({ a, b }, i) => {
+    if (particles.inverseMass[a] === 0 || particles.inverseMass[b] === 0) return
+    const mid: Vec3 = [(p[3 * a] + p[3 * b]) / 2, (p[3 * a + 1] + p[3 * b + 1]) / 2, (p[3 * a + 2] + p[3 * b + 2]) / 2]
+    linkPenetration[i] = Math.max(0, particleRadius - distance(mid))
+  })
   recording.frames.push({
     time: options.time,
     root: options.root,
     positions: particles.position.slice(0, 3 * particles.count),
-    penetration
+    penetration,
+    linkPenetration
   })
 }
 
@@ -52,12 +61,14 @@ export function nonFinite (recording: Recording): number {
   return count
 }
 
-function frameSpeed (recording: Recording, index: number): number {
+function frameSpeed (recording: Recording, index: number, particles?: number[]): number {
   const a = recording.frames[index - 1]
   const b = recording.frames[index]
   const dt = b.time - a.time
   let best = 0
-  for (let i = 0; i < b.positions.length; i += 3) {
+  const count = b.positions.length / 3
+  for (const k of particles ?? Array.from({ length: count }, (_, n) => n)) {
+    const i = 3 * k
     const d = Math.hypot(b.positions[i] - a.positions[i], b.positions[i + 1] - a.positions[i + 1],
       b.positions[i + 2] - a.positions[i + 2])
     if (d / dt > best) best = d / dt
@@ -85,23 +96,29 @@ export function maxStrain (recording: Recording): number {
   return best
 }
 
-/** Fraction of frames in which any particle has penetration depth above the threshold (metres). */
+/**
+ * Fraction of frames in which any particle, or the midpoint of any constraint between free particles, has
+ * penetration depth above the threshold (metres).
+ */
 export function penetratingFrames (recording: Recording, threshold: number): number {
   if (recording.frames.length === 0) return 0
-  const hits = recording.frames.filter(f => f.penetration.some(d => d > threshold)).length
+  const hits = recording.frames.filter(f => f.penetration.some(d => d > threshold) ||
+    f.linkPenetration.some(d => d > threshold)).length
   return hits / recording.frames.length
 }
 
+export type SettleOptions = { fromTime: number, speedThreshold: number, particles?: number[] }
+
 /**
  * Time from fromTime until the frame-to-frame max particle speed is below speedThreshold and stays below for all
- * later frames; Infinity if the final frame is still moving faster.
+ * later frames; Infinity if the final frame is still moving faster. Only the listed particles count when given.
  */
-export function settleSeconds (recording: Recording, options: { fromTime: number, speedThreshold: number }): number {
+export function settleSeconds (recording: Recording, options: SettleOptions): number {
   const { frames } = recording
   const first = Math.max(1, frames.findIndex(f => f.time >= options.fromTime))
   let settled = frames.length
   for (let i = frames.length - 1; i >= first; i--) {
-    if (frameSpeed(recording, i) >= options.speedThreshold) break
+    if (frameSpeed(recording, i, options.particles) >= options.speedThreshold) break
     settled = i
   }
   if (settled === frames.length) return Infinity
@@ -137,7 +154,7 @@ export function overshootDegrees (recording: Recording, options: { stopTime: num
   return (Math.max(...after) - forward[forward.length - 1]) * 180 / Math.PI
 }
 
-type LagOptions = { turnStart: number, turnEnd: number, swing: SwingOptions }
+export type LagOptions = { turnStart: number, turnEnd: number, swing: SwingOptions, minPeakDegrees?: number }
 
 function peakIndex (values: number[], recording: Recording, from: number, to: number): number {
   let best = -1
@@ -150,14 +167,30 @@ function peakIndex (values: number[], recording: Recording, from: number, to: nu
 
 /**
  * Frame index of peak |sideways swing| in [turnStart, turnEnd + 1 s] minus frame index of peak |body angular
- * velocity| in [turnStart, turnEnd]; first frame wins ties.
+ * velocity| in [turnStart, turnEnd]; first frame wins ties. -1 if either window is empty or the sideways peak is
+ * below minPeakDegrees.
  */
 export function lagFrames (recording: Recording, options: LagOptions): number {
   const side = swingAngles(recording, options.swing).sideways.map(Math.abs)
   const omega = recording.frames.map(f => Math.abs(f.root.angularVelocity))
   const sidePeak = peakIndex(side, recording, options.turnStart, options.turnEnd + 1)
   const turnPeak = peakIndex(omega, recording, options.turnStart, options.turnEnd)
+  if (sidePeak === -1 || turnPeak === -1) return -1
+  if (side[sidePeak] * 180 / Math.PI < (options.minPeakDegrees ?? 0)) return -1
   return sidePeak - turnPeak
+}
+
+export type WindDriftOptions = { hem: number[], restHem: Vec3 }
+
+/** Mean over frames of the horizontal (x, z) distance from restHem to the hem centroid, in metres. */
+export function windDriftMetres (recording: Recording, options: WindDriftOptions): number {
+  if (recording.frames.length === 0) return 0
+  let total = 0
+  for (const { positions } of recording.frames) {
+    const hem = centroid(positions, options.hem)
+    total += Math.hypot(hem[0] - options.restHem[0], hem[2] - options.restHem[2])
+  }
+  return total / recording.frames.length
 }
 
 export type WindAlignmentOptions = { hem: number[], restHem: Vec3, windDirection: Vec3 }

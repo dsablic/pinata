@@ -268,7 +268,13 @@ function rigidRecording (run: Run): Recording {
     for (let i = 0; i < rest.length; i += 3) {
       positions.set(toWorld([rest[i], rest[i + 1], rest[i + 2]], root as RootState), i)
     }
-    return { time, root, positions, penetration: new Float64Array(rest.length / 3) }
+    return {
+      time,
+      root,
+      positions,
+      penetration: new Float64Array(rest.length / 3),
+      linkPenetration: new Float64Array(system.constraints.length)
+    }
   })
   return { constraints: system.constraints, frames }
 }

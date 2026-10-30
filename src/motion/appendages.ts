@@ -31,14 +31,72 @@ function oscillation (limb: AppendageLimb, time: number): number {
 }
 
 /**
- * Rotation from body rest space to world for the first segment's target: the oscillator, then the parent joint's
- * rotation in the body (none for a parent that only moves with the body), then the body's yaw.
+ * Rotation from body rest space to world for the first segment's target: the oscillator, then `body` (the rotation
+ * of the joint the chain hangs from, rest space to world).
  */
-function rootFrame (limb: AppendageLimb, yaw: number, time: number, parent: Matrix | undefined): Matrix {
+function rootFrame (limb: AppendageLimb, body: Matrix, time: number): Matrix {
   const angle = oscillation(limb, time)
-  const body = parent === undefined ? yawMatrix(yaw) : multiply(yawMatrix(yaw), parent)
   if (angle === 0 || limb.oscillate === undefined) return body
   return multiply(body, axisAngle(normalize(limb.oscillate.axis), angle))
+}
+
+/** The yaw of the body after a parent joint's rotation within the body (none for a joint rigid with the body). */
+export function bodyFrame (yaw: number, parent: Matrix | undefined): Matrix {
+  return parent === undefined ? yawMatrix(yaw) : multiply(yawMatrix(yaw), parent)
+}
+
+/** A spring chain's state: one rigid segment per bone, each with its tip, velocity, target and rotation. */
+export type SpringChain = { limb: AppendageLimb, segments: Segment[] }
+
+export function createSpringChain (limb: AppendageLimb, rest: Pose): SpringChain {
+  const segments: Segment[] = limb.joints.slice(1).map((joint, i) => {
+    const bone = sub(rest[joint], rest[limb.joints[i]])
+    const zero: Vec3 = [0, 0, 0]
+    return { length: length(bone), rest: normalize(bone), tip: zero, velocity: zero, target: zero, frame: IDENTITY }
+  })
+  return { limb, segments }
+}
+
+/**
+ * Places the chain at rest on its targets (step undefined; tips start with `velocity(tip)`), or advances it one
+ * spring step of `step` seconds, with its root at `base` and `body` the rotation of the joint it hangs from.
+ */
+function placeChain (
+  chain: SpringChain,
+  base: Vec3,
+  body: Matrix,
+  time: number,
+  options: { step?: number, velocity?: (tip: Vec3) => Vec3 }
+): void {
+  const { limb, segments } = chain
+  let frame = rootFrame(limb, body, time)
+  let from = base
+  for (const segment of segments) {
+    const direction = apply(frame, segment.rest)
+    const goal = add(from, scale(direction, segment.length))
+    if (options.step === undefined) {
+      segment.tip = goal
+      segment.target = goal
+      segment.velocity = options.velocity?.(goal) ?? [0, 0, 0]
+    } else springStep(segment, from, goal, limb, options.step)
+    segment.frame = multiply(between(direction, normalize(sub(segment.tip, from))), frame)
+    frame = segment.frame
+    from = segment.tip
+  }
+}
+
+export function startChain (
+  chain: SpringChain,
+  base: Vec3,
+  body: Matrix,
+  time: number,
+  velocity: (tip: Vec3) => Vec3
+): void {
+  placeChain(chain, base, body, time, { velocity })
+}
+
+export function stepChain (chain: SpringChain, base: Vec3, body: Matrix, time: number, dt: number): void {
+  placeChain(chain, base, body, time, { step: dt })
 }
 
 function parentRotation (from: Matrix | undefined, to: Matrix | undefined, u: number): Matrix | undefined {
@@ -71,11 +129,8 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
   const { frames, poses, transforms } = sequence
   const { rest, fps, substeps } = options
   const root = limb.joints[0]
-  const segments: Segment[] = limb.joints.slice(1).map((joint, i) => {
-    const bone = sub(rest[joint], rest[limb.joints[i]])
-    const zero: Vec3 = [0, 0, 0]
-    return { length: length(bone), rest: normalize(bone), tip: zero, velocity: zero, target: zero, frame: IDENTITY }
-  })
+  const chain = createSpringChain(limb, rest)
+  const { segments } = chain
   const start = frames[0].root
   const baseAt = (f: number): Vec3 => toWorld(poses[f][root], frames[f].root)
   const rotationAt = (f: number): Matrix | undefined => transforms[f][parent]?.rotation
@@ -85,22 +140,6 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
     const r = sub(p, start.position)
     return add(start.velocity, scale([r[2], 0, -r[0]], start.angularVelocity))
   }
-  const place = (base: Vec3, yaw: number, time: number, rotation: Matrix | undefined, step?: number): void => {
-    let frame = rootFrame(limb, yaw, time, rotation)
-    let from = base
-    for (const segment of segments) {
-      const direction = apply(frame, segment.rest)
-      const goal = add(from, scale(direction, segment.length))
-      if (step === undefined) {
-        segment.tip = goal
-        segment.target = goal
-        segment.velocity = startVelocity(goal)
-      } else springStep(segment, from, goal, limb, step)
-      segment.frame = multiply(between(direction, normalize(sub(segment.tip, from))), frame)
-      frame = segment.frame
-      from = segment.tip
-    }
-  }
   const record = (f: number): void => {
     const unyaw = yawMatrix(-frames[f].root.yaw)
     segments.forEach((segment, i) => { poses[f][limb.joints[i + 1]] = toLocal(segment.tip, frames[f].root) })
@@ -109,7 +148,7 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
       transforms[f][joint] = transformTo(multiply(unyaw, bone.frame), rest[joint], poses[f][joint])
     })
   }
-  place(baseAt(0), frames[0].root.yaw, 0, rotationAt(0))
+  startChain(chain, baseAt(0), bodyFrame(start.yaw, rotationAt(0)), 0, startVelocity)
   record(0)
   const dt = 1 / (fps * substeps)
   for (let f = 1; f < frames.length; f++) {
@@ -118,8 +157,8 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
     const [turnFrom, turnTo] = [rotationAt(f - 1), rotationAt(f)]
     for (let s = 1; s <= substeps; s++) {
       const u = s / substeps
-      const rotation = parentRotation(turnFrom, turnTo, u)
-      place(lerp(from, to, u), yawFrom + (yawTo - yawFrom) * u, (f - 1 + u) / fps, rotation, dt)
+      const body = bodyFrame(yawFrom + (yawTo - yawFrom) * u, parentRotation(turnFrom, turnTo, u))
+      stepChain(chain, lerp(from, to, u), body, (f - 1 + u) / fps, dt)
     }
     record(f)
   }

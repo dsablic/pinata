@@ -27,3 +27,19 @@ Gate thresholds are locked (see `pocs/p3-secondary-motion/gates.ts`). Material v
 - Gates: all pass; windAlignment 0.995. Wind drift silk 0.52 m, wool 0.25 m, leather 0.08 m.
 - Observed: body-frame stills separate the materials clearly (silk fans widest, leather a narrow wedge) and the
   rigid control collapses to one line.
+
+## Review (AI judge panel)
+
+Packet: body-frame stills from `reports/p3/`, renamed and shuffled. Key and answers in `docs/plans/p3-judge/`.
+3 blind judges, fresh agents, no project context.
+
+| Question | Result | Chance level |
+|---|---|---|
+| Rank 3 materials lightest to heaviest from turn-stop stills | 3 of 3 judges exact | 1 in 6 per judge |
+| Rank 3 materials from wind stills | 3 of 3 exact | 1 in 6 |
+| Wind side, one image mirrored to control side bias | 6 of 6 | 1 in 2 each |
+| Simulated vs rigid cape, both orders, 2 pairs | 12 of 12 picked simulated, confidence 4-5 | 1 in 2 each |
+
+Caveat: simulated vs rigid is an easy question (the rigid cape does not move), so it shows the motion is visible,
+not that it looks natural. The material rankings are the stronger evidence: judges told silk, wool and leather
+apart from motion alone, in both scenarios.

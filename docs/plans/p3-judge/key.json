@@ -1,0 +1,4 @@
+{"rankTurn": {"m1": "wool", "m2": "leather", "m3": "silk", "lightestToHeaviest": ["m3", "m1", "m2"]},
+ "rankWind": {"w1": "leather", "w2": "silk", "w3": "wool", "lightestToHeaviest": ["w2", "w3", "w1"]},
+ "windFrom": {"d1": "right", "d2": "left"},
+ "realCloth": {"a1": "left", "a2": "right", "a3": "right", "a4": "left"}}

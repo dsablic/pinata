@@ -4,99 +4,93 @@
   <img src="docs/assets/logo.gif" alt="A fat pixel-art unicorn piñata hanging from a rope, hit every few seconds, swinging with its limp legs, rainbow mane and tail flopping (simulated cloth physics, seamless loop)" width="400">
 </p>
 
-Piñata is an experiment in AI-driven character animation. An AI agent describes a character as text (a mannequin of
-simple volumes, materials, a behaviour script), and the tooling does what an AI finds hard to do by hand: physics,
-inverse kinematics and secondary motion such as a cape swinging after a turn. Output is rendered as pixel art, with
-numeric diagnostics and still images an agent can read to check its own work.
+Piñata is a character animation engine built for AI agents, and it is a work in progress. An agent describes a
+character as text: a mannequin of simple volumes, a rig, materials and behaviours. The engine then does what an
+agent finds hard to do by hand: walking on uneven ground, inverse kinematics, physics and secondary motion such as a
+cape swinging after a turn. It renders pixel art and reports numeric diagnostics and still images, so an agent can
+check its own work.
 
-The repository is in a proof-of-concept phase. Each idea is proven in isolation against gates fixed before the code
-was written, and visual quality is judged by blind, calibrated AI judge panels rather than by eye.
+## What works
 
-## Findings so far
+- **Characters as text:** humanoids, quadrupeds, hexapods, octopods and creatures with general limbs (tails, ears,
+  manes), checked by `npm run check` and started from templates with `npm run new`. See
+  [`docs/authoring.md`](docs/authoring.md).
+- **Motion:** footstep planning with IK legs on flat ground, ramps and stairs; spring-driven appendages; simulated
+  cloth (capes, scarves, chains) with wind and gravity; a joint hierarchy for attached parts.
+- **Rendering:** a procedural pixel-art renderer that stays stable in motion, with interchangeable styles.
+- **Live runtime:** characters animate frame by frame in the browser and in a terminal pane.
+  - **The world:** a cast of characters living on procedurally generated terrain, wandering, visiting each other,
+    resting and reacting to pokes and weather. The whole world is [one declarative config](site/world.json).
+  - **The hanging piñata:** a character on a rope you can poke, drag and tune. Embed it with
+    `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
+    `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.
+  - **In Claude Code:** the `pinata` mod shows the piñata in a pane beside the chat, reacting as the agent works. In
+    this repository it is enabled once you trust the folder; elsewhere run
+    `/plugin install pinata --marketplace dsablic/pinata`, then `/pinata` opens the pane. It needs Node.js 24.
+- **Checking quality:** every feature is built against gates fixed before the code, and visual quality is judged by
+  blind AI judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)).
 
-| Proof | Question | Result |
-|---|---|---|
-| P1 static style | Can a procedural renderer turn a 3D mannequin into pixel art that passes as hand-made at 32-64px? | No. Readable and consistent across 8 directions, but blind judges picked the hand-made reference in 36 of 36 comparisons. |
-| P2 pixel stability | Does the renderer stay stable in motion? | Yes, with temporal hysteresis (flicker under 1%). |
-| P3 secondary motion | Does a simulated cape read as inertia, with materials and wind distinguishable by motion alone? | Yes. Gates pass, a rigid control fails them, judges ranked materials and read wind correctly every time. |
-| P4 locomotion | Does a behaviour script compile into planted, non-sliding footsteps with IK legs? | Yes for the motion; not readable as small procedural pixel strips. |
-| P5 AI authoring loop | Can a fresh AI agent author a character from a one-line prompt with only the guide and the check command? | Yes. Three characters passed every gate in 1-6 runs and judges matched each to its prompt. |
-| P6 style swap | Is style independent of motion? | Yes. One character in three styles, judges grouped by character and by style without error. |
-| Skins spike | Do AI-drawn per-part sprites look better than procedural rendering? | Promising: preferred in walk strips and rated more hand-made than CC0 references in 44 of 54 comparisons, but formally inconclusive. |
+## In progress
 
-The working conclusion is that the value is in the motion engine (scripted locomotion, IK and secondary motion with
-machine-checkable diagnostics, authored by AI), with per-part sprites as the visual layer. See [`docs/FINDINGS.md`](docs/FINDINGS.md) and
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
-
-## Live characters
-
-The motion engine also runs live, frame by frame: a character hangs from a rope, swings, twists and flops, and plays
-behaviours (`idle`, `think`, `busy`, `celebrate`, `fail`) that page or agent events switch between.
-
-- **In the browser:** the [showcase page](https://dsablic.github.io/pinata/) (built by CI for every release tag)
-  shows the component on its own: poke and drag the unicorn piñata, and tune its environment and motion live.
-  Locally: `npm run runtime`, then open http://127.0.0.1:8080/. Embed it with
-  `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
-  `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.
-- **In Claude Code:** the `pinata` mod shows the piñata in a pane beside the chat, reacting as the agent works
-  (thinking on a prompt, bouncing on tool calls, a whack on a failure, a spin when a turn succeeds). Working in this
-  repository, it is enabled for you once you trust the folder (`.claude/settings.json`). Elsewhere:
-
-  ```
-  /plugin install pinata --marketplace dsablic/pinata
-  ```
-
-  Then `/pinata` opens the pane and `/pinata hit` whacks it. Real pixels in kitty, Ghostty and iTerm2 3.5+, coloured
-  blocks elsewhere. It needs Node.js 24 on the PATH.
+- **Natural motion from motion capture** ([plan](docs/plans/2026-10-30-motion-data.md)): humanoids driven by
+  retargeted CMU motion capture through motion matching, with their feet locked to the terrain and a physical body
+  leading. Clips and retargeting are done; playback is under way.
+- **Physical bodies** ([plan](docs/plans/2026-10-30-physical-walking.md)) for creatures without motion-capture data.
+- Then weather and particles, character skins, a physics engine, and pages whose elements become terrain. The
+  [roadmap](docs/ROADMAP.md) and [TODO](docs/TODO.md) have the order.
 
 ## Running it
 
-Requires Node.js 24 or later; TypeScript runs directly through Node's type stripping, with no build step.
+Requires Node.js 24 or later; TypeScript runs directly through Node's type stripping, with no build step except for
+the browser bundle.
 
 ```bash
 npm install
-npm test            # unit tests
-npm run typecheck   # tsc, no emit
-npm run p1          # P1: render the knight in 8 directions, evaluate gates, write reports/p1/
-npm run p3          # P3: simulate cape and plume in three scenarios per material, write reports/p3/
-npm run p2          # P2, p4, p6 and skins likewise; see package.json
-npm run check -- examples/knight   # check a character package (see docs/authoring.md)
-npm run new -- --template hexapod my-bug   # write a starter package (biped, quadruped, hexapod or octopod)
-npm run judge -- build panel.json packet/ key.json   # blind judge panel (see docs/judging.md)
-npm run demo        # render the walking piñata demo (animated PNG and frames) to reports/demo/
-npm run skins -- pocs/skins-spike/artist-skin.json   # render the knight with AI-drawn part sprites
-npm run p1:verify   # same as p1 plus the determinism re-run; likewise p2:verify, p3:verify, p4:verify, p6:verify
+npm test                       # unit tests
+npm run typecheck              # tsc, no emit
+npm run runtime                # build the site and serve the world at http://127.0.0.1:8080/
+npm run check -- examples/knight                 # check a character package
+npm run new -- --template hexapod my-bug         # write a starter package (biped, quadruped, hexapod or octopod)
+npm run judge -- build panel.json packet/ key.json   # build a blind judge panel
+npm run mocap -- convert motion/takes.json <cmu-dir> motion/clips   # rebuild the motion clips
+npm run demo                   # render the walking piñata demo to reports/demo/
 ```
 
-Each proof-of-concept runner exits 0 when all gates pass, 1 when a gate fails and 2 when the harness itself fails,
-and writes a `summary.txt`, `metrics.json` and still images to `reports/<poc>/`. P1 also writes `preview.html`.
+The original proof-of-concept runners (`npm run p1` to `p6`, `skins`, each with a `:verify` variant that adds a
+determinism re-run) still work and keep their outputs byte-identical. They write reports to `reports/<poc>/` and exit 0
+when every gate passes, 1 when one fails and 2 when the harness itself fails.
 
-The determinism check (the `nondeterministicFrames` gate) re-renders everything in a child process and roughly
-doubles the run time, so it only runs with `--verify` (`npm run p1 -- --verify` or `npm run p1:verify`). Without it the
-gate is reported as `SKIP` and the verdict reads `PASS (1 skipped)`, never a plain pass.
+The [showcase site](https://dsablic.github.io/pinata/) is rebuilt by CI for every release tag, so it can lag behind
+`main`.
+
+## How it got here
+
+The project started as a series of proofs of concept, each testing one idea in isolation against fixed gates and
+blind judge panels. In short: procedural pixel art is readable but does not pass as hand-made (P1); it stays stable in
+motion (P2); simulated capes read as inertia, material and wind (P3); scripted footsteps with IK legs work (P4); a fresh
+AI agent can author a character from a one-line prompt (P5); style is independent of motion (P6); and AI-drawn part
+sprites look promising (skins spike). The conclusion was that the value is in the motion engine, which is what is now
+being built. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the details.
 
 ## Repository layout
 
-- [`src/`](src): the library, one directory per component (formats, raster, style, sim, motion, diagnostics).
-- [`pocs/`](pocs): one directory per proof of concept, with its assets, gates and runner.
-- [`examples/`](examples): character packages: the knight, a four-legged dog, the piñata, three characters authored by AI
-  agents in P5 (rogue, dwarf, wizard), and creatures with general limbs: a six-legged beetle, an eight-legged spider and
-  a horse with five-joint legs, a swishing tail and ears, and the walking unicorn piñata from the logo.
-- [`docs/assets/`](docs/assets): the provisional logo (a hanging unicorn piñata, rendered with the engine) and a lineup
-  of the general-limbs examples at 48 px.
+- [`src/`](src): the engine, one directory per component: `formats` (character files and validation), `motion`
+  (gait, IK, appendages), `sim` (cloth), `raster` and `style` (rendering), `world` (terrain and the live world),
+  `mocap` (motion-capture clips and retargeting), `runtime` (live characters), `judge`, `diagnostics` and `cli`.
+- [`examples/`](examples): character packages: the knight, rogue, dwarf and wizard, a dog, a horse, a beetle, a spider,
+  and the piñata and unicorn piñata.
+- [`motion/`](motion): motion-capture clips converted from the CMU database, with their sources.
+- [`site/`](site): the showcase pages and the world config.
+- [`mods/pinata/`](mods/pinata): the Claude Code mod.
+- [`pocs/`](pocs): the proof-of-concept runners, with their assets and gates.
 - [`test/`](test): unit tests.
-- [`refs/`](refs): CC0 reference sprites used in the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
-- [`docs/plans/`](docs/plans): the viability design, the plan for each proof, findings logs and the judge panel artefacts.
-
-## Further reading
-
-- [`docs/FINDINGS.md`](docs/FINDINGS.md): everything the proofs established, in one page.
-- [`docs/TODO.md`](docs/TODO.md): current state and the next tasks, for picking the work up later.
-- [`docs/ROADMAP.md`](docs/ROADMAP.md): what the proofs showed and the plan for building the tool.
-- [`docs/authoring.md`](docs/authoring.md): how to write a character package.
-- [`docs/plans/2026-10-30-viability-design.md`](docs/plans/2026-10-30-viability-design.md): requirements, components, proofs and the AI judge panel method.
-- [`docs/plans/*-findings.md`](docs/plans): every tuning run and judge result, per proof.
+- [`refs/`](refs): CC0 reference sprites from the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
+- [`docs/`](docs): the [roadmap](docs/ROADMAP.md), [TODO](docs/TODO.md), [findings](docs/FINDINGS.md),
+  [authoring guide](docs/authoring.md), [judging guide](docs/judging.md), and [plans](docs/plans) with their gates and
+  findings logs.
 
 ## Licence
 
-MIT, see `LICENSE`. The reference sprites in [`refs/`](refs) are CC0 works by their respective authors.
+MIT, see `LICENSE`. The reference sprites in [`refs/`](refs) are CC0 works by their respective authors. The motion
+clips come from the [CMU Graphics Lab Motion Capture Database](http://mocap.cs.cmu.edu), which may be copied, modified
+and redistributed but not resold; see [`motion/README.md`](motion/README.md).

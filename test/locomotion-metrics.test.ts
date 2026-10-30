@@ -4,15 +4,15 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 import { planGait } from '../src/motion/gait.ts'
 import {
   alternationViolations, boneLengthError, footSlidePx, frameHashes, groundPenetrationPx, kneeLimitViolations,
-  kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, reachViolations, recordLocomotion, rootSpeedError,
-  unsupportedFrames
+  kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, plantedRuns, reachViolations, recordLocomotion,
+  rootSpeedError, unsupportedFrames
 } from '../src/motion/metrics.ts'
 import type { LocomotionFrame, LocomotionRecording } from '../src/motion/metrics.ts'
-import { restPose } from '../src/motion/pose.ts'
+import { legLabels, restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
 import { assertClose } from './helpers.ts'
-import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
+import { mannequin, quadMannequin, quadRig, rig, walkTrack } from './locomotion-fixtures.ts'
 
 const geometry = { rig, mannequin }
 const rest = restPose(mannequin)
@@ -226,4 +226,93 @@ test('recordLocomotion stores world-space joints, clamp counts and planner plant
   assertClose(rec.frames[10].joints.chest[1], rest.chest[1] + frames[10].pelvisOffset[1], 1e-9)
   assert.equal(rec.frames[10].planted.left, frames[10].feet[0].planted)
   assert.equal(rec.frames[10].clamped, 0)
+})
+
+const quadGeometry = { rig: quadRig, mannequin: quadMannequin }
+const quadRest = restPose(quadMannequin)
+const QUAD_NAMES = ['LH', 'LF', 'RH', 'RF']
+
+function quadFeet (lifts: number[]): Pose {
+  const pose = structuredClone(quadRest)
+  QUAD_NAMES.forEach((name, i) => {
+    pose[`ankle${name}`][1] += lifts[i]
+    pose[`toe${name}`][1] += lifts[i]
+  })
+  return pose
+}
+
+function quadPattern (rows: string[]): LocomotionRecording {
+  const frames = [...rows[0]].map((_, i) => frame(i, quadFeet(rows.map(row => row[i] === '1' ? 0 : 0.5))))
+  return recording(frames)
+}
+
+test('legLabels name two legs by side and four legs by side and front or hind', () => {
+  assert.deepEqual(legLabels(rig, rest), ['left', 'right'])
+  assert.deepEqual(legLabels(quadRig, quadRest), ['left hind', 'left front', 'right hind', 'right front'])
+  const shuffled = { ...quadRig, legs: [quadRig.legs[3], quadRig.legs[0], quadRig.legs[1], quadRig.legs[2]] }
+  assert.deepEqual(legLabels(shuffled, quadRest), ['right front', 'left hind', 'left front', 'right hind'])
+})
+
+test('plantedFrames counts per leg label for four legs', () => {
+  const counts = plantedFrames(quadPattern(['11111', '10000', '11000', '00000']), quadGeometry)
+  assert.deepEqual(counts, { 'left hind': 4, 'left front': 0, 'right hind': 1, 'right front': 0 })
+})
+
+test('plantedRuns carry the leg index', () => {
+  const runs = plantedRuns(quadPattern(['11100', '00111', '00000', '11111']), quadGeometry)
+  assert.deepEqual(runs.map(r => [r.leg, r.start, r.end]), [[0, 1, 2], [3, 1, 4], [1, 3, 4]])
+})
+
+test('footSlidePx, groundPenetrationPx and unsupportedFrames see all four feet', () => {
+  const slide = [0, 1, 2].map(i => {
+    const pose = quadFeet([0.5, 0.5, 0, 0.5])
+    pose.ankleRH[0] += 0.01 * i
+    pose.toeRH[0] += 0.01 * i
+    return frame(i, pose)
+  })
+  assertClose(footSlidePx(recording(slide), quadGeometry, SCALE), 0.01 / SCALE, 1e-9)
+  const sunk = quadFeet([0, 0, 0, -0.01])
+  assertClose(groundPenetrationPx(recording([frame(0, sunk)]), quadGeometry, SCALE), 0.01 / SCALE, 1e-9)
+  assert.equal(unsupportedFrames(quadPattern(['110', '000', '000', '011']), quadGeometry), 0)
+  assert.equal(unsupportedFrames(quadPattern(['1000', '0000', '0000', '0001']), quadGeometry), 2)
+})
+
+test('alternationViolations follows the phase order of four legs', () => {
+  const order = quadPattern(['11000000', '00110000', '00001100', '00000011'])
+  assert.equal(alternationViolations(order, quadGeometry, [{ start: 0, end: 1 }]), 0)
+})
+
+test('alternationViolations counts a leg planting out of phase order and a leg repeating', () => {
+  const swapped = quadPattern(['110000000000', '000011000000', '001100000000', '000000110000'])
+  assert.equal(alternationViolations(swapped, quadGeometry, [{ start: 0, end: 1 }]), 3)
+  const repeated = quadPattern(['110011000000', '000000110000', '000000001100', '000000000011'])
+  assert.equal(alternationViolations(repeated, quadGeometry, [{ start: 0, end: 1 }]), 1)
+})
+
+test('alternationViolations honours explicit phases on two legs', () => {
+  const swappedRig = { ...rig, legs: [{ ...rig.legs[0], phase: 0.5 }, { ...rig.legs[1], phase: 0 }] }
+  const fine = pattern('11100011100011', '00011100011100')
+  assert.equal(alternationViolations(fine, { rig: swappedRig, mannequin }, [{ start: 0, end: 1 }]), 0)
+})
+
+test('kneeLimitViolations uses each leg bend as its forward', () => {
+  const rec = recording([frame(0, quadRest)])
+  assert.equal(kneeLimitViolations(rec, quadGeometry), 0)
+  const wrong = { ...quadRig, legs: quadRig.legs.map(leg => ({ ...leg, bend: 'forward' as const })) }
+  assert.equal(kneeLimitViolations(rec, { rig: wrong, mannequin: quadMannequin }), 2)
+})
+
+test('a recorded quadruped walk has per-leg planted flags and passes the leg metrics', () => {
+  const track = walkTrack(0.9, 8)
+  const frames = planGait({ track, rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 10, fps: 24 })
+  const rec = recordLocomotion(frames, { rig: quadRig, rest: quadRest, mannequin: quadMannequin, fps: 24 })
+  assert.deepEqual(Object.keys(rec.frames[10].planted), ['left hind', 'left front', 'right hind', 'right front'])
+  assert.equal(rec.frames[10].planted['left front'], frames[10].feet[1].planted)
+  assert.equal(kneeLimitViolations(rec, quadGeometry), 0)
+  assert.equal(reachViolations(rec), 0)
+  assert.equal(alternationViolations(rec, quadGeometry, [{ start: 2, end: 7 }]), 0)
+  assert.ok(footSlidePx(rec, quadGeometry, 0.8 / 48) < 0.25)
+  assert.ok(boneLengthError(rec, quadGeometry, quadRest) < 1e-9)
+  assert.ok(rootSpeedError(rec, quadGeometry, [{ start: 2, end: 7, speed: 0.9 }]) < 0.05)
+  assert.equal(unsupportedFrames(rec, quadGeometry), 0)
 })

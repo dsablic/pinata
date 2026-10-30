@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
+import { legBend, legPhases } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -8,25 +9,24 @@ import type { GaitFrame } from './gait.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from './ik.ts'
 import { verticalExtent } from './extent.ts'
 import { poseAt } from './locomotion.ts'
-import { footRadii } from './pose.ts'
+import { footRadii, legLabels, restPose } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState, Script } from './script.ts'
 
 type Side = 'left' | 'right'
-export type Sides<T> = Record<Side, T>
 
 export type LocomotionFrame = {
   time: number
   root: RootState
   joints: Pose
   clamped: number
-  planted: Sides<boolean>
+  planted: Record<string, boolean>
 }
 export type LocomotionRecording = { fps: number, frames: LocomotionFrame[] }
 export type Geometry = { rig: Rig, mannequin: Mannequin }
 export type Window = { start: number, end: number }
 export type SteadySegment = Window & { speed: number }
-export type PlantedRun = { side: Side, start: number, end: number }
+export type PlantedRun = { leg: number, side: Side, start: number, end: number }
 
 const PLANT_HEIGHT = 0.02
 export const MAX_KNEE_FLEXION = 150
@@ -38,15 +38,15 @@ export function recordLocomotion (
   options: { rig: Rig, rest: Pose, mannequin: Mannequin, fps: number }
 ): LocomotionRecording {
   const { rig, rest, mannequin, fps } = options
+  const labels = legLabels(rig, rest)
   return {
     fps,
     frames: frames.map((frame, i) => {
       const { pose, clamped } = poseAt({ frame, rig, rest, mannequin })
       const joints: Pose = {}
       for (const [name, local] of Object.entries(pose)) joints[name] = toWorld(local, frame.root)
-      const planted = (side: Side): boolean => frame.feet.find(f => f.side === side)?.planted ?? false
-      const flags = { left: planted('left'), right: planted('right') }
-      return { time: i / fps, root: frame.root, joints, clamped, planted: flags }
+      const planted = Object.fromEntries(labels.map((label, k) => [label, frame.feet[k]?.planted ?? false]))
+      return { time: i / fps, root: frame.root, joints, clamped, planted }
     })
   }
 }
@@ -73,29 +73,33 @@ function footPlanted (recording: LocomotionRecording, leg: Leg, mannequin: Manne
   return plantedPairs(soles(recording, leg, mannequin)).map(flags => flags.some(Boolean))
 }
 
-/** Per foot, the frames at which a sole point is within 2 cm of the ground in that and the previous frame. */
-export function plantedFrames (recording: LocomotionRecording, geometry: Geometry): Sides<number> {
-  const counts: Sides<number> = { left: 0, right: 0 }
-  for (const leg of geometry.rig.legs) {
-    counts[leg.side] += footPlanted(recording, leg, geometry.mannequin).filter(Boolean).length
-  }
+/**
+ * Per foot, keyed by its leg label (see legLabels), the frames at which a sole point is within 2 cm of the ground in
+ * that and the previous frame.
+ */
+export function plantedFrames (recording: LocomotionRecording, geometry: Geometry): Record<string, number> {
+  const labels = legLabels(geometry.rig, restPose(geometry.mannequin))
+  const counts: Record<string, number> = {}
+  geometry.rig.legs.forEach((leg, i) => {
+    counts[labels[i]] = footPlanted(recording, leg, geometry.mannequin).filter(Boolean).length
+  })
   return counts
 }
 
 /** Runs of consecutive planted frames per foot, as inclusive frame indices. */
 export function plantedRuns (recording: LocomotionRecording, geometry: Geometry): PlantedRun[] {
   const runs: PlantedRun[] = []
-  for (const leg of geometry.rig.legs) {
+  for (const [index, leg] of geometry.rig.legs.entries()) {
     const flags = footPlanted(recording, leg, geometry.mannequin)
     let start = -1
     flags.forEach((planted, i) => {
       if (planted && start < 0) start = i
       if (!planted && start >= 0) {
-        runs.push({ side: leg.side, start, end: i - 1 })
+        runs.push({ leg: index, side: leg.side, start, end: i - 1 })
         start = -1
       }
     })
-    if (start >= 0) runs.push({ side: leg.side, start, end: flags.length - 1 })
+    if (start >= 0) runs.push({ leg: index, side: leg.side, start, end: flags.length - 1 })
   }
   return runs.sort((a, b) => a.start - b.start || a.end - b.end)
 }
@@ -154,21 +158,22 @@ export function reachViolations (recording: LocomotionRecording): number {
   return recording.frames.filter(f => f.clamped > 0).length
 }
 
-function forwardOf (root: RootState): Vec3 {
-  return [Math.sin(root.yaw), 0, Math.cos(root.yaw)]
+function kneeDirection (root: RootState, leg: Leg): Vec3 {
+  const sign = legBend(leg) === 'backward' ? -1 : 1
+  return [sign * Math.sin(root.yaw), 0, sign * Math.cos(root.yaw)]
 }
 
 function flexions (recording: LocomotionRecording, leg: Leg): number[] {
   return recording.frames.map(f => kneeFlexionDegrees(f.joints[leg.hip], f.joints[leg.knee], f.joints[leg.ankle]))
 }
 
-/** Knee-frames with flexion outside [0, 150] degrees or a knee bending backwards of the body's front. */
+/** Knee-frames with flexion outside [0, 150] degrees or a knee on the wrong side of its leg's bend direction. */
 export function kneeLimitViolations (recording: LocomotionRecording, geometry: Geometry): number {
   let count = 0
   for (const leg of geometry.rig.legs) {
     flexions(recording, leg).forEach((flexion, i) => {
       const { joints, root } = recording.frames[i]
-      const backward = kneeBendsBackward(joints[leg.hip], joints[leg.knee], joints[leg.ankle], forwardOf(root))
+      const backward = kneeBendsBackward(joints[leg.hip], joints[leg.knee], joints[leg.ankle], kneeDirection(root, leg))
       if (flexion < -FLEXION_EPSILON || flexion > MAX_KNEE_FLEXION + FLEXION_EPSILON || backward) count++
     })
   }
@@ -238,8 +243,8 @@ export function rootSpeedError (recording: LocomotionRecording, geometry: Geomet
     const to = at(end)
     const travelled = Math.hypot(to[0] - from[0], to[2] - from[2])
     const measured: number[] = []
-    for (const leg of geometry.rig.legs) {
-      const plants = runs.filter(run => run.side === leg.side)
+    for (const [index, leg] of geometry.rig.legs.entries()) {
+      const plants = runs.filter(run => run.leg === index)
         .map(run => plantCentre(recording, leg, geometry.mannequin, run))
         .filter(c => c.time >= start - TIME_EPSILON && c.time <= end + TIME_EPSILON)
       if (plants.length < 2 || travelled === 0) continue
@@ -279,8 +284,14 @@ export function unsupportedFrames (recording: LocomotionRecording, geometry: Geo
   }).length
 }
 
-/** Plants inside the windows by the same foot as the previous plant (geometric plants, time of first frame). */
+/**
+ * Plants inside the windows (geometric plants, time of first frame) by a leg other than the one whose phase comes
+ * next after the previous plant's leg. With two legs this counts the same foot planting twice in a row.
+ */
 export function alternationViolations (recording: LocomotionRecording, geometry: Geometry, windows: Window[]): number {
+  const phases = legPhases(geometry.rig)
+  const order = phases.map((_, leg) => leg).sort((a, b) => phases[a] - phases[b] || a - b)
+  const following = (leg: number): number => order[(order.indexOf(leg) + 1) % order.length]
   let count = 0
   for (const { start, end } of windows) {
     const inside = plantedRuns(recording, geometry).filter(run => {
@@ -288,7 +299,7 @@ export function alternationViolations (recording: LocomotionRecording, geometry:
       return time >= start - TIME_EPSILON && time <= end + TIME_EPSILON
     })
     inside.forEach((run, i) => {
-      if (i > 0 && inside[i - 1].side === run.side) count++
+      if (i > 0 && following(inside[i - 1].leg) !== run.leg) count++
     })
   }
   return count

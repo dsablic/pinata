@@ -4,36 +4,38 @@ import { readFileSync } from 'node:fs'
 import { loadCharacter } from '../src/formats/character.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import { solePoints } from '../src/motion/metrics.ts'
-import { validateActivities } from '../src/world/activities.ts'
+import { validateWorldConfig } from '../src/world/config.ts'
 import { createWorld } from '../src/world/world.ts'
 import type { CastMember, World, WorldFrame } from '../src/world/world.ts'
 
 const FPS = 24
-const NAMES = ['knight', 'dog', 'rogue', 'beetle', 'horse', 'dwarf', 'spider', 'wizard']
-const cast: CastMember[] = NAMES.map(name => {
+const config = validateWorldConfig(
+  JSON.parse(readFileSync(new URL('../site/world.json', import.meta.url), 'utf8'))
+).value!
+const cast: CastMember[] = config.cast.map(name => {
   const character = loadCharacter(new URL(`../examples/${name}`, import.meta.url).pathname).value!
   return { name, mannequin: character.mannequin, rig: character.rig }
 })
-const activities = validateActivities(
-  JSON.parse(readFileSync(new URL('../site/activities.json', import.meta.url), 'utf8'))
-).value!
 
 function world (seed = 3): World {
-  return createWorld({ seed, cast, activities, fps: FPS, length: 16 })
+  return createWorld({ seed, cast, config, fps: FPS })
 }
 
 function run (w: World, frames: number): WorldFrame[] {
   return Array.from({ length: frames }, () => w.step())
 }
 
-test('the showcase activities validate, and mistakes name their path', () => {
-  assert.ok(activities !== undefined)
-  const broken = structuredClone(activities) as any
+test('the showcase world config validates, and mistakes name their path', () => {
+  assert.ok(config !== undefined)
+  const broken = structuredClone(config) as any
   broken.activities.wander.steps[0].to = 'moon'
   broken.activities.rest.steps[1].seconds = [5, 1]
-  broken.reactions.poke = []
-  assert.deepEqual(validateActivities(broken).errors.map(e => e.path).sort(), [
-    'activities.rest.steps[1].seconds', 'activities.wander.steps[0].to', 'reactions.poke'
+  broken.reactions.poke.steps = []
+  broken.view.palette.sky = 'blue'
+  broken.lanes.width = 3
+  assert.deepEqual(validateWorldConfig(broken).errors.map(e => e.path).sort(), [
+    'activities.rest.steps[1].seconds', 'activities.wander.steps[0].to', 'lanes.width', 'reactions.poke.steps',
+    'view.palette.sky'
   ])
 })
 

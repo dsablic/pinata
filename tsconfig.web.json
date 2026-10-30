@@ -13,5 +13,5 @@
     "outDir": "dist/web",
     "rootDir": "src"
   },
-  "files": ["src/runtime/browser.ts", "src/runtime/showcase.ts"]
+  "files": ["src/runtime/browser.ts", "src/runtime/showcase.ts", "src/world/page.ts"]
 }

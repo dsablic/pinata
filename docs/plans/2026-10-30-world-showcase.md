@@ -122,3 +122,18 @@ agent wiring stays out of it.
   backward and zero-length spans; heights outside the course continue the end spans.
 - New tests: generated courses walked both ways by both bodies with regular steps (at most 2.2x the nominal step)
   and a lean under 35 degrees, and the generator's edge cases.
+
+## Decisions during batch C
+
+- **Declarative config (user, 2026-10-30):** everything about the world that is tuning rather than mechanism lives in
+  one file, `site/world.json`: the cast, terrain limits, lanes, motion timing, how far walks go, the activities and
+  the poke reaction, the view (scale, size, camera, samples, palette) and the bubble glyphs. It is checked by a small
+  declarative schema checker (`src/formats/schema.ts`: numbers with ranges, enums, ranges, colours, arrays, maps,
+  objects with optional fields and tagged unions, each error with its path), which replaced the hand-written
+  activities validation; the other formats can move to it over time. New worlds, casts and activities are config,
+  not code.
+- The world renders each character in its own box that follows it (keeping its own temporal hysteresis) at 1 sample
+  per pixel by default; terrain is drawn once as pixel art (a top band across the lanes and a front face). In headless
+  Chrome, 8 characters run at 19.6 ms mean, 19.8 ms p95 per frame.
+- Pages: `index.html` is the world; the hanging piñata moved to `pinata.html`. The site builder writes
+  `world.bundle.json` (config plus the cast's mannequin, style and rig), validated in the browser.

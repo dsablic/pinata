@@ -17,6 +17,8 @@ export type TerrainOptions = {
   maxHeight: number
   /** Shortest stair tread: at least the longest foot on the course, so a foot fits on one tread. */
   minTread?: number
+  /** Heights of flat runs come in multiples of this (default half the largest rise). */
+  heightStep?: number
 }
 
 /** A small, fast, seeded random generator (mulberry32): the same seed gives the same sequence everywhere. */
@@ -74,17 +76,19 @@ export function terrainOf (spans: Span[]): Terrain {
 const MIN_FLAT = 1.2
 const MAX_FLAT = 3.5
 const MIN_TREAD = 0.28
+/** Longest flight of stairs; bigger height changes become ramps where ramps are allowed. */
+const MAX_FLIGHT = 6
 
 /**
- * A random course: flat runs at heights in [0, maxHeight] (whole multiples of half the largest rise), each joined to
+ * A random course: flat runs at heights in [0, maxHeight] (whole multiples of heightStep), each joined to
  * the next by a ramp no steeper than maxSlopeDegrees or a flight of stairs whose rises do not exceed maxRise and whose
- * treads are at least minTread (default 0.28 m). With no room for two heights it is one flat run; with no slope
- * allowed, transitions are stairs.
+ * treads are at least minTread (default 0.28 m); flights longer than six steps become ramps. With no room for two
+ * heights it is one flat run; with no slope allowed, transitions are stairs.
  */
 export function generateTerrain (seed: number, options: TerrainOptions): Terrain {
   const next = random(seed)
   const spans: Span[] = []
-  const quantum = options.maxRise / 2
+  const quantum = options.heightStep ?? options.maxRise / 2
   const levels = quantum > 0 ? Math.floor(options.maxHeight / quantum + 1e-9) : 0
   const tread = Math.max(MIN_TREAD, options.minTread ?? 0)
   const ramps = options.maxSlopeDegrees > 0
@@ -99,8 +103,8 @@ export function generateTerrain (seed: number, options: TerrainOptions): Terrain
     let target = height
     while (target === height) target = Math.floor(next() * (levels + 1)) * quantum
     const drop = target - height
-    if (!ramps || next() < 0.5) {
-      const steps = Math.ceil(Math.abs(drop) / options.maxRise - 1e-9)
+    const steps = Math.ceil(Math.abs(drop) / options.maxRise - 1e-9)
+    if (!ramps || (steps <= MAX_FLIGHT && next() < 0.5)) {
       const run = steps * (tread + 0.12 * next())
       spans.push({ kind: 'stairs', from: x, to: x + run, start: height, end: target, steps })
       x += run

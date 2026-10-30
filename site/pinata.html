@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piñata — live characters</title>
+<meta name="description" content="A pixel-art piñata animated live in the browser by the Piñata motion engine: rope and twist physics, spring limbs, live pixel-art rendering.">
+<style>
+  :root {
+    --bg: #f4ecd8; --ink: #2b2233; --muted: #6f6478; --panel: #fffaf0; --line: #d9ccb4; --accent: #c2477a;
+    --beam: #7a5a3a; --beam-dark: #4a3426; --sky-a: #fbe7c6; --sky-b: #f4ecd8;
+  }
+  [data-scene="night"] { --sky-a: #1d1b33; --sky-b: #2d2a4a; }
+  [data-scene="workshop"] { --sky-a: #d8e6e1; --sky-b: #b9d1c9; }
+  [data-scene="party"] { --sky-a: #ffd6e8; --sky-b: #ffeec2; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  header { padding: 20px 16px 8px; max-width: 1080px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 22px; }
+  header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+  main { max-width: 1080px; margin: 0 auto; padding: 8px 16px 32px; display: grid; gap: 16px;
+    grid-template-columns: minmax(0, 1fr) 320px; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+  .stage { position: relative; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; min-height: 470px;
+    background: linear-gradient(var(--sky-a), var(--sky-b)); display: flex; justify-content: center; }
+  .beam { position: absolute; left: 0; right: 0; top: 0; height: 12px; background: var(--beam);
+    border-bottom: 3px solid var(--beam-dark); }
+  .stage pinata-character { margin-top: 6px; cursor: grab; }
+  .readout { position: absolute; left: 10px; bottom: 8px; font: 12px ui-monospace, monospace; color: var(--muted);
+    background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 2px 6px; border-radius: 4px; }
+  aside { display: grid; gap: 12px; align-content: start; }
+  fieldset { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 0; padding: 10px 12px; }
+  legend { font-weight: 600; padding: 0 4px; }
+  label { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; margin: 6px 0; }
+  label input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+  label output { font: 12px ui-monospace, monospace; color: var(--muted); }
+  .buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+  button, select { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line);
+    background: #fff; color: var(--ink); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  footer { max-width: 1080px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: 13px; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body data-scene="day">
+<header>
+  <h1>Piñata, live</h1>
+  <p>A pixel-art character animated in your browser, frame by frame: rope and twist physics, limp spring legs and a
+  flopping mane and tail, rendered to pixel art on every frame. Poke it, drag it, and tune the environment and the
+  motion. Everything is computed live by the <a href="https://github.com/dsablic/pinata">Piñata</a> motion engine.</p>
+</header>
+<main>
+  <section class="stage" aria-label="Live character">
+    <div class="beam"></div>
+    <pinata-character id="character" src="characters/unicorn.json" scale="3" samples="3" motion="full"></pinata-character>
+    <div class="readout" id="readout">loading…</div>
+  </section>
+  <aside>
+    <fieldset>
+      <legend>Interact</legend>
+      <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">Click the piñata to poke it from that side, or drag it
+      and let go.</p>
+      <div class="buttons"><button id="hit">Whack it</button></div>
+    </fieldset>
+    <fieldset>
+      <legend>Environment</legend>
+      <label>Wind <output id="windOut"></output><input id="wind" type="range" min="-3" max="3" step="0.1" value="0"></label>
+      <label>Gravity <output id="gravityOut"></output><input id="gravity" type="range" min="1" max="25" step="0.1" value="9.81"></label>
+      <label>Rope length <output id="ropeOut"></output><input id="rope" type="range" min="0.3" max="0.9" step="0.01" value="0.7"></label>
+      <label>Scene <select id="scene"><option>day</option><option>night</option><option>workshop</option><option>party</option></select></label>
+    </fieldset>
+    <fieldset>
+      <legend>Motion</legend>
+      <label>Swing damping <output id="swingOut"></output><input id="swing" type="range" min="0" max="3" step="0.05" value="0.55"></label>
+      <label>Twist stiffness <output id="twistKOut"></output><input id="twistK" type="range" min="0" max="20" step="0.5" value="5"></label>
+      <label>Twist damping <output id="twistCOut"></output><input id="twistC" type="range" min="0" max="5" step="0.1" value="1.1"></label>
+      <label>Leg stiffness <output id="limbKOut"></output><input id="limbK" type="range" min="0" max="0.9" step="0.01" value="0.15"></label>
+      <label>Leg damping <output id="limbCOut"></output><input id="limbC" type="range" min="0" max="1" step="0.01" value="0.3"></label>
+      <label>Render samples (per axis) <output id="samplesOut"></output><input id="samples" type="range" min="1" max="4" step="1" value="3"></label>
+      <label style="grid-template-columns:auto 1fr"><input id="reduced" type="checkbox"> Reduced motion</label>
+    </fieldset>
+  </aside>
+</main>
+<footer>
+  Embed it on your own page with <code>&lt;pinata-character src="unicorn.json"&gt;&lt;/pinata-character&gt;</code>;
+  apps drive it through its events and methods. Built from
+  <a id="commit" href="https://github.com/dsablic/pinata">the repository</a> for every release tag.
+</footer>
+<script type="module" src="js/runtime/showcase.js"></script>
+</body>
+</html>

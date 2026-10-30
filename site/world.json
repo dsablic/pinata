@@ -1,0 +1,96 @@
+{
+  "cast": ["knight", "dog", "rogue", "beetle", "horse", "dwarf", "spider", "wizard"],
+  "terrain": {
+    "length": 16,
+    "maxSlopeDegrees": 14,
+    "maxHeight": 1,
+    "heightStep": 0.2,
+    "riseOfLeg": 0.3,
+    "treadOfFoot": 1.15
+  },
+  "lanes": {
+    "spacing": 0.45
+  },
+  "motion": {
+    "settleSeconds": 0.7,
+    "turnSecondsPerRadian": 0.45,
+    "minTurnSeconds": 0.4,
+    "springSubsteps": 4
+  },
+  "targets": {
+    "random": 8,
+    "far": 14,
+    "friendGap": 0.45,
+    "away": [2, 4]
+  },
+  "activities": {
+    "wander": {
+      "weight": 4,
+      "steps": [
+        { "do": "walk", "to": "random", "speed": 1 },
+        { "do": "stand", "seconds": [0.8, 2.5] }
+      ]
+    },
+    "lookAround": {
+      "weight": 2,
+      "steps": [
+        { "do": "face", "toward": "camera" },
+        { "do": "stand", "seconds": [1, 2], "say": "?" },
+        { "do": "turn", "degrees": 120 },
+        { "do": "stand", "seconds": [0.6, 1.2] }
+      ]
+    },
+    "visit": {
+      "weight": 3,
+      "steps": [
+        { "do": "walk", "to": "friend", "speed": 1 },
+        { "do": "face", "toward": "friend" },
+        { "do": "stand", "seconds": [2, 4], "say": "…" }
+      ]
+    },
+    "dash": {
+      "weight": 1,
+      "steps": [
+        { "do": "walk", "to": "far", "speed": 1.5 },
+        { "do": "stand", "seconds": [1, 2], "say": "!" }
+      ]
+    },
+    "rest": {
+      "weight": 1,
+      "steps": [
+        { "do": "face", "toward": "camera" },
+        { "do": "stand", "seconds": [3, 6], "say": "z" }
+      ]
+    }
+  },
+  "reactions": {
+    "poke": {
+      "say": "!",
+      "steps": [
+        { "do": "walk", "to": "away", "speed": 1.6 },
+        { "do": "stand", "seconds": [0.8, 1.5] }
+      ]
+    }
+  },
+  "view": {
+    "pixelsPerMetre": 34,
+    "width": 560,
+    "height": 170,
+    "azimuthDeg": 12,
+    "elevationDeg": 14,
+    "samples": 1,
+    "floorPx": 22,
+    "palette": {
+      "top": "#8fbf6a",
+      "side": "#9a7350",
+      "edge": "#4f3a2a",
+      "sky": "#f4ecd8"
+    }
+  },
+  "glyphs": {
+    "…": [".....", ".....", ".....", ".....", "#.#.#"],
+    "?": [".###.", "#...#", "...#.", ".....", "..#.."],
+    "!": ["..#..", "..#..", "..#..", ".....", "..#.."],
+    "z": ["#####", "...#.", "..#..", ".#...", "#####"]
+  }
+}

@@ -13,8 +13,8 @@ import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { parentsOf } from '../motion/skeleton.ts'
 import { toWorld } from '../sim/body.ts'
-import { pickActivity } from './activities.ts'
-import type { Activities, Step } from './activities.ts'
+import { pickActivity } from './config.ts'
+import type { Step, WorldConfig } from './config.ts'
 import { generateTerrain, random } from './terrain.ts'
 import type { Terrain } from './terrain.ts'
 import { trackOf, turnBetween } from './track.ts'
@@ -31,16 +31,11 @@ export type ActorFrame = {
   handover?: true
 }
 export type WorldFrame = { index: number, time: number, actors: ActorFrame[] }
-export type WorldOptions = {
-  seed: number
-  cast: CastMember[]
-  activities: Activities
-  fps: number
-  /** World length along x, metres. */
-  length: number
-}
+export type WorldOptions = { seed: number, cast: CastMember[], config: WorldConfig, fps: number }
 export type World = {
   terrain: Terrain
+  /** How far the depth lanes reach either side of z = 0, metres. */
+  lanes: number
   step: () => WorldFrame
   /** Startles an actor, as a click on it from a side does: it reacts with the poke steps. */
   poke: (actor: number, fromX: number) => void
@@ -63,21 +58,9 @@ type Actor = {
   chains: Array<{ chain: SpringChain, parent: string, started: boolean, base: Vec3, yaw: number }>
 }
 
-const LANE_SPACING = 0.45
-const TREAD_MARGIN = 1.15
-const SPRING_SUBSTEPS = 4
-const SETTLE_SECONDS = 0.7
-const TURN_SECONDS_PER_RADIAN = 0.45
-const MIN_TURN_SECONDS = 0.4
+/** Turns smaller than this (radians) are skipped; characters keep this far (metres) from the world's ends. */
 const FACING_TOLERANCE = 0.05
 const EDGE = 1
-const VISIT_GAP = 0.45
-const POKE_SAY = '!'
-const AWAY_MIN = 2
-const AWAY_MAX = 4
-/** Longest walks, in seconds at the walk's speed: a wander, and a dash to somewhere far. */
-const WANDER_SECONDS = 8
-const FAR_SECONDS = 14
 
 function legLength (member: CastMember): number {
   const rest = restPose(member.mannequin)
@@ -107,19 +90,20 @@ function halfLength (member: CastMember): number {
  * so the plans join without a jump. Deterministic for a seed.
  */
 export function createWorld (options: WorldOptions): World {
-  const { cast, activities, fps } = options
+  const { cast, config, fps } = options
+  const { motion, targets } = config
   const next = random(options.seed)
-  const maxRise = 0.3 * Math.min(...cast.map(legLength))
   const terrain = generateTerrain(options.seed, {
-    length: options.length, maxRise, maxSlopeDegrees: 16, maxHeight: Math.min(1.2, 8 * maxRise),
-    minTread: TREAD_MARGIN * Math.max(...cast.map(footLength))
+    ...config.terrain,
+    maxRise: config.terrain.riseOfLeg * Math.min(...cast.map(legLength)),
+    minTread: config.terrain.treadOfFoot * Math.max(...cast.map(footLength))
   })
   const ground = terrain.ground
-  const span: [number, number] = [terrain.from + EDGE, Math.min(terrain.to, options.length) - EDGE]
+  const span: [number, number] = [terrain.from + EDGE, Math.min(terrain.to, config.terrain.length) - EDGE]
   let frameIndex = 0
 
   const actors: Actor[] = cast.map((member, i) => {
-    const lane = (i - (cast.length - 1) / 2) * LANE_SPACING
+    const lane = (i - (cast.length - 1) / 2) * config.lanes.spacing
     const x = span[0] + (span[1] - span[0]) * (i + 0.5) / cast.length
     const parents = parentsOf(member.rig)
     const chains = member.rig.limbs.filter((l): l is AppendageLimb => l.kind === 'appendage').map(limb => ({
@@ -149,30 +133,31 @@ export function createWorld (options: WorldOptions): World {
   const turnTo = (actor: Actor, yaw: number, moves: Move[]): void => {
     const turn = Math.abs(turnBetween(actor.root.yaw, yaw))
     if (turn < FACING_TOLERANCE) return
-    moves.push({ kind: 'turn', yaw, seconds: Math.max(MIN_TURN_SECONDS, turn * TURN_SECONDS_PER_RADIAN) })
+    moves.push({ kind: 'turn', yaw, seconds: Math.max(motion.minTurnSeconds, turn * motion.turnSecondsPerRadian) })
   }
 
   const targetX = (actor: Actor, step: Extract<Step, { do: 'walk' }>): number => {
     const x = actor.root.position[0]
     const reach = (seconds: number): number => actor.member.rig.gait.referenceSpeed * step.speed * seconds
     const clamp = (v: number): number => Math.min(span[1], Math.max(span[0], v))
-    if (step.to === 'random') return clamp(x + (2 * next() - 1) * reach(WANDER_SECONDS))
+    if (step.to === 'random') return clamp(x + (2 * next() - 1) * reach(targets.random))
     if (step.to === 'far') {
-      const distance = Math.min(reach(FAR_SECONDS), (span[1] - span[0]) / 2) * (0.6 + 0.4 * next())
+      const distance = Math.min(reach(targets.far), (span[1] - span[0]) / 2) * (0.6 + 0.4 * next())
       const room = [span[1] - x, x - span[0]]
       const direction = room[0] >= room[1] ? 1 : -1
       return clamp(x + direction * distance)
     }
     if (step.to === 'friend') {
       const friend = actors[actor.friend]
-      const gap = VISIT_GAP + halfLength(actor.member) + halfLength(friend.member)
+      const gap = targets.friendGap + halfLength(actor.member) + halfLength(friend.member)
       const fx = friend.root.position[0]
       const side = x <= fx ? -1 : 1
       return clamp(fx + side * gap)
     }
     const from = actor.poked ?? x
     const away = Math.sign(x - from) || (next() < 0.5 ? 1 : -1)
-    return clamp(x + away * Math.min(reach(FAR_SECONDS), AWAY_MIN + (AWAY_MAX - AWAY_MIN) * next()))
+    const [near, far] = targets.away
+    return clamp(x + away * Math.min(reach(targets.far), near + (far - near) * next()))
   }
 
   /** Turns the actor's next step into moves; stand steps also set what it says. */
@@ -196,21 +181,21 @@ export function createWorld (options: WorldOptions): World {
       moves.push({
         kind: 'turn',
         yaw: actor.root.yaw + step.degrees * Math.PI / 180,
-        seconds: Math.max(MIN_TURN_SECONDS, Math.abs(step.degrees) * Math.PI / 180 * TURN_SECONDS_PER_RADIAN)
+        seconds: Math.max(motion.minTurnSeconds, Math.abs(step.degrees) * Math.PI / 180 * motion.turnSecondsPerRadian)
       })
     } else {
       const seconds = step.seconds[0] + (step.seconds[1] - step.seconds[0]) * next()
       moves.push({ kind: 'stand', seconds })
       if (step.say !== undefined) actor.say = { glyph: step.say, until: time + seconds }
     }
-    moves.push({ kind: 'stand', seconds: SETTLE_SECONDS })
+    moves.push({ kind: 'stand', seconds: motion.settleSeconds })
     return moves
   }
 
   const plan = (actor: Actor, time: number): void => {
     if (actor.steps.length === 0) {
-      actor.activity = pickActivity(activities, next())
-      actor.steps = [...activities.activities[actor.activity].steps]
+      actor.activity = pickActivity(config.activities, next())
+      actor.steps = [...config.activities[actor.activity].steps]
       let friend = Math.floor(next() * (actors.length - 1))
       if (friend >= actors.indexOf(actor)) friend++
       actor.friend = actors.length > 1 ? friend : 0
@@ -234,7 +219,8 @@ export function createWorld (options: WorldOptions): World {
 
   type Turns = ReturnType<typeof poseAt>['transforms']
   const springs = (actor: Actor, frame: GaitFrame, joints: Pose, transforms: Turns): void => {
-    const dt = 1 / (fps * SPRING_SUBSTEPS)
+    const substeps = motion.springSubsteps
+    const dt = 1 / (fps * substeps)
     for (const entry of actor.chains) {
       const root = entry.chain.limb.joints[0]
       const base = joints[root]
@@ -243,8 +229,8 @@ export function createWorld (options: WorldOptions): World {
         startChain(entry.chain, base, bodyFrame(frame.root.yaw, rotation), frameIndex / fps, () => [0, 0, 0])
         entry.started = true
       } else {
-        for (let s = 1; s <= SPRING_SUBSTEPS; s++) {
-          const u = s / SPRING_SUBSTEPS
+        for (let s = 1; s <= substeps; s++) {
+          const u = s / substeps
           const at = add(entry.base, scale(sub(base, entry.base), u))
           const yaw = entry.yaw + turnBetween(entry.yaw, frame.root.yaw) * u
           stepChain(entry.chain, at, bodyFrame(yaw, rotation), (frameIndex - 1 + u) / fps, dt)
@@ -263,11 +249,11 @@ export function createWorld (options: WorldOptions): World {
         actor.root = { ...frame.root, velocity: [0, 0, 0], angularVelocity: 0 }
         actor.plants = frame.feet.map(foot => ({ ankle: foot.ankle, yaw: foot.toeYaw }))
       }
-      actor.steps = [...activities.reactions.poke]
+      actor.steps = [...config.reactions.poke.steps]
       actor.activity = 'startled'
       actor.frames = []
       actor.next = 0
-      actor.say = { glyph: POKE_SAY, until: time + 1 }
+      actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
       plan(actor, time)
       actor.poked = undefined
     }
@@ -295,6 +281,7 @@ export function createWorld (options: WorldOptions): World {
 
   return {
     terrain,
+    lanes: (cast.length - 1) / 2 * config.lanes.spacing,
     poke: (index, fromX) => {
       const actor = actors[index]
       if (actor !== undefined) actor.poked = fromX

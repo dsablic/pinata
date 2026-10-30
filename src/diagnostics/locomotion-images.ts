@@ -1,0 +1,187 @@
+import type { Mannequin } from '../formats/mannequin.ts'
+import type { Rig } from '../formats/rig.ts'
+import type { Style } from '../formats/style.ts'
+import { createImage, setPixel } from '../image.ts'
+import type { Image } from '../image.ts'
+import type { Vec3 } from '../math/vec.ts'
+import { plantedRuns, solePoints } from '../motion/metrics.ts'
+import type { LocomotionRecording } from '../motion/metrics.ts'
+import { fitCamera } from '../raster/camera.ts'
+import type { Camera } from '../raster/camera.ts'
+import { rasterize } from '../raster/gbuffer.ts'
+import { stylize } from '../style/stylize.ts'
+import { disc, line } from './draw.ts'
+import { sheet } from './images.ts'
+
+export const LEFT_FOOT = 0x2c7bb6
+export const RIGHT_FOOT = 0xd7191c
+export const GROUND = 0x333333
+const PATH = 0x000000
+const BACKGROUND = 0xf7f7f7
+const LEFT_OLD = 0xc6dbef
+const RIGHT_OLD = 0xfcbba1
+const MARGIN_PX = 12
+const FOOT_RADIUS = 0.06
+const STRIP_MARGIN = 2
+
+type Geometry = { rig: Rig, mannequin: Mannequin }
+
+function blank (width: number, height: number): Image {
+  const img = createImage(width, height)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) setPixel(img, x, y, BACKGROUND)
+  }
+  return img
+}
+
+function mix (from: number, to: number, t: number): number {
+  const channel = (shift: number): number => {
+    const a = (from >> shift) & 0xff
+    const b = (to >> shift) & 0xff
+    return Math.round(a + (b - a) * t)
+  }
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0)
+}
+
+export type FootprintOptions = Geometry & { size: number }
+
+/** Top view, +x right and +z up: black root path, one disc per planted foot run (left blue, right red). */
+export function footprintTrace (recording: LocomotionRecording, options: FootprintOptions): Image {
+  const { size, rig, mannequin } = options
+  const runs = plantedRuns(recording, { rig, mannequin })
+  const centre = (side: string, start: number, end: number): [number, number] => {
+    const leg = rig.legs.find(l => l.side === side)!
+    let x = 0
+    let z = 0
+    let n = 0
+    for (let i = start; i <= end; i++) {
+      for (const p of solePoints(recording.frames[i].joints, leg, mannequin)) {
+        x += p[0]
+        z += p[2]
+        n++
+      }
+    }
+    return [x / n, z / n]
+  }
+  const plants = runs.map(run => ({ side: run.side, at: centre(run.side, run.start, run.end) }))
+  const points = [...recording.frames.map((f): [number, number] => [f.root.position[0], f.root.position[2]]),
+    ...plants.map(p => p.at)]
+  const xs = points.map(p => p[0])
+  const zs = points.map(p => p[1])
+  const pad = 0.3
+  const minX = Math.min(...xs) - pad
+  const minZ = Math.min(...zs) - pad
+  const span = Math.max(Math.max(...xs) + pad - minX, Math.max(...zs) + pad - minZ)
+  const scale = (size - 2 * MARGIN_PX) / span
+  const toPixel = (x: number, z: number): [number, number] => {
+    return [MARGIN_PX + (x - minX) * scale, size - MARGIN_PX - (z - minZ) * scale]
+  }
+  const img = blank(size, size)
+  const path = recording.frames.map(f => toPixel(f.root.position[0], f.root.position[2]))
+  for (let i = 1; i < path.length; i++) line(img, path[i - 1][0], path[i - 1][1], path[i][0], path[i][1], PATH)
+  const radius = Math.max(3, FOOT_RADIUS * scale)
+  for (const { side, at } of plants) {
+    const [px, py] = toPixel(at[0], at[1])
+    disc(img, px, py, radius, side === 'left' ? LEFT_FOOT : RIGHT_FOOT)
+  }
+  return img
+}
+
+export type OnionOptions = Geometry & {
+  width: number
+  height: number
+  from: number
+  to: number
+  every: number
+  axis: 'x' | 'z'
+}
+
+/** Side view in world space of hip-knee-ankle-toe lines every Nth frame from `from` to `to`, older frames lighter. */
+export function legOnionSkin (recording: LocomotionRecording, options: OnionOptions): Image {
+  const { width, height, rig } = options
+  const axis = options.axis === 'x' ? 0 : 2
+  const shown: number[] = []
+  for (let i = options.from; i < options.to; i += options.every) shown.push(i)
+  shown.push(options.to)
+  const chain = (i: number, side: string): Array<[number, number]> => {
+    const leg = rig.legs.find(l => l.side === side)!
+    const { joints } = recording.frames[i]
+    return [leg.hip, leg.knee, leg.ankle, leg.toe].map(name => [joints[name][axis], joints[name][1]])
+  }
+  const all = shown.flatMap(i => rig.legs.flatMap(l => chain(i, l.side)))
+  const minA = Math.min(...all.map(p => p[0]))
+  const maxA = Math.max(...all.map(p => p[0]))
+  const maxUp = Math.max(...all.map(p => p[1]))
+  const scale = Math.min((width - 2 * MARGIN_PX) / Math.max(maxA - minA, 1e-6), (height - 2 * MARGIN_PX) / maxUp)
+  const ground = height - MARGIN_PX
+  const toPixel = (p: [number, number]): [number, number] => {
+    return [width / 2 + (p[0] - (minA + maxA) / 2) * scale, ground - p[1] * scale]
+  }
+  const img = blank(width, height)
+  line(img, 0, ground, width - 1, ground, GROUND)
+  line(img, 0, ground + 1, width - 1, ground + 1, GROUND)
+  shown.forEach((index, order) => {
+    const t = shown.length === 1 ? 1 : order / (shown.length - 1)
+    for (const leg of rig.legs) {
+      const rgb = leg.side === 'left' ? mix(LEFT_OLD, LEFT_FOOT, t) : mix(RIGHT_OLD, RIGHT_FOOT, t)
+      const pixels = chain(index, leg.side).map(toPixel)
+      for (let k = 1; k < pixels.length; k++) {
+        line(img, pixels[k - 1][0], pixels[k - 1][1], pixels[k][0], pixels[k][1], rgb)
+        line(img, pixels[k - 1][0] + 1, pixels[k - 1][1], pixels[k][0] + 1, pixels[k][1], rgb)
+      }
+    }
+  })
+  return img
+}
+
+export type StripOptions = {
+  mannequin: Mannequin
+  style: Style
+  frames: number[]
+  azimuthDeg: number
+  elevationDeg: number
+  targetHeightPx: number
+  scale: number
+  gap: number
+}
+
+function merged (cameras: Camera[]): Camera {
+  const below = (c: Camera): number => c.height - c.baseline
+  const baseline = Math.max(...cameras.map(c => c.baseline))
+  return {
+    ...cameras[0],
+    width: Math.max(...cameras.map(c => c.width)),
+    height: baseline + Math.max(...cameras.map(below)),
+    baseline,
+    rayDistance: Math.max(...cameras.map(c => c.rayDistance))
+  }
+}
+
+/**
+ * The chosen frames rendered with the P1 pipeline and laid side by side. One camera serves every cell, centred on
+ * the root's horizontal position at the middle frame, so the character moves across the strip.
+ */
+export function pixelStrip (recording: LocomotionRecording, options: StripOptions): Image {
+  const { mannequin, style, frames } = options
+  const middle = recording.frames[frames[Math.floor(frames.length / 2)]].root.position
+  const origin: Vec3 = [middle[0], 0, middle[2]]
+  const posed = frames.map((i): Mannequin => {
+    const joints = { ...mannequin.joints }
+    for (const [name, p] of Object.entries(recording.frames[i].joints)) {
+      joints[name] = [p[0] - origin[0], p[1], p[2] - origin[2]]
+    }
+    return { ...mannequin, joints }
+  })
+  const fit = {
+    azimuthDeg: options.azimuthDeg,
+    elevationDeg: options.elevationDeg,
+    targetHeightPx: options.targetHeightPx,
+    margin: STRIP_MARGIN
+  }
+  const camera = merged(posed.map(m => fitCamera(m, fit)))
+  const cells = posed.map(m => {
+    const { image } = stylize(rasterize(m, camera), m, camera, style)
+    return { image, anchor: [0, 0] as [number, number] }
+  })
+  return sheet([cells], { scale: options.scale, gap: options.gap, background: BACKGROUND })
+}

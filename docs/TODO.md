@@ -11,9 +11,10 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
   N-segment IK, gait and pose for any limbs, appendage dynamics (spring and oscillator), balance and appendage gates,
   `npm run new`, the beetle, spider and horse examples (lineup in [`docs/assets/lineup.png`](assets/lineup.png)) and
   the authoring guide. Existing outputs are byte-identical (only wall-clock timing in `metrics.json` differs).
-- **Waiting on you:** (1) confirm the balance gate applies only to rigs with more than four legs (the plan said 3+,
-  but the dog example fails it; see "Decisions during batch C" in the plan); (2) the unicorn piñata package is not on
-  this machine, so moving it into `examples/` is still open.
+- The balance gate applies to rigs with more than four legs (confirmed; even leg counts for now).
+- Direction (user, 2026-10-30): a character is an image plus any number of points; the engine animates the points and
+  the image follows by a 2D mesh warp; templates are starting points to refine, never limits. Draft plan:
+  [image and points](plans/2026-10-30-image-points.md), waiting for review.
 - Specs written, not started: live runtime spike P8 ([spec](plans/2026-10-30-runtime-spike.md)) and composable
   behaviours ([spec](plans/2026-10-30-composable-behaviours.md)).
 - Provisional logo: a hanging unicorn piñata, seamless loop, in [`docs/assets/`](assets). It was rendered by a

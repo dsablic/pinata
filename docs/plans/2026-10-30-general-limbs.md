@@ -54,7 +54,7 @@ rig, style, materials, motion) that passes `check`.
 | Starter packages pass `check` | all four templates | new test per template |
 | New examples pass `check` | `examples/beetle` (hexapod, 3-segment legs), `examples/spider` (octopod), `examples/horse` (quadruped, 3-segment digitigrade legs, tail and ears as appendages) | examples |
 | N-segment IK | segment lengths preserved within 1e-9; end reaches reachable targets within 1e-4 m; joint limits respected | unit tests |
-| `unbalancedFrames` | 0 for characters with more than four legs (was 3+; see "Decisions during batch C"): frames where the centre of the body (pelvis-group centroid projected on the ground) lies outside the convex hull of the planted feet by more than 2 cm | new locomotion gate |
+| `unbalancedFrames` | 0 for characters with more than four legs (was 3+; changed and confirmed, see "Decisions during batch C"): frames where the centre of the body (pelvis-group centroid projected on the ground) lies outside the convex hull of the planted feet by more than 2 cm | new locomotion gate |
 | `appendageBoneLengthError` | <= 0.01 | new gate |
 | `appendageNonFinite` | 0 | new gate |
 | Existing locomotion gates | pass on every new example (slide, knee speed generalised to every bending joint, ground, reach, alternation in phase order, support) | examples |
@@ -117,7 +117,7 @@ rig, style, materials, motion) that passes `check`.
   has the body centre up to 5 cm outside the support triangle in 25 frames even with a volume-weighted centre (88 mm
   and 107 frames with a plain joint mean, which the head and ears pull forward). A four-legged walk balances
   dynamically, so `unbalancedFrames` is gated for **more than four legs** only; bipeds and quadrupeds show no line.
-  Needs the user's confirmation.
+  Confirmed by the user (2026-10-30): bodies keep even leg counts for now.
 - Body centre: volume-weighted centroid of the parts whose joints are all pelvis or upperBody joints (each part at its
   midpoint), falling back to the mean of those joints when no part qualifies. Support: the convex hull of sole points
   within 2 cm of the ground in that frame; frames without support are left to `unsupportedFrames`.

@@ -1,5 +1,5 @@
 import type { Mannequin } from '../formats/mannequin.ts'
-import type { Rig } from '../formats/rig.ts'
+import type { Leg, Rig } from '../formats/rig.ts'
 import type { Style } from '../formats/style.ts'
 import { createImage, setPixel } from '../image.ts'
 import type { Image } from '../image.ts'
@@ -50,7 +50,7 @@ type Footprint = { side: string, heel: [number, number], toe: [number, number] }
 function footprints (recording: LocomotionRecording, options: Geometry): Footprint[] {
   const { rig, mannequin } = options
   return plantedRuns(recording, { rig, mannequin }).map(run => {
-    const leg = rig.legs.find(l => l.side === run.side)!
+    const leg = rig.legs[run.leg]
     const sums = [[0, 0], [0, 0]]
     for (let i = run.start; i <= run.end; i++) {
       solePoints(recording.frames[i].joints, leg, mannequin).forEach((p, k) => {
@@ -114,14 +114,13 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
   const shown: number[] = []
   for (let i = options.from; i < options.to; i += options.every) shown.push(i)
   shown.push(options.to)
-  const chain = (i: number, side: string): Array<[number, number]> => {
-    const leg = rig.legs.find(l => l.side === side)!
+  const chain = (i: number, leg: Leg): Array<[number, number]> => {
     const { joints } = recording.frames[i]
     const joint = (name: string): [number, number] => [joints[name][axis], joints[name][1]]
     const soles = solePoints(joints, leg, options.mannequin).map((p): [number, number] => [p[axis], p[1]])
     return [joint(leg.hip), joint(leg.knee), joint(leg.ankle), ...soles]
   }
-  const all = shown.flatMap(i => rig.legs.flatMap(l => chain(i, l.side)))
+  const all = shown.flatMap(i => rig.legs.flatMap(l => chain(i, l)))
   const minA = Math.min(...all.map(p => p[0]))
   const maxA = Math.max(...all.map(p => p[0]))
   const maxUp = Math.max(...all.map(p => p[1]))
@@ -137,7 +136,7 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
     const t = shown.length === 1 ? 1 : order / (shown.length - 1)
     for (const leg of rig.legs) {
       const rgb = leg.side === 'left' ? mix(LEFT_OLD, LEFT_FOOT, t) : mix(RIGHT_OLD, RIGHT_FOOT, t)
-      const pixels = chain(index, leg.side).map(toPixel)
+      const pixels = chain(index, leg).map(toPixel)
       for (let k = 1; k < pixels.length; k++) {
         line(img, pixels[k - 1][0], pixels[k - 1][1], pixels[k][0], pixels[k][1], rgb)
         line(img, pixels[k - 1][0] + 1, pixels[k - 1][1], pixels[k][0] + 1, pixels[k][1], rgb)

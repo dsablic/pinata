@@ -2,15 +2,66 @@
   "database": "CMU Graphics Lab Motion Capture Database, http://mocap.cs.cmu.edu",
   "fps": 24,
   "sourceFps": 120,
-  "drop": ["lfingers", "rfingers", "lthumb", "rthumb"],
+  "drop": [
+    "lfingers",
+    "rfingers",
+    "lthumb",
+    "rthumb"
+  ],
   "takes": [
-    { "name": "walk", "subject": "16", "trial": "15", "description": "walk" },
-    { "name": "walk-2", "subject": "16", "trial": "16", "description": "walk" },
-    { "name": "walk-stop", "subject": "16", "trial": "33", "description": "slow walk, stop" },
-    { "name": "walk-turn-left", "subject": "16", "trial": "17", "description": "walk, 90-degree left turn" },
-    { "name": "walk-turn-right", "subject": "16", "trial": "19", "description": "walk, 90-degree right turn" },
-    { "name": "run", "subject": "16", "trial": "35", "description": "run/jog" },
-    { "name": "run-stop", "subject": "16", "trial": "57", "description": "run/jog, sudden stop" },
-    { "name": "turn-in-place", "subject": "69", "trial": "16", "description": "turn in place" }
+    {
+      "name": "walk-start",
+      "subject": "16",
+      "trial": "31",
+      "description": "walk (starting from standing)"
+    },
+    {
+      "name": "walk",
+      "subject": "16",
+      "trial": "15",
+      "description": "walk"
+    },
+    {
+      "name": "walk-2",
+      "subject": "16",
+      "trial": "16",
+      "description": "walk"
+    },
+    {
+      "name": "walk-stop",
+      "subject": "16",
+      "trial": "33",
+      "description": "slow walk, stop"
+    },
+    {
+      "name": "walk-turn-left",
+      "subject": "16",
+      "trial": "17",
+      "description": "walk, 90-degree left turn"
+    },
+    {
+      "name": "walk-turn-right",
+      "subject": "16",
+      "trial": "19",
+      "description": "walk, 90-degree right turn"
+    },
+    {
+      "name": "run",
+      "subject": "16",
+      "trial": "35",
+      "description": "run/jog"
+    },
+    {
+      "name": "run-stop",
+      "subject": "16",
+      "trial": "57",
+      "description": "run/jog, sudden stop"
+    },
+    {
+      "name": "turn-in-place",
+      "subject": "69",
+      "trial": "16",
+      "description": "turn in place"
+    }
   ]
 }

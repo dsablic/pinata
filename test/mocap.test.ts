@@ -112,10 +112,7 @@ for (const name of HUMANOIDS) {
     assert.ok(boneLengthError(recording, { rig, mannequin }, rest) <= LENGTH_TOLERANCE)
   })
 
-  // The knight's right leg is 1.3 cm longer than its left and modelled stepping forward, so one vertical placement
-  // cannot put both feet down; foot locking (batch B) does.
-  const todo = name === 'knight' ? 'both feet down needs foot locking (motion-data plan, batch B)' : undefined
-  test(`${name}: standing at the end of a stop keeps both feet within 2 cm of the ground`, { todo }, () => {
+  test(`${name}: standing at the end of a stop keeps both feet within 2 cm of the ground`, () => {
     const frames = retargetClip(clip('walk-stop'), options)
     const last = retargetedRecording(frames, options).frames[frames.length - 1]
     for (const leg of legsOf(rig)) {

@@ -85,3 +85,25 @@ characters on the same clip never move in lockstep.
   placement cannot put both down; the test is a todo until foot locking (batch B). Before IK, foot slide on the walk
   is 2.0 to 3.7 px, also for batch B. Remaining in A: character style, the strip render command, the early judge
   panel, review.
+- **2026-10-30, plan change (user agreed):** character style moved into batch B, and the early judge panel replaced
+  by one panel at the end of B on finished playback.
+- **2026-10-30, batch B built.** Style (`src/mocap/style.ts`), retargeting split into rotations and assembly so
+  blending works on rotations, a motion database per character with matching features (`src/mocap/database.ts`), and
+  the player (`src/mocap/player.ts`): a light physical body (speed and heading gains, wind drag, shoves), motion
+  matching every 5 frames with inertialized switches, root motion stretched to the body and drawn toward it, sole
+  points held where they touch, feet on the terrain (tilted on ramps, lifted over stair edges ahead), the pelvis
+  following the feet and kept within every held leg's range, feet in the air kept in range without moving across
+  the ground, and two-bone IK. A ninth take (CMU 16_31, a walk starting from standing) was added, as no take started
+  from rest. Gates, as tests (`test/mocap-playback.test.ts`): on generated terrain (stairs at 0.3 of the shortest
+  leg), each humanoid walking, stopping and turning for 60 s on two seeds keeps slide 0 px, penetration 0 px, reach
+  violations 0, knee limits 0, bone lengths exact (also checked by hand on ten more seeds: all pass); a 4 m/s headwind
+  slows the walk by more than 10%; a shove moves the body more than 0.1 m; the neutral style changes nothing and two
+  styles differ by more than 5 degrees RMS on the styled joints. The body's height between the feet is now a soft
+  minimum, so it does not jump as the weight passes between them, which also puts both of the knight's feet within
+  2 cm when standing: that test passes (it was a todo). Existing outputs byte-identical.
+- **Fail, recorded: transitions.** At 34% to 56% of switches some joint moves more than 3 times its median per-frame
+  movement of the surrounding second. The gate is mis-specified: ordinary frames with no switch fail it at 32% to
+  48%, because feet landing and lifting make movement lumpy and the gate takes the worst of 30-odd joints. Proposed
+  replacement, for the user to approve (it is a different measure, not a tightening): switch frames are no lumpier
+  than ordinary ones, the share over 3 times at switches at most the share at ordinary frames plus 5 points. Today
+  that passes for the knight and wizard and fails for the rogue and dwarf by 7 to 13 points.

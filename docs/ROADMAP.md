@@ -1,6 +1,6 @@
 # Piñata Roadmap
 
-This roadmap turns the proof-of-concept results into a plan for building the tool. Every proof's plan, gates,
+This roadmap turns the proof-of-concept results into a plan for building the tool. The results are summarised in [`docs/FINDINGS.md`](FINDINGS.md). Every proof's plan, gates,
 findings and judge artefacts are in [`docs/plans/`](plans).
 
 ## What the proofs showed

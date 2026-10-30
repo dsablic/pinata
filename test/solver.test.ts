@@ -145,3 +145,23 @@ test('pinned particles follow a moving root', () => {
     assertClose(anchorWorld(body, 'top', root)[1], 2, 1e-9)
   }
 })
+
+function freeParticle (mass: number, material: Partial<SimMaterial>): System {
+  const system = chain(1, [0, 1, 0], { ...rope, particleMass: mass, ...material })
+  system.pins.length = 0
+  system.particles.inverseMass[0] = 1 / mass
+  system.constraints.length = 0
+  system.particles.position.set([2, 5, 0, 3, 5, 0])
+  system.particles.previous.set(system.particles.position)
+  return system
+}
+
+test('drag on a very light particle stays stable and approaches the wind speed', () => {
+  const system = freeParticle(0.001, { damping: 0, drag: 1 })
+  const wind: Wind = { direction: [1, 0, 0], speed: 5, gust: 0 }
+  run(system, { wind, gravity: [0, 0, 0] }, 1)
+  const p = system.particles
+  const speed = Math.hypot(p.position[0] - p.previous[0], p.position[1] - p.previous[1]) / DT
+  assert.ok(Number.isFinite(speed))
+  assertClose(speed, 5, 0.1)
+})

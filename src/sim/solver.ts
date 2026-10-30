@@ -51,9 +51,9 @@ export function step (system: System, options: StepOptions): void {
     let vx = (position[o] - previous[o]) / dt
     let vy = (position[o + 1] - previous[o + 1]) / dt
     let vz = (position[o + 2] - previous[o + 2]) / dt
-    vx += (gx + k * (wind[0] - vx)) * dt
-    vy += (gy + k * (wind[1] - vy)) * dt
-    vz += (gz + k * (wind[2] - vz)) * dt
+    vx = (vx + gx * dt + k * dt * wind[0]) / (1 + k * dt)
+    vy = (vy + gy * dt + k * dt * wind[1]) / (1 + k * dt)
+    vz = (vz + gz * dt + k * dt * wind[2]) / (1 + k * dt)
     previous[o] = position[o]
     previous[o + 1] = position[o + 1]
     previous[o + 2] = position[o + 2]

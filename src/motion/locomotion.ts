@@ -1,4 +1,5 @@
 import type { Mannequin } from '../formats/mannequin.ts'
+import { legBend } from '../formats/rig.ts'
 import type { Rig } from '../formats/rig.ts'
 import { add, length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -9,6 +10,7 @@ import type { Pose } from './pose.ts'
 type Options = { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequin }
 
 const FORWARD: Vec3 = [0, 0, 1]
+const BACKWARD: Vec3 = [0, 0, -1]
 const MAX_TOE_PITCH = 20 * Math.PI / 180
 
 function toLocal (world: Vec3, frame: GaitFrame): Vec3 {
@@ -42,16 +44,16 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
   const shift = (name: string): Vec3 => add(rest[name], frame.pelvisOffset)
   for (const name of [rig.pelvis, ...rig.upperBody]) pose[name] = shift(name)
   let clamped = 0
-  for (const leg of rig.legs) {
-    const foot = frame.feet.find(f => f.side === leg.side)
-    if (foot === undefined) throw new Error(`gait frame has no ${leg.side} foot`)
+  for (const [index, leg] of rig.legs.entries()) {
+    const foot = frame.feet[index]
+    if (foot === undefined) throw new Error(`gait frame has no foot for leg ${index}`)
     const hip = shift(leg.hip)
     const result = twoBoneIk({
       hip,
       target: toLocal(foot.ankle, frame),
       upper: length(sub(rest[leg.knee], rest[leg.hip])),
       lower: length(sub(rest[leg.ankle], rest[leg.knee])),
-      pole: FORWARD
+      pole: legBend(leg) === 'backward' ? BACKWARD : FORWARD
     })
     if (result.clamped) clamped++
     const flat = sub(rest[leg.toe], rest[leg.ankle])

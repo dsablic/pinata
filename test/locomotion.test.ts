@@ -10,7 +10,9 @@ import { toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
-import { mannequin, rig, straightMannequin, turnTrack, walkTrack } from './locomotion-fixtures.ts'
+import {
+  mannequin, quadMannequin, quadRig, rig, straightMannequin, turnTrack, walkTrack
+} from './locomotion-fixtures.ts'
 
 const rest = restPose(mannequin)
 
@@ -135,4 +137,38 @@ test('knees stay at least 25 degrees bent while stepping around in place', () =>
     return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
   })
   assert.ok(Math.min(...flexions) >= 25, `knee reached ${Math.min(...flexions)} degrees`)
+})
+
+test('each leg bends toward its own side: forward legs and backward legs of a quadruped', () => {
+  const quadRest = restPose(quadMannequin)
+  const gait = planGait({
+    track: walkTrack(0.9, 4), rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 6, fps: 24
+  })
+  let bent = 0
+  for (const frame of gait) {
+    const { pose, clamped } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
+    assert.equal(clamped, 0)
+    for (const leg of quadRig.legs) {
+      const forward: Vec3 = leg.bend === 'backward' ? [0, 0, -1] : [0, 0, 1]
+      assert.equal(kneeBendsBackward(pose[leg.hip], pose[leg.knee], pose[leg.ankle], forward), false)
+      const chord = sub(pose[leg.ankle], pose[leg.hip])
+      const offset = sub(pose[leg.knee], pose[leg.hip])
+      const along = (chord[0] * offset[0] + chord[1] * offset[1] + chord[2] * offset[2]) / length(chord) ** 2
+      const side = offset[2] - chord[2] * along
+      if (Math.abs(side) > 0.01) bent++
+      assert.ok(leg.bend === 'backward' ? side < 1e-9 : side > -1e-9)
+    }
+  }
+  assert.ok(bent > 100)
+})
+
+test('four feet are assigned to the legs by index, not by side', () => {
+  const quadRest = restPose(quadMannequin)
+  const [frame] = planGait({
+    track: walkTrack(0, 0), rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 1, fps: 24
+  })
+  const { pose } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
+  for (const leg of quadRig.legs) {
+    for (let k = 0; k < 3; k++) assertClose(pose[leg.ankle][k], quadRest[leg.ankle][k], 1e-6)
+  }
 })

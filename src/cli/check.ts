@@ -8,7 +8,7 @@ import { writeOutput } from '../diagnostics/report.ts'
 import { clothChecks, hasCloth } from './cloth.ts'
 import { locomotionChecks, locomotionRecording } from './locomotion.ts'
 import { contactSheet, renderStatic, staticChecks } from './static.ts'
-import { clothOnionSkin, footprints, walkStrip } from './stills.ts'
+import { clothOnionSkin, footprints, walkStrip, withSettledCloth } from './stills.ts'
 import { formatSummary, runChecks } from './summary.ts'
 import type { Check } from './summary.ts'
 
@@ -64,14 +64,15 @@ function clearReport (out: string): void {
 function analyse (character: Character, out: string): number {
   const started = performance.now()
   const frames = renderStatic(character.mannequin, character.style)
-  writeOutput(join(out, 'sheet.png'), encodePng(contactSheet(frames)))
   const run = simulateCharacter({
     mannequin: character.mannequin, rig: character.rig, scenario: character.scenario, materials: character.materials
   })
   const recording = locomotionRecording(character, run)
-  writeOutput(join(out, 'walk.png'), encodePng(walkStrip(character, recording)))
-  writeOutput(join(out, 'footprints.png'), encodePng(footprints(character, recording)))
   const cloth = hasCloth(character)
+  const shown = cloth ? renderStatic(withSettledCloth(character, recording, run.recording), character.style) : frames
+  writeOutput(join(out, 'sheet.png'), encodePng(contactSheet(shown)))
+  writeOutput(join(out, 'walk.png'), encodePng(walkStrip(character, recording, cloth ? run.recording : undefined)))
+  writeOutput(join(out, 'footprints.png'), encodePng(footprints(character, recording)))
   if (cloth) writeOutput(join(out, 'cloth.png'), encodePng(clothOnionSkin(character, recording, run.recording)))
   const checks: Check[] = [
     ...staticChecks(character.mannequin, character.style, frames),

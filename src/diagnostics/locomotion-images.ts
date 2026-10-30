@@ -6,6 +6,9 @@ import type { Image } from '../image.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { plantedRuns, solePoints } from '../motion/metrics.ts'
 import type { LocomotionRecording } from '../motion/metrics.ts'
+import type { RootState } from '../motion/script.ts'
+import { withClothParts } from '../sim/render.ts'
+import type { ClothParts } from '../sim/render.ts'
 import { fitCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { rasterize } from '../raster/gbuffer.ts'
@@ -148,6 +151,7 @@ export function legOnionSkin (recording: LocomotionRecording, options: OnionOpti
 
 export type StripOptions = {
   mannequin: Mannequin
+  cloth?: (frame: number, origin: RootState) => ClothParts
   style: Style
   frames: number[]
   azimuthDeg: number
@@ -177,12 +181,14 @@ export function pixelStrip (recording: LocomotionRecording, options: StripOption
   const { mannequin, style, frames } = options
   const middle = recording.frames[frames[Math.floor(frames.length / 2)]].root.position
   const origin: Vec3 = [middle[0], 0, middle[2]]
+  const view: RootState = { position: origin, yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 }
   const posed = frames.map((i): Mannequin => {
     const joints = { ...mannequin.joints }
     for (const [name, p] of Object.entries(recording.frames[i].joints)) {
       joints[name] = [p[0] - origin[0], p[1], p[2] - origin[2]]
     }
-    return { ...mannequin, joints }
+    const body = { ...mannequin, joints }
+    return options.cloth === undefined ? body : withClothParts(body, options.cloth(i, view))
   })
   const fit = {
     azimuthDeg: options.azimuthDeg,

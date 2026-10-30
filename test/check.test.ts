@@ -101,6 +101,22 @@ test('a character without cloth skips the cloth gates and the cloth still', () =
   assert.ok(!existsSync(join(run.out, 'cloth.png')))
 })
 
+test('a cape with a render entry is drawn into sheet.png and walk.png without changing any gate', () => {
+  const plain = check(ok)
+  const drawn = check(variant(d => {
+    patch(d, 'motion.json', j => { j.cape.render = { material: 'tunic', radius: 0.02 } })
+  }))
+  assert.equal(drawn.status, 0, drawn.stdout + drawn.stderr)
+  for (const file of ['sheet.png', 'walk.png']) {
+    assert.notDeepEqual(readFileSync(join(drawn.out, file)), readFileSync(join(plain.out, file)), file)
+  }
+  for (const file of ['footprints.png', 'cloth.png']) {
+    assert.deepEqual(readFileSync(join(drawn.out, file)), readFileSync(join(plain.out, file)), file)
+  }
+  const gates = (run: Run): unknown => JSON.parse(readFileSync(join(run.out, 'metrics.json'), 'utf8')).gates
+  assert.deepEqual(gates(drawn), gates(plain))
+})
+
 const OUTPUTS = ['sheet.png', 'walk.png', 'footprints.png', 'cloth.png', 'metrics.json']
 
 test('an exit 2 run leaves no report files from an earlier run', () => {

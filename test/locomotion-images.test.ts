@@ -146,6 +146,43 @@ test('pixelStrip lays frames side by side with a fixed camera so the character m
   assert.ok(centres[0] < centres[1] && centres[1] < centres[2] && centres[2] < centres[3], centres.join(','))
 })
 
+test('pixelStrip draws the cloth parts of every frame beside the body, placed in the strip like the body', () => {
+  const frames: LocomotionFrame[] = [0, 1].map(i => ({
+    time: i / 24,
+    root: { position: [0, 0, i * 0.3], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 },
+    joints: pose(i * 0.3, 0, 0, i * 0.3, i * 0.3),
+    clamped: 0,
+    planted: { left: true, right: true }
+  }))
+  const options = {
+    mannequin, style, frames: [0, 1], azimuthDeg: 270, elevationDeg: 0, targetHeightPx: 48, scale: 1, gap: 2
+  }
+  const plain = pixelStrip({ fps: 24, frames }, options)
+  const seen: number[] = []
+  const cloth = (frame: number, origin: { position: number[] }) => {
+    seen.push(frame)
+    const z = frames[frame].root.position[2] - origin.position[2]
+    return {
+      joints: { 'c.0': [0, 1.2, z - 0.3], 'c.1': [0, 0.6, z - 0.3] } as Record<string, [number, number, number]>,
+      parts: [{
+        name: 'c.0-1', shape: 'capsule' as const, a: 'c.0', b: 'c.1', radiusA: 0.05, radiusB: 0.05, material: 'm',
+        allowThin: true
+      }]
+    }
+  }
+  const drawn = pixelStrip({ fps: 24, frames }, { ...options, cloth })
+  const count = (img: Image): number => {
+    const background = getPixel(img, 0, 0)
+    let n = 0
+    for (let y = 0; y < img.height; y++) {
+      for (let x = 0; x < img.width; x++) if (getPixel(img, x, y) !== background) n++
+    }
+    return n
+  }
+  assert.deepEqual(seen, [0, 1])
+  assert.ok(count(drawn) > count(plain))
+})
+
 function footprintRecording (yawRate: number): LocomotionRecording {
   const frames: LocomotionFrame[] = []
   for (let i = 0; i < 40; i++) {

@@ -4,7 +4,9 @@ import type { Image } from '../image.ts'
 import type { LocomotionRecording } from '../motion/metrics.ts'
 import { bodyFrameOnionSkin } from '../diagnostics/motion-images.ts'
 import { footprintTrace, pixelStrip } from '../diagnostics/locomotion-images.ts'
+import type { Mannequin } from '../formats/mannequin.ts'
 import type { Recording } from '../sim/metrics.ts'
+import { clothParts, withClothParts } from '../sim/render.ts'
 import { walkingWindows } from './locomotion.ts'
 
 const FOOTPRINT_SIZE = 384
@@ -20,7 +22,22 @@ function steadyRange (character: Character, recording: LocomotionRecording): { f
   return { first: clamp(Math.round(window.start * fps)), last: clamp(Math.round(window.end * fps)) }
 }
 
-export function walkStrip (character: Character, recording: LocomotionRecording): Image {
+/**
+ * The body with the rendered cloth strands of the middle frame of the first steady walk, in body-local space, for
+ * the static views: the cloth has settled into the walk there and hangs where it does while the character moves.
+ */
+export function withSettledCloth (
+  character: Character,
+  locomotion: LocomotionRecording,
+  cloth: Recording
+): Mannequin {
+  const { first, last } = steadyRange(character, locomotion)
+  const frame = Math.round((first + last) / 2)
+  const parts = clothParts(character.scenario, cloth.frames[frame].positions, locomotion.frames[frame].root)
+  return withClothParts(character.mannequin, parts)
+}
+
+export function walkStrip (character: Character, recording: LocomotionRecording, cloth?: Recording): Image {
   const { first, last } = steadyRange(character, recording)
   const [window] = walkingWindows(character)
   const cycle = stride(character.rig.gait, window.speed) / window.speed
@@ -30,6 +47,9 @@ export function walkStrip (character: Character, recording: LocomotionRecording)
   return pixelStrip(recording, {
     mannequin: character.mannequin,
     style: character.style,
+    cloth: cloth === undefined
+      ? undefined
+      : (frame, root) => clothParts(character.scenario, cloth.frames[frame].positions, root),
     frames: Array.from({ length: STRIP.frames }, (_, i) => start + i * step),
     azimuthDeg: 90,
     elevationDeg: STRIP.elevationDeg,

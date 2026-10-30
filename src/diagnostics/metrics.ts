@@ -48,27 +48,52 @@ export function paletteSize (images: Image[]): number {
   return colours.size
 }
 
+function isEdge (g: GBuffer, x: number, y: number, p: number, depth: number): boolean {
+  if (x < 0 || y < 0 || x >= g.width || y >= g.height) return true
+  const j = y * g.width + x
+  return g.part[j] === EMPTY || (g.part[j] !== p && g.depth[j] > depth)
+}
+
+function isThinPixel (g: GBuffer, x: number, y: number, p: number, depth: number): boolean {
+  const narrowAcross = isEdge(g, x - 1, y, p, depth) && isEdge(g, x + 1, y, p, depth)
+  const narrowDown = isEdge(g, x, y - 1, p, depth) && isEdge(g, x, y + 1, p, depth)
+  return narrowAcross || narrowDown
+}
+
 export function thinParts (g: GBuffer, m: Mannequin): ThinPart[] {
   const pixels = new Array<number>(m.parts.length).fill(0)
   const thin = new Array<number>(m.parts.length).fill(0)
-  const isEdge = (x: number, y: number, p: number, depth: number) => {
-    if (x < 0 || y < 0 || x >= g.width || y >= g.height) return true
-    const j = y * g.width + x
-    return g.part[j] === EMPTY || (g.part[j] !== p && g.depth[j] > depth)
-  }
   for (let y = 0; y < g.height; y++) {
     for (let x = 0; x < g.width; x++) {
-      const i = y * g.width + x
-      const p = g.part[i]
+      const p = g.part[y * g.width + x]
       if (p === EMPTY) continue
       pixels[p]++
-      const d = g.depth[i]
-      const narrowAcross = isEdge(x - 1, y, p, d) && isEdge(x + 1, y, p, d)
-      const narrowDown = isEdge(x, y - 1, p, d) && isEdge(x, y + 1, p, d)
-      if (narrowAcross || narrowDown) thin[p]++
+      if (isThinPixel(g, x, y, p, g.depth[y * g.width + x])) thin[p]++
     }
   }
   return m.parts
     .map((part, i) => ({ part: part.name, pixels: pixels[i], thinFraction: pixels[i] === 0 ? 0 : thin[i] / pixels[i] }))
     .filter((_, i) => m.parts[i].allowThin !== true)
+}
+
+/** Names of the parts that sit in front of the 1-px-wide pixels of `part`, most pixels first. */
+export function thinOccluders (g: GBuffer, m: Mannequin, part: string): string[] {
+  const target = m.parts.findIndex(p => p.name === part)
+  const counts = new Map<number, number>()
+  for (let y = 0; y < g.height; y++) {
+    for (let x = 0; x < g.width; x++) {
+      const i = y * g.width + x
+      if (g.part[i] !== target || !isThinPixel(g, x, y, target, g.depth[i])) continue
+      const front = new Set<number>()
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (x + dx < 0 || y + dy < 0 || x + dx >= g.width || y + dy >= g.height) continue
+          const j = (y + dy) * g.width + x + dx
+          if (g.part[j] !== EMPTY && g.part[j] !== target && g.depth[j] < g.depth[i]) front.add(g.part[j])
+        }
+      }
+      for (const q of front) counts.set(q, (counts.get(q) ?? 0) + 1)
+    }
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]).map(([q]) => m.parts[q].name)
 }

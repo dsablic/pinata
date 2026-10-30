@@ -1,4 +1,4 @@
-import { gate, P1_GATES } from '../../pocs/p1-static-style/gates.ts'
+import { gate, MIN_PIXELS_FOR_THIN, P1_GATES } from '../../pocs/p1-static-style/gates.ts'
 import { createImage } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
@@ -7,9 +7,9 @@ import { fitCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { EMPTY, rasterize } from '../raster/gbuffer.ts'
 import type { GBuffer } from '../raster/gbuffer.ts'
-import { stylize } from '../style/stylize.ts'
+import { borderingPart, stylize } from '../style/stylize.ts'
 import { sheet } from '../diagnostics/images.ts'
-import { outlineGaps, paletteSize, strayPixelIndices, thinParts } from '../diagnostics/metrics.ts'
+import { outlineGaps, paletteSize, strayPixelIndices, thinOccluders, thinParts } from '../diagnostics/metrics.ts'
 import type { ThinPart } from '../diagnostics/metrics.ts'
 import type { Check } from './summary.ts'
 
@@ -19,7 +19,6 @@ export const DIRECTIONS = 8
 const MARGIN = 4
 const SHEET_SCALE = 8
 const SHEET_BACKGROUND = 0xc8c8c8
-const MIN_PIXELS_FOR_THIN = 4
 const THIN_PIXELS = 2
 const SHOWN_THIN_PARTS = 3
 const SHOWN_STRAY_PARTS = 3
@@ -72,7 +71,7 @@ function dimensions (part: Part): { across: number, text: string } {
 }
 
 function metres (value: number): string {
-  return `${(Math.ceil(value * 100) / 100).toFixed(2)} m`
+  return `${(Math.ceil(value * 1000 - 1e-9) / 1000).toFixed(3)} m`
 }
 
 function directionName (direction: number): string {
@@ -83,35 +82,42 @@ function describe (f: StaticFrame): string {
   return `${f.size}px, elevation ${f.elevation}, direction ${f.direction} (${directionName(f.direction)})`
 }
 
+function quoted (names: string[]): string {
+  return names.map(n => `'${n}'`).join(' and ')
+}
+
+function thinPartHint (worst: FrameMetrics, mannequin: Mannequin, name: string, percent: string): string {
+  const { frame } = worst
+  const part = mannequin.parts.find(q => q.name === name) as Part
+  const { across, text } = dimensions(part)
+  const needed = THIN_PIXELS * mannequin.height / Math.min(...SIZES)
+  const lead = `'${name}' (${percent}% of its pixels are 1px wide; ${text})`
+  if (across < needed - 1e-9) {
+    return `${lead} is ${across.toFixed(3)} m across and needs at least ${metres(needed)} (${THIN_PIXELS} px at ` +
+      `${Math.min(...SIZES)} px): raise radiusA and radiusB ` +
+      '(or width and thickness), or set allowThin: true if it is meant to be a thin line such as a blade or a cord'
+  }
+  const front = thinOccluders(frame.gbuffer, mannequin, name).slice(0, SHOWN_THIN_PARTS)
+  const behind = front.length === 0 ? 'the parts in front of it' : quoted(front)
+  return `${lead} is wide enough (${across.toFixed(3)} m, needs ${metres(needed)}), but only a 1-px strip of it ` +
+    `shows past ${behind} in this view: show more of it (so 2 px or more stick out), hide it fully behind the part ` +
+    `in front (parts under ${MIN_PIXELS_FOR_THIN} visible pixels are ignored), or set allowThin: true`
+}
+
 function thinHint (worst: FrameMetrics, mannequin: Mannequin): string {
   const { frame } = worst
   const bad = worst.thin.filter(p => p.thinFraction > P1_GATES.maxThinFraction.threshold)
     .sort((a, b) => b.thinFraction - a.thinFraction).slice(0, SHOWN_THIN_PARTS)
-  const needed = THIN_PIXELS * mannequin.height / frame.size
-  const parts = bad.map(p => {
-    const part = mannequin.parts.find(q => q.name === p.part) as Part
-    const { across, text } = dimensions(part)
-    return `'${p.part}' (${(p.thinFraction * 100).toFixed(0)}% of its pixels are 1px wide, about ${metres(across)} ` +
-      `across; ${text})`
-  })
-  return `thin parts at ${describe(frame)}: ${parts.join('; ')}. At ${frame.size}px one pixel is ` +
-    `${(mannequin.height / frame.size).toFixed(3)} m, so make each at least ${metres(needed)} across ` +
-    '(raise radiusA and radiusB, or width and thickness), or set allowThin: true on the part if it is meant ' +
-    'to be a thin line such as a blade or a cord.'
+  const parts = bad.map(p => thinPartHint(worst, mannequin, p.part, (p.thinFraction * 100).toFixed(0)))
+  return `thin parts at ${describe(frame)}, where one pixel is ${(mannequin.height / frame.size).toFixed(3)} m: ` +
+    `${parts.join('; ')}.`
 }
 
 function ownerOf (frame: StaticFrame, index: number, mannequin: Mannequin): string {
-  const { width, height, part } = frame.gbuffer
+  const { width, part } = frame.gbuffer
   const x = index % width
-  const y = Math.floor(index / width)
-  for (const [dx, dy] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const nx = x + dx
-    const ny = y + dy
-    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue
-    const p = part[ny * width + nx]
-    if (p !== EMPTY) return mannequin.parts[p].name
-  }
-  return 'outline'
+  const own = part[index] !== EMPTY ? part[index] : borderingPart(frame.gbuffer, x, Math.floor(index / width))
+  return own === EMPTY ? 'outline' : mannequin.parts[own].name
 }
 
 function strayHint (worst: FrameMetrics, mannequin: Mannequin): string {
@@ -134,8 +140,8 @@ function paletteHint (mannequin: Mannequin, style: Style, count: number): string
   const ramps = [...uses].map(([name, n]) => `'${name}' (${style.materials[name]?.length ?? 0} colours, ${n} parts)`)
   const decals = new Set(mannequin.decals.flatMap(d => [...d.pattern.join('')]).filter(c => c !== '.')).size
   return `${count} distinct colours over all views. Parts use ${ramps.join(', ')}, plus the outline colour and ` +
-    `${decals} decal colours. Give parts the same material where the look allows it, drop an unused ramp colour from ` +
-    'style.json materials, or use fewer decal colours.'
+    `${decals} decal colours. Give parts the same material where the look allows it, use one fewer band in ` +
+    'style.json bands (removes one colour from every ramp), or use fewer decal colours.'
 }
 
 function worstBy (items: FrameMetrics[], value: (m: FrameMetrics) => number): FrameMetrics {

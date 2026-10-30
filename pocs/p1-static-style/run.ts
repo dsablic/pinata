@@ -18,7 +18,7 @@ import { encodePng } from '../../src/png/encode.ts'
 import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
 import { depthImage, normalImage, partImage, sheet } from '../../src/diagnostics/images.ts'
 import { evaluate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
-import { gate } from './gates.ts'
+import { gate, MIN_PIXELS_FOR_THIN } from './gates.ts'
 import { pngHeight, planAb } from './ab.ts'
 import type { AbPlan } from './ab.ts'
 import { previewHtml } from './preview.ts'
@@ -30,7 +30,6 @@ const DIRECTIONS = 8
 const MARGIN = 4
 const SHEET_SCALE = 8
 const SHEET_BACKGROUND = 0xc8c8c8
-const MIN_PIXELS_FOR_THIN = 4
 const CHILD_TIMEOUT_MS = 60000
 const FACING = [
   'front',

@@ -1,5 +1,7 @@
 import type { Gate } from '../../src/diagnostics/report.ts'
 
+export const MIN_PIXELS_FOR_THIN = 4
+
 export const P1_GATES = {
   outlineGaps: {
     op: '<=',

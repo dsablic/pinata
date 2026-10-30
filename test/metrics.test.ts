@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { outlineGaps, paletteSize, strayPixels, thinParts } from '../src/diagnostics/metrics.ts'
+import { outlineGaps, paletteSize, strayPixels, thinOccluders, thinParts } from '../src/diagnostics/metrics.ts'
 import { createImage, setPixel } from '../src/image.ts'
-import { EMPTY } from '../src/raster/gbuffer.ts'
+import { fitCamera } from '../src/raster/camera.ts'
+import { EMPTY, rasterize } from '../src/raster/gbuffer.ts'
 import type { GBuffer } from '../src/raster/gbuffer.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 
@@ -114,4 +115,27 @@ test('a part is not thin where nearer parts cover its sides, but is where farthe
   }
   assert.equal(thinParts(strip(0.5), m)[0].thinFraction, 0)
   assert.equal(thinParts(strip(2), m)[0].thinFraction, 1)
+})
+
+test('thinOccluders names the part in front of a wide part whose visible strip is one pixel', () => {
+  const capsule = (name: string, a: string, b: string, ra: number, rb: number) => {
+    return { name, shape: 'capsule' as const, a, b, radiusA: ra, radiusB: rb, material: 'm' }
+  }
+  const m: Mannequin = {
+    name: 't',
+    height: 1.2,
+    joints: { k: [0.08, 0.28, -0.03], a: [0.08, 0.06, 0], t: [0.08, 0.04, 0.12], top: [0, 1.1, 0], bot: [0, 0.8, 0] },
+    parts: [
+      capsule('foot', 'a', 't', 0.06, 0.04),
+      capsule('shin', 'k', 'a', 0.05, 0.05),
+      capsule('head', 'top', 'bot', 0.1, 0.1)
+    ],
+    decals: []
+  }
+  const camera = fitCamera(m, { azimuthDeg: 180, elevationDeg: 0, targetHeightPx: 32, margin: 4 })
+  const g = rasterize(m, camera)
+  const foot = thinParts(g, m).find(p => p.part === 'foot')
+  assert.ok((foot?.thinFraction ?? 0) > 0.25)
+  assert.deepEqual(thinOccluders(g, m, 'foot'), ['shin'])
+  assert.deepEqual(thinOccluders(g, m, 'head'), [])
 })

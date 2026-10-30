@@ -140,7 +140,7 @@ function drawDecals (image: Image, g: GBuffer, m: Mannequin, cam: Camera, style:
 
 const OFFSETS_4 = [[0, -1], [-1, 0], [1, 0], [0, 1]]
 
-function borderingPart (g: GBuffer, x: number, y: number): number {
+export function borderingPart (g: GBuffer, x: number, y: number): number {
   let best = EMPTY
   let bestDepth = Infinity
   for (const [dx, dy] of OFFSETS_4) {

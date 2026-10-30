@@ -53,6 +53,18 @@ export function parseAsf (text: string): AsfSkeleton {
   const angle = units.find(line => line.startsWith('angle'))?.split(/\s+/)[1] ?? 'deg'
   if (angle !== 'deg') throw new Error(`ASF angles in '${angle}' are not supported; expected deg`)
   const metresPerUnit = INCH / lengthUnit
+  const rootData = new Map((parts.get('root') ?? []).map(line => {
+    const [key, ...rest] = line.split(/\s+/)
+    return [key, rest.join(' ')]
+  }))
+  const expected: Array<[string, string]> = [['order', 'TX TY TZ RX RY RZ'], ['axis', 'XYZ'], ['orientation', '0 0 0']]
+  for (const [key, value] of expected) {
+    const found = rootData.get(key)
+    const normal = found?.split(/\s+/).map(v => key === 'orientation' ? String(Number(v)) : v).join(' ')
+    if (found !== undefined && normal !== value) {
+      throw new Error(`ASF root ${key} '${found}' is not supported; expected '${value}'`)
+    }
+  }
   const parents = new Map<string, string>()
   for (const line of parts.get('hierarchy') ?? []) {
     if (line === 'begin' || line === 'end') continue

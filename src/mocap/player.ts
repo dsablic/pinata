@@ -71,19 +71,22 @@ const RATE_RANGE: [number, number] = [0.8, 1.25]
 const SYNC = 0.12
 /** A sole point this close to the ground (metres) is held where it is. */
 const HOLD_HEIGHT = 0.025
+/** Least height of a swinging foot's ends above the ground, metres (real toes clear it by 1 to 3 cm). */
+const SWING_CLEARANCE = 0.03
 /** Ends that stay this close to the ground from one frame to the next are kept from moving across it. */
 const PIN_HEIGHT = 0.021
 /** Seconds over which a released foot rejoins its animation; a foot pulled off the ground steps over a longer time. */
-const RELEASE_SECONDS = 0.15
+const RELEASE_SECONDS = 0.25
 const STEP_SECONDS = 0.25
 /** A held foot further than this share of its leg's reach from its animation is pulled off and steps across. */
 const RELEASE_SHARE = 0.15
 /** Height of that step, as a share of the leg's reach. */
 const STEP_HEIGHT_SHARE = 0.15
 /** Seconds of the swing path ahead whose ground a swinging foot rises to clear. */
-const LOOKAHEAD_SECONDS = 0.1
-/** Fastest a swinging foot's ground reference sinks, m/s. */
+const LOOKAHEAD_SECONDS = 0.2
+/** Fastest a swinging foot's ground reference sinks and rises, m/s. */
 const SINK_SPEED = 1.2
+const RISE_SPEED = 1.5
 /** Time constant of the pelvis following the feet's ground, seconds. */
 const BASE_SECONDS = 0.12
 /** Most knee flexion the body allows before it rises, and that a foot in the air may reach, degrees (limit 150). */
@@ -128,6 +131,12 @@ function clamp (v: number, low: number, high: number): number {
 function fade (seconds: number): number {
   const u = clamp(seconds / BLEND_SECONDS, 0, 1)
   return (1 - u) ** 3
+}
+
+/** Height of a step through it, 0 to 1: up quickly off the ground, then down to touch with zero slope. */
+function stepLift (u: number): number {
+  const s = Math.sin(Math.PI * clamp(u, 0, 1))
+  return u < 0.5 ? Math.sqrt(s) : s * s
 }
 
 function sampleFrame (frames: BodyFrame[], t: number): BodyFrame {
@@ -349,7 +358,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
    * reference, then held ends kept where they touched down, ends that come within HOLD_HEIGHT of the ground held, and
    * the foot lifted to stand on the ground under both ends.
    */
-  const placeFoot = (k: number, animated: Vec3, local: Matrix): { ankle: Vec3, rotation: Matrix } => {
+  const placeFoot = (k: number, animated: Vec3, local: Matrix, contact: boolean): { ankle: Vec3, rotation: Matrix } => {
     const foot = feet[k]
     foot.prior = foot.last
     const turn = multiply(yawMatrix(root.yaw), local)
@@ -368,26 +377,29 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     if (held) {
       const end = foot.heel ?? foot.toe as Vec3
       foot.reference = ground(end[0], end[2])
-    } else if (highest >= foot.reference) foot.reference = highest
-    else foot.reference = Math.max(highest, foot.reference - SINK_SPEED * dt)
+    } else {
+      // rises toward the highest ground just ahead and sinks toward it, both at a limited speed (where the foot
+      // actually is, the ground is kept below it when it is placed)
+      const rising = Math.min(highest, foot.reference + RISE_SPEED * dt)
+      const sinking = Math.max(highest, foot.reference - SINK_SPEED * dt)
+      foot.reference = highest >= foot.reference ? rising : sinking
+    }
     const animatedAnkle: Vec3 = [world[0], foot.reference + height, world[2]]
     foot.target = { ankle: animatedAnkle, rotation }
     let ankle = animatedAnkle
     let turned = rotation
     let stepping = false
     if (foot.release !== undefined) {
-      const { offset, turn: offsetTurn, start, step } = foot.release
+      const { offset, turn: offsetTurn, start, step, from } = foot.release
       const u = clamp((frameCount - start) * dt / (step ? STEP_SECONDS : RELEASE_SECONDS), 0, 1)
       if (u >= 1) foot.release = undefined
-      else {
-        const w = step ? 1 - u * u * (3 - 2 * u) : 1 - u
-        const bump = step ? STEP_HEIGHT_SHARE * reach[k] * Math.sqrt(Math.sin(Math.PI * u)) : 0
-        ankle = add(ankle, [offset[0] * w, offset[1] * w + bump, offset[2] * w])
-        // a step clears the ground it left as well as the ground it goes to
-        if (step) ankle = [ankle[0], Math.max(ankle[1], foot.release.from + bump), ankle[2]]
-        turned = multiply(interpolate(IDENTITY, offsetTurn, w), rotation)
-        stepping = step
-      }
+      const w = 1 - u * u * (3 - 2 * u)
+      const bump = step ? STEP_HEIGHT_SHARE * reach[k] * stepLift(u) : 0
+      ankle = add(ankle, [offset[0] * w, offset[1] * w + bump, offset[2] * w])
+      // a step clears the ground it left as well as the ground it goes to, the first fading into the second
+      if (step) ankle = [ankle[0], Math.max(ankle[1], from * w + animatedAnkle[1] * (1 - w) + bump), ankle[2]]
+      turned = multiply(interpolate(IDENTITY, offsetTurn, w), rotation)
+      stepping = step && u < 1
     }
     // which ends touch, measured on the animated foot; a held end that drifted too far from it is let go
     const free = soles(ankle, turned, k)
@@ -396,8 +408,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       return end === undefined ? 0 : Math.hypot(end[0] - now[0], end[2] - now[2])
     }
     const pulled = Math.max(drift(foot.heel, free.heel), drift(foot.toe, free.toe)) > RELEASE_SHARE * reach[k]
-    const heelDown = !stepping && !pulled && above(free.heel) <= HOLD_HEIGHT
-    const toeDown = !stepping && !pulled && above(free.toe) <= HOLD_HEIGHT
+    // the clip says when a foot is on the ground; the height says which ends touch
+    const heelDown = contact && !stepping && !pulled && above(free.heel) <= HOLD_HEIGHT
+    const toeDown = contact && !stepping && !pulled && above(free.toe) <= HOLD_HEIGHT
     const wasHeld = foot.heel !== undefined || foot.toe !== undefined
     const before = foot.last === undefined ? undefined : soles(foot.last.ankle, foot.last.rotation, k)
     if (!heelDown) foot.heel = undefined
@@ -422,18 +435,20 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       ankle = foot.last.ankle
       final = foot.last.rotation
     }
-    // stand on the ground under both ends
+    // stand on the ground under both ends; a foot the clip swings keeps clear of it
+    const clearance = !contact && foot.heel === undefined && foot.toe === undefined ? SWING_CLEARANCE : 0
     const placed = soles(ankle, final, k)
-    const lift = Math.max(0, ground(placed.heel[0], placed.heel[2]) - placed.heel[1],
-      ground(placed.toe[0], placed.toe[2]) - placed.toe[1])
+    const lift = Math.max(0, clearance + ground(placed.heel[0], placed.heel[2]) - placed.heel[1],
+      clearance + ground(placed.toe[0], placed.toe[2]) - placed.toe[1])
     ankle = [ankle[0], ankle[1] + lift, ankle[2]]
     // an end that stays this close to the ground does not move across it, held or not
     if (before !== undefined && foot.last !== undefined) {
       const now = soles(ankle, final, k)
       const pinned = (['heel', 'toe'] as const)
         .filter(end => above(before[end]) <= PIN_HEIGHT && above(now[end]) <= PIN_HEIGHT)
-      if (pinned.length === 2) {
-        // both ends stay down: the whole foot stays as it was, across the ground
+      const otherHeld = pinned.length === 1 && (pinned[0] === 'heel' ? foot.toe : foot.heel) !== undefined
+      if (pinned.length === 2 || otherHeld) {
+        // both ends stay down, or one stays down while the other is held: the whole foot stays as it was
         final = foot.last.rotation
         ankle = [foot.last.ankle[0], ankle[1], foot.last.ankle[2]]
       } else if (pinned.length === 1) {
@@ -509,7 +524,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       const frame = playing()
       last = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
-      const targets = legs.map((leg, k) => placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY))
+      const targets = legs.map((leg, k) => {
+        return placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY, frame.contact[k] ?? true)
+      })
       // the pelvis follows the lower foot's ground
       const lowest = Math.min(...feet.map(f => f.reference))
       base += (lowest - base) * (1 - Math.exp(-dt / BASE_SECONDS))
@@ -517,17 +534,22 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       // FOLD_DEGREES; when two cannot both be kept, the one limiting reach steps off
       const isHeld = (k: number): boolean => feet[k].heel !== undefined || feet[k].toe !== undefined
       const hips = legs.map(leg => toWorldPoint(add(pose[leg.hip], [0, base, 0])))
-      const bounds = (k: number): { floor: number, ceiling: number } => {
+      /** How far the body may lower (ceiling) and must rise (floor) for a foot; a foot out of reach across the ground
+       * sets no ceiling (no height reaches it) and is marked. */
+      const bounds = (k: number): { floor: number, ceiling: number, out: boolean } => {
         const hip = hips[k]
         const ankle = targets[k].ankle
         const flat = Math.hypot(ankle[0] - hip[0], ankle[2] - hip[2])
         const gap = hip[1] - ankle[1]
         const span = REACH_SHARE * reach[k]
         return {
-          ceiling: flat < span ? Math.sqrt(span * span - flat * flat) - gap : -Infinity,
-          floor: flat < folded[k] ? Math.sqrt(folded[k] ** 2 - flat * flat) - gap : -Infinity
+          ceiling: flat < span ? Math.sqrt(span * span - flat * flat) - gap : Infinity,
+          floor: flat < folded[k] ? Math.sqrt(folded[k] ** 2 - flat * flat) - gap : -Infinity,
+          out: flat >= span
         }
       }
+      // a held foot no height can reach steps off
+      for (const k of legs.map((_, k) => k).filter(k => isHeld(k) && bounds(k).out)) stepOff(k)
       let floor = -Infinity
       let ceiling = Infinity
       for (let pass = 0; pass < legs.length; pass++) {
@@ -537,15 +559,16 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
         if (floor <= ceiling || held.length === 0) break
         const limiting = held.reduce((a, b) => bounds(b).ceiling < bounds(a).ceiling ? b : a)
         stepOff(limiting)
-        targets[limiting] = { ankle: targets[limiting].ankle, rotation: targets[limiting].rotation }
       }
       // feet in the air ask the body to rise where they would fold and lower where they could not reach, as far as
       // the held feet allow; the body lowers at once and rises gradually, and the held feet's range is kept every frame
       const air = legs.map((_, k) => k).filter(k => !isHeld(k)).map(bounds)
       const airFloor = Math.max(-Infinity, ...air.map(b => b.floor))
       const airCeiling = Math.min(Infinity, ...air.map(b => b.ceiling))
-      const wanted = clamp(Math.min(airCeiling, Math.max(airFloor, 0)), floor, ceiling)
+      const free = Math.min(airCeiling, Math.max(airFloor, 0))
+      const wanted = clamp(Number.isFinite(free) ? free : 0, Number.isFinite(floor) ? floor : -Infinity, ceiling)
       settle = wanted < settle ? wanted : settle + (wanted - settle) * (1 - Math.exp(-dt / BASE_SECONDS))
+      if (!Number.isFinite(settle)) settle = 0
       const drop = Math.min(ceiling, Math.max(floor, settle))
       // feet in the air keep their place across the ground and rise or sink to stay within the leg's range, never
       // into the ground

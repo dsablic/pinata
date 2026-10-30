@@ -102,8 +102,28 @@ characters on the same clip never move in lockstep.
   minimum, so it does not jump as the weight passes between them, which also puts both of the knight's feet within
   2 cm when standing: that test passes (it was a todo). Existing outputs byte-identical.
 - **Fail, recorded: transitions.** At 34% to 56% of switches some joint moves more than 3 times its median per-frame
-  movement of the surrounding second. The gate is mis-specified: ordinary frames with no switch fail it at 32% to
-  48%, because feet landing and lifting make movement lumpy and the gate takes the worst of 30-odd joints. Proposed
-  replacement, for the user to approve (it is a different measure, not a tightening): switch frames are no lumpier
-  than ordinary ones, the share over 3 times at switches at most the share at ordinary frames plus 5 points. Today
-  that passes for the knight and wizard and fails for the rogue and dwarf by 7 to 13 points.
+  movement of the surrounding second. Ordinary frames with no switch fail the same test at 32% to 48%: feet landing
+  and lifting make movement lumpy, and the gate takes the worst of 30-odd joints.
+- **2026-10-30, independent review of A and B** (assume the code is wrong). The math (quaternions, yaw conventions,
+  FK against the CMU convention, inertialization order) checked out. Fixed:
+  - **Critical:** a foot out of reach across the ground made the body's height minus infinity and then NaN for good
+    (a dwarf over its speed, or shoved hard). Out-of-reach feet now set no limit, held ones step off, and the height
+    is kept finite; a test pushes characters far past their legs and checks every joint is finite and the gates hold.
+  - A step ended with a one-frame vertical snap (its lift was still 71% up on its last frame): the lift now lands
+    with zero slope and the ground it left fades into the ground it goes to.
+  - Nearly every footfall was a synthetic step, because held feet were let go only when they drifted, not when the
+    clip lifted them: the player now reads the clips' contact flags (a foot is held only while its clip has it on
+    the ground), and a foot the clip swings keeps 3 cm clear of the ground (real toes clear it by 1 to 3 cm, under
+    the 2 cm the slide metric counts as touching). Lifts that follow the capture went from 0-20% to 75-88%.
+  - A swinging foot's ground reference jumped to the ground under its animation (ahead of the foot during a step); it
+    now rises and sinks at limited speeds, and a released foot's offsets fade smoothly over 0.25 s.
+  - A one-end pin moved a held end; a foot with one end held and the other staying down now stays as it was.
+  - The ASF reader refuses a root section it does not support instead of assuming the CMU one.
+  After the fixes the quality gates pass on 8 seeds per humanoid, and switches are about as lumpy as ordinary frames:
+  19% to 31% of switches over 3 times against 17% to 32% of ordinary frames. **Proposed replacement for the
+  transitions gate, for the user to approve** (a different measure, not a tightening): the share of switch frames
+  over 3 times is at most the share at ordinary frames plus 10 points.
+- **Fail, recorded: the judge panel, round 1** (before the review fixes). Mocap picked in 75% of the answers on real
+  pairs (gate 80%): the wizard, rogue and dwarf 6 of 6 each, the knight 0 of 6 (its mocap strip carries the sword
+  arm stiffly out in front; the procedural one swings it). Controls left unseparated by 75% of judges, left picks
+  56%. Two of the three judges gave identical answers, so the panel is less independent than three judges suggest.

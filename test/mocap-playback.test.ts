@@ -179,3 +179,27 @@ test('style: the neutral style changes nothing; two styles on one clip differ by
     assert.ok(rms >= 5, `${joint}: ${rms.toFixed(1)} degrees RMS`)
   }
 })
+
+test('pushed far past its legs, the body stays finite and the locomotion gates hold', () => {
+  const flat = { ground: () => 0 }
+  const finite = (run: Run): boolean => {
+    return run.world.frames.every(f => Object.values(f.joints).every(p => p.every(Number.isFinite)))
+  }
+  const cases: Array<[string, (frame: number) => Command, Parameters<typeof play>[4]]> = [
+    ['dwarf', () => ({ speed: 2.2, heading: EAST }), undefined],
+    ['dwarf', () => ({ speed: 0.5, heading: EAST }), (player, frame) => { if (frame === 30) player.push([4, 0, 0]) }],
+    ['dwarf', () => ({ speed: 0.5, heading: EAST }), player => { player.wind[0] = 10 }],
+    ['knight', () => ({ speed: 1.2, heading: EAST }), (player, frame) => { if (frame === 30) player.push([0, 0, 8]) }],
+    ['wizard', () => ({ speed: 1.2, heading: EAST }), player => { player.wind[0] = -6 }]
+  ]
+  for (const [name, steer, setup] of cases) {
+    const character = characters.get(name) as Character
+    const geometry = { rig: character.rig, mannequin: character.mannequin }
+    const run = play(name, flat, 6, steer, setup)
+    assert.ok(finite(run), `${name}: every joint finite`)
+    assert.ok(metrics.footSlidePx(run.relative, geometry, METRES_PER_PIXEL) <= 0.25, `${name}: slide`)
+    assert.ok(metrics.groundPenetrationPx(run.relative, geometry, METRES_PER_PIXEL) <= 0.5, `${name}: penetration`)
+    assert.equal(metrics.kneeLimitViolations(run.world, geometry), 0, `${name}: knees`)
+  }
+})
+

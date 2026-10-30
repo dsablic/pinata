@@ -154,7 +154,7 @@ function abPairs (): { pairs: AbPair[], key: Array<{ ref: string, ours: 'left' |
     return { ref, ours: side }
   })
   const pairs = key.map(({ ref, ours: side }) => {
-    const theirs = `../../refs/p1/${ref}`
+    const theirs = `../../refs/p1/${encodeURIComponent(ref)}`
     return side === 'left' ? { left: ours, right: theirs } : { left: theirs, right: ours }
   })
   return { pairs, key }

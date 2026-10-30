@@ -87,3 +87,7 @@ test('fitCamera starts rays outside every part', () => {
 test('fitCamera needs a margin of at least one pixel for the outline', () => {
   assert.throws(() => fitCamera(tPose, { ...fit, margin: 0, azimuthDeg: 0, elevationDeg: 0 }), RangeError)
 })
+
+test('fitCamera needs an integer margin', () => {
+  assert.throws(() => fitCamera(tPose, { ...fit, margin: 1.5, azimuthDeg: 0, elevationDeg: 0 }), RangeError)
+})

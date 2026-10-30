@@ -16,6 +16,7 @@ export type SheetCell = { image: Image, anchor: [number, number] }
 export function sheet (rows: SheetCell[][], options: SheetOptions): Image {
   const { scale, gap, background } = options
   const cells = rows.flat()
+  if (!cells.every(c => c.anchor.every(Number.isInteger))) throw new RangeError('anchor coordinates must be integers')
   const left = Math.max(...cells.map(c => c.anchor[0]))
   const above = Math.max(...cells.map(c => c.anchor[1]))
   const right = Math.max(...cells.map(c => c.image.width - c.anchor[0]))

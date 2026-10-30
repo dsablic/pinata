@@ -9,7 +9,8 @@ export const P1_GATES = {
   maxThinFraction: {
     op: '<=',
     threshold: 0.25,
-    rationale: 'Parts mostly 1px thick vanish or flicker at 32px; a quarter allows tapered ends. Occlusion is ignored.'
+    rationale: 'Parts mostly 1px thick vanish or flicker at 32px; a quarter allows tapered ends. ' +
+      'Covered sides are not edges.'
   },
   paletteSize: {
     op: '<=',

@@ -76,3 +76,8 @@ test('partImage gives 24 parts 24 distinct colours', () => {
   const colours = new Set(Array.from({ length: 24 }, (_, x) => getPixel(image, x, 0)))
   assert.equal(colours.size, 24)
 })
+
+test('sheet rejects an anchor that is not an integer', () => {
+  const item: SheetCell = { image: createImage(2, 2), anchor: [0.5, 0] }
+  assert.throws(() => sheet([[item]], { scale: 1, gap: 0, background: 0 }), RangeError)
+})

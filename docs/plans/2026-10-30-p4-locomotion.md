@@ -214,3 +214,19 @@ Review batch C, then run the judge panel (controller) and log findings in `docs/
 - Starting gait in Task C4: `strideLength` 1.0 instead of 1.3. At 1.3 the knight's short, straight legs need a
   0.39 m pelvis drop and the knee peaks at 645 degrees/s (gate 600); at 1.0 it measured 556 degrees/s. This is a rig
   parameter, not a gate.
+
+## Amendment after the batch A/B review (before batch C)
+
+The review predicted gate failures on the knight; these are planner and rig fixes, the gates are unchanged.
+
+- Ground contact: the planner places each planted foot so its lowest sole point (from the rest pose and the foot
+  part's radii) is at y = 0, instead of keeping the rest ankle height. The knight's rest toe sole is 2 cm below the
+  floor.
+- Swing edges: a swing foot moves only vertically for the first and last 10% of its swing (horizontal motion uses a
+  remapped ease), so the sole leaves and meets the ground without sliding. Toe pitch starts after lift-off.
+- Gait gains `strideExponent` (default 0.5): `stride(speed) = strideLength * (speed / referenceSpeed) ^ exponent`,
+  clamped as before. A larger exponent lengthens strides instead of raising cadence at speed; the starting value is
+  tuned in C4 against the knee-speed gate.
+- Pelvis drop keeps feet within 0.99 of leg length (was 0.95), so straight-legged rigs don't walk crouched.
+- `Arm` gains optional `carried: string[]`: joints that move rigidly with the arm's swing (the knight's `swordTip`).
+- The foot's side comes from `leg.side`, not the sign of the rest ankle's x.

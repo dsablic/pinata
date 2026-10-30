@@ -25,7 +25,8 @@ write the code test-first; each batch is reviewed (spec first, then quality).
 
 - Units: metres, seconds, kilograms. Y up; the knight faces +Z at yaw 0; yaw rotates about +Y, positive turns the
   knight's front toward +X.
-- Output frame rate 24 fps. Simulation substep `1/240 s` (10 substeps per frame). Both live in the scenario file.
+- Output frame rate 24 fps. Simulation substep `1/960 s` (40 substeps per frame; 10 left the cape stretched past
+  the strain gate after collisions). Both live in the scenario file.
 - Determinism: no `Math.random`, no time-dependent input, fixed iteration order. Gusts come from a fixed sum of
   sines of simulation time.
 
@@ -41,13 +42,20 @@ Scenarios: `turn-stop` (walk, 90 degree turn, stop, hold), `wind` (idle in gusty
 | maxStrain | <= 0.10 | Cloth stretched more than 10% beyond rest length reads as rubber. |
 | penetratingFrames | <= 1% | Fraction of frames with any particle deeper than 0.5 px (at 48px scale) inside the body. |
 | settleSeconds | each in [0.2, 3.0], and silk > wool > leather | After the stop, time until max particle speed < 0.05 m/s (wind off). Real capes settle in about a second; heavier, stiffer materials settle faster. |
-| overshootDegrees | >= 5 for silk and wool | After the turn, the cape's swing angle (below) passes its final rest angle by at least 5 degrees: visible follow-through. |
-| lagFrames | >= 1 for all materials | The cape's swing angle reaches half of the body's turn at least one frame after the body does. |
+| overshootDegrees | >= 5 for silk and wool | After the stop, the forward swing angle (below) passes its final rest value by at least 5 degrees: visible follow-through. |
+| lagFrames | >= 1 for all materials | The peak of the absolute sideways swing angle comes at least one frame after the peak of the body's turn rate. |
 | windAlignment | >= 0.7 | Mean cosine between the horizontal hem displacement (from windless rest) and the wind direction during the wind scenario. |
 | nondeterministicFrames | 0 | Particle positions hashed per frame match a re-run in a child process. |
 
-Swing angle: the yaw, in world space, of the vector from the cape's top-centre anchor to the hem centroid, projected
-on the horizontal plane. It is measured relative to the body's yaw at the same instant, then unwrapped over time.
+Swing angles (amended after the batch B review, before batch C): take the hem centroid relative to the cape's
+top-centre anchor, in body-local space (`R(-yaw) * (hem - anchor)`). Forward swing = `atan2(local z, -local y)`,
+positive when the hem swings toward the body's front. Sideways swing = `atan2(local x, -local y)`. These are the
+pendulum angles of the cape about its top edge. The first definition (yaw of the horizontal anchor-to-hem vector)
+was undefined for a cape hanging straight down: the horizontal vector is a few millimetres long and its yaw is noise.
+
+Material values in Task C3 are starting points only. The batch B review measured that the settle order is decided
+by `damping + drag / mass` per material, so tuning those values (within the locked gates) is expected and is logged
+in the findings file.
 
 ## Judge panel (secondary, after the gates pass)
 
@@ -216,7 +224,8 @@ A recorder stores, per output frame: time, root state, all particle positions (c
 penetration depth (`particleRadius - distance` when positive). Metrics, each a pure function of the recording:
 `nonFinite`, `maxSpeed`, `maxStrain` (over all constraints, `(length - rest) / rest`), `penetratingFrames`
 (fraction of frames with any depth above a given threshold in metres), `settleSeconds(fromTime, speedThreshold)`,
-`swingAngles` (per frame, as defined in the gates section), `overshootDegrees(turnEndTime)`, `lagFrames`,
+`swingAngles` (forward and sideways per frame, as defined in the gates section), `overshootDegrees(stopTime)`,
+`lagFrames(turnStart, turnEnd)`,
 `windAlignment(restHem)`, and `frameHashes` (sha256 of each frame's positions). Test each with small synthetic
 recordings whose answers are known.
 

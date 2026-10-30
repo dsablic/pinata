@@ -170,6 +170,16 @@ test('rejects a script that does not end with a hold', () => {
   assert.deepEqual(paths(input), [])
 })
 
+test('rejects a final hold shorter than accelSeconds', () => {
+  const input = scenario()
+  input.script.segments[2] = { action: 'hold', duration: 0.2 }
+  const [error] = validateScenario(input).errors
+  assert.equal(error.path, 'script.segments')
+  assert.match(error.message, /last hold to last at least accelSeconds \(0\.3 s\)/)
+  input.script.segments[2] = { action: 'hold', duration: 0.3 }
+  assert.deepEqual(paths(input), [])
+})
+
 test('echoes an unknown segment action', () => {
   const input = scenario()
   input.script.segments[0] = { action: 'jump', speed: 1, duration: 1 }

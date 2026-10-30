@@ -167,6 +167,12 @@ function validateScript (script: unknown, errors: ValidationError[]): void {
   if (script.segments.length > 0 && !(isRecord(last) && last.action === 'hold')) {
     const message = "expected the last segment to be a 'hold', so the motion ends at rest"
     errors.push({ path: 'script.segments', message })
+  } else if (isRecord(last) && isNonNegative(script.accelSeconds) && isFiniteNumber(last.duration)) {
+    if (last.duration < script.accelSeconds) {
+      const message = `expected the last hold to last at least accelSeconds (${script.accelSeconds} s), ` +
+        'so the motion ends at rest'
+      errors.push({ path: 'script.segments', message })
+    }
   }
 }
 

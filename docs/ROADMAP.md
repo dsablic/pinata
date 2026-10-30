@@ -76,6 +76,17 @@ stay consistent across views and survive walking, at 48 px and 32 px. Gates to f
 - A walk strip in every direction is preferred over the procedural renderer by a majority.
 - One human pixel artist reviews the results (the only human check kept in the plan).
 
+## Body plans and rigid-body behaviours (in progress)
+
+- **General limbs** (`docs/plans/2026-10-30-general-limbs.md`): any number of legs with any segment count, arms,
+  and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
+  octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under
+  the front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.
+- **Rigid-body behaviours:** a prototype hung the unicorn piñata from a rope, whacked it, and let it swing and twist
+  with limp legs, mane and tail (simulated as cloth on the moving body). To make that a motion script like walking:
+  a root with full 3D orientation (today it can only yaw), a `hang` behaviour (rope or spring from an anchor), scripted
+  `hit` events (impulse and spin at a point), and limp limbs as low-stiffness appendages.
+
 ## Phase 2: depth (after the MVP)
 
 - **Animation readability.** P4 showed a kinematically correct walk is not automatically readable at 48 px; skins

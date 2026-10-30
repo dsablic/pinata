@@ -2,7 +2,7 @@ import type { Mannequin, Part } from '../formats/mannequin.ts'
 import { normalize } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { boundingSphere } from './bounds.ts'
-import { project, rayOrigin } from './camera.ts'
+import { project } from './camera.ts'
 import type { Camera } from './camera.ts'
 import { boxDistance, boxFrame, roundCone, roundConeDistance } from './sdf.ts'
 
@@ -82,12 +82,14 @@ function writeNormal (prim: Primitive, px: number, py: number, pz: number, out: 
   out[2] = l === 0 ? 0 : nz * k
 }
 
-function sample (prims: Primitive[], active: Int32Array, count: number, cam: Camera, o: Vec3, acc: Accumulator): void {
-  const [ox, oy, oz] = o
+type Scene = { prims: Primitive[], cam: Camera, acc: Accumulator, active: Int32Array, count: number }
+
+function sample (scene: Scene, ox: number, oy: number, oz: number): void {
+  const { prims, cam, acc, active } = scene
   const dir = cam.forward
   let best = -1
   let bestT = Infinity
-  for (let k = 0; k < count; k++) {
+  for (let k = 0; k < scene.count; k++) {
     const i = active[k]
     const t = trace(prims[i], ox, oy, oz, dir)
     if (t < bestT) {
@@ -136,14 +138,14 @@ function cull (discs: Disc[], px: number, py: number, active: Int32Array): numbe
  */
 export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GBuffer): GBuffer {
   const prims = m.parts.map(part => compile(m, part))
-  const count = cam.width * cam.height
+  const pixels = cam.width * cam.height
   const g: GBuffer = {
     width: cam.width,
     height: cam.height,
-    part: new Int16Array(count).fill(EMPTY),
-    depth: new Float32Array(count),
-    normal: new Float32Array(count * 3),
-    coverage: new Float32Array(count)
+    part: new Int16Array(pixels).fill(EMPTY),
+    depth: new Float32Array(pixels),
+    normal: new Float32Array(pixels * 3),
+    coverage: new Float32Array(pixels)
   }
   const acc: Accumulator = {
     hits: new Float64Array(prims.length),
@@ -153,18 +155,23 @@ export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GB
     total: 0
   }
   const discs = prims.map(prim => screenDisc(cam, prim))
-  const active = new Int32Array(prims.length)
+  const scene: Scene = { prims, cam, acc, active: new Int32Array(prims.length), count: 0 }
+  const [rx, ry, rz] = cam.right
+  const [ux, uy, uz] = cam.up
+  const behind = -cam.rayDistance
+  const [bx, by, bz] = [cam.forward[0] * behind, cam.forward[1] * behind, cam.forward[2] * behind]
   for (let py = 0; py < cam.height; py++) {
     for (let px = 0; px < cam.width; px++) {
       acc.hits.fill(0)
       acc.depth.fill(0)
       acc.normal.fill(0)
       acc.total = 0
-      const count = cull(discs, px, py, active)
-      for (let sy = 0; sy < samples && count > 0; sy++) {
+      scene.count = cull(discs, px, py, scene.active)
+      for (let sy = 0; sy < samples && scene.count > 0; sy++) {
+        const v = (cam.baseline - (py + (sy + 0.5) / samples)) / cam.pixelsPerUnit
         for (let sx = 0; sx < samples; sx++) {
-          const o = rayOrigin(cam, px + (sx + 0.5) / samples, py + (sy + 0.5) / samples)
-          sample(prims, active, count, cam, o, acc)
+          const u = (px + (sx + 0.5) / samples - cam.width / 2) / cam.pixelsPerUnit
+          sample(scene, rx * u + ux * v + bx, ry * u + uy * v + by, rz * u + uz * v + bz)
         }
       }
       resolvePixel(g, py * cam.width + px, acc, { samples: samples * samples, previous })

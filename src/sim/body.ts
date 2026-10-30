@@ -33,14 +33,14 @@ export function anchorWorld (m: Mannequin, joint: string, root: RootState): Vec3
   return toWorld(m.joints[joint], root)
 }
 
-function localDistance (parts: Primitive[], p: Vec3): number {
+function localDistance (parts: Primitive[], x: number, y: number, z: number): number {
   let best = Infinity
   for (const part of parts) {
-    const dx = p[0] - part.center[0]
-    const dy = p[1] - part.center[1]
-    const dz = p[2] - part.center[2]
+    const dx = x - part.center[0]
+    const dy = y - part.center[1]
+    const dz = z - part.center[2]
     if (Math.sqrt(dx * dx + dy * dy + dz * dz) - part.radius >= best) continue
-    const d = part.sdf(p)
+    const d = part.dist(x, y, z)
     if (d < best) best = d
   }
   return best
@@ -68,13 +68,18 @@ export function bodyCollider (m: Mannequin, exclude: string[], root: RootState):
 export function partsCollider (parts: Primitive[], root: RootState): Collider {
   const c = Math.cos(root.yaw)
   const s = Math.sin(root.yaw)
-  const distance = (p: Vec3): number => localDistance(parts, toLocal(p, root))
+  const distance = (p: Vec3): number => {
+    const x = p[0] - root.position[0]
+    const y = p[1] - root.position[1]
+    const z = p[2] - root.position[2]
+    return localDistance(parts, x * c - z * s, y, x * s + z * c)
+  }
   const normal = (p: Vec3): Vec3 => {
     const [x, y, z] = toLocal(p, root)
     const h = NORMAL_STEP
-    const gx = localDistance(parts, [x + h, y, z]) - localDistance(parts, [x - h, y, z])
-    const gy = localDistance(parts, [x, y + h, z]) - localDistance(parts, [x, y - h, z])
-    const gz = localDistance(parts, [x, y, z + h]) - localDistance(parts, [x, y, z - h])
+    const gx = localDistance(parts, x + h, y, z) - localDistance(parts, x - h, y, z)
+    const gy = localDistance(parts, x, y + h, z) - localDistance(parts, x, y - h, z)
+    const gz = localDistance(parts, x, y, z + h) - localDistance(parts, x, y, z - h)
     const n = normalize([gx, gy, gz])
     if (n[0] === 0 && n[1] === 0 && n[2] === 0) return [0, 1, 0]
     return [n[0] * c + n[2] * s, n[1], -n[0] * s + n[2] * c]

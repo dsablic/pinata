@@ -5,6 +5,7 @@ const REACH_MARGIN = 1e-6
 const MAX_ITERATIONS = 400
 const CONVERGED = 1e-10
 const INITIAL_BULGE = 0.5
+const REST_SHAPE_MINIMUM = 1e-3
 const DEGREES = Math.PI / 180
 
 export const MAX_FLEXION_DEGREES = 150
@@ -68,7 +69,8 @@ export function chainIk (options: ChainIkOptions): { joints: Vec3[], clamped: bo
   const sideward = sub(pole, scale(axis, dot(pole, axis)))
   const side = length(sideward) === 0 ? orthogonal(axis) : normalize(sideward)
   const ranges = limitRanges(options.limits, bones - 1)
-  const flat = fabrik({ lengths, signs, ranges, reach, total })
+  const start = startShape(joints, { pole, signs, reach, total })
+  const flat = fabrik({ lengths, signs, ranges, reach, start })
   const placed = flat.map(([u, v]) => add(root, add(scale(axis, u), scale(side, v))))
   return { joints: placed, clamped: reach !== distance }
 }
@@ -78,20 +80,37 @@ function limitRanges (limits: FlexionLimits | FlexionLimits[] | undefined, count
   return Array.from({ length: count }, (_, i) => Array.isArray(limits) ? limits[i] ?? fallback : limits ?? fallback)
 }
 
-type Problem = { lengths: number[], signs: number[], ranges: FlexionLimits[], reach: number, total: number }
+type Shape = { pole: Vec3, signs: number[], reach: number, total: number }
 
-function fabrik ({ lengths, signs, ranges, reach, total }: Problem): Plane[] {
-  const count = lengths.length
-  const goal: Plane = [reach, 0]
+/** The rest shape in the solution plane where its joints already bend to their sides, else a zigzag on the sides. */
+function startShape (joints: Vec3[], { pole, signs, reach, total }: Shape): Plane[] {
+  const count = joints.length - 1
   const slack = Math.sqrt(Math.max(0, total * total - reach * reach))
-  let points: Plane[] = [[0, 0]]
+  const axis = normalize(sub(joints[count], joints[0]))
+  const side = normalize(sub(pole, scale(axis, dot(pole, axis))))
+  const restReach = dot(sub(joints[count], joints[0]), axis)
+  const usable = restReach > 0 && length(side) > 0
+  const points: Plane[] = [[0, 0]]
   let along = 0
   for (let i = 1; i <= count; i++) {
-    along += lengths[i - 1]
+    along += length(sub(joints[i], joints[i - 1]))
     const fraction = along / total
-    const bulge = i === count ? 0 : (signs[i - 1] ?? 1) * INITIAL_BULGE * slack * Math.sin(Math.PI * fraction)
-    points.push([reach * fraction, bulge])
+    const rel = sub(joints[i], joints[0])
+    const [u, v] = usable ? [dot(rel, axis) * reach / restReach, dot(rel, side)] : [0, 0]
+    const sign = signs[i - 1] ?? 1
+    const keep = usable && i < count && sign * v > REST_SHAPE_MINIMUM * total
+    const zigzag = i === count ? 0 : sign * INITIAL_BULGE * slack * Math.sin(Math.PI * fraction)
+    points.push(keep ? [u, v] : [reach * fraction, zigzag])
   }
+  return points
+}
+
+type Problem = { lengths: number[], signs: number[], ranges: FlexionLimits[], reach: number, start: Plane[] }
+
+function fabrik ({ lengths, signs, ranges, reach, start }: Problem): Plane[] {
+  const count = lengths.length
+  const goal: Plane = [reach, 0]
+  let points = start
   for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
     points = forwardPass(backwardPass(points, goal, lengths), lengths, signs, ranges)
     const end = points[count]

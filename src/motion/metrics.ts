@@ -1,15 +1,16 @@
 import { createHash } from 'node:crypto'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { armsOf, legBend, legPhases, legsOf } from '../formats/rig.ts'
-import type { Leg, Rig } from '../formats/rig.ts'
+import { armsOf, legPhases, legsOf } from '../formats/rig.ts'
+import type { Bend, Leg, Rig } from '../formats/rig.ts'
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
 import type { GaitFrame } from './gait.ts'
-import { kneeBendsBackward, kneeFlexionDegrees } from './ik.ts'
+import { kneeBendsBackward, kneeFlexionDegrees, MAX_FLEXION_DEGREES } from './ik.ts'
 import { verticalExtent } from './extent.ts'
 import { poseAt } from './locomotion.ts'
-import { footRadii, legLabels, restPose } from './pose.ts'
+import { bendingJoints, footRadii, legLabels, restPose } from './pose.ts'
+import type { JointTriple } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState, Script } from './script.ts'
 
@@ -29,7 +30,7 @@ export type SteadySegment = Window & { speed: number }
 export type PlantedRun = { leg: number, side: Side, start: number, end: number }
 
 const PLANT_HEIGHT = 0.02
-export const MAX_KNEE_FLEXION = 150
+export const MAX_KNEE_FLEXION = MAX_FLEXION_DEGREES
 const FLEXION_EPSILON = 1e-6
 const TIME_EPSILON = 1e-9
 
@@ -158,46 +159,67 @@ export function reachViolations (recording: LocomotionRecording): number {
   return recording.frames.filter(f => f.clamped > 0).length
 }
 
-function kneeDirection (root: RootState, leg: Leg): Vec3 {
-  const sign = legBend(leg) === 'backward' ? -1 : 1
+function bendDirection (root: RootState, bend: Bend): Vec3 {
+  const sign = bend === 'backward' ? -1 : 1
   return [sign * Math.sin(root.yaw), 0, sign * Math.cos(root.yaw)]
 }
 
-function flexions (recording: LocomotionRecording, leg: Leg): number[] {
-  return recording.frames.map(f => kneeFlexionDegrees(f.joints[leg.hip], f.joints[leg.knee], f.joints[leg.ankle]))
+export type JointSpeed = { leg: number, joint: string, value: number }
+
+function flexions (recording: LocomotionRecording, triple: JointTriple): number[] {
+  const [a, b, c] = triple
+  return recording.frames.map(f => kneeFlexionDegrees(f.joints[a], f.joints[b], f.joints[c]))
 }
 
-/** Knee-frames with flexion outside [0, 150] degrees or a knee on the wrong side of its leg's bend direction. */
+/**
+ * Joint-frames, over every intermediate joint of every leg, with flexion outside the leg's limits (default
+ * [0, 150] degrees) or a joint on the wrong side of its bend direction.
+ */
 export function kneeLimitViolations (recording: LocomotionRecording, geometry: Geometry): number {
   let count = 0
   for (const leg of legsOf(geometry.rig)) {
-    flexions(recording, leg).forEach((flexion, i) => {
-      const { joints, root } = recording.frames[i]
-      const backward = kneeBendsBackward(joints[leg.hip], joints[leg.knee], joints[leg.ankle], kneeDirection(root, leg))
-      if (flexion < -FLEXION_EPSILON || flexion > MAX_KNEE_FLEXION + FLEXION_EPSILON || backward) count++
+    const { min, max } = leg.limits ?? { min: 0, max: MAX_KNEE_FLEXION }
+    bendingJoints(leg).forEach((triple, i) => {
+      const [a, b, c] = triple
+      flexions(recording, triple).forEach((flexion, frame) => {
+        const { joints, root } = recording.frames[frame]
+        const direction = bendDirection(root, leg.bends[i])
+        const backward = min >= 0 && kneeBendsBackward(joints[a], joints[b], joints[c], direction)
+        if (flexion < min - FLEXION_EPSILON || flexion > max + FLEXION_EPSILON || backward) count++
+      })
     })
   }
   return count
 }
 
-/** Largest knee flexion change between consecutive frames, in degrees per second at the recording's frame rate. */
-export function kneeSpeedDegPerSec (recording: LocomotionRecording, geometry: Geometry): number {
-  let peak = 0
-  for (const leg of legsOf(geometry.rig)) {
-    const values = flexions(recording, leg)
-    for (let i = 1; i < values.length; i++) peak = Math.max(peak, Math.abs(values[i] - values[i - 1]))
+/** Largest flexion change between consecutive frames of each intermediate joint of each leg, in degrees per second. */
+export function jointSpeedsDegPerSec (recording: LocomotionRecording, geometry: Geometry): JointSpeed[] {
+  const speeds: JointSpeed[] = []
+  for (const [index, leg] of legsOf(geometry.rig).entries()) {
+    for (const triple of bendingJoints(leg)) {
+      const values = flexions(recording, triple)
+      let peak = 0
+      for (let i = 1; i < values.length; i++) peak = Math.max(peak, Math.abs(values[i] - values[i - 1]))
+      speeds.push({ leg: index, joint: triple[1], value: peak * recording.fps })
+    }
   }
-  return peak * recording.fps
+  return speeds
+}
+
+/** Largest flexion change of any leg joint between consecutive frames, in degrees per second. */
+export function kneeSpeedDegPerSec (recording: LocomotionRecording, geometry: Geometry): number {
+  return Math.max(0, ...jointSpeedsDegPerSec(recording, geometry).map(speed => speed.value))
 }
 
 function bones (rig: Rig): Array<[string, string]> {
+  const pairs = (joints: string[]): Array<[string, string]> => joints.slice(1).map((j, i) => [joints[i], j])
   return [
-    ...legsOf(rig).flatMap((l): Array<[string, string]> => [[l.hip, l.knee], [l.knee, l.ankle], [l.ankle, l.toe]]),
-    ...armsOf(rig).flatMap((a): Array<[string, string]> => [[a.shoulder, a.elbow], [a.elbow, a.wrist]])
+    ...legsOf(rig).flatMap(leg => pairs(leg.joints)),
+    ...armsOf(rig).flatMap(arm => pairs(arm.joints.slice(0, Math.max(2, arm.joints.length - 1))))
   ]
 }
 
-/** Largest relative change of a thigh, shin, foot, upper-arm or forearm length from the rest pose. */
+/** Largest relative change of any leg bone, or any arm bone other than the last, from the rest pose. */
 export function boneLengthError (recording: LocomotionRecording, geometry: Geometry, rest: Pose): number {
   let worst = 0
   for (const [a, b] of bones(geometry.rig)) {

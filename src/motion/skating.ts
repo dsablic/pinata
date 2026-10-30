@@ -1,10 +1,9 @@
 import { legPhases, legsOf, stride } from '../formats/rig.ts'
-import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
 import { planGait } from './gait.ts'
 import type { FootState, GaitFrame } from './gait.ts'
-import { soleHeight } from './pose.ts'
+import { chainLength, soleHeight } from './pose.ts'
 
 const PHASE_SHIFT = 0.25
 const REACH_FRACTION = 0.98
@@ -32,7 +31,7 @@ export function planSkating (options: Options): GaitFrame[] {
       const home = rest[leg.ankle]
       const height = home[1] - soleHeight(leg, rest, mannequin) + gait.stepHeight * lift
       const hip = rest[leg.hip]
-      const legLength = length(sub(rest[leg.knee], hip)) + length(sub(rest[leg.ankle], rest[leg.knee]))
+      const legLength = chainLength(leg.chain, rest)
       const reach = legLength * REACH_FRACTION
       const drop = hip[1] + frame.pelvisOffset[1] - height
       const room = Math.sqrt(Math.max(0, reach * reach - drop * drop - (home[0] - hip[0]) ** 2))

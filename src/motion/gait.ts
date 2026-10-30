@@ -2,9 +2,8 @@ import { legPhases, legsOf, stride } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Rig } from '../formats/rig.ts'
 import { toWorld } from '../sim/body.ts'
-import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import { soleHeight } from './pose.ts'
+import { chainLength, soleHeight } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState } from './script.ts'
 
@@ -21,6 +20,7 @@ export type GaitFrame = {
   pelvisOffset: Vec3
   feet: FootState[]
   armSwing: number
+  armSwings: number[]
   phase: number
 }
 
@@ -52,6 +52,10 @@ const WALK_REACH_FRACTION = 0.96
 const DROP_SMOOTHING_SECONDS = 0.04
 const CLEARANCE = 0.01
 const MAX_SWING_EDGE = 0.25
+
+function swingCycle (phase: number, offset: number): number {
+  return offset === 0.5 ? -Math.cos(2 * Math.PI * phase) : Math.cos(2 * Math.PI * (phase + offset))
+}
 
 function smoothstep (x: number): number {
   return x * x * (3 - 2 * x)
@@ -173,15 +177,13 @@ function buildFeet (options: Options, phase: number[], cycle: Cycle): Foot[] {
   const feet = legsOf(rig).map((leg, index): Foot => {
     const restAnkle = rest[leg.ankle]
     const planted: Vec3 = [restAnkle[0], restAnkle[1] - soleHeight(leg, rest, mannequin), restAnkle[2]]
-    const upper = length(sub(rest[leg.knee], rest[leg.hip]))
-    const lower = length(sub(rest[leg.ankle], rest[leg.knee]))
     const initial: Plant = { phase: cycle.initial[index], ankle: toWorld(planted, start), yaw: start.yaw }
     return {
       side: leg.side,
       sign: leg.side === 'left' ? 1 : -1,
       planted,
       restHip: rest[leg.hip],
-      reach: upper + lower,
+      reach: chainLength(leg.chain, rest),
       partner: cycle.partner[index],
       plants: [initial]
     }
@@ -285,6 +287,7 @@ export function planGait (options: Options): GaitFrame[] {
     return Math.min(0, ...feet.map((foot, k) => neededOffset(foot, states[k], roots[i], fraction)))
   })
   const drops = smoothDrops(needed, Math.round(DROP_SMOOTHING_SECONDS * fps))
+  const offsets = legPhases(rig)
   const frames: GaitFrame[] = []
   for (let i = 0; i < count; i++) {
     const root = roots[i]
@@ -297,6 +300,7 @@ export function planGait (options: Options): GaitFrame[] {
       pelvisOffset: [0, offset, 0],
       feet: states,
       armSwing: gait.armSwingDegrees * Math.cos(2 * Math.PI * phase[i]) * ease,
+      armSwings: offsets.map(offset => gait.armSwingDegrees * swingCycle(phase[i], offset) * ease),
       phase: phase[i]
     })
   }

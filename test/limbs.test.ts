@@ -231,8 +231,37 @@ test('legsOf and armsOf name the hip, knee, ankle and toe and the shoulder to th
     ['hipL', 'kneeL', 'ankleL', 'toeL', 'left', 0.1, 'backward', 0])
   assert.equal(right.bend, undefined)
   const [arm] = armsOf(rig)
-  assert.deepEqual([arm.shoulder, arm.elbow, arm.wrist, arm.hand, arm.carried, arm.index],
-    ['shL', 'elL', 'wrL', 'haL', ['sword'], 2])
+  assert.deepEqual([arm.shoulder, arm.joints, arm.carried, arm.index],
+    ['shL', ['shL', 'elL', 'wrL', 'haL'], ['sword'], 2])
+})
+
+test('armsOf lists arms of any joint count', () => {
+  const rig = validateRig(limbsRig([
+    ...twoLegs(),
+    { kind: 'arm', joints: ['a1', 'a2'], side: 'left' },
+    { kind: 'arm', joints: ['b1', 'b2', 'b3', 'b4', 'b5', 'b6'], side: 'right' }
+  ])).value!
+  assert.deepEqual(armsOf(rig).map(arm => [arm.shoulder, arm.joints.length]), [['a1', 2], ['b1', 6]])
+})
+
+test('legsOf exposes the chain from the hip to the ankle, the bends and the limits', () => {
+  const rig = validateRig(limbsRig([
+    leg('left', 'L', 6, {
+      phase: 0, bend: ['forward', 'backward', 'forward', 'backward'], limits: { min: 0, max: 90 }
+    }),
+    leg('right', 'R', 5, { phase: 0.5, bend: 'backward' })
+  ])).value!
+  const [first, second] = legsOf(rig)
+  assert.deepEqual(first.chain, ['hipL', 'kneeL', 'hockL', 'fetlockL', 'pasternL'])
+  assert.deepEqual(first.bends, ['forward', 'backward', 'forward', 'backward'])
+  assert.deepEqual(first.limits, { min: 0, max: 90 })
+  assert.deepEqual(second.bends, ['backward', 'backward', 'backward'])
+  assert.equal(second.limits, undefined)
+})
+
+test('legsOf bends default to forward for every intermediate joint', () => {
+  const rig = validateRig(limbsRig([leg('left', 'L', 5, { phase: 0 }), leg('right', 'R', 5, { phase: 0.5 })])).value!
+  assert.deepEqual(legsOf(rig)[0].bends, ['forward', 'forward', 'forward'])
 })
 
 test('legsOf takes the foot from the last two joints of a longer leg', () => {

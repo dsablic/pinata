@@ -1,14 +1,13 @@
 import { gate } from '../../pocs/p4-locomotion/gates.ts'
 import type { Mannequin, Part } from '../formats/mannequin.ts'
-import { armsOf, legBend, legPhases, legsOf, stride, withLimbs } from '../formats/rig.ts'
+import { armsOf, legPhases, legsOf, stride, withLimbs } from '../formats/rig.ts'
 import type { Leg } from '../formats/rig.ts'
 import type { Character } from '../formats/character.ts'
-import { length, sub } from '../math/vec.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../motion/ik.ts'
 import * as metrics from '../motion/metrics.ts'
 import type { Geometry, LocomotionRecording, SteadySegment } from '../motion/metrics.ts'
-import { footRadii, legLabels, restPose } from '../motion/pose.ts'
-import type { Pose } from '../motion/pose.ts'
+import { bendingJoints, chainLength, footRadii, legLabels, restPose } from '../motion/pose.ts'
+import type { JointTriple, Pose } from '../motion/pose.ts'
 import type { CharacterRun } from '../motion/character.ts'
 import type { Check } from './summary.ts'
 
@@ -190,8 +189,7 @@ function reachHint (ctx: Context): string {
   const { gait } = ctx.character.rig
   const legs = legsOf(ctx.character.rig).map((leg, index) => {
     const rest = restPose(ctx.character.mannequin)
-    const total = length(sub(rest[leg.hip], rest[leg.knee])) + length(sub(rest[leg.knee], rest[leg.ankle]))
-    return `${ctx.labels[index]} ${total.toFixed(2)} m`
+    return `${ctx.labels[index]} ${chainLength(leg.chain, rest).toFixed(2)} m`
   }).join(', ')
   return `a foot target was out of the leg's reach in frames ${frames[0]} to ${frames[frames.length - 1]} (first at ` +
     `${at(ctx, frames[0])}), so the leg was straightened and clamped. Leg length hip to ankle: ${legs}. Shorten ` +
@@ -199,37 +197,52 @@ function reachHint (ctx: Context): string {
     `(now ${gait.bobAmplitude}), or lengthen the legs in the mannequin.`
 }
 
-function kneeProblem (ctx: Context, leg: Leg, frame: number): string {
+function jointWord (leg: Leg, joint: string): string {
+  return joint === leg.knee ? 'knee' : `'${joint}' joint`
+}
+
+function jointProblem (ctx: Context, leg: Leg, frame: number): string {
   const f = ctx.recording.frames[frame]
-  const [hip, knee, ankle] = [f.joints[leg.hip], f.joints[leg.knee], f.joints[leg.ankle]]
-  const sign = legBend(leg) === 'backward' ? -1 : 1
-  const direction: [number, number, number] = [sign * Math.sin(f.root.yaw), 0, sign * Math.cos(f.root.yaw)]
-  if (kneeBendsBackward(hip, knee, ankle, direction)) {
-    return `the knee bends the wrong way there: this leg has bend '${legBend(leg)}', so its knee must point ` +
-      `${legBend(leg)}; check that '${leg.hip}', '${leg.knee}' and '${leg.ankle}' are three distinct joints, that ` +
-      `the rest pose has the knee on that side of the hip-ankle line (or set the leg's bend to match it), and ` +
-      'that the leg is not folded'
+  const { min, max } = leg.limits ?? { min: 0, max: metrics.MAX_KNEE_FLEXION }
+  const triples = bendingJoints(leg)
+  const flexionOf = ([a, b, c]: JointTriple): number => kneeFlexionDegrees(f.joints[a], f.joints[b], f.joints[c])
+  const wrongWay = (triple: JointTriple, i: number): boolean => {
+    const sign = leg.bends[i] === 'backward' ? -1 : 1
+    const direction: [number, number, number] = [sign * Math.sin(f.root.yaw), 0, sign * Math.cos(f.root.yaw)]
+    return min >= 0 && kneeBendsBackward(f.joints[triple[0]], f.joints[triple[1]], f.joints[triple[2]], direction)
   }
-  const flexion = kneeFlexionDegrees(hip, knee, ankle)
-  return `the knee flexion there is ${flexion.toFixed(0)} degrees, outside 0 to ${metrics.MAX_KNEE_FLEXION}. ` +
+  const outside = (triple: JointTriple): boolean => flexionOf(triple) > max || flexionOf(triple) < min
+  const found = triples.findIndex((triple, i) => wrongWay(triple, i) || outside(triple))
+  const index = found < 0 ? 0 : found
+  const [a, b, c] = triples[index]
+  const word = jointWord(leg, b)
+  if (wrongWay(triples[index], index)) {
+    const bend = leg.bends[index]
+    return `the ${word} bends the wrong way there: this joint has bend '${bend}', so it must point ${bend}; ` +
+      `check that '${a}', '${b}' and '${c}' are three distinct joints, that the rest pose has the ${word} on that ` +
+      `side of the '${a}' to '${c}' line (or set the leg's bend to match it), and that the leg is not folded`
+  }
+  return `the ${word} flexion there is ${flexionOf(triples[index]).toFixed(0)} degrees, outside ${min} to ${max}. ` +
     `Lower rig.gait.stepHeight (now ${ctx.character.rig.gait.stepHeight}) or lengthen the legs`
 }
 
 function kneeLimitHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.kneeLimitViolations(r, g), 'leg')
   const total = metrics.kneeLimitViolations(ctx.recording, geometryOf(ctx))
-  return `${total} knee-frames over all legs violate the knee limits, ${worst.value} of them in the ${worst.label}, ` +
-    `first in ${at(ctx, worst.frame)}: ${kneeProblem(ctx, worst.leg, worst.frame)}.`
+  return `${total} joint-frames over all legs violate the joint limits, ${worst.value} of them in the ` +
+    `${worst.label}, first in ${at(ctx, worst.frame)}: ${jointProblem(ctx, worst.leg, worst.frame)}.`
 }
 
 function kneeSpeedHint (ctx: Context): string {
   const worst = worstLeg(ctx, (g, r) => metrics.kneeSpeedDegPerSec(r, g), 'leg')
   const { gait } = ctx.character.rig
-  return `the ${worst.label} knee flexes at ${worst.value.toFixed(0)} degrees/s in ${at(ctx, worst.frame)}, which ` +
-    `reads as a pop. Lower rig.gait.stanceFraction (now ${gait.stanceFraction}, minimum 0.5; a smaller value gives a ` +
-    `longer, slower swing) or lengthen strideLength (now ${gait.strideLength}). A higher stepHeight (now ` +
-    `${gait.stepHeight}) raises knee speed, but lowering it can bring back foot slide; walking slower does not ` +
-    'reliably help.'
+  const speeds = metrics.jointSpeedsDegPerSec(ctx.recording, legGeometry(ctx.character, worst.leg))
+  const fastest = speeds.reduce((a, b) => b.value > a.value ? b : a)
+  return `the ${worst.label} ${jointWord(worst.leg, fastest.joint)} flexes at ${worst.value.toFixed(0)} degrees/s in ` +
+    `${at(ctx, worst.frame)}, which reads as a pop. Lower rig.gait.stanceFraction (now ${gait.stanceFraction}, ` +
+    `minimum 0.5; a smaller value gives a longer, slower swing) or lengthen strideLength (now ` +
+    `${gait.strideLength}). A higher stepHeight (now ${gait.stepHeight}) raises joint speed, but lowering it can ` +
+    'bring back foot slide; walking slower does not reliably help.'
 }
 
 function limbGeometries (ctx: Context): Array<{ label: string, geometry: Geometry }> {

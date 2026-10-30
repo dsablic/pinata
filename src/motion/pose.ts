@@ -1,6 +1,7 @@
-import { legsOf } from '../formats/rig.ts'
+import { armsOf, legsOf } from '../formats/rig.ts'
 import type { Leg, Rig } from '../formats/rig.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
+import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 
 export type Pose = Record<string, Vec3>
@@ -21,6 +22,28 @@ export function footRadii (leg: Leg, mannequin: Mannequin): { ankle: number, toe
     throw new Error(`no capsule part spans ankle '${leg.ankle}' and toe '${leg.toe}'`)
   }
   return { ankle: foot.radiusA, toe: foot.radiusB }
+}
+
+export type JointTriple = [string, string, string]
+
+/** Every intermediate joint of the leg's hip-to-ankle chain with the joints on either side of it. */
+export function bendingJoints (leg: Leg): JointTriple[] {
+  return leg.chain.slice(1, -1).map((joint, i): JointTriple => [leg.chain[i], joint, leg.chain[i + 2]])
+}
+
+export function chainLength (chain: string[], rest: Pose): number {
+  return chain.slice(1).reduce((total, joint, i) => total + length(sub(rest[joint], rest[chain[i]])), 0)
+}
+
+/** For each arm, the index in legsOf of the leg on its side whose hip is nearest the shoulder along the body. */
+export function nearestLegs (rig: Rig, rest: Pose): number[] {
+  const legs = legsOf(rig)
+  return armsOf(rig).map(arm => {
+    const gap = (leg: Leg): number => Math.abs(rest[leg.hip][2] - rest[arm.shoulder][2])
+    const onSide = legs.filter(leg => leg.side === arm.side)
+    const pool = onSide.length > 0 ? onSide : legs
+    return legs.indexOf(pool.reduce((a, b) => gap(b) < gap(a) ? b : a))
+  })
 }
 
 export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number {

@@ -125,3 +125,11 @@ test('the result is deterministic', () => {
   const run = (): Vec3[] => chainIk({ joints: rest, target: [0.1, 0.4, 0.3], pole, limits }).joints
   assert.deepEqual(run(), run())
 })
+
+test('a target at the rest end of a bent chain gives back the rest shape', () => {
+  const bent: Vec3[] = [[0, 1, 0], [0, 0.75, 0.12], [0, 0.6, -0.05], [0, 0.5, 0.05], [0, 0.4, 0.05]]
+  const result = chainIk({ joints: bent, target: bent[4], pole, bends: [1, -1, 1] })
+  bent.forEach((joint, i) => {
+    for (let k = 0; k < 3; k++) assertClose(result.joints[i][k], joint[k], 1e-9)
+  })
+})

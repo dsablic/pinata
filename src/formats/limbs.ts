@@ -45,12 +45,15 @@ export type Leg = {
   name: string
   side: Side
   joints: string[]
+  chain: string[]
   hip: string
   knee: string
   ankle: string
   toe: string
   phase?: number
   bend?: Bend
+  bends: Bend[]
+  limits?: Limits
 }
 export type Arm = {
   index: number
@@ -59,9 +62,6 @@ export type Arm = {
   side: Side
   joints: string[]
   shoulder: string
-  elbow: string
-  wrist: string
-  hand: string
   carried?: string[]
 }
 
@@ -95,25 +95,32 @@ export function legsOf ({ limbs }: Source): Leg[] {
       name: limb.name,
       side: limb.side,
       joints,
+      chain: joints.slice(0, -1),
       hip: joints[0],
       knee: joints[1],
       ankle: joints[joints.length - 2],
       toe: joints[joints.length - 1],
       phase: limb.phase,
-      bend: Array.isArray(limb.bend) ? limb.bend[0] : limb.bend
+      bend: Array.isArray(limb.bend) ? limb.bend[0] : limb.bend,
+      bends: bendsOf(limb),
+      limits: limb.limits
     })
   })
   return legs
 }
 
-/** Arms with the four joints (shoulder, elbow, wrist, hand) the locomotion code moves; longer or shorter arms wait. */
+function bendsOf (limb: LegLimb): Bend[] {
+  const { bend } = limb
+  if (Array.isArray(bend)) return bend
+  return Array.from({ length: limb.joints.length - 2 }, () => bend ?? 'forward')
+}
+
 export function armsOf ({ limbs }: Source): Arm[] {
   const arms: Arm[] = []
   limbs.forEach((limb, index) => {
-    if (limb.kind !== 'arm' || limb.joints.length !== 4) return
-    const [shoulder, elbow, wrist, hand] = limb.joints
+    if (limb.kind !== 'arm') return
     arms.push({
-      index, limb, name: limb.name, side: limb.side, joints: limb.joints, shoulder, elbow, wrist, hand,
+      index, limb, name: limb.name, side: limb.side, joints: limb.joints, shoulder: limb.joints[0],
       carried: limb.carried
     })
   })

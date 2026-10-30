@@ -328,3 +328,23 @@ test('explicit phases on two legs set the time between landings', () => {
     assertClose(found[i].frame - found[i - 1].frame, share * cycleFrames, 1.01)
   }
 })
+
+test('arm swing per leg is the swing at the leg phase: a biped swings left and right in opposition', () => {
+  const frames = plan(walkTrack(1.2, 4), 6)
+  for (const frame of frames) {
+    assert.equal(frame.armSwings[0], frame.armSwing)
+    assert.equal(frame.armSwings[1], -frame.armSwing)
+  }
+})
+
+test('arm swing follows each leg phase for a quadruped', () => {
+  const rest = restPose(quadMannequin)
+  const frames = planGait({
+    track: walkTrack(0.9, 4), rig: quadRig, rest, mannequin: quadMannequin, duration: 6, fps: FPS
+  })
+  const frame = frames.reduce((best, f) => Math.abs(f.armSwing) > Math.abs(best.armSwing) ? f : best)
+  assert.equal(frame.armSwings.length, 4)
+  assertClose(frame.armSwings[0], frame.armSwing, 1e-12)
+  assertClose(frame.armSwings[2], -frame.armSwing, 1e-12)
+  assertClose(Math.hypot(frame.armSwings[1], frame.armSwings[3]), Math.abs(frame.armSwing), 1e-9)
+})

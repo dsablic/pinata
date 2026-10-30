@@ -1,16 +1,16 @@
 import type { Mannequin } from '../formats/mannequin.ts'
-import { armsOf, legBend, legsOf } from '../formats/rig.ts'
-import type { Rig } from '../formats/rig.ts'
-import { add, length, sub } from '../math/vec.ts'
+import { armsOf, legsOf } from '../formats/rig.ts'
+import type { Leg, Rig } from '../formats/rig.ts'
+import { add, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import type { GaitFrame } from './gait.ts'
-import { twoBoneIk } from './ik.ts'
+import type { FootState, GaitFrame } from './gait.ts'
+import { chainIk, MAX_FLEXION_DEGREES } from './ik.ts'
+import { nearestLegs } from './pose.ts'
 import type { Pose } from './pose.ts'
 
-type Options = { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequin }
+type PoseOptions = { frame: GaitFrame, rig: Rig, rest: Pose, mannequin: Mannequin }
 
 const FORWARD: Vec3 = [0, 0, 1]
-const BACKWARD: Vec3 = [0, 0, -1]
 const MAX_TOE_PITCH = 20 * Math.PI / 180
 
 function toLocal (world: Vec3, frame: GaitFrame): Vec3 {
@@ -38,7 +38,24 @@ function pitchUp (v: Vec3, angle: number): Vec3 {
   return rotateX(v, -angle)
 }
 
-export function poseAt (options: Options): { pose: Pose, clamped: number } {
+function placeLeg (leg: Leg, options: PoseOptions, foot: FootState): { placed: Pose, clamped: boolean } {
+  const { frame, rest } = options
+  const result = chainIk({
+    joints: leg.chain.map(name => rest[name]),
+    root: add(rest[leg.hip], frame.pelvisOffset),
+    target: toLocal(foot.ankle, frame),
+    pole: FORWARD,
+    bends: leg.bends.map(bend => bend === 'backward' ? -1 : 1),
+    limits: leg.limits ?? { min: 0, max: MAX_FLEXION_DEGREES }
+  })
+  const placed: Pose = Object.fromEntries(leg.chain.map((name, i) => [name, result.joints[i]]))
+  const flat = sub(rest[leg.toe], rest[leg.ankle])
+  const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.toePitch), foot.toeYaw - frame.root.yaw)
+  placed[leg.toe] = add(result.joints[leg.chain.length - 1], toe)
+  return { placed, clamped: result.clamped }
+}
+
+export function poseAt (options: PoseOptions): { pose: Pose, clamped: number } {
   const { frame, rig, rest } = options
   const pose: Pose = {}
   const shift = (name: string): Vec3 => add(rest[name], frame.pelvisOffset)
@@ -47,29 +64,21 @@ export function poseAt (options: Options): { pose: Pose, clamped: number } {
   for (const [index, leg] of legsOf(rig).entries()) {
     const foot = frame.feet[index]
     if (foot === undefined) throw new Error(`gait frame has no foot for leg ${index}`)
-    const hip = shift(leg.hip)
-    const result = twoBoneIk({
-      hip,
-      target: toLocal(foot.ankle, frame),
-      upper: length(sub(rest[leg.knee], rest[leg.hip])),
-      lower: length(sub(rest[leg.ankle], rest[leg.knee])),
-      pole: legBend(leg) === 'backward' ? BACKWARD : FORWARD
-    })
-    if (result.clamped) clamped++
-    const flat = sub(rest[leg.toe], rest[leg.ankle])
-    const toe = rotateY(pitchUp(flat, MAX_TOE_PITCH * foot.toePitch), foot.toeYaw - frame.root.yaw)
-    pose[leg.hip] = hip
-    pose[leg.knee] = result.knee
-    pose[leg.ankle] = result.end
-    pose[leg.toe] = add(result.end, toe)
+    const { placed, clamped: bound } = placeLeg(leg, options, foot)
+    Object.assign(pose, placed)
+    if (bound) clamped++
   }
-  for (const arm of armsOf(rig)) {
+  const followed = nearestLegs(rig, rest)
+  for (const [index, arm] of armsOf(rig).entries()) {
     const shoulder = shift(arm.shoulder)
-    const angle = (arm.side === 'left' ? 1 : -1) * frame.armSwing * Math.PI / 180
+    const angle = frame.armSwings[followed[index]] * Math.PI / 180
     pose[arm.shoulder] = shoulder
-    for (const name of [arm.elbow, arm.wrist, arm.hand, ...(arm.carried ?? [])]) {
+    for (const name of [...arm.joints.slice(1), ...(arm.carried ?? [])]) {
       pose[name] = add(shoulder, rotateX(sub(rest[name], rest[arm.shoulder]), angle))
     }
+  }
+  for (const limb of rig.limbs) {
+    if (limb.kind === 'appendage') for (const name of limb.joints) pose[name] = shift(name)
   }
   return { pose, clamped }
 }

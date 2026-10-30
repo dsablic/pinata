@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { evaluate, summarize } from '../src/diagnostics/report.ts'
-import { sheet } from '../src/diagnostics/images.ts'
+import { partImage, sheet } from '../src/diagnostics/images.ts'
 import type { SheetCell } from '../src/diagnostics/images.ts'
+import type { GBuffer } from '../src/raster/gbuffer.ts'
 import { createImage, getPixel, setPixel } from '../src/image.ts'
 
 test('evaluate applies each gate operator', () => {
@@ -60,4 +61,18 @@ test('sheet scales the anchor offset with the cells', () => {
   })
   assert.equal(getPixel(out, 1 + 2, 1 + 2), 0xff0000)
   assert.equal(getPixel(out, 1 + 6 + 1 + 2, 1 + 2), 0x00ff00)
+})
+
+test('partImage gives 24 parts 24 distinct colours', () => {
+  const g: GBuffer = {
+    width: 24,
+    height: 1,
+    part: Int16Array.from({ length: 24 }, (_, i) => i),
+    depth: new Float32Array(24),
+    normal: new Float32Array(72),
+    coverage: new Float32Array(24)
+  }
+  const image = partImage(g)
+  const colours = new Set(Array.from({ length: 24 }, (_, x) => getPixel(image, x, 0)))
+  assert.equal(colours.size, 24)
 })

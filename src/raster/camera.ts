@@ -54,6 +54,7 @@ export function makeCamera (o: CameraOptions): Camera {
 }
 
 export function fitCamera (m: Mannequin, o: FitOptions): Camera {
+  if (o.margin < 1) throw new RangeError('margin must be at least 1 so the outline has a free pixel')
   const basis = makeBasis(o.azimuthDeg, o.elevationDeg)
   const pixelsPerUnit = o.targetHeightPx / m.height
   let uMax = 0

@@ -39,7 +39,11 @@ Gate thresholds are locked (see `pocs/p1-static-style/gates.ts`). Each run chang
 
 All automated gates pass and the remaining issues are minor:
 
-- maxThinFraction sits exactly at 0.25, so small asset changes can tip it. Watch it when the knight changes.
+- maxThinFraction sits exactly at 0.25, from `hips` in `32px-el30-d2`: 4 visible pixels, one of them thin because
+  the sword sits behind it. A 4-pixel part can only score 0, 0.25, 0.5 and so on, so this is one pixel from failing,
+  and a 3-pixel hips would drop out of the gate entirely. Watch it when the knight changes.
+- Run 2 changed four parts at once despite the one-change rule. They share one cause (too thin for 32px), but the
+  log can't attribute the gain to a single part.
 - At 32px, where the sword crosses a leg in the side view, it reads as a ladder (blade fill plus outline).
 - Faces carry no detail beyond the 3px visor, which is hidden from the side. Expected for procedural rendering;
   decals at more anchors would be the next lever.

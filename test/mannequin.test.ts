@@ -182,3 +182,12 @@ test('messages keep significant digits for tiny values', () => {
   const [error] = validateMannequin(input).errors.filter(e => e.path === 'parts[0]')
   assert.match(error.message, /distance 0\.0001234;/)
 })
+
+test('tolerates float error when rounding equals half the a->b length', () => {
+  const input = valid()
+  input.joints.base = [0, 0.66, 0]
+  input.joints.top = [0, 0.82, 0]
+  input.parts[1].thickness = 0.2
+  input.parts[1].rounding = 0.08
+  assert.deepEqual(paths(input).filter(p => p === 'parts[1].rounding'), [])
+})

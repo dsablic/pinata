@@ -48,6 +48,7 @@ const BOX_FIELDS = [...PART_FIELDS, 'width', 'thickness', 'rounding', 'widthAxis
 const DECAL_FIELDS = ['name', 'anchor', 'normal', 'pattern'] as const
 
 const JOINT_LIMIT = 1e6
+const EPSILON = 1e-9
 
 type Context = { joints: Record<string, unknown> | undefined, names: Set<string>, errors: ValidationError[] }
 
@@ -168,7 +169,7 @@ function validateBox (part: Record<string, unknown>, path: string, ctx: Context,
   if (!isPositive(thickness)) ctx.errors.push({ path: `${path}.thickness`, message: 'expected a positive number' })
   if (!isFiniteNumber(rounding) || rounding < 0) {
     ctx.errors.push({ path: `${path}.rounding`, message: 'expected a number >= 0' })
-  } else if (isPositive(width) && isPositive(thickness) && rounding > Math.min(width, thickness) / 2) {
+  } else if (isPositive(width) && isPositive(thickness) && rounding > Math.min(width, thickness) / 2 + EPSILON) {
     ctx.errors.push({
       path: `${path}.rounding`,
       message: `must be at most ${round(Math.min(width, thickness) / 2)} (half the smaller of width and thickness)`
@@ -184,7 +185,7 @@ function validateBox (part: Record<string, unknown>, path: string, ctx: Context,
     ctx.errors.push({ path: `${path}.b`, message: 'a box needs distinct joints a and b' })
     return
   }
-  if (isFiniteNumber(rounding) && rounding > length(segment) / 2) {
+  if (isFiniteNumber(rounding) && rounding > length(segment) / 2 + EPSILON) {
     ctx.errors.push({
       path: `${path}.rounding`,
       message: `must be at most ${round(length(segment) / 2)} (half the a->b length)`

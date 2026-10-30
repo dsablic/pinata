@@ -62,3 +62,8 @@ export function walkTrack (speed: number, walkSeconds: number): (t: number) => R
     return { position: [0, 0, z], yaw: 0, velocity: [0, 0, moving ? speed : 0], angularVelocity: 0 }
   }
 }
+
+export const straightMannequin: Mannequin = {
+  ...mannequin,
+  joints: { ...mannequin.joints, kneeL: [0.1, 0.5, 0.02], kneeR: [-0.1, 0.5, 0.02] }
+}

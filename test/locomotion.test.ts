@@ -8,7 +8,7 @@ import { toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
-import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
+import { mannequin, rig, straightMannequin, walkTrack } from './locomotion-fixtures.ts'
 
 const rest = restPose(mannequin)
 
@@ -78,4 +78,14 @@ test('arms swing in opposite directions and the upper body follows the pelvis', 
   assert.ok(left * right < 0)
   assertClose(pose.chest[1] - rest.chest[1], frame.pelvisOffset[1])
   assertClose(pose.shoulderL[1] - rest.shoulderL[1], frame.pelvisOffset[1])
+})
+
+test('a straight-legged rig at rest stays within 1 cm of its rest pose', () => {
+  const straight = restPose(straightMannequin)
+  const [frame] = planGait({
+    track: walkTrack(0, 0), rig, rest: straight, mannequin: straightMannequin, duration: 1, fps: 24
+  })
+  const { pose, clamped } = poseAt({ frame, rig, rest: straight, mannequin: straightMannequin })
+  assert.equal(clamped, 0)
+  assert.ok(Math.abs(pose.pelvis[1] - straight.pelvis[1]) < 0.01, `pelvis moved ${pose.pelvis[1] - straight.pelvis[1]}`)
 })

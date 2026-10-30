@@ -8,7 +8,14 @@ import { soleHeight } from './pose.ts'
 import type { Pose } from './pose.ts'
 import type { RootState } from './script.ts'
 
-export type FootState = { side: 'left' | 'right', ankle: Vec3, toeYaw: number, planted: boolean, lift: number, toePitch: number }
+export type FootState = {
+  side: 'left' | 'right'
+  ankle: Vec3
+  toeYaw: number
+  planted: boolean
+  lift: number
+  toePitch: number
+}
 export type GaitFrame = {
   root: RootState
   pelvisOffset: Vec3
@@ -31,7 +38,7 @@ type Foot = { side: 'left' | 'right', sign: number, planted: Vec3, restHip: Vec3
 const TURN_CYCLES_PER_RADIAN = 2 / Math.PI
 const REST_EPSILON = 1e-9
 const PHASE_EPSILON = 1e-9
-const REACH_FRACTION = 0.95
+const REACH_FRACTION = 0.99
 const DROP_SMOOTHING_SECONDS = 0.125
 const SWING_EDGE = 0.1
 

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import type { Recording } from '../src/sim/metrics.ts'
+import { getPixel } from '../src/image.ts'
 import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../src/diagnostics/motion-images.ts'
 
 const body: Mannequin = {
@@ -86,6 +87,27 @@ test('bodyFrameOnionSkin collapses a cape fixed in body space to one shape', () 
   const one = bodyFrameOnionSkin(rigid, { size: 128, frames: [7], body, exclude: [] })
   const many = bodyFrameOnionSkin(rigid, { size: 128, frames: [0, 1, 2, 3, 4, 5, 6, 7], body, exclude: [] })
   assert.deepEqual(many.data, one.data)
+})
+
+test('bodyFrameOnionSkin front view puts the body-local +X side on the right', () => {
+  const positions = new Float64Array([0.6, 1.5, -0.3, 0.6, 0.6, -0.3])
+  const root = { position: [0, 0, 0] as Vec3, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+  const rec: Recording = {
+    constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }],
+    frames: [{ time: 0, root, positions, penetration: new Float64Array(2) }]
+  }
+  const img = bodyFrameOnionSkin(rec, { size: 128, frames: [0], body, exclude: [], horizontal: 'x' })
+  let left = 0
+  let right = 0
+  for (let y = 0; y < img.height; y++) {
+    for (let x = 0; x < img.width; x++) {
+      const c = getPixel(img, x, y)
+      if (((c >> 16) & 0xff) - ((c >> 8) & 0xff) < 60) continue
+      if (x < img.width / 2) left++
+      else right++
+    }
+  }
+  assert.ok(right > 0 && left === 0, `cape pixels left ${left}, right ${right}`)
 })
 
 test('angleChart plots swing and yaw into an image of the requested size', () => {

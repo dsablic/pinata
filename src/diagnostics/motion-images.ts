@@ -173,31 +173,44 @@ export function sideOnionSkin (recording: Recording, options: OnionOptions): Ima
   return img
 }
 
-export type BodyFrameOptions = { size: number, frames: number[], body: Mannequin, exclude: string[] }
+export type BodyFrameOptions = {
+  size: number
+  frames: number[]
+  body: Mannequin
+  exclude: string[]
+  horizontal?: 'x' | 'z'
+}
 
-function toLocal (positions: Float64Array, root: RootState): Array<[number, number]> {
+function toLocal (positions: Float64Array, root: RootState, horizontal: 'x' | 'z'): Array<[number, number]> {
   const c = Math.cos(root.yaw)
   const s = Math.sin(root.yaw)
   const local: Array<[number, number]> = []
   for (let p = 0; p < positions.length; p += 3) {
     const dx = positions[p] - root.position[0]
     const dz = positions[p + 2] - root.position[2]
-    local.push([dx * s + dz * c, -(positions[p + 1] - root.position[1])])
+    const across = horizontal === 'z' ? dx * s + dz * c : dx * c - dz * s
+    local.push([across, -(positions[p + 1] - root.position[1])])
   }
   return local
 }
 
-/** Side view in the body's local frame (z right, y up): static silhouette, cape constraints of chosen frames. */
+/**
+ * View in the body's local frame: static silhouette plus cape constraints of chosen frames. `horizontal` 'z'
+ * (default) is a side view with the body's front to the right; 'x' is a front view with the body's +X to the right.
+ */
 export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOptions): Image {
   const { frames } = recording
-  const shown = options.frames.map(i => ({ index: i, local: toLocal(frames[i].positions, frames[i].root) }))
+  const horizontal = options.horizontal ?? 'z'
+  const shown = options.frames.map(i => {
+    return { index: i, local: toLocal(frames[i].positions, frames[i].root, horizontal) }
+  })
   const view = fit([[0, 0], [0, -options.body.height], ...shown.flatMap(f => f.local)], options.size)
   const img = blank(options.size)
   const identity: RootState = { position: [0, 0, 0], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 }
   const collider = bodyCollider(options.body, options.exclude, identity)
   fillBody(img, view, {
     distance: collider.distance,
-    toPoint: (a, b, s) => [s, -b, a],
+    toPoint: (a, b, s) => horizontal === 'z' ? [s, -b, a] : [a, -b, s],
     depths: steps(-BODY_MARGIN, BODY_MARGIN, 9),
     rgb: BODY_LOCAL
   })

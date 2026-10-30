@@ -45,11 +45,7 @@
     ]
   },
   "wind": {
-    "direction": [
-      1,
-      0,
-      0
-    ],
+    "direction": [0, 0, -1],
     "speed": 4,
     "gust": 0.4
   }

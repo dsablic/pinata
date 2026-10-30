@@ -210,6 +210,21 @@ function windMetric (material: string): number {
   })
 }
 
+function windDisplacement (material: string): number {
+  const run = find('wind', material)
+  const rest = windlessRestHem(run)
+  const total = run.recording.frames.reduce((sum, frame) => {
+    let x = 0
+    let z = 0
+    for (const i of run.hem) {
+      x += frame.positions[3 * i] / run.hem.length
+      z += frame.positions[3 * i + 2] / run.hem.length
+    }
+    return sum + Math.hypot(x - rest[0], z - rest[2])
+  }, 0)
+  return total / run.recording.frames.length
+}
+
 const penetrationLimit = PENETRATION_PX * (bodies.get('turn-stop') as Mannequin).height / PX_SCALE
 const other = childHashes()
 const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
@@ -217,6 +232,7 @@ const nondeterministic = runs.flatMap(runHashes).filter(([id, hash]) => other.ge
 const perMaterial = Object.fromEntries(MATERIALS.map(name => [name, {
   ...turnStopMetrics(name),
   wind: windMetric(name),
+  windDisplacementMetres: windDisplacement(name),
   maxSpeed: metrics.maxSpeed(find('soak', name).recording)
 }]))
 const perRun = runs.map(r => ({
@@ -275,6 +291,15 @@ function writeBodyFrameStills (run: Run, prefix: string, recording: Recording): 
   writeOutput(join(outDir, `${prefix}-stop.png`), encodePng(bodyFrameOnionSkin(recording, { ...base, frames: stop })))
 }
 
+function writeWindFront (run: Run): void {
+  const body = bodies.get(run.scenario.name) as Mannequin
+  const frames = run.recording.frames.map((_, i) => i).filter(i => i % BODY_STEP === 0)
+  const options = { size: STILL_SIZE, frames, body, exclude: run.scenario.bodyExcludeParts, horizontal: 'x' as const }
+  writeOutput(join(outDir, `${run.id}-front.png`), encodePng(bodyFrameOnionSkin(run.recording, options)))
+  const side = { ...options, horizontal: 'z' as const }
+  writeOutput(join(outDir, `${run.id}-body.png`), encodePng(bodyFrameOnionSkin(run.recording, side)))
+}
+
 function writeStills (run: Run): void {
   const body = bodies.get(run.scenario.name) as Mannequin
   const exclude = run.scenario.bodyExcludeParts
@@ -286,6 +311,7 @@ function writeStills (run: Run): void {
   writeOutput(join(outDir, `${run.id}-angles.png`),
     encodePng(angleChart(run.recording, { ...CHART, swing: run.swing })))
   if (run.scenario.name === 'turn-stop') writeBodyFrameStills(run, run.id, run.recording)
+  if (run.scenario.name === 'wind') writeWindFront(run)
   if (run.id === 'turn-stop-silk') {
     writeBodyFrameStills(run, 'turn-stop-rigid', rigidRecording(run))
     writeOutput(join(outDir, 'turn-stop-rigid-side.png'), encodePng(sideOnionSkin(rigidRecording(run), onion)))

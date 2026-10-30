@@ -30,6 +30,7 @@ const MARGIN = 4
 const SHEET_SCALE = 8
 const SHEET_BACKGROUND = 0xc8c8c8
 const MIN_PIXELS_FOR_THIN = 4
+const CHILD_TIMEOUT_MS = 60000
 const AB_FRAME = '48px-el30-d1'
 const FACING = ['front', 'front-left', 'left', 'back-left', 'back', 'back-right', 'right', 'front-right']
 
@@ -64,6 +65,14 @@ function fail (message: string): never {
   if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
   process.exit(2)
 }
+
+process.on('uncaughtException', err => {
+  try {
+    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
+  } catch {
+    process.exit(2)
+  }
+})
 
 function loadJson (file: string): unknown {
   try {
@@ -129,7 +138,8 @@ const frameMetrics = frames.map(f => {
 })
 
 function childHashes (): Map<string, string> {
-  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--hashes'], { encoding: 'utf8' })
+  const args = [fileURLToPath(import.meta.url), '--hashes']
+  const output = execFileSync(process.execPath, args, { encoding: 'utf8', timeout: CHILD_TIMEOUT_MS })
   const hashes = new Map<string, string>()
   for (const line of output.split('\n').filter(l => l !== '')) {
     const [id, hash] = line.split(' ')

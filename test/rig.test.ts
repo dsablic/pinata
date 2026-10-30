@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkCapeAnchors, checkRig, stride, validateRig } from '../src/formats/rig.ts'
+import { checkCapeAnchors, checkRig, legBend, legPhases, stride, validateRig } from '../src/formats/rig.ts'
 import { validateMannequin } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
 
@@ -123,6 +123,105 @@ test('checkRig needs one left and one right leg', () => {
   const one = rig()
   one.legs.pop()
   assert.deepEqual(paths(one), ['legs'])
+})
+
+function quadrupedRig () {
+  const input: Record<string, any> = rig()
+  input.legs = [
+    { side: 'left', hip: 'hipL', knee: 'kneeL', ankle: 'ankleL', toe: 'toeL', phase: 0 },
+    { side: 'left', hip: 'hipLF', knee: 'kneeLF', ankle: 'ankleLF', toe: 'toeLF', phase: 0.25 },
+    { side: 'right', hip: 'hipR', knee: 'kneeR', ankle: 'ankleR', toe: 'toeR', phase: 0.5 },
+    { side: 'right', hip: 'hipRF', knee: 'kneeRF', ankle: 'ankleRF', toe: 'toeRF', phase: 0.75 }
+  ]
+  input.gait.stanceFraction = 0.75
+  return input
+}
+
+function quadrupedMannequin () {
+  const m = mannequin()
+  const names = ['hipLF', 'kneeLF', 'ankleLF', 'toeLF', 'hipRF', 'kneeRF', 'ankleRF', 'toeRF']
+  names.forEach((name, i) => { m.joints[name] = [20 + i, 0, 0] })
+  return m
+}
+
+test('accepts four legs with a phase on each and optional bend', () => {
+  const input = quadrupedRig()
+  Object.assign(input.legs[0], { bend: 'backward' })
+  assert.deepEqual(paths(input), [])
+  assert.deepEqual(validateRig(input).value!.legs[0].bend, 'backward')
+  assert.equal(validateRig(input).value!.legs[1].phase, 0.25)
+})
+
+test('only two or four legs are allowed', () => {
+  const three = quadrupedRig()
+  three.legs.pop()
+  assert.deepEqual(paths(three), ['legs'])
+  assert.match(validateRig(three).errors[0].message, /two or four legs; found 3/)
+  const none = rig()
+  none.legs = []
+  assert.deepEqual(paths(none), ['legs'])
+})
+
+test('with four legs every phase is required and the message names the walk order', () => {
+  const input = quadrupedRig()
+  delete input.legs[2].phase
+  const [error, ...rest] = validateRig(input).errors
+  assert.deepEqual(rest, [])
+  assert.equal(error.path, 'legs[2].phase')
+  assert.match(error.message, /left hind 0, left front 0\.25, right hind 0\.5, right front 0\.75/)
+})
+
+test('phase must be at least 0 and below 1, and bend forward or backward', () => {
+  for (const bad of [-0.1, 1, 1.5, Number.NaN, '0.5']) {
+    const input = rig()
+    Object.assign(input.legs[0], { phase: bad })
+    assert.deepEqual(paths(input), ['legs[0].phase'])
+  }
+  for (const bad of ['up', 3]) {
+    const input = rig()
+    Object.assign(input.legs[1], { bend: bad })
+    assert.deepEqual(paths(input), ['legs[1].bend'])
+  }
+  const ok = rig()
+  Object.assign(ok.legs[0], { phase: 0.99, bend: 'forward' })
+  assert.deepEqual(paths(ok), [])
+})
+
+test('legPhases defaults two legs to left 0 and right 0.5 and honours explicit phases', () => {
+  assert.deepEqual(legPhases(validateRig(rig()).value!), [0, 0.5])
+  const swapped = rig()
+  swapped.legs.reverse()
+  assert.deepEqual(legPhases(validateRig(swapped).value!), [0.5, 0])
+  const custom = rig()
+  Object.assign(custom.legs[1], { phase: 0.4 })
+  assert.deepEqual(legPhases(validateRig(custom).value!), [0, 0.4])
+  assert.deepEqual(legPhases(validateRig(quadrupedRig()).value!), [0, 0.25, 0.5, 0.75])
+})
+
+test('legBend defaults to forward', () => {
+  const input = rig()
+  Object.assign(input.legs[1], { bend: 'backward' })
+  const { legs } = validateRig(input).value!
+  assert.deepEqual(legs.map(legBend), ['forward', 'backward'])
+})
+
+test('checkRig accepts two left and two right legs and rejects other splits', () => {
+  assert.deepEqual(checkRig(validateRig(quadrupedRig()).value!, quadrupedMannequin()), [])
+  const input = quadrupedRig()
+  input.legs[3].side = 'left'
+  const errors = checkRig(validateRig(input).value!, quadrupedMannequin())
+  assert.deepEqual(errors.map(e => e.path), ['legs'])
+  assert.match(errors[0].message, /two left and two right legs/)
+})
+
+test('checkRig needs a stanceFraction at which all four feet can be planted together', () => {
+  const input = quadrupedRig()
+  input.gait.stanceFraction = 0.7
+  const errors = checkRig(validateRig(input).value!, quadrupedMannequin())
+  assert.deepEqual(errors.map(e => e.path), ['gait.stanceFraction'])
+  assert.match(errors[0].message, /at least 0\.75/)
+  input.gait.stanceFraction = 0.78
+  assert.deepEqual(checkRig(validateRig(input).value!, quadrupedMannequin()), [])
 })
 
 test('stride grows with the square root of speed and is clamped', () => {

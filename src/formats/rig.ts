@@ -4,7 +4,16 @@ import type { Cape } from './sim.ts'
 import { checkKnownKeys, copyKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
-export type Leg = { side: 'left' | 'right', hip: string, knee: string, ankle: string, toe: string }
+export type Bend = 'forward' | 'backward'
+export type Leg = {
+  side: 'left' | 'right'
+  hip: string
+  knee: string
+  ankle: string
+  toe: string
+  phase?: number
+  bend?: Bend
+}
 export type Arm = {
   side: 'left' | 'right'
   shoulder: string
@@ -28,7 +37,10 @@ export type Rig = { legs: Leg[], arms: Arm[], pelvis: string, upperBody: string[
 const RIG_FIELDS = ['legs', 'arms', 'pelvis', 'upperBody', 'gait'] as const
 const LEG_JOINTS = ['hip', 'knee', 'ankle', 'toe'] as const
 const ARM_JOINTS = ['shoulder', 'elbow', 'wrist', 'hand'] as const
-const LEG_FIELDS = ['side', ...LEG_JOINTS] as const
+const LEG_FIELDS = ['side', ...LEG_JOINTS, 'phase', 'bend'] as const
+const WALK_ORDER = 'left hind 0, left front 0.25, right hind 0.5, right front 0.75'
+const PHASE_TOLERANCE = 1e-9
+const NON_JOINT_FIELDS: ReadonlySet<string> = new Set(['side', 'carried', 'phase', 'bend'])
 const ARM_FIELDS = ['side', ...ARM_JOINTS, 'carried'] as const
 const GAIT_FIELDS = [
   'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing',
@@ -51,6 +63,15 @@ const EXCLUSIVE_MINIMUM: ReadonlySet<string> = new Set(['strideLength', 'referen
 export function stride (gait: Gait, speed: number): number {
   const ratio = (Math.max(0, speed) / gait.referenceSpeed) ** (gait.strideExponent ?? 0.5)
   return gait.strideLength * Math.min(1.5, Math.max(0.5, ratio))
+}
+
+/** Gait cycle offset of every leg: the leg's `phase`, else 0 for a left and 0.5 for a right leg. */
+export function legPhases (rig: Rig): number[] {
+  return rig.legs.map(leg => leg.phase ?? (leg.side === 'left' ? 0 : 0.5))
+}
+
+export function legBend (leg: Leg): Bend {
+  return leg.bend ?? 'forward'
 }
 
 export function validateRig (input: unknown): Validated<Rig> {
@@ -88,7 +109,8 @@ function validateLimbs (
     if (limb.side !== 'left' && limb.side !== 'right') {
       errors.push({ path: `${here}.side`, message: "expected 'left' or 'right'" })
     }
-    for (const field of fields.filter(f => f !== 'side' && f !== 'carried')) {
+    if (path === 'legs') validateLegGait(limb, here, value.length, errors)
+    for (const field of fields.filter(f => !NON_JOINT_FIELDS.has(f))) {
       if (!isNonEmptyString(limb[field])) errors.push({ path: `${here}.${field}`, message: 'expected a joint name' })
     }
     if (fields.includes('carried') && limb.carried !== undefined) {
@@ -96,8 +118,24 @@ function validateLimbs (
       if (!ok) errors.push({ path: `${here}.carried`, message: 'expected an array of joint names' })
     }
   })
-  if (path === 'legs' && value.length !== 2) {
-    errors.push({ path, message: `expected exactly two legs, one left and one right; found ${value.length}` })
+  if (path === 'legs' && value.length !== 2 && value.length !== 4) {
+    errors.push({ path, message: `expected two or four legs; found ${value.length}` })
+  }
+}
+
+function validateLegGait (leg: Record<string, unknown>, here: string, count: number, errors: ValidationError[]): void {
+  const { phase, bend } = leg
+  if (phase === undefined && count === 4) {
+    errors.push({
+      path: `${here}.phase`,
+      message: `expected a number from 0 up to 1: four legs need a phase each (the usual walk order is ${WALK_ORDER})`
+    })
+  } else if (phase !== undefined && !(isFiniteNumber(phase) && phase >= 0 && phase < 1)) {
+    const message = "expected a number from 0 up to 1: the leg's offset in the gait cycle"
+    errors.push({ path: `${here}.phase`, message })
+  }
+  if (bend !== undefined && bend !== 'forward' && bend !== 'backward') {
+    errors.push({ path: `${here}.bend`, message: "expected 'forward' or 'backward': the side the knee points" })
   }
 }
 
@@ -143,9 +181,12 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
   rig.upperBody.forEach((joint, i) => { use(joint, `upperBody[${i}]`) })
   checkBones(rig, mannequin, errors)
   const sides = rig.legs.map(l => l.side).sort().join(',')
-  if (sides !== 'left,right') {
-    errors.push({ path: 'legs', message: `expected one left and one right leg; found ${sides}` })
+  const expected = rig.legs.length === 4 ? 'left,left,right,right' : 'left,right'
+  if (sides !== expected) {
+    const want = rig.legs.length === 4 ? 'two left and two right legs' : 'one left and one right leg'
+    errors.push({ path: 'legs', message: `expected ${want}; found ${sides}` })
   }
+  errors.push(...checkStance(rig))
   const missing = known.filter(joint => !used.has(joint))
   if (missing.length > 0) {
     errors.push({
@@ -155,6 +196,18 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
     })
   }
   return errors
+}
+
+function checkStance (rig: Rig): ValidationError[] {
+  const phases = legPhases(rig).sort((a, b) => a - b)
+  const widest = Math.max(...phases.map((p, i) => (phases[(i + 1) % phases.length] - p + 1) % 1 || 1))
+  const needed = 1 - widest
+  if (rig.gait.stanceFraction >= needed - PHASE_TOLERANCE) return []
+  return [{
+    path: 'gait.stanceFraction',
+    message: `with these leg phases a foot is always in the air, so the character could never stand still; ` +
+      `raise stanceFraction to at least ${Math.ceil(needed * 1000 - 1e-6) / 1000} (now ${rig.gait.stanceFraction})`
+  }]
 }
 
 const BONES: Record<'legs' | 'arms', Array<readonly [string, string]>> = {

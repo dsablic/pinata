@@ -203,3 +203,56 @@ test('pushed far past its legs, the body stays finite and the locomotion gates h
   }
 })
 
+/**
+ * The worst ratio, over every joint, of its movement into a frame (relative to the root) to its median per-frame
+ * movement over the surrounding second.
+ */
+function lumpiness (run: Run, frame: number): number {
+  const local = (i: number, joint: string): number[] => {
+    const f = run.world.frames[i]
+    const p = f.joints[joint]
+    const dx = p[0] - f.root.position[0]
+    const dz = p[2] - f.root.position[2]
+    const c = Math.cos(f.root.yaw)
+    const s = Math.sin(f.root.yaw)
+    return [dx * c - dz * s, p[1], dx * s + dz * c]
+  }
+  const move = (i: number, joint: string): number => {
+    const a = local(i - 1, joint)
+    const b = local(i, joint)
+    return Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
+  }
+  let worst = 0
+  for (const joint of Object.keys(run.world.frames[frame].joints)) {
+    const around: number[] = []
+    for (let i = frame - 12; i <= frame + 12; i++) if (i !== frame) around.push(move(i, joint))
+    around.sort((a, b) => a - b)
+    worst = Math.max(worst, move(frame, joint) / Math.max(around[12], 1e-4))
+  }
+  return worst
+}
+
+test('transitions: clip switches are no lumpier than ordinary frames, within 10 points, over three courses', t => {
+  const results: Array<{ message: string, pass: boolean }> = []
+  for (const name of HUMANOIDS) {
+    const counts = { switches: 0, switchLumps: 0, ordinary: 0, ordinaryLumps: 0 }
+    for (const seed of [3, 11, 17]) {
+      const terrain = course(seed)
+      const run = play(name, terrain, 60, wander(name, terrain, seed + 7))
+      const inside = (i: number): boolean => i >= 13 && i + 12 < run.frames.length
+      const switches = run.frames.map((f, i) => f.switched && inside(i) ? i : -1).filter(i => i >= 0)
+      const near = new Set(switches.flatMap(i => [i - 1, i, i + 1]))
+      const ordinary = Array.from({ length: 140 }, (_, j) => 20 + 9 * j).filter(i => inside(i) && !near.has(i))
+      counts.switches += switches.length
+      counts.switchLumps += switches.filter(i => lumpiness(run, i) > 3).length
+      counts.ordinary += ordinary.length
+      counts.ordinaryLumps += ordinary.filter(i => lumpiness(run, i) > 3).length
+    }
+    const atSwitches = counts.switchLumps / counts.switches
+    const elsewhere = counts.ordinaryLumps / counts.ordinary
+    const message = `${name}: ${atSwitches.toFixed(2)} at switches, ${elsewhere.toFixed(2)} elsewhere`
+    results.push({ message, pass: atSwitches <= elsewhere + 0.1 })
+  }
+  t.diagnostic(results.map(r => r.message).join('; '))
+  assert.ok(results.every(r => r.pass), results.map(r => r.message).join('; '))
+})

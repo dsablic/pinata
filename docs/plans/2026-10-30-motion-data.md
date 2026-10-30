@@ -155,3 +155,24 @@ characters on the same clip never move in lockstep.
     code using them can match across the two. Within one engine runs are identical. A fix, for the user to decide: a
     deterministic math module (a port of the fdlibm functions V8 13.6 uses, so Node outputs stay byte-identical) used
     everywhere in place of those Math functions.
+- **2026-10-30, user decisions.** Transitions gate restated (user): switch frames are no lumpier than ordinary
+  frames, the share over 3 times at switches at most the share at ordinary frames plus 10 points, pooled over three
+  courses per humanoid (one course alone is too noisy: shares move 5 to 10 points between runs). Determinism across
+  Node and Chrome dropped (user): runs within one engine stay identical; identity across engines is not achievable
+  with the built-in Math functions. Release after the batch C review (user).
+- **Transitions, now passing.** The restated gate first failed for the rogue and dwarf (16 and 12 points over):
+  switches carried the old pose but not its velocity, so motion turned abruptly. Switches now use dead blending (the
+  old motion runs on at its own velocity, slowing to a stop over 0.2 s, and fades into the new clip). Measured:
+  knight 0.22 at switches against 0.25 elsewhere, rogue 0.24 / 0.19, dwarf 0.18 / 0.22, wizard 0.26 / 0.20 (test).
+- **2026-10-30, independent review of batch C**, fixed:
+  - Critical: in strong wind a walk could never end (the body balanced short of its target) and characters drifted
+    off the world; the wind now takes at most 80% of what the legs can give, a standing body braces three times
+    harder, and a walk also ends once stopped near its target or well past its expected time.
+  - Critical: repeated pokes added up to 7.8 m/s; a poke now adds 1.8 m/s but cannot push past 2.5 m/s.
+  - The startled walk went back toward the poke half the time (the poke was forgotten before the walk was planned).
+  - Malformed capture data threw in the bundle reader; it is now reported at its path, as are members not in the
+    cast.
+  - The poke test passed vacuously (the knight walked that way anyway): it now compares with the same world unpoked,
+    on three seeds for every captured actor, and checks the startled walk goes away. New tests: 8 m/s wind both
+    ways for a minute (nobody leaves the world or gets stuck), repeated pokes, malformed bundles.
+  - Also: after a walk the actor keeps facing along it (not toward its lane); clicks pick a character within 14 px.

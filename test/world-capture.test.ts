@@ -9,6 +9,7 @@ import * as metrics from '../src/motion/metrics.ts'
 import type { LocomotionRecording } from '../src/motion/metrics.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import { validateWorldConfig } from '../src/world/config.ts'
+import { readWorldBundle } from '../src/world/bundle.ts'
 import { createWorld } from '../src/world/world.ts'
 import type { CastMember, World, WorldFrame } from '../src/world/world.ts'
 
@@ -78,13 +79,63 @@ test('over a minute on the showcase terrain, captured actors keep busy and their
   }
 })
 
-test('a poke shoves a captured actor at least 0.1 m away and it reacts', () => {
-  const world = createWorld({ seed: 3, cast, config, fps: FPS })
-  const { k } = captured[0]
-  const before = run(world, 2 * FPS)
-  const x = before[before.length - 1].actors[k].root.position[0]
-  const after = run(world, FPS, i => { if (i === 0) world.poke(k, x - 0.5) })
-  const furthest = Math.max(...after.map(f => f.actors[k].root.position[0] - x))
-  assert.ok(furthest >= 0.1, `moved ${furthest.toFixed(2)} m`)
-  assert.ok(after.some(f => f.actors[k].activity === 'startled' && f.actors[k].say !== undefined))
+test('a poke shoves each captured actor away, further than it would have gone, and its startled walk goes away', () => {
+  for (const seed of [3, 5, 8]) {
+    for (const { member, k } of captured) {
+      const poked = createWorld({ seed, cast, config, fps: FPS })
+      const plain = createWorld({ seed, cast, config, fps: FPS })
+      const x = run(poked, 2 * FPS)[2 * FPS - 1].actors[k].root.position[0]
+      run(plain, 2 * FPS)
+      const after = run(poked, 2 * FPS, i => { if (i === 0) poked.poke(k, x - 0.5) })
+      const baseline = run(plain, 2 * FPS)
+      const shove = after[11].actors[k].root.position[0] - baseline[11].actors[k].root.position[0]
+      assert.ok(shove >= 0.1, `seed ${seed}, ${member.name}: shoved ${shove.toFixed(2)} m beyond its own path`)
+      assert.ok(after.some(f => f.actors[k].activity === 'startled' && f.actors[k].say !== undefined))
+      const end = after[after.length - 1].actors[k].root.position[0]
+      assert.ok(end > x, `seed ${seed}, ${member.name}: the startled walk went back toward the poke`)
+    }
+  }
+})
+
+test('repeated pokes do not add up, and strong wind neither strands nor blows away captured actors', () => {
+  const span = (world: World): [number, number] => [world.extent[0] - 0.5, world.extent[1] + 0.5]
+  const poked = createWorld({ seed: 3, cast, config, fps: FPS })
+  const { k } = captured[captured.length - 1]
+  run(poked, FPS)
+  const frames = run(poked, 3 * FPS, i => {
+    if (i < FPS && i % 4 === 0) poked.poke(k, poked.extent[0])
+  })
+  const fastest = Math.max(...frames.map(f => Math.hypot(f.actors[k].root.velocity[0], f.actors[k].root.velocity[2])))
+  assert.ok(fastest < 3, `top speed ${fastest.toFixed(2)} m/s`)
+  for (const speed of [8, -8]) {
+    const world = createWorld({ seed: 3, cast, config, fps: FPS })
+    world.environment.wind.speed = Math.abs(speed)
+    world.environment.wind.direction = [Math.sign(speed), 0, 0]
+    world.environment.wind.gust = 0.4
+    const windy = run(world, 60 * FPS)
+    const [low, high] = span(world)
+    for (const { member, k } of captured) {
+      const xs = windy.map(f => f.actors[k].root.position[0])
+      assert.ok(xs.every(x => x >= low && x <= high), `${speed} m/s: ${member.name} left the world`)
+      const activities = new Set(windy.slice(30 * FPS).map(f => f.actors[k].activity))
+      const handovers = windy.slice(30 * FPS).filter(f => f.actors[k].handover).length
+      assert.ok(handovers >= 2, `${speed} m/s: ${member.name} stuck in ${[...activities].join(', ')}`)
+    }
+  }
+})
+
+test('malformed capture data is reported at its path, not thrown', () => {
+  const bundle = JSON.parse(readFileSync('site/world.json', 'utf8'))
+  const members = config.cast.map(name => {
+    const dir = join('examples', name)
+    const read = (file: string): unknown => JSON.parse(readFileSync(join(dir, file), 'utf8'))
+    return { name, mannequin: read('mannequin.json'), style: read('style.json'), rig: read('rig.json') }
+  })
+  const paths = (capture: unknown): string[] => {
+    return (readWorldBundle({ config: bundle, cast: members, capture }).errors).map(e => e.path).sort()
+  }
+  assert.deepEqual(paths('nope'), ['capture'])
+  assert.deepEqual(paths({ clips: [], base: {} }), ['capture.members'])
+  assert.deepEqual(paths({ clips: {}, base: {}, members: null }), ['capture.clips', 'capture.members'])
+  assert.deepEqual(paths({ clips: [], base: {}, members: { ghost: {} } }), ['capture.members.ghost'])
 })

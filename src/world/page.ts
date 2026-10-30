@@ -7,7 +7,7 @@ import type { World, WorldFrame } from './world.ts'
 
 const FPS = 24
 const SCALE = 2
-const POKE_RADIUS_PX = 10
+const POKE_RADIUS_PX = 14
 const STAT_WINDOW = 120
 
 function byId<T extends HTMLElement> (id: string): T {

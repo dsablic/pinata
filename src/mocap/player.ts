@@ -57,13 +57,16 @@ export type Player = {
 }
 
 const DEFAULT_TUNING: BodyTuning = { speedGain: 3, maxAcceleration: 3, turnGain: 4, drag: 0.03 }
+/** Most of the legs' acceleration the wind can take, and how much harder a standing body holds its place. */
+const WIND_SHARE = 0.8
+const STAND_GAIN = 3
 /** Matching runs every this many frames, and when a clip runs out. */
 const SEARCH_EVERY = 5
 /** A jump closer than this many frames to the frame playing is not taken. */
 const SAME_FRAME = 3
 /** The playing frame's cost is lowered by this much, so playback does not jump for nothing. */
 const STAY_BONUS = 0.15
-/** Seconds over which a switch's offsets fade (inertialization). */
+/** Seconds over which a switch's old motion runs on and fades into the new clip (dead blending). */
 const BLEND_SECONDS = 0.2
 /** How far playback speed may stretch to follow the body. */
 const RATE_RANGE: [number, number] = [0.8, 1.25]
@@ -73,6 +76,8 @@ const SYNC = 0.12
 const HOLD_HEIGHT = 0.025
 /** Least height of a swinging foot's ends above the ground, metres (real toes clear it by 1 to 3 cm). */
 const SWING_CLEARANCE = 0.03
+/** How fast that clearance comes and goes, m/s. */
+const CLEARANCE_SPEED = 0.4
 /** Ends that stay this close to the ground from one frame to the next are kept from moving across it. */
 const PIN_HEIGHT = 0.021
 /** Seconds over which a released foot rejoins its animation; a foot pulled off the ground steps over a longer time. */
@@ -87,8 +92,9 @@ const LOOKAHEAD_SECONDS = 0.2
 /** Fastest a swinging foot's ground reference sinks and rises, m/s. */
 const SINK_SPEED = 1.2
 const RISE_SPEED = 1.5
-/** Time constant of the pelvis following the feet's ground, seconds. */
+/** Time constant of the pelvis following the feet's ground, and of it lowering for a foot in the air, seconds. */
 const BASE_SECONDS = 0.12
+const LOWER_SECONDS = 0.06
 /** Most knee flexion the body allows before it rises, and that a foot in the air may reach, degrees (limit 150). */
 const FOLD_DEGREES = 140
 const TUCK_DEGREES = 148
@@ -108,6 +114,8 @@ type Foot = {
   frozen?: Matrix
   /** Ground under the foot that its animation is measured from. */
   reference: number
+  /** How far it keeps its ends clear of the ground, easing to SWING_CLEARANCE while the clip swings it. */
+  clearance: number
   release?: { offset: Vec3, turn: Matrix, start: number, step: boolean, from: number }
   /** Where the animation put the ankle last frame (world, before the ground). */
   animated?: Vec3
@@ -125,12 +133,6 @@ function turnBetween (a: number, b: number): number {
 
 function clamp (v: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, v))
-}
-
-/** Inertialization's fade: 1 at the switch, 0 after BLEND_SECONDS, with zero slope at the end. */
-function fade (seconds: number): number {
-  const u = clamp(seconds / BLEND_SECONDS, 0, 1)
-  return (1 - u) ** 3
 }
 
 /** Height of a step through it, 0 to 1: up quickly off the ground, then down to touch with zero slope. */
@@ -207,21 +209,33 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   let entry = Math.max(0, entries.findIndex(e => e.endsAtRest))
   let t = entries[entry].frames.length - 1
   let frameCount = 0
-  type Blend = { rotations: Record<string, Matrix>, clearance: { left: number, right: number }, start: number }
+  /** A switch's old motion: its last rotations and clearances, how they were changing per frame, and when. */
+  type Blend = {
+    rotations: Record<string, Matrix>
+    turning: Record<string, Matrix>
+    clearance: { left: number, right: number }
+    rising: { left: number, right: number }
+    start: number
+  }
   let blend: Blend | undefined
   let last: BodyFrame | undefined
+  let before: BodyFrame | undefined
   let switched = false
   const startGround = ground(body.position[0], body.position[2])
   let base = startGround
   /** The body's rise for folded legs, eased in and out. */
   let settle = 0
-  const feet: Foot[] = legs.map(() => ({ reference: startGround }))
+  const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const stepBody = (): void => {
     const want: Vec3 = [Math.sin(command.heading) * command.speed, 0, Math.cos(command.heading) * command.speed]
     const relative = sub(wind, body.velocity)
-    const drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
-    let push = scale(sub(want, body.velocity), tuning.speedGain)
+    let drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
+    // the legs can always out-push the wind, and a body told to stand braces against it
+    const most = WIND_SHARE * tuning.maxAcceleration
+    if (length(drag) > most) drag = scale(drag, most / length(drag))
+    const gain = command.speed > 0 ? tuning.speedGain : STAND_GAIN * tuning.speedGain
+    let push = scale(sub(want, body.velocity), gain)
     if (length(push) > tuning.maxAcceleration) push = scale(push, tuning.maxAcceleration / length(push))
     body.velocity = add(body.velocity, scale(add(push, drag), dt))
     body.velocity[1] = 0
@@ -273,16 +287,18 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const chosen = candidates[best]
     if (chosen.entry === entry && Math.abs(chosen.frame - t) < SAME_FRAME) return
     if (last !== undefined) {
-      const next = entries[chosen.entry].frames[chosen.frame]
-      const offsets: Record<string, Matrix> = {}
+      const from = before ?? last
+      const turning: Record<string, Matrix> = {}
       for (const joint of Object.keys(last.rotations)) {
-        offsets[joint] = multiply(last.rotations[joint], transpose(next.rotations[joint]))
+        turning[joint] = multiply(last.rotations[joint], transpose(from.rotations[joint]))
       }
       blend = {
-        rotations: offsets,
-        clearance: {
-          left: last.clearance.left - next.clearance.left,
-          right: last.clearance.right - next.clearance.right
+        rotations: last.rotations,
+        turning,
+        clearance: last.clearance,
+        rising: {
+          left: last.clearance.left - from.clearance.left,
+          right: last.clearance.right - from.clearance.right
         },
         start: frameCount
       }
@@ -292,27 +308,32 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     switched = true
   }
 
-  /** The clip frame playing, with any switch's offsets faded in. */
+  /**
+   * The clip frame playing. After a switch (dead blending), the old motion carries on from its last frame at its own
+   * velocity, slowing to a stop over BLEND_SECONDS, and fades into the new clip, so neither pose nor velocity jumps.
+   */
   const playing = (): BodyFrame => {
     const frame = sampleFrame(entries[entry].frames, t)
     if (blend === undefined) return frame
-    const w = fade((frameCount - blend.start) * dt)
-    if (w <= 0) {
+    const span = BLEND_SECONDS * fps
+    const n = frameCount - blend.start + 1
+    if (n >= span) {
       blend = undefined
       return frame
     }
+    const carried = n - n * n / (2 * span)
+    const u = n / span
+    const w = u * u * (3 - 2 * u)
     const rotations: Record<string, Matrix> = {}
     for (const [joint, rotation] of Object.entries(frame.rotations)) {
-      rotations[joint] = multiply(interpolate(IDENTITY, blend.rotations[joint], w), rotation)
+      const old = multiply(interpolate(IDENTITY, blend.turning[joint], carried), blend.rotations[joint])
+      rotations[joint] = interpolate(old, rotation, w)
     }
-    return {
-      ...frame,
-      rotations,
-      clearance: {
-        left: frame.clearance.left + blend.clearance.left * w,
-        right: frame.clearance.right + blend.clearance.right * w
-      }
+    const side = (key: 'left' | 'right'): number => {
+      const old = blend!.clearance[key] + blend!.rising[key] * carried
+      return old + (frame.clearance[key] - old) * w
     }
+    return { ...frame, rotations, clearance: { left: side('left'), right: side('right') } }
   }
 
   const advance = (): void => {
@@ -436,7 +457,10 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       final = foot.last.rotation
     }
     // stand on the ground under both ends; a foot the clip swings keeps clear of it
-    const clearance = !contact && foot.heel === undefined && foot.toe === undefined ? SWING_CLEARANCE : 0
+    const wanted = !contact && foot.heel === undefined && foot.toe === undefined ? SWING_CLEARANCE : 0
+    const step = CLEARANCE_SPEED * dt
+    foot.clearance = Math.min(foot.clearance + step, Math.max(foot.clearance - step, wanted))
+    const clearance = foot.clearance
     const placed = soles(ankle, final, k)
     const lift = Math.max(0, clearance + ground(placed.heel[0], placed.heel[2]) - placed.heel[1],
       clearance + ground(placed.toe[0], placed.toe[2]) - placed.toe[1])
@@ -522,6 +546,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
       if (frameCount > 0) advance()
       const frame = playing()
+      before = last
       last = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
       const targets = legs.map((leg, k) => {
@@ -561,13 +586,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
         stepOff(limiting)
       }
       // feet in the air ask the body to rise where they would fold and lower where they could not reach, as far as
-      // the held feet allow; the body lowers at once and rises gradually, and the held feet's range is kept every frame
+      // the held feet allow; the body eases there, lowering faster than it rises, and the held feet's range is kept
+      // every frame
       const air = legs.map((_, k) => k).filter(k => !isHeld(k)).map(bounds)
       const airFloor = Math.max(-Infinity, ...air.map(b => b.floor))
       const airCeiling = Math.min(Infinity, ...air.map(b => b.ceiling))
       const free = Math.min(airCeiling, Math.max(airFloor, 0))
       const wanted = clamp(Number.isFinite(free) ? free : 0, Number.isFinite(floor) ? floor : -Infinity, ceiling)
-      settle = wanted < settle ? wanted : settle + (wanted - settle) * (1 - Math.exp(-dt / BASE_SECONDS))
+      const ease = wanted < settle ? LOWER_SECONDS : BASE_SECONDS
+      settle += (wanted - settle) * (1 - Math.exp(-dt / ease))
       if (!Number.isFinite(settle)) settle = 0
       const drop = Math.min(ceiling, Math.max(floor, settle))
       // feet in the air keep their place across the ground and rise or sink to stay within the leg's range, never

@@ -31,9 +31,8 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
   const errors: ValidationError[] = config.errors.map(e => ({ ...e, path: `config.${e.path}` }))
   const cast: CastMember[] = []
   const looks: Look[] = []
-  const capture = isRecord(input.capture) ? input.capture as CaptureData : undefined
-  const written = capture !== undefined && Array.isArray(capture.clips) ? capture.clips : []
-  const clips = readClips(written, errors, 'capture.clips')
+  const capture = readCapture(input.capture, errors)
+  const clips = capture === undefined ? [] : readClips(capture.clips, errors, 'capture.clips')
   input.cast.forEach((member: unknown, i) => {
     const at = (file: string, e: ValidationError): ValidationError => ({ ...e, path: `cast[${i}].${file}.${e.path}` })
     if (!isRecord(member) || typeof member.name !== 'string') {
@@ -65,7 +64,9 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     }
     const look = { ...mannequin.value, parts: mannequin.value.parts.filter(part => !hidden.has(part.name)) }
     const clothed = cloth === undefined ? {} : { cloth }
-    const own = capture?.members[member.name]
+    const own = capture !== undefined && Object.hasOwn(capture.members, member.name)
+      ? capture.members[member.name]
+      : undefined
     const database = own === undefined
       ? undefined
       : captureFor({ rig: resolved, mannequin: look }, clips, capture?.base, own, errors,
@@ -75,6 +76,10 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     const drape = cloth === undefined ? {} : { cloth: cloth.scenario }
     looks.push({ mannequin: look, style: style.value, ...drape })
   })
+  const named = new Set(input.cast.map(member => isRecord(member) ? member.name : undefined))
+  for (const name of Object.keys(capture?.members ?? {})) {
+    if (!named.has(name)) errors.push({ path: `capture.members.${name}`, message: 'not a member of the cast' })
+  }
   if (errors.length > 0 || config.value === undefined) return { errors }
   return { value: { config: config.value, cast, looks }, errors }
 }
@@ -119,4 +124,21 @@ function dressed (scenario: Scenario, dress: Dress): Scenario {
       return render === undefined ? chain : { ...chain, render }
     })
   }
+}
+
+/** The bundle's motion capture, when it has any: clips, the shared retargeting and each member's, each checked. */
+function readCapture (input: unknown, errors: ValidationError[]): CaptureData | undefined {
+  if (input === undefined) return undefined
+  if (!isRecord(input)) {
+    errors.push({ path: 'capture', message: 'expected { clips, base, members }' })
+    return undefined
+  }
+  const clips = Array.isArray(input.clips) ? input.clips : undefined
+  if (clips === undefined) errors.push({ path: 'capture.clips', message: 'expected an array of motion clips' })
+  if (!isRecord(input.base)) errors.push({ path: 'capture.base', message: 'expected the shared retargeting' })
+  if (!isRecord(input.members)) {
+    errors.push({ path: 'capture.members', message: 'expected each member\'s retargeting, by name' })
+  }
+  if (clips === undefined || !isRecord(input.base) || !isRecord(input.members)) return undefined
+  return { clips, base: input.base, members: input.members }
 }

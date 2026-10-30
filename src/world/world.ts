@@ -65,14 +65,20 @@ export type World = {
 
 type Plant = { ankle: Vec3, yaw: number, pitch?: number }
 
-/** Captured actors: how near (m) a walk's target counts as reached, how hard they slow toward it (1/s), how strongly
- * they steer back to their lane, how long past its time a turn may take (s), the speed of a poke's shove (m/s), and
- * how many finished moves one frame may skip past. */
+/** Captured actors: how near (m) a walk's target counts as reached, and how near once they have stopped (m/s) there;
+ * how long past its time a walk may take (s); how hard they slow toward the target (1/s); how strongly they steer
+ * back to their lane; how long past its time a turn may take (s); the speed a poke's shove adds and the speed pokes
+ * cannot push past (m/s); and how many
+ * finished moves one frame may skip past. */
 const CAPTURE_ARRIVAL = 0.08
+const CAPTURE_NEAR = 0.3
+const CAPTURE_STOPPED = 0.05
+const CAPTURE_WALK_GRACE = 3
 const CAPTURE_APPROACH = 1.5
 const CAPTURE_LANE_PULL = 2
 const CAPTURE_TURN_GRACE = 1.5
 const CAPTURE_SHOVE = 1.8
+const CAPTURE_SHOVE_TOP = 2.5
 const CAPTURE_MOVES_PER_FRAME = 8
 type Actor = {
   member: CastMember
@@ -103,6 +109,8 @@ type Actor = {
   player?: Player
   moves: Move[]
   moveStart: number
+  /** Where along x the current move began. */
+  moveFrom: number
   /** The heading it last chose, which it keeps while standing. */
   facing?: number
 }
@@ -202,7 +210,8 @@ export function createWorld (options: WorldOptions): World {
       friend: (i + 1) % cast.length,
       chains,
       moves: [],
-      moveStart: 0
+      moveStart: 0,
+      moveFrom: x
     }
   })
   for (const actor of actors) {
@@ -470,10 +479,13 @@ export function createWorld (options: WorldOptions): World {
     const elapsed = time - actor.moveStart
     if (move.kind === 'walk') {
       const dx = move.x - position[0]
-      if (Math.abs(dx) < CAPTURE_ARRIVAL) return undefined
-      // heads for the target along its lane, slowing as it nears it
-      const heading = Math.atan2(dx, (actor.lane - position[2]) * CAPTURE_LANE_PULL)
-      return { speed: Math.min(move.speed, CAPTURE_APPROACH * Math.abs(dx)), heading }
+      const stopped = Math.hypot(actor.root.velocity[0], actor.root.velocity[2]) < CAPTURE_STOPPED
+      const late = elapsed > CAPTURE_WALK_GRACE + Math.abs(move.x - actor.moveFrom) / Math.max(move.speed, 0.1)
+      if (Math.abs(dx) < CAPTURE_ARRIVAL || (Math.abs(dx) < CAPTURE_NEAR && stopped) || late) return undefined
+      // heads for the target along its lane, slowing as it nears it; it keeps facing along the walk afterwards
+      actor.facing = dx > 0 ? Math.PI / 2 : -Math.PI / 2
+      const pull = Math.abs(dx) > CAPTURE_NEAR ? (actor.lane - position[2]) * CAPTURE_LANE_PULL : 0
+      return { speed: Math.min(move.speed, CAPTURE_APPROACH * Math.abs(dx)), heading: Math.atan2(dx, pull) }
     }
     if (move.kind === 'turn') {
       const facing = Math.abs(turnBetween(yaw, move.yaw)) < FACING_TOLERANCE
@@ -490,13 +502,15 @@ export function createWorld (options: WorldOptions): World {
   const stepCaptured = (actor: Actor, player: Player, time: number): ActorFrame => {
     let handover = false
     if (actor.poked !== undefined) {
+      // shoved away, but repeated pokes do not add up past a top speed; the startled walk goes away too
       const away = Math.sign(actor.root.position[0] - actor.poked) || 1
-      player.push([away * CAPTURE_SHOVE, 0, 0])
+      const along = actor.root.velocity[0] * away
+      const shoved = Math.min(along + CAPTURE_SHOVE, Math.max(along, CAPTURE_SHOVE_TOP))
+      player.push([away * (shoved - along), 0, 0])
       actor.steps = [...config.reactions.poke.steps]
       actor.activity = 'startled'
       actor.moves = []
       actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
-      actor.poked = undefined
     }
     let command: Command | undefined
     for (let guard = 0; guard < CAPTURE_MOVES_PER_FRAME && command === undefined; guard++) {
@@ -510,16 +524,19 @@ export function createWorld (options: WorldOptions): World {
         }
         actor.moves = movesOf(actor, actor.steps.shift() as Step, time)
         actor.moveStart = time
+        actor.moveFrom = actor.root.position[0]
         handover = true
       }
       command = commandFor(actor, actor.moves[0], time)
       if (command === undefined) {
         actor.moves.shift()
         actor.moveStart = time
+        actor.moveFrom = actor.root.position[0]
       }
     }
+    actor.poked = undefined
     const given = command ?? { speed: 0, heading: actor.facing ?? actor.root.yaw }
-    if (given.speed > 0 || command !== undefined) actor.facing = given.heading
+    if (command !== undefined && actor.moves[0]?.kind === 'turn') actor.facing = given.heading
     player.command(given)
     const wind = windAt(environment.wind, time)
     player.wind[0] = wind[0]

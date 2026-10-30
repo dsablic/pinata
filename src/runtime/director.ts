@@ -20,6 +20,8 @@ export type Directions = {
 type Active = { name: string, behaviour: Behaviour, start: number, blend: number, end?: number, fadeOut?: number }
 
 const DEFAULT_THEN_BLEND = 0.3
+/** Offsets move joints directly, so they fade in and out over at least this long, even on a zero blend. */
+const MIN_OFFSET_BLEND = 0.2
 /** Reduced motion: amplitudes, impulses, spins and turns are scaled down, periods stretched. */
 const REDUCED_SCALE = 0.4
 const REDUCED_SLOWDOWN = 1.5
@@ -29,11 +31,12 @@ function smooth (x: number): number {
   return t * t * (3 - 2 * t)
 }
 
-function weightAt (active: Active, time: number): number {
-  const fadeIn = active.blend > 0 ? smooth((time - active.start) / active.blend) : 1
+function weightAt (active: Active, time: number, minimum = 0): number {
+  const blend = Math.max(active.blend, minimum)
+  const fadeIn = blend > 0 ? smooth((time - active.start) / blend) : 1
   if (active.end === undefined) return fadeIn
-  const fadeOut = (active.fadeOut ?? 0) > 0 ? 1 - smooth((time - active.end) / (active.fadeOut ?? 1)) : 0
-  return Math.min(fadeIn, fadeOut)
+  const fadeOut = Math.max(active.fadeOut ?? 0, minimum)
+  return Math.min(fadeIn, fadeOut > 0 ? 1 - smooth((time - active.end) / fadeOut) : 0)
 }
 
 export type Director = {
@@ -45,8 +48,9 @@ export type Director = {
 
 /**
  * Plays named behaviours with cross-fades: a new behaviour fades in over `blend` seconds while the previous ones fade
- * out over the same time. Behaviours with `then` hand over after `duration`; events in a behaviour fire once, at
- * their time after it starts. `reduced` applies the reduced-motion scaling.
+ * out over the same time (offsets over at least 0.2 s). Periodic primitives run on the shared clock, so a wave that
+ * two behaviours share carries on across a switch. Behaviours with `then` hand over after `duration`; events in a
+ * behaviour fire once, at their time after it starts. `reduced` applies the reduced-motion scaling.
  */
 export function createDirector (spec: Behaviours, options: { reduced: boolean }): Director {
   const factor = options.reduced ? REDUCED_SCALE : 1
@@ -89,10 +93,11 @@ export function createDirector (spec: Behaviours, options: { reduced: boolean })
       }
       for (const active of actives) {
         const weight = weightAt(active, time)
+        const offsetWeight = weightAt(active, time, MIN_OFFSET_BLEND)
         const local = time - active.start
         for (const layer of active.behaviour.layers) {
           if (layer.do === 'sway') {
-            const wave = Math.sin(2 * Math.PI * local / (layer.period * slow))
+            const wave = Math.sin(2 * Math.PI * time / (layer.period * slow))
             directions.push = add(directions.push, [layer.amplitude * factor * wave * weight, 0, 0])
           } else if (local < layer.duration * slow) {
             const rate = 2 * Math.PI * layer.turns * factor / (layer.duration * slow)
@@ -104,8 +109,8 @@ export function createDirector (spec: Behaviours, options: { reduced: boolean })
           }
         }
         for (const additive of active.behaviour.additive) {
-          const wave = Math.sin(2 * Math.PI * local / (additive.period * slow))
-          const offset = additive.amplitude * factor * wave * weight
+          const wave = Math.sin(2 * Math.PI * time / (additive.period * slow))
+          const offset = additive.amplitude * factor * wave * offsetWeight
           if (additive.do === 'bounce') directions.bounce += offset
           else directions.breathe.push({ mask: additive.mask, offset })
         }
@@ -118,7 +123,9 @@ export function createDirector (spec: Behaviours, options: { reduced: boolean })
           directions.events.push({ ...event, impulse: scale(event.impulse, factor), spin: event.spin * factor })
         })
       }
-      while (actives.length > 1 && weightAt(actives[0], time) === 0 && actives[0].end !== undefined) actives.shift()
+      while (actives.length > 1 && actives[0].end !== undefined && weightAt(actives[0], time, MIN_OFFSET_BLEND) === 0) {
+        actives.shift()
+      }
       lastUpdate = time
       return directions
     }

@@ -7,7 +7,7 @@ import type { World, WorldFrame } from './world.ts'
 
 const FPS = 24
 const SCALE = 2
-const POKE_RADIUS_PX = 18
+const POKE_RADIUS_PX = 10
 const STAT_WINDOW = 120
 
 function byId<T extends HTMLElement> (id: string): T {
@@ -101,12 +101,15 @@ canvas.addEventListener('click', event => {
   const y = (event.clientY - box.top) * canvas.height / box.height
   let best = -1
   let bestDistance = POKE_RADIUS_PX
+  // the actor with a joint nearest the click: the root sits at height 0, below the feet on a hill
   last.actors.forEach((actor, i) => {
-    const [px, py] = running!.screen(actor.root.position)
-    const distance = Math.hypot(px - x, py - 10 - y)
-    if (distance < bestDistance) {
-      best = i
-      bestDistance = distance
+    for (const joint of Object.values(actor.joints)) {
+      const [px, py] = running!.screen(joint)
+      const distance = Math.hypot(px - x, py - y)
+      if (distance < bestDistance) {
+        best = i
+        bestDistance = distance
+      }
     }
   })
   if (best < 0) return

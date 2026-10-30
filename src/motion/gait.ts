@@ -39,7 +39,7 @@ const TURN_CYCLES_PER_RADIAN = 2 / Math.PI
 const REST_EPSILON = 1e-9
 const PHASE_EPSILON = 1e-9
 const REACH_FRACTION = 0.99
-const DROP_SMOOTHING_SECONDS = 0.125
+const DROP_SMOOTHING_SECONDS = 0.04
 const SWING_EDGE = 0.1
 
 function smoothstep (x: number): number {

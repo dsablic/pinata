@@ -2346,7 +2346,7 @@ import { validateStyle } from '../../src/formats/style.ts'
 import { checkReferences } from '../../src/formats/references.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
 import type { Validated } from '../../src/formats/validate.ts'
-import { makeCamera } from '../../src/raster/camera.ts'
+import { fitCamera } from '../../src/raster/camera.ts'
 import type { Camera } from '../../src/raster/camera.ts'
 import { rasterize } from '../../src/raster/gbuffer.ts'
 import type { GBuffer } from '../../src/raster/gbuffer.ts'
@@ -2408,11 +2408,10 @@ if (referenceErrors.length > 0) {
 }
 
 function renderFrame (size: number, elevation: number, direction: number): Frame {
-  const camera = makeCamera({
+  const camera = fitCamera(mannequin, {
     azimuthDeg: direction * 45,
     elevationDeg: elevation,
     targetHeightPx: size,
-    modelHeight: mannequin.height,
     margin: MARGIN
   })
   const gbuffer = rasterize(mannequin, camera)

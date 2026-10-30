@@ -1,0 +1,6 @@
+{
+  "name": "pinata",
+  "version": "0.1.0",
+  "description": "A live pixel-art piñata in a pane beside the chat that reacts to what Claude Code is doing",
+  "types": "./types/index.d.ts"
+}

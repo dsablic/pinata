@@ -6,11 +6,11 @@
   "innerLineDepth": 0.12,
   "decalMinFacing": 0.3,
   "materials": {
-    "steel": ["#4a5368", "#8492ad", "#d0dbea"],
-    "steel-dark": ["#2b3040", "#4f5870", "#7d89a3"],
-    "leather": ["#3d2618", "#70452b", "#a8734a"],
-    "cloth-red": ["#4f1622", "#8e2a35", "#d0554e"],
-    "blade": ["#6a788c", "#b4c3d3", "#f2f7fb"]
+    "steel": ["#39375a", "#7b8aa8", "#e0e4d6"],
+    "steel-dark": ["#221f36", "#4a5272", "#8f9eaa"],
+    "leather": ["#3a1f26", "#7a4a2c", "#c99a5b"],
+    "cloth-red": ["#3e1030", "#9a2a36", "#e0704a"],
+    "blade": ["#5a6580", "#aebccc", "#fffbe8"]
   },
   "decalColors": { "x": "#1b1421" }
 }

@@ -88,3 +88,10 @@ Pass rule, fixed now. Same packet design, same 3 references, 3 fresh judges, eve
 - Facing: at least 7 of 8 directions majority-correct at el30. el0 is reported but does not gate (judge noise was
   high there).
 If A/B still fails, move to the skins fallback.
+
+## Run 5 (P1b)
+
+- Change: hue-shifted ramps (shadows toward cool purple, highlights toward warm yellow, deeper shadow shades).
+- Gates: all pass (maxThinFraction 0.250, paletteSize 15, maxStrayPixels 1).
+- Observed: warmer palette with clearer light/shadow contrast; the cape's lit panel now reads orange against
+  wine-red shadow.

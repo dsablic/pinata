@@ -28,7 +28,7 @@ function smoothstepSlope (x: number): number {
 }
 
 function easing (change: SpeedChange, t: number, accelSeconds: number): number {
-  if (accelSeconds <= 0) return t >= change.start ? change.to : change.from
+  if (accelSeconds <= 0) return 1
   return smoothstep((t - change.start) / accelSeconds)
 }
 

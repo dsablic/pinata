@@ -1,4 +1,4 @@
-# Pinata Roadmap
+# Piñata Roadmap
 
 This roadmap turns the proof-of-concept results into a plan for building the tool. Every proof's plan, gates,
 findings and judge artefacts are in `docs/plans/`.

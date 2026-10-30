@@ -1,4 +1,4 @@
-# Pinata: Viability Design
+# Piñata: Viability Design
 
 Date: 2026-10-30
 Status: approved for proof-of-concept phase

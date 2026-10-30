@@ -1,6 +1,6 @@
-# Pinata
+# Piñata
 
-Pinata is an experiment in AI-driven character animation. An AI agent describes a character as text (a mannequin of
+Piñata is an experiment in AI-driven character animation. An AI agent describes a character as text (a mannequin of
 simple volumes, materials, a behaviour script), and the tooling does what an AI finds hard to do by hand: physics,
 inverse kinematics and secondary motion such as a cape swinging after a turn. Output is rendered as pixel art, with
 numeric diagnostics and still images an agent can read to check its own work.

@@ -1,0 +1,265 @@
+{
+  "name": "placeholder",
+  "view": "side-right",
+  "palette": {
+    "o": "#1b1421",
+    "s": "#7b8aa8",
+    "d": "#4a5272",
+    "l": "#7a4a2c",
+    "r": "#9a2a36",
+    "b": "#aebccc"
+  },
+  "parts": {
+    "helmet": {
+      "rows": [
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss",
+        "ssssssssssssss"
+      ],
+      "pivotA": [7, 7],
+      "pivotB": [7, 7]
+    },
+    "plume": {
+      "rows": [
+        "rrrrrrrrrrrrr",
+        "rrrrrrrrrrrrr",
+        "rrrrrrrrrrrrr",
+        "rrrrrrrrrrrrr"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [11, 2]
+    },
+    "torso": {
+      "rows": [
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss",
+        "ssssssssssss"
+      ],
+      "pivotA": [0, 4],
+      "pivotB": [11, 4]
+    },
+    "hips": {
+      "rows": [
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll"
+      ],
+      "pivotA": [0, 4],
+      "pivotB": [4, 4]
+    },
+    "capeL": {
+      "rows": [
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr"
+      ],
+      "pivotA": [0, 2],
+      "pivotB": [23, 2]
+    },
+    "capeR": {
+      "rows": [
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr",
+        "rrrrrrrrrrrrrrrrrrrrrrrr"
+      ],
+      "pivotA": [0, 2],
+      "pivotB": [23, 2]
+    },
+    "thighL": {
+      "rows": [
+        "ddddddddddddddddd",
+        "ddddddddddddddddd",
+        "ddddddddddddddddd",
+        "ddddddddddddddddd",
+        "ddddddddddddddddd",
+        "ddddddddddddddddd"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [13, 3]
+    },
+    "shinL": {
+      "rows": [
+        "ddddddddddddddd",
+        "ddddddddddddddd",
+        "ddddddddddddddd",
+        "ddddddddddddddd",
+        "ddddddddddddddd"
+      ],
+      "pivotA": [3, 2],
+      "pivotB": [12, 2]
+    },
+    "footL": {
+      "rows": [
+        "lllllllll",
+        "lllllllll",
+        "lllllllll",
+        "lllllllll",
+        "lllllllll"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [6, 2]
+    },
+    "thighR": {
+      "rows": [
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [12, 3]
+    },
+    "shinR": {
+      "rows": [
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd",
+        "dddddddddddddddd"
+      ],
+      "pivotA": [3, 2],
+      "pivotB": [13, 2]
+    },
+    "footR": {
+      "rows": [
+        "lllllllll",
+        "lllllllll",
+        "lllllllll",
+        "lllllllll",
+        "lllllllll"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [6, 2]
+    },
+    "pauldronL": {
+      "rows": [
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [3, 3]
+    },
+    "upperArmL": {
+      "rows": [
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [9, 3]
+    },
+    "forearmL": {
+      "rows": [
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [8, 2]
+    },
+    "handL": {
+      "rows": [
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [2, 2]
+    },
+    "pauldronR": {
+      "rows": [
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss",
+        "sssssss"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [3, 3]
+    },
+    "upperArmR": {
+      "rows": [
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd",
+        "ddddddddddddd"
+      ],
+      "pivotA": [3, 3],
+      "pivotB": [9, 3]
+    },
+    "forearmR": {
+      "rows": [
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd",
+        "ddddddddddd"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [8, 2]
+    },
+    "handR": {
+      "rows": [
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll",
+        "lllll"
+      ],
+      "pivotA": [2, 2],
+      "pivotB": [2, 2]
+    },
+    "sword": {
+      "rows": [
+        "bbbbbbbbbbbbbbbbbbbb",
+        "bbbbbbbbbbbbbbbbbbbb"
+      ],
+      "pivotA": [1, 1],
+      "pivotB": [18, 1]
+    }
+  }
+}

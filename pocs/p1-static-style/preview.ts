@@ -32,8 +32,9 @@ pre { background: #fff; padding: 12px; }
 <pre>${escapeHtml(summary)}</pre>
 <h2>Checklist</h2>
 <ol>
-<li>For each column of the contact sheet, write which way the character faces (front, front-left, left, back-left,
-back, back-right, right, front-right). Compare with <code>facing</code> in <code>ab-key.json</code> afterwards.</li>
+<li>For each column of the contact sheet, write which way the character faces, as a screen direction from your point
+of view (for example "front, turned to screen-left" or "side, facing screen-right").
+Compare with <code>facing</code> in <code>ab-key.json</code> afterwards.</li>
 <li>In the 32px rows, can you point to the head, torso, arms, legs, cape and sword?</li>
 <li>Answer each A/B pair below before opening <code>ab-key.json</code>.</li>
 </ol>

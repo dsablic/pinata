@@ -32,7 +32,16 @@ const SHEET_SCALE = 8
 const SHEET_BACKGROUND = 0xc8c8c8
 const MIN_PIXELS_FOR_THIN = 4
 const CHILD_TIMEOUT_MS = 60000
-const FACING = ['front', 'front-left', 'left', 'back-left', 'back', 'back-right', 'right', 'front-right']
+const FACING = [
+  'front',
+  'front, turned to screen-left',
+  'side, facing screen-left',
+  'back, turned to screen-left',
+  'back',
+  'back, turned to screen-right',
+  'side, facing screen-right',
+  'front, turned to screen-right'
+]
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = join(here, '..', '..')

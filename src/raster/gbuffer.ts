@@ -2,7 +2,7 @@ import type { Mannequin, Part } from '../formats/mannequin.ts'
 import { normalize } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { boundingSphere } from './bounds.ts'
-import { rayOrigin } from './camera.ts'
+import { project, rayOrigin } from './camera.ts'
 import type { Camera } from './camera.ts'
 import { boxDistance, boxFrame, roundCone, roundConeDistance } from './sdf.ts'
 
@@ -82,12 +82,13 @@ function writeNormal (prim: Primitive, px: number, py: number, pz: number, out: 
   out[2] = l === 0 ? 0 : nz * k
 }
 
-function sample (prims: Primitive[], cam: Camera, o: Vec3, acc: Accumulator): void {
+function sample (prims: Primitive[], active: Int32Array, count: number, cam: Camera, o: Vec3, acc: Accumulator): void {
   const [ox, oy, oz] = o
   const dir = cam.forward
   let best = -1
   let bestT = Infinity
-  for (let i = 0; i < prims.length; i++) {
+  for (let k = 0; k < count; k++) {
+    const i = active[k]
     const t = trace(prims[i], ox, oy, oz, dir)
     if (t < bestT) {
       bestT = t
@@ -105,6 +106,27 @@ function sample (prims: Primitive[], cam: Camera, o: Vec3, acc: Accumulator): vo
   acc.normal[best * 3] += n[0] * rx + n[1] * ry + n[2] * rz
   acc.normal[best * 3 + 1] += n[0] * ux + n[1] * uy + n[2] * uz
   acc.normal[best * 3 + 2] += -(n[0] * dir[0] + n[1] * dir[1] + n[2] * dir[2])
+}
+
+type Disc = { x: number, y: number, r2: number }
+
+const DISC_SLACK_PX = 1e-3
+
+function screenDisc (cam: Camera, prim: Primitive): Disc {
+  const { x, y } = project(cam, prim.center)
+  const r = prim.radius * cam.pixelsPerUnit + DISC_SLACK_PX
+  return { x, y, r2: r * r }
+}
+
+function cull (discs: Disc[], px: number, py: number, active: Int32Array): number {
+  let count = 0
+  for (let i = 0; i < discs.length; i++) {
+    const d = discs[i]
+    const dx = Math.max(px - d.x, d.x - (px + 1), 0)
+    const dy = Math.max(py - d.y, d.y - (py + 1), 0)
+    if (dx * dx + dy * dy <= d.r2) active[count++] = i
+  }
+  return count
 }
 
 /**
@@ -130,15 +152,19 @@ export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GB
     scratch: new Float64Array(3),
     total: 0
   }
+  const discs = prims.map(prim => screenDisc(cam, prim))
+  const active = new Int32Array(prims.length)
   for (let py = 0; py < cam.height; py++) {
     for (let px = 0; px < cam.width; px++) {
       acc.hits.fill(0)
       acc.depth.fill(0)
       acc.normal.fill(0)
       acc.total = 0
-      for (let sy = 0; sy < samples; sy++) {
+      const count = cull(discs, px, py, active)
+      for (let sy = 0; sy < samples && count > 0; sy++) {
         for (let sx = 0; sx < samples; sx++) {
-          sample(prims, cam, rayOrigin(cam, px + (sx + 0.5) / samples, py + (sy + 0.5) / samples), acc)
+          const o = rayOrigin(cam, px + (sx + 0.5) / samples, py + (sy + 0.5) / samples)
+          sample(prims, active, count, cam, o, acc)
         }
       }
       resolvePixel(g, py * cam.width + px, acc, { samples: samples * samples, previous })

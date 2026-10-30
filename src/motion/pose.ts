@@ -12,12 +12,17 @@ export function posedMannequin (m: Mannequin, pose: Pose): Mannequin {
   return { ...m, joints: structuredClone(pose) }
 }
 
-export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number {
+export function footRadii (leg: Leg, mannequin: Mannequin): { ankle: number, toe: number } {
   const foot = mannequin.parts.find(part => {
     return part.shape === 'capsule' && part.a === leg.ankle && part.b === leg.toe
   })
   if (foot === undefined || foot.shape !== 'capsule') {
     throw new Error(`no capsule part spans ankle '${leg.ankle}' and toe '${leg.toe}'`)
   }
-  return Math.min(rest[leg.ankle][1] - foot.radiusA, rest[leg.toe][1] - foot.radiusB)
+  return { ankle: foot.radiusA, toe: foot.radiusB }
+}
+
+export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number {
+  const radii = footRadii(leg, mannequin)
+  return Math.min(rest[leg.ankle][1] - radii.ankle, rest[leg.toe][1] - radii.toe)
 }

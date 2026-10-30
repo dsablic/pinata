@@ -1,0 +1,13 @@
+{"note": "more_hand_made side per pair; ours is on the side given in key.json ab; p07-p10 are hand-made controls",
+ "round1_assembled_wording": {
+  "judge1": {"p01": "right", "p02": "left", "p03": "left", "p04": "right", "p05": "right", "p06": "left", "p07": "cant_tell", "p08": "cant_tell", "p09": "cant_tell", "p10": "cant_tell", "w1": "bottom", "w2": "top"},
+  "judge2": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "left", "p08": "right", "p09": "right", "p10": "left", "w1": "top", "w2": "bottom"},
+  "judge3": {"p01": "right", "p02": "left", "p03": "left", "p04": "right", "p05": "left", "p06": "right", "p07": "cant_tell", "p08": "cant_tell", "p09": "right", "p10": "left", "w1": "top", "w2": "bottom"}},
+ "round2_assembled_wording": {
+  "judge4": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "right", "p08": "left", "p09": "left", "p10": "right"},
+  "judge5": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "right", "p08": "left", "p09": "left", "p10": "right"},
+  "judge6": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "right", "p08": "left", "p09": "left", "p10": "right"}},
+ "round3_p1_wording": {
+  "judge7": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "left", "p08": "right", "p09": "left", "p10": "right"},
+  "judge8": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "left", "p08": "right", "p09": "right", "p10": "left"},
+  "judge9": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right", "p07": "left", "p08": "right", "p09": "right", "p10": "left"}}}

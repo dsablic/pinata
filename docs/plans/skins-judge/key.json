@@ -1,0 +1,4 @@
+{"ab": {"p01": "left", "p02": "right", "p03": "right", "p04": "left", "p05": "left", "p06": "right",
+        "p07": "control", "p08": "control", "p09": "control", "p10": "control"},
+ "walk": {"w1": "top", "w2": "bottom"},
+ "note": "ab values say which side is ours (the skinned knight); walk values say where the skins strip is"}

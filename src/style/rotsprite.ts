@@ -115,7 +115,8 @@ function mode (counts: Map<string, number>, centre: string): string {
   let bestRank: [number, number, number] = [-1, 0, 0]
   for (const colour of [...counts.keys()].sort()) {
     const r = rank(colour, counts.get(colour) as number)
-    const better = r[0] !== bestRank[0] ? r[0] > bestRank[0] : r[1] !== bestRank[1] ? r[1] > bestRank[1] : r[2] > bestRank[2]
+    const first = [0, 1, 2].find(i => r[i] !== bestRank[i])
+    const better = first !== undefined && r[first] > bestRank[first]
     if (better) {
       best = colour
       bestRank = r
@@ -242,7 +243,8 @@ export function cleanRotation (grid: Grid, pivot: [number, number], angle: numbe
       const rotated = rotSprite(grid, pivot, angle, { sample: 'centre', offset })
       const counts = colourCounts(rotated.grid)
       // how far past the tolerance the worst colour's area strays (0 when all are within it), then jaggies
-      const stray = Math.max(0, ...[...source].map(([c, n]) => Math.abs((counts.get(c) ?? 0) - n) - (AREA_TOLERANCE * n + 1)))
+      const strays = [...source].map(([c, n]) => Math.abs((counts.get(c) ?? 0) - n) - (AREA_TOLERANCE * n + 1))
+      const stray = Math.max(0, ...strays)
       const score: [number, number] = [stray, jaggies(rotated.grid)]
       if (score[0] < bestScore[0] || (score[0] === bestScore[0] && score[1] < bestScore[1])) {
         best = rotated

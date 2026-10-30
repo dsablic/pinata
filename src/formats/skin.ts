@@ -9,18 +9,27 @@ export type SkinPart = {
   hidden?: boolean
 }
 
+/**
+ * The views an eight-direction skin draws, facing screen-right where they are not symmetric: front, the front
+ * three-quarter view, the side, the back three-quarter view, and the back. Left-facing directions mirror them.
+ */
+export const VIEWS = ['front', 'frontSide', 'side', 'backSide', 'back'] as const
+export type ViewName = typeof VIEWS[number]
+
+/** A skin: v1 draws one view (`view: 'side-right'`, `parts`); v2 draws every view in `views`. */
 export type Skin = {
   name: string
-  view: 'side-right'
+  view?: 'side-right'
   palette: Record<string, string>
   parts: Record<string, SkinPart>
+  views?: Record<ViewName, { parts: Record<string, SkinPart> }>
 }
 
 export const TRANSPARENT_CHAR = '.'
 export const MAX_COLOURS = 16
 export const MAX_SPRITE_SIZE = 64
 
-const SKIN_FIELDS = ['name', 'view', 'palette', 'parts'] as const
+const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
 const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden'] as const
 const HEX = /^#[0-9a-fA-F]{6}$/
 
@@ -29,10 +38,35 @@ export function validateSkin (input: unknown): Validated<Skin> {
   const errors: ValidationError[] = []
   checkKnownKeys(input, SKIN_FIELDS, '', errors)
   if (!isNonEmptyString(input.name)) errors.push({ path: 'name', message: 'expected a non-empty string' })
-  if (input.view !== 'side-right') {
-    errors.push({ path: 'view', message: "expected 'side-right' (the only supported view)" })
-  }
   const palette = validatePalette(input.palette, errors)
+  if (input.views !== undefined) {
+    // v2: every view drawn, no single-view fields
+    if (input.view !== undefined || input.parts !== undefined) {
+      errors.push({ path: 'views', message: "an eight-direction skin has 'views' only; drop 'view' and 'parts'" })
+    }
+    if (!isRecord(input.views)) {
+      errors.push({ path: 'views', message: `expected an object with ${VIEWS.join(', ')}` })
+    } else {
+      checkKnownKeys(input.views, VIEWS, 'views', errors)
+      for (const view of VIEWS) {
+        const drawn = input.views[view]
+        if (!isRecord(drawn) || !isRecord(drawn.parts)) {
+          errors.push({ path: `views.${view}`, message: 'expected { parts: { partName: sprite } }' })
+          continue
+        }
+        checkKnownKeys(drawn, ['parts'], `views.${view}`, errors)
+        for (const [name, part] of Object.entries(drawn.parts)) {
+          validatePart(part, `views.${view}.parts.${name}`, palette, errors)
+        }
+      }
+    }
+    if (errors.length > 0) return { errors }
+    const skin = structuredClone(input) as unknown as Skin
+    return { value: { ...skin, parts: skin.views!.side.parts }, errors }
+  }
+  if (input.view !== 'side-right') {
+    errors.push({ path: 'view', message: "expected 'side-right', or 'views' for an eight-direction skin" })
+  }
   if (!isRecord(input.parts)) {
     errors.push({ path: 'parts', message: 'expected an object mapping part name to a sprite' })
   } else {
@@ -142,22 +176,27 @@ function validatePivot (pivot: unknown, path: string, size: Size, errors: Valida
 }
 
 export function checkSkin (skin: Skin, mannequin: Mannequin): ValidationError[] {
+  if (skin.views === undefined) return checkParts(skin.parts, mannequin, 'parts')
+  return VIEWS.flatMap(view => checkParts(skin.views![view].parts, mannequin, `views.${view}.parts`))
+}
+
+function checkParts (parts: Record<string, SkinPart>, mannequin: Mannequin, at: string): ValidationError[] {
   const errors: ValidationError[] = []
   const names = new Set(mannequin.parts.map(p => p.name))
   for (const part of mannequin.parts) {
-    const sprite = Object.hasOwn(skin.parts, part.name) ? skin.parts[part.name] : undefined
+    const sprite = Object.hasOwn(parts, part.name) ? parts[part.name] : undefined
     if (sprite === undefined) {
       errors.push({
-        path: `parts.${part.name}`,
+        path: `${at}.${part.name}`,
         message: `no sprite for part '${part.name}'; draw it, or add { "hidden": true } if it is not visible`
       })
     } else if (sprite.hidden !== true && part.a !== part.b) {
-      checkTwoJoint(sprite, `parts.${part.name}`, errors)
+      checkTwoJoint(sprite, `${at}.${part.name}`, errors)
     }
   }
-  for (const name of Object.keys(skin.parts)) {
+  for (const name of Object.keys(parts)) {
     if (names.has(name)) continue
-    errors.push({ path: `parts.${name}`, message: `unknown part '${name}'; mannequin parts: ${[...names].join(', ')}` })
+    errors.push({ path: `${at}.${name}`, message: `unknown part '${name}'; mannequin parts: ${[...names].join(', ')}` })
   }
   return errors
 }

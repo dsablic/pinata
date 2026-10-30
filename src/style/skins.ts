@@ -7,6 +7,8 @@ import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import type { Pose } from '../motion/pose.ts'
 import { cleanRotation, toGrid } from './rotsprite.ts'
+import { chooseView, counterpart, facingAngle, fitted, mirrored } from './views.ts'
+import type { ViewChoice } from './views.ts'
 import type { Rotated } from './rotsprite.ts'
 
 export type SkinnedOptions = {
@@ -21,6 +23,12 @@ export type SkinnedOptions = {
    */
   rotation?: 'nearest' | 'clean'
   angles?: Map<string, number>
+  /**
+   * For an eight-direction skin: the character's yaw, and a place to keep the view between frames (its sector), so
+   * the view changes with hysteresis.
+   */
+  yaw?: number
+  view?: { sector?: number }
 }
 
 type Screen = { x: number, y: number, depth: number }
@@ -53,16 +61,34 @@ function jointOf (m: Mannequin, pose: Pose, name: string): Vec3 {
   return pose[name] ?? m.joints[name]
 }
 
+/**
+ * The sprite a part shows: for a one-view skin, its own; for an eight-direction skin, the chosen view's (the
+ * counterpart's, mirrored, in a left-facing direction), fitted to the bone's length on screen.
+ */
+function spriteFor (o: SkinnedOptions, name: string, single: boolean, choice: ViewChoice | undefined, length: number) {
+  if (choice === undefined || o.skin.views === undefined) return o.skin.parts[name]
+  const parts = o.skin.views[choice.view].parts
+  const drawn = parts[choice.mirror ? counterpart(name) : name] ?? parts[name]
+  if (drawn === undefined) return undefined
+  const turned = choice.mirror ? mirrored(drawn, !single) : drawn
+  return single ? turned : fitted(turned, length)
+}
+
 function placements (o: SkinnedOptions): Placement[] {
   const found: Placement[] = []
+  let choice: ViewChoice | undefined
+  if (o.skin.views !== undefined) {
+    choice = chooseView(facingAngle(o.camera, o.yaw ?? 0), o.view?.sector)
+    if (o.view !== undefined) o.view.sector = choice.sector
+  }
   for (const part of o.mannequin.parts) {
-    const sprite = o.skin.parts[part.name]
-    if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
-      continue
-    }
     const a: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.a))
     const b: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.b))
     const single = part.a === part.b
+    const sprite = spriteFor(o, part.name, single, choice, Math.hypot(b.x - a.x, b.y - a.y))
+    if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
+      continue
+    }
     const raw = Math.atan2(b.y - a.y, b.x - a.x)
     const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, o.angles?.get(part.name)) : snapAngle(raw)
     if (!single && o.rotation === 'clean') o.angles?.set(part.name, angle)

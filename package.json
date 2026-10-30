@@ -39,6 +39,7 @@
     "new": "node src/cli/new.ts",
     "judge": "node src/cli/judge.ts",
     "mocap": "node src/cli/mocap.ts",
+    "skin": "node src/cli/skin.ts",
     "build:web": "tsc -p tsconfig.web.json",
     "site": "npm run build:web && node src/cli/site.ts",
     "runtime": "npm run site && node src/cli/serve.ts _site",

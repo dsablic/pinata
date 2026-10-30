@@ -266,6 +266,10 @@ the leg whose phase comes next after the previous plant's leg (see `alternationV
 - **Bend.** Animals have knees that point both ways. Give the legs whose joint should point backward (the hock of a
   hind leg) `"bend": "backward"`; `kneeLimitViolations` then judges that knee against the body's back instead of its
   front.
+- **Proportions.** Each foot swings up to `strideLength` / 2 either side of its hip, so keep `strideLength` well under
+  the front-to-back distance between the hind and front hips (about 0.6 times it). A longer stride makes a hind foot
+  reach past the front foot on the same side, which reads as crossed legs in 3/4 views, especially on short, round
+  bodies. Shortening the stride raises the step rate, so lower the script speed with it.
 - **Start.** The walk starts from the rest pose with all feet planted, so a leg that has just landed stays planted
   for `stanceFraction` of a cycle. Keep `strideLength` x `stanceFraction` / 2 well below the leg length, and give the
   script an `accelSeconds` at least as long as the first stance (about a second for a dog), or the rest-pose plants

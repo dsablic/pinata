@@ -37,14 +37,23 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
 
 1. Merge the P1-P6 runners into one library of reusable pieces with a stable API; keep the proof runners as
    regression suites (each runner's gates become tests that must keep passing).
-2. Render simulated cloth and chains into the pixel output. Today only parts are drawn, so every P5 author had to add
-   a static stand-in part for the cape or scarf. This was the main product gap found.
+2. ~~Render simulated cloth and chains into the pixel output.~~ Done: chains and capes with a `render` entry are drawn
+   as thin capsule parts, in the demo and in the `check` contact sheet and walk strip.
 3. Judge tooling in TypeScript: replace the shell and JavaScript packet scripts with a `judge` module (packet
    building with correct spacing, keys, scoring, controls), used by every future visual check.
 4. Fix gate definitions the proofs found weak: area jumps that count occlusion (P2), speed windows that return
    Infinity with few plants (P4), the thin-part metric's non-monotonic behaviour, and the borderline knight values
    (thin fraction at 0.25, stray pixels at 2).
-5. Performance: sequential rendering with hysteresis takes minutes for long sequences; profile before optimising.
+5. ~~Performance.~~ Done, with byte-identical output: scalar ray maths and per-pixel culling made rendering 6-14x
+   faster (P2 5.6 min to 7 s, demo 1.7 s to 0.12 s per frame); the determinism re-run is behind `--verify`. Next
+   options that keep pixels: faster PNG compression and sheet assembly. Options that change pixels: analytic ray
+   intersection, fewer sub-samples.
+6. Stray pixels from mostly hidden parts: every four-legged piñata failed `maxStrayPixels` on single pixels of bands
+   peeking past other parts at 32 px. Clean these up in the renderer (or exclude them from the metric with a
+   principled rule) rather than leaving each author to chase them.
+7. Quadruped gaits are fragile: short legs exceed the knee-speed gate at ordinary speeds (the unicorn), and turning
+   broke the dragon's walk until it slowed to 0.1 m/s. Tune the planner for short-legged and many-legged bodies as
+   part of the general limbs work.
 
 Exit: all proof suites pass from the library; cloth is visible in rendered frames; one command per proof.
 

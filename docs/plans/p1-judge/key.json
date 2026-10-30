@@ -1,0 +1,127 @@
+{
+  "facing": {
+    "f01.png": {
+      "frame": "32px-el0-d6",
+      "truth": "side, facing screen-right"
+    },
+    "f02.png": {
+      "frame": "32px-el30-d4",
+      "truth": "back"
+    },
+    "f03.png": {
+      "frame": "32px-el0-d7",
+      "truth": "front, turned to screen-right"
+    },
+    "f04.png": {
+      "frame": "32px-el30-d1",
+      "truth": "front, turned to screen-left"
+    },
+    "f05.png": {
+      "frame": "32px-el30-d0",
+      "truth": "front"
+    },
+    "f06.png": {
+      "frame": "32px-el30-d6",
+      "truth": "side, facing screen-right"
+    },
+    "f07.png": {
+      "frame": "32px-el30-d5",
+      "truth": "back, turned to screen-right"
+    },
+    "f08.png": {
+      "frame": "32px-el30-d2",
+      "truth": "side, facing screen-left"
+    },
+    "f09.png": {
+      "frame": "32px-el30-d7",
+      "truth": "front, turned to screen-right"
+    },
+    "f10.png": {
+      "frame": "32px-el0-d0",
+      "truth": "front"
+    },
+    "f11.png": {
+      "frame": "32px-el0-d2",
+      "truth": "side, facing screen-left"
+    },
+    "f12.png": {
+      "frame": "32px-el0-d4",
+      "truth": "back"
+    },
+    "f13.png": {
+      "frame": "32px-el30-d3",
+      "truth": "back, turned to screen-left"
+    },
+    "f14.png": {
+      "frame": "32px-el0-d5",
+      "truth": "back, turned to screen-right"
+    },
+    "f15.png": {
+      "frame": "32px-el0-d1",
+      "truth": "front, turned to screen-left"
+    },
+    "f16.png": {
+      "frame": "32px-el0-d3",
+      "truth": "back, turned to screen-left"
+    }
+  },
+  "parts": {},
+  "ab": {
+    "p01.png": {
+      "kind": "real",
+      "ref": "polygondan-pixel-knight-32.png",
+      "frame": "32px-el30-d7",
+      "ours": "right"
+    },
+    "p02.png": {
+      "kind": "control",
+      "left": "polygondan-pixel-knight-32.png",
+      "right": "marqueeplier-knight-64.png"
+    },
+    "p03.png": {
+      "kind": "real",
+      "ref": "bastianse-pixelknight-48.png",
+      "frame": "32px-el30-d0",
+      "ours": "left"
+    },
+    "p04.png": {
+      "kind": "control",
+      "left": "marqueeplier-knight-64.png",
+      "right": "polygondan-pixel-knight-32.png"
+    },
+    "p05.png": {
+      "kind": "real",
+      "ref": "bastianse-pixelknight-48.png",
+      "frame": "32px-el30-d0",
+      "ours": "right"
+    },
+    "p06.png": {
+      "kind": "real",
+      "ref": "polygondan-pixel-knight-32.png",
+      "frame": "32px-el30-d7",
+      "ours": "left"
+    },
+    "p07.png": {
+      "kind": "real",
+      "ref": "marqueeplier-knight-64.png",
+      "frame": "48px-el30-d1",
+      "ours": "left"
+    },
+    "p08.png": {
+      "kind": "control",
+      "left": "bastianse-pixelknight-48.png",
+      "right": "polygondan-pixel-knight-32.png"
+    },
+    "p09.png": {
+      "kind": "real",
+      "ref": "marqueeplier-knight-64.png",
+      "frame": "48px-el30-d1",
+      "ours": "right"
+    },
+    "p10.png": {
+      "kind": "control",
+      "left": "polygondan-pixel-knight-32.png",
+      "right": "bastianse-pixelknight-48.png"
+    }
+  }
+}

@@ -49,3 +49,22 @@ All automated gates pass and the remaining issues are minor:
   decals at more anchors would be the next lever.
 
 Next: reference sprites (Task 14), then the human and external review (Task 15).
+
+## Review (AI judge panel, replaces Task 15's human review)
+
+Method: 3 blind judges (fresh agents, no project context) saw neutrally named, 8x upscaled images only. Facing: 16
+frames (32px, elevations 0 and 30, 8 directions). A/B: 3 real pairs (ours vs a hand-made reference) and 2 control
+pairs (hand-made vs hand-made), each in both left/right orders. Packet builder, key, raw answers and scoring are in
+`docs/plans/p1-judge/` (`score.txt` has the full table).
+
+- A/B: the hand-made reference was picked on all 18 real comparisons; controls were "can't tell" on all 12. The
+  judges are calibrated, so this is a reliable detection. Reasons given, consistently: one uniform black outline,
+  mechanical banded shading, no accent colours or hand-placed details, stiff symmetric pose.
+- Facing: 3/4 view (el30) majority-correct on 7 of 8 directions (passes the 7/8 bar). Side camera (el0)
+  majority-correct on 2 of 8 (fails), mostly front/back vs side confusions. Judges varied (14, 10 and 3 of 16
+  exact), so part of this is judge noise.
+- Parts: head, torso, legs and cape named in all 16 frames by all judges; arms and sword missed only where hidden.
+
+Verdict: P1 fails the "looks hand-made" criterion at both 32px and 48px. Per the design, the fallback is per-part
+skins before declaring the procedural style approach dead. The judges' reasons point to specific renderer
+improvements (selective coloured outlines, hue-shifted ramps, accent decals) that have not been tried yet.

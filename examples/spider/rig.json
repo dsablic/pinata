@@ -1,0 +1,125 @@
+{
+  "template": "octopod",
+  "pelvis": "pelvis",
+  "upperBody": [
+    "abdomen",
+    "thorax",
+    "head",
+    "fangL",
+    "fangR"
+  ],
+  "limbs": [
+    {
+      "kind": "leg",
+      "name": "legL1",
+      "side": "left",
+      "bend": "up",
+      "joints": [
+        "hipL1",
+        "kneeL1",
+        "hockL1",
+        "ankleL1",
+        "toeL1"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legL2",
+      "side": "left",
+      "bend": "up",
+      "joints": [
+        "hipL2",
+        "kneeL2",
+        "hockL2",
+        "ankleL2",
+        "toeL2"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legL3",
+      "side": "left",
+      "bend": "up",
+      "joints": [
+        "hipL3",
+        "kneeL3",
+        "hockL3",
+        "ankleL3",
+        "toeL3"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legL4",
+      "side": "left",
+      "bend": "up",
+      "joints": [
+        "hipL4",
+        "kneeL4",
+        "hockL4",
+        "ankleL4",
+        "toeL4"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR1",
+      "side": "right",
+      "bend": "up",
+      "joints": [
+        "hipR1",
+        "kneeR1",
+        "hockR1",
+        "ankleR1",
+        "toeR1"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR2",
+      "side": "right",
+      "bend": "up",
+      "joints": [
+        "hipR2",
+        "kneeR2",
+        "hockR2",
+        "ankleR2",
+        "toeR2"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR3",
+      "side": "right",
+      "bend": "up",
+      "joints": [
+        "hipR3",
+        "kneeR3",
+        "hockR3",
+        "ankleR3",
+        "toeR3"
+      ]
+    },
+    {
+      "kind": "leg",
+      "name": "legR4",
+      "side": "right",
+      "bend": "up",
+      "joints": [
+        "hipR4",
+        "kneeR4",
+        "hockR4",
+        "ankleR4",
+        "toeR4"
+      ]
+    }
+  ],
+  "gait": {
+    "strideLength": 0.08,
+    "referenceSpeed": 0.12,
+    "stepHeight": 0.075,
+    "bobAmplitude": 0.002,
+    "stanceFraction": 0.65,
+    "footSpacing": 0.5
+  }
+}

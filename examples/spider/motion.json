@@ -1,0 +1,34 @@
+{
+  "script": {
+    "accelSeconds": 1,
+    "segments": [
+      {
+        "action": "move",
+        "speed": 0.12,
+        "duration": 3.4
+      },
+      {
+        "action": "turn",
+        "degrees": 90,
+        "duration": 2
+      },
+      {
+        "action": "move",
+        "speed": 0.12,
+        "duration": 3.4
+      },
+      {
+        "action": "hold",
+        "duration": 1
+      }
+    ]
+  },
+  "gravity": [
+    0,
+    -9.81,
+    0
+  ],
+  "fps": 24,
+  "substeps": 8,
+  "particleRadius": 0.02
+}

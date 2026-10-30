@@ -1,0 +1,12 @@
+{
+  "name": "spider", "light": [-0.5, 0.7, 0.5], "bands": [0.05, 0.6], "outline": "#120d0a",
+  "outlineMode": "selective", "innerLineDepth": 0.1, "decalMinFacing": 0.3,
+  "materials": {
+    "body": ["#2a1c14", "#4e3322", "#7d5537"],
+    "carapace": ["#1c1410", "#3a2a1e", "#62483a"],
+    "band": ["#5a3e22", "#9a7040", "#cfa66a"],
+    "fang": ["#4a0f12", "#8a1d22", "#c94a4a"],
+    "dark": ["#0f0b09", "#221a15", "#3a2e26"]
+  },
+  "decalColors": {}
+}

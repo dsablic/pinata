@@ -9,7 +9,7 @@ export function evaluate (gates: Gate[]): GateResult[] {
   return gates.map(g => ({ ...g, pass: g.op === '<=' ? g.value <= g.threshold : g.value >= g.threshold }))
 }
 
-function formatNumber (v: number): string {
+export function formatNumber (v: number): string {
   return Number.isInteger(v) ? String(v) : v.toFixed(3)
 }
 

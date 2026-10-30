@@ -18,16 +18,21 @@ export function outlineGaps (img: Image, outlineMask: Uint8Array): number {
   return gaps
 }
 
-export function strayPixels (img: Image, exclude: Uint8Array): number {
-  let strays = 0
+/** Pixel indices (y * width + x) of coloured pixels outside `exclude` with no 8-neighbour of the same colour. */
+export function strayPixelIndices (img: Image, exclude: Uint8Array): number[] {
+  const strays: number[] = []
   for (let y = 0; y < img.height; y++) {
     for (let x = 0; x < img.width; x++) {
       const c = getPixel(img, x, y)
       if (c === TRANSPARENT || exclude[y * img.width + x] === 1) continue
-      if (!neighbours8(img, x, y).includes(c)) strays++
+      if (!neighbours8(img, x, y).includes(c)) strays.push(y * img.width + x)
     }
   }
   return strays
+}
+
+export function strayPixels (img: Image, exclude: Uint8Array): number {
+  return strayPixelIndices(img, exclude).length
 }
 
 export function paletteSize (images: Image[]): number {

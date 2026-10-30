@@ -1,0 +1,20 @@
+{
+  "name": "muted",
+  "light": [-0.5, 0.7, 0.5],
+  "bands": [0.3],
+  "outline": "#2a2420",
+  "outlineMode": "uniform",
+  "innerLineDepth": 0.12,
+  "decalMinFacing": 0.3,
+  "materials": {
+    "steel": ["#5f636b", "#9a9c98"],
+    "steel-dark": ["#45484f", "#73757a"],
+    "leather": ["#5a4636", "#8c7456"],
+    "cloth-red": ["#6b4540", "#9a6f64"],
+    "blade": ["#7c7f84", "#b4b3aa"],
+    "fur": ["#5e5040", "#8f8068"],
+    "skin": ["#8a6a56", "#b8977a"],
+    "beard": ["#7a5440", "#a87c5c"]
+  },
+  "decalColors": { "x": "#2a2420", "g": "#b09a5e", "r": "#6b4540", "e": "#2a2420" }
+}

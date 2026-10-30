@@ -1,0 +1,20 @@
+{
+  "name": "vivid",
+  "light": [-0.5, 0.7, 0.5],
+  "bands": [0.05, 0.6, 0.92],
+  "outline": "#0b0614",
+  "outlineMode": "selective",
+  "innerLineDepth": 0.12,
+  "decalMinFacing": 0.3,
+  "materials": {
+    "steel": ["#1d2a6b", "#3a64d8", "#6fc4ff", "#f4fbff"],
+    "steel-dark": ["#3a1a52", "#1d2a6b", "#3a64d8", "#6fc4ff"],
+    "blade": ["#3a64d8", "#6fc4ff", "#f4fbff", "#f4fbff"],
+    "leather": ["#4a1208", "#a8431a", "#f08a1c", "#ffd04a"],
+    "cloth-red": ["#5a0a2a", "#c4143c", "#ff4a3a", "#ff9a6a"],
+    "fur": ["#3a1a52", "#7a3ab0", "#b86af0", "#f4fbff"],
+    "skin": ["#c4143c", "#ff4a3a", "#ff9a6a", "#ffd04a"],
+    "beard": ["#5a0a2a", "#a8431a", "#f08a1c", "#ffd04a"]
+  },
+  "decalColors": { "x": "#0b0614", "g": "#ffd04a", "r": "#ff4a3a", "e": "#0b0614" }
+}

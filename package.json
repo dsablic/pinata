@@ -27,6 +27,7 @@
     "p2": "node pocs/p2-pixel-stability/run.ts",
     "p3": "node pocs/p3-secondary-motion/run.ts",
     "p4": "node pocs/p4-locomotion/run.ts",
+    "p6": "node pocs/p6-style-swap/run.ts",
     "skins": "node pocs/skins-spike/run.ts",
     "check": "node src/cli/check.ts"
   },

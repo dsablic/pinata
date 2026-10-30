@@ -1,4 +1,4 @@
-import { createImage, getPixel, neighbours4, neighbours8, parseHex, setPixel, TRANSPARENT } from '../image.ts'
+import { createImage, getPixel, neighbours4, parseHex, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Style } from '../formats/style.ts'
@@ -18,7 +18,7 @@ export function stylize (g: GBuffer, m: Mannequin, cam: Camera, style: Style): S
   const shaded = createImage(g.width, g.height)
   shade(shaded, g, m, style)
   drawInnerLines(shaded, g, m, style)
-  const image = removeStrays(shaded)
+  const image = removeStrays(shaded, g)
   const decalMask = drawDecals(image, g, m, cam, style)
   drawOutline(image, parseHex(style.outline))
   return { image, decalMask }
@@ -35,7 +35,9 @@ function shade (image: Image, g: GBuffer, m: Mannequin, style: Style): void {
     const n: Vec3 = [g.normal[i * 3], g.normal[i * 3 + 1], g.normal[i * 3 + 2]]
     const brightness = dot(n, light)
     const shadeIndex = style.bands.filter(t => brightness >= t).length
-    setPixel(image, i % g.width, Math.floor(i / g.width), parseHex(rampOf(g, m, style, i)[shadeIndex]))
+    const ramp = rampOf(g, m, style, i)
+    const colour = m.parts[g.part[i]].allowThin === true ? ramp[Math.floor(ramp.length / 2)] : ramp[shadeIndex]
+    setPixel(image, i % g.width, Math.floor(i / g.width), parseHex(colour))
   }
 }
 
@@ -70,13 +72,22 @@ function mostCommon (values: number[]): number {
   return best
 }
 
-function removeStrays (image: Image): Image {
+function removeStrays (image: Image, g: GBuffer): Image {
   const out: Image = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.data) }
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
+      const part = g.part[y * g.width + x]
+      if (part === EMPTY) continue
       const c = getPixel(image, x, y)
-      if (c === TRANSPARENT) continue
-      const around = neighbours8(image, x, y).filter(n => n !== TRANSPARENT)
+      const around: number[] = []
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx
+          const ny = y + dy
+          if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= g.width || ny >= g.height) continue
+          if (g.part[ny * g.width + nx] === part) around.push(getPixel(image, nx, ny))
+        }
+      }
       if (around.length === 0 || around.includes(c)) continue
       setPixel(out, x, y, mostCommon(around))
     }

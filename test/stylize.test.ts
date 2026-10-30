@@ -85,3 +85,29 @@ test('darkens the farther part where two parts meet at a depth break', () => {
   assert.equal(getPixel(image, 3, 2), DARK)
   assert.equal(getPixel(image, 2, 2), LIGHT)
 })
+
+test('shades an allowThin part with the middle ramp colour and keeps it free of neighbour colours', () => {
+  const g = block([0, 0, 1])
+  const thinStyle: Style = { ...style, materials: { ...style.materials, t: ['#000020', '#00aa00', '#00ff00'] } }
+  const withThin: Mannequin = {
+    ...mannequin,
+    parts: [...mannequin.parts, { ...mannequin.parts[0], name: 'q', material: 't', allowThin: true }]
+  }
+  for (let k = 1; k <= 3; k++) {
+    const i = k * 5 + k
+    g.part[i] = 1
+    g.depth[i] = 0.5
+    g.normal.set([0, 0, k === 2 ? 1 : -1], i * 3)
+  }
+  const { image } = stylize(g, withThin, camera, thinStyle)
+  for (let k = 1; k <= 3; k++) assert.equal(getPixel(image, k, k), 0x00aa00)
+})
+
+test('leaves a pixel alone when it has no neighbours of its own part', () => {
+  const g = block([0, 0, 1])
+  const two: Mannequin = { ...mannequin, parts: [...mannequin.parts, { ...mannequin.parts[0], name: 'q' }] }
+  g.part[2 * 5 + 2] = 1
+  g.normal.set([0, 0, -1], (2 * 5 + 2) * 3)
+  const { image } = stylize(g, two, camera, style)
+  assert.equal(getPixel(image, 2, 2), DARK)
+})

@@ -52,7 +52,7 @@ Motion scripts gain a segment that plays a behaviour for a duration (`{ "action"
 "duration": 2 }`) and can run layers in parallel with `move`/`turn` segments.
 
 Masks are sets of joints in the point hierarchy (a joint name covers its whole subtree; limb names and `body` are
-shorthands), per [`docs/plans/2026-10-30-image-points.md`](2026-10-30-image-points.md), "Decisions during batch A".
+shorthands), and joints that no driver, layer or overlay writes follow their parent after the overlays, per [`docs/plans/2026-10-30-image-points.md`](2026-10-30-image-points.md), "Decisions during batch A".
 
 ## Evaluation order (per frame)
 

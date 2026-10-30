@@ -77,12 +77,14 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
     return { length: length(bone), rest: normalize(bone), tip: zero, velocity: zero, target: zero, frame: IDENTITY }
   })
   const start = frames[0].root
+  const baseAt = (f: number): Vec3 => toWorld(poses[f][root], frames[f].root)
+  const rotationAt = (f: number): Matrix | undefined => transforms[f][parent]?.rotation
+  const moving = frames.length > 1 && (rotationAt(0) !== undefined || rotationAt(1) !== undefined)
   const startVelocity = (p: Vec3): Vec3 => {
+    if (moving) return scale(sub(baseAt(1), baseAt(0)), fps)
     const r = sub(p, start.position)
     return add(start.velocity, scale([r[2], 0, -r[0]], start.angularVelocity))
   }
-  const baseAt = (f: number): Vec3 => toWorld(poses[f][root], frames[f].root)
-  const rotationAt = (f: number): Matrix | undefined => transforms[f][parent]?.rotation
   const place = (base: Vec3, yaw: number, time: number, rotation: Matrix | undefined, step?: number): void => {
     let frame = rootFrame(limb, yaw, time, rotation)
     let from = base
@@ -101,11 +103,11 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
   }
   const record = (f: number): void => {
     const unyaw = yawMatrix(-frames[f].root.yaw)
-    for (const [i, segment] of segments.entries()) {
-      const joint = limb.joints[i + 1]
-      poses[f][joint] = toLocal(segment.tip, frames[f].root)
-      transforms[f][joint] = transformTo(multiply(unyaw, segment.frame), rest[joint], poses[f][joint])
-    }
+    segments.forEach((segment, i) => { poses[f][limb.joints[i + 1]] = toLocal(segment.tip, frames[f].root) })
+    limb.joints.forEach((joint, i) => {
+      const bone = segments[Math.min(i, segments.length - 1)]
+      transforms[f][joint] = transformTo(multiply(unyaw, bone.frame), rest[joint], poses[f][joint])
+    })
   }
   place(baseAt(0), frames[0].root.yaw, 0, rotationAt(0))
   record(0)
@@ -130,8 +132,10 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
  * Each segment carries the rotation from rest to its current direction (its target's rotation followed by the
  * smallest swing to where the spring put it), and its children aim through that rotation. The tips are integrated in
  * world space at `substeps` steps per frame, with the root joint, the parent's rotation and yaw interpolated between
- * frames, and each tip is projected back to its bone length. Appendages run parents first; after each, the joints
- * attached below it are placed again. Deterministic; changes the poses and transforms in place.
+ * frames, and each tip is projected back to its bone length. Every appendage joint turns with the segment that leaves
+ * it (the tip with the last segment), as leg joints do. Appendages run parents first; after each, the joints attached
+ * below it are placed again. An appendage on a joint that turns starts moving with that joint's first-frame velocity.
+ * Deterministic; changes the poses and transforms in place.
  */
 export function animateAppendages (sequence: Sequence, options: Options): void {
   const { rig, rest } = options
@@ -149,6 +153,7 @@ export function animateAppendages (sequence: Sequence, options: Options): void {
       inherit(pose, sequence.transforms[f], { rest, parents, order, driven })
     })
     animate(limb, sequence, parents[limb.joints[0]] ?? rig.pelvis, options)
+    driven.add(limb.joints[0])
   }
   if (rig.attached === undefined) return
   sequence.poses.forEach((pose, f) => { inherit(pose, sequence.transforms[f], { rest, parents, order, driven }) })

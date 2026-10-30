@@ -43,13 +43,32 @@ export function parentsOf (rig: Rig): Parents {
   return parents
 }
 
+/** The joints of a cycle of parents, in order, or undefined when every chain ends at the root. */
+export function findCycle (parents: Parents): string[] | undefined {
+  try {
+    hierarchyOrder(parents)
+    return undefined
+  } catch (err) {
+    if (!(err instanceof CycleError)) throw err
+    return err.joints
+  }
+}
+
+class CycleError extends Error {
+  readonly joints: string[]
+  constructor (joints: string[]) {
+    super(`joints form a cycle: ${joints.join(' -> ')}`)
+    this.joints = joints
+  }
+}
+
 /** Joint names with every parent before its children; throws on a cycle. */
 export function hierarchyOrder (parents: Parents): string[] {
   const order: string[] = []
   const state = new Map<string, 'visiting' | 'done'>()
   const visit = (joint: string, path: string[]): void => {
     if (state.get(joint) === 'done') return
-    if (state.get(joint) === 'visiting') throw new Error(`joints form a cycle: ${[...path, joint].join(' -> ')}`)
+    if (state.get(joint) === 'visiting') throw new CycleError([...path.slice(path.indexOf(joint)), joint])
     state.set(joint, 'visiting')
     const parent = parents[joint]
     if (parent !== undefined) visit(parent, [...path, joint])

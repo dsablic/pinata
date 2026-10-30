@@ -6,7 +6,7 @@ import type { Bend, Leg, Limb, Side } from './limbs.ts'
 import { applyGaitDefaults, applyLegDefaults, isTemplateName, TEMPLATE_NAMES } from './templates.ts'
 import type { TemplateName } from './templates.ts'
 import { checkKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from './validate.ts'
-import { hierarchyOrder, parentsOf } from '../motion/skeleton.ts'
+import { findCycle, parentsOf } from '../motion/skeleton.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type { Arm, ArmLimb, AppendageLimb, Bend, Leg, LegLimb, Limb, Limits, Oscillator, Side } from './limbs.ts'
@@ -285,6 +285,7 @@ export function checkRig (rig: Rig, mannequin: Mannequin): ValidationError[] {
 }
 
 function checkParents (rig: Rig, known: string[], errors: ValidationError[]): void {
+  const before = errors.length
   const unknown = (joint: string): string => `unknown joint '${joint}'; known joints: ${known.join(', ')}`
   for (const [joint, parent] of Object.entries(rig.attached ?? {})) {
     if (!known.includes(parent)) errors.push({ path: `attached.${joint}`, message: unknown(parent) })
@@ -299,13 +300,19 @@ function checkParents (rig: Rig, known: string[], errors: ValidationError[]): vo
       errors.push({ path, message })
     }
   })
-  if (errors.length > 0) return
-  try {
-    hierarchyOrder(parentsOf(rig))
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    errors.push({ path: 'attached', message: `${message}; every chain of attached joints must end at the pelvis` })
-  }
+  if (errors.length > before) return
+  const cycle = findCycle(parentsOf(rig))
+  if (cycle === undefined) return
+  const attached = cycle.find(joint => rig.attached?.[joint] !== undefined)
+  const hanging = rig.limbs.findIndex(limb => {
+    return limb.kind === 'appendage' && limb.parent !== undefined && cycle.includes(limb.joints[0])
+  })
+  const path = attached !== undefined ? `attached.${attached}` : `${limbPath(rig, hanging)}.parent`
+  errors.push({
+    path,
+    message: `joints form a cycle: ${cycle.join(' -> ')}; every chain of parents (attached joints and appendage ` +
+      'parents) must end at the pelvis'
+  })
 }
 
 function checkLegs (rig: Rig): ValidationError[] {

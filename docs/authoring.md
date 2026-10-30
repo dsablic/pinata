@@ -242,7 +242,8 @@ is listed nowhere is an error. Decal anchors, cape anchors and chain anchors are
 `upperBody`, `attached` or `carried`. Together these form a hierarchy: every joint has a parent (the pelvis for
 `upperBody` and for the first joint of legs and arms, the previous joint along a limb, the last arm joint for
 `carried`, the named joint for `attached` and for an appendage's `parent`), and a joint that nothing else moves
-follows its parent's position and rotation. Cloth and chains pinned to a joint turn with it too. Cape anchors must
+follows its parent's position and rotation. A limb joint turns with the bone that leaves it, the last joint of a limb
+with the bone that arrives (a joint attached to a knee stays on the shin, one attached to a toe stays on the foot). Cloth and chains pinned to a joint turn with it too. Cape anchors must
 still move with the body as one piece: `upperBody`, or attached joints whose parents lead to the pelvis through
 `upperBody` only.
 
@@ -281,7 +282,7 @@ is no gravity: the rest pose is the shape it returns to.
 | `stiffness` | 0 to 1, default 0.6 | How hard it springs back: natural frequency 0.3 Hz at 0 up to 3 Hz just below 1; exactly 1 is rigid. |
 | `damping` | 0 to 1, default 0.4 | Damping ratio: 0 swings on, 1 settles without overshoot. |
 | `parent` | joint name, default the pelvis | The joint the appendage hangs from: it moves and turns with that joint (a tassel on a hand, a plume on a helmet joint, a tail on the last joint of another appendage). |
-| `oscillate` | `{ "axis": [x, y, z], "degrees": number, "period": seconds, "phase": 0..1 }` | Optional rhythmic swing of the first segment about `axis` (body space; `[0, 1, 0]` wags side to side), `degrees` (0 to 180) either way, one full swing every `period` seconds (required when `degrees` > 0). The rest of the chain follows. |
+| `oscillate` | `{ "axis": [x, y, z], "degrees": number, "period": seconds, "phase": 0..1 }` | Optional rhythmic swing of the first segment about `axis` (in the parent joint's frame, which is body space for the default pelvis parent; `[0, 1, 0]` wags side to side), `degrees` (0 to 180) either way, one full swing every `period` seconds (required when `degrees` > 0). The rest of the chain follows. |
 
 A soft appendage on a very fast spin (a half turn in a fraction of a second) trails nearly 180 degrees behind and
 flails; keep stiffness up or turns slower.

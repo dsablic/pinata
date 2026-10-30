@@ -167,8 +167,14 @@ ordinary `points.json` the author edits. `check` validates any points file the s
   own (pelvis group, IK legs, swinging arms with carried joints, appendage springs) and report a transform for each;
   only joints no driver owns are placed from their parent's transform. That keeps every existing output
   byte-identical without reproducing old float operations through the hierarchy.
-- Leg joints turn with the bone that leaves them (the toe with the foot), by the smallest rotation from rest: no
-  twist. Good enough for attachments; a twist source can come with behaviours.
+- One rotation rule for limb joints: a joint turns with the bone that leaves it, and the last joint of a chain with
+  the bone that arrives (the toe with the foot, an appendage tip with its last segment). Legs use the smallest
+  rotation from rest (no twist; a twist source can come with behaviours); appendage joints use their segment's
+  rotation, which carries the oscillator's twist. An appendage's first joint turns with its first segment, so a joint
+  attached to it turns with that segment.
+- An appendage hanging from a joint that turns starts moving with that joint's first-frame velocity.
+- Known limit: cloth and chain particles start at the rest pose, so a chain pinned to a limb jumps to the posed pin
+  (now rotated as well as moved) on the first substep, as chains on the body always did by the pelvis offset.
 - Format, kept small until batch B's `points.json`: a rig field `attached` (`{ joint: parent }`) for joints that ride
   rigidly on any joint, and an appendage field `parent`. The hierarchy (`parentsOf`) is derived from the rig;
   cycles are load errors. Legs and arms still hang from the pelvis.
@@ -181,5 +187,6 @@ ordinary `points.json` the author edits. `check` validates any points file the s
   ["shoulderL"]` is the whole left arm with what it carries and anything attached to it); limb names and `body` (the
   pelvis and upperBody) stay as shorthands. A layer writes transforms for the joints in its mask, and joints below
   them that no layer or driver owns follow by inheritance. Evaluation per frame: base drivers (root, gait and IK,
-  swing), layers, constraints, inheritance, additive overlays, events, then the sequence-level springs and cloth,
-  which matches the behaviours spec's order with inheritance placed after constraints.
+  swing), layers, constraints, additive overlays (written as transforms on the joints they name), inheritance,
+  events, then the sequence-level springs and cloth: the behaviours spec's order with inheritance after the overlays,
+  so a head bob also moves a visor attached to the head (found in the batch A review).

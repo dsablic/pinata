@@ -41,12 +41,18 @@ export function axisAngle (axis: Vec3, angle: number): Matrix {
   ]
 }
 
-/** The smallest rotation that takes unit vector from onto unit vector to. */
+/**
+ * The smallest rotation that takes unit vector from onto unit vector to; for opposite vectors, a half turn about an
+ * axis at right angles to them.
+ */
 export function between (from: Vec3, to: Vec3): Matrix {
   const axis = cross(from, to)
   const sin = length(axis)
-  if (sin < PARALLEL_EPSILON) return IDENTITY
-  return axisAngle(scale(axis, 1 / sin), Math.atan2(sin, dot(from, to)))
+  if (sin >= PARALLEL_EPSILON) return axisAngle(scale(axis, 1 / sin), Math.atan2(sin, dot(from, to)))
+  if (dot(from, to) > 0) return IDENTITY
+  const helper: Vec3 = Math.abs(from[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]
+  const perpendicular = cross(from, helper)
+  return axisAngle(scale(perpendicular, 1 / length(perpendicular)), Math.PI)
 }
 
 /** The axis and angle of a rotation matrix; the axis is [1, 0, 0] for (near) identity. */

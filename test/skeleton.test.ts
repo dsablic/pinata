@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { checkRig, validateRig } from '../src/formats/rig.ts'
+import { checkCapeAnchors, checkRig, validateRig } from '../src/formats/rig.ts'
 import type { AppendageLimb, Rig } from '../src/formats/rig.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import { planGait } from '../src/motion/gait.ts'
@@ -15,7 +15,9 @@ import { hierarchyOrder, parentsOf } from '../src/motion/skeleton.ts'
 import { apply } from '../src/math/matrix.ts'
 import { add, length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
+import { createRootTrack } from '../src/motion/script.ts'
 import { assertClose } from './helpers.ts'
+import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
 import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
 
 const FPS = 24
@@ -138,4 +140,88 @@ test('a cloth chain pinned to a swinging hand turns with it', () => {
     turned = Math.max(turned, length(sub(apply(rotation, step), step)))
   })
   assert.ok(turned > 0.005, `largest turn of the pinned link: ${turned} m`)
+})
+
+test('a joint attached to a knee stays on the shin, which leaves the knee', () => {
+  const kneed: Mannequin = {
+    ...tasselled,
+    joints: { ...tasselled.joints, pad: lerpVec(mannequin.joints.kneeL, mannequin.joints.ankleL, 0.4) }
+  }
+  const padded: Rig = { ...armed, attached: { ...armed.attached, pad: 'kneeL' } }
+  const padRest = restPose(kneed)
+  for (const frame of walk(padded).slice(5, 45)) {
+    const { pose } = poseAt({ frame, rig: padded, rest: padRest, mannequin: kneed })
+    const expected = lerpVec(pose.kneeL, pose.ankleL, 0.4)
+    for (let k = 0; k < 3; k++) assertClose(pose.pad[k], expected[k], 1e-9)
+  }
+})
+
+function lerpVec (a: Vec3, b: Vec3, u: number): Vec3 {
+  return add(a, [(b[0] - a[0]) * u, (b[1] - a[1]) * u, (b[2] - a[2]) * u])
+}
+
+test('on a turning walk, joints attached to a soft tail stay on the segment that leaves their parent', () => {
+  const tailed: Mannequin = {
+    ...hexMannequin,
+    joints: {
+      ...hexMannequin.joints,
+      tip: lerpVec(hexMannequin.joints.tail2, hexMannequin.joints.tail3, 1.5),
+      knot: lerpVec(hexMannequin.joints.tail2, hexMannequin.joints.tail3, 0.3),
+      tuft1: hexMannequin.joints.tail3,
+      tuft2: add(hexMannequin.joints.tail3, [0.05, 0.05, -0.05]),
+      tuftEnd: add(hexMannequin.joints.tail3, [0.1, 0.1, -0.1])
+    }
+  }
+  const tuft: AppendageLimb = {
+    kind: 'appendage', name: 'tuft', joints: ['tuft1', 'tuft2'], parent: 'tail3', stiffness: 0.5, damping: 0.4
+  }
+  const soft: AppendageLimb = {
+    kind: 'appendage', name: 'tail', joints: ['tail1', 'tail2', 'tail3'], stiffness: 0.2, damping: 0.3
+  }
+  const tailRig: Rig = {
+    ...hexRig,
+    limbs: [tuft, ...hexRig.limbs.filter(l => l.kind !== 'appendage'), soft],
+    attached: { tip: 'tail3', knot: 'tail2', tuftEnd: 'tuft2' }
+  }
+  assert.deepEqual(checkRig(tailRig, tailed), [])
+  const tailRest = restPose(tailed)
+  const script = { accelSeconds: 0.5, segments: [
+    { action: 'move' as const, speed: 0.3, duration: 1.5 }, { action: 'turn' as const, degrees: 120, duration: 1.5 }
+  ] }
+  const frames = planGait({
+    track: createRootTrack(script), rig: tailRig, rest: tailRest, mannequin: tailed, duration: 3, fps: FPS
+  })
+  const { poses } = poseSequence(frames, { rig: tailRig, rest: tailRest, mannequin: tailed, fps: FPS })
+  let bent = 0
+  poses.forEach(pose => {
+    const tipAt = lerpVec(pose.tail2, pose.tail3, 1.5)
+    const knotAt = lerpVec(pose.tail2, pose.tail3, 0.3)
+    for (let k = 0; k < 3; k++) {
+      assertClose(pose.tip[k], tipAt[k], 1e-9)
+      assertClose(pose.knot[k], knotAt[k], 1e-9)
+      assertClose(pose.tuft1[k], pose.tail3[k], 1e-12)
+      assertClose(pose.tuftEnd[k], lerpVec(pose.tuft1, pose.tuft2, 2)[k], 1e-9)
+    }
+    bent = Math.max(bent, length(sub(sub(pose.tail3, pose.tail2), sub(tailRest.tail3, tailRest.tail2))))
+  })
+  assert.ok(bent > 0.01, `largest tail swing: ${bent}`)
+})
+
+test('cape anchors may be attached through upperBody joints but not through a limb', () => {
+  const capeRig = (parent: string): Rig => {
+    return { ...armed, attached: { ...armed.attached, capeA: parent, capeB: parent } }
+  }
+  const cape = { anchorLeft: 'capeA', anchorRight: 'capeB' }
+  assert.deepEqual(checkCapeAnchors(cape, capeRig('chest')), [])
+  const errors = checkCapeAnchors(cape, capeRig('wristL'))
+  assert.equal(errors.length, 2)
+  assert.match(errors[0].message, /attached to a joint that moves on its own/)
+})
+
+test('a cycle made of appendage parents is reported at the appendage', () => {
+  const a: AppendageLimb = { ...tassel, name: 'a', joints: ['tassel1', 'tassel2'], parent: 'badge' }
+  const looped: Rig = { ...rig, limbs: [...rig.limbs, a], attached: { badge: 'tassel2' } }
+  const loopedErrors = checkRig(looped, tasselled)
+  assert.equal(loopedErrors.length, 1)
+  assert.match(loopedErrors[0].message, /joints form a cycle: (badge|tassel1|tassel2) -> .* every chain of parents/)
 })

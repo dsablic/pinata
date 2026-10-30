@@ -258,7 +258,7 @@ knee, ankle, toe) uses exact two-bone IK; a longer leg (say hip, stifle, hock, f
 | `side` | `"left"` or `"right"` | The side of the body (+X is the character's left). |
 | `phase` | number, 0 up to (not including) 1 | The leg's offset in the gait cycle: the leg lands when the cycle reaches this fraction. Default for two legs: left 0, right 0.5. Without a template, required on every leg when there are more than two. |
 | `bend` | `"forward"`, `"backward"` or `"up"`, or an array | The side each bending joint points to: toward the body's front (+Z), its back (-Z), or up (splayed legs, like a spider's, whose knees rise above the hip). An array gives one value per bending joint, the joints strictly between the hip and the ankle (`joints.length - 3` of them); `"up"` cannot be mixed with the others. Default `"forward"`. The rest position of a joint does not choose its side. |
-| `limits` | `{ "min": degrees, "max": degrees }` | Flexion range of every bending joint, -180 to 180. Default 0 to 150 degrees for legs of 5 or more joints; none for 4-joint legs. |
+| `limits` | `{ "min": degrees, "max": degrees }` | Flexion range of every bending joint, -180 to 180, enforced by the IK and measured by `kneeLimitViolations`. Default 0 to 150 degrees (a 4-joint leg's IK enforces it only when given). |
 
 **Arms** swing about their first joint, in counter-phase to the nearest leg on the same side, by
 `gait.armSwingDegrees`. `carried` lists joints that move rigidly with the arm, such as the tip of a held sword.

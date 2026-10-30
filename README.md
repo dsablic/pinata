@@ -1,7 +1,7 @@
 # Piñata
 
 <p align="center">
-  <img src="docs/assets/logo.gif" alt="A fat pixel-art unicorn piñata walking, its rainbow mane and tail swinging with simulated cloth physics" width="400">
+  <img src="docs/assets/logo.gif" alt="A fat pixel-art unicorn piñata hanging from a rope, swinging after a hit, its limp legs, rainbow mane and tail flopping with simulated cloth physics" width="400">
 </p>
 
 Piñata is an experiment in AI-driven character animation. An AI agent describes a character as text (a mannequin of

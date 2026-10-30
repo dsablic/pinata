@@ -64,3 +64,34 @@ test('thin parts are one pixel across in either direction', () => {
     { part: 'thin', pixels: 3, thinFraction: 1 }
   ])
 })
+
+test('a part is not thin where nearer parts cover its sides, but is where farther parts or empty space do', () => {
+  const part = { shape: 'capsule' as const, a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'm' }
+  const m: Mannequin = {
+    name: 'm',
+    height: 1,
+    joints: { o: [0, 0, 0] },
+    parts: [{ ...part, name: 'mid' }, { ...part, name: 'side' }],
+    decals: []
+  }
+  const strip = (sideDepth: number): GBuffer => {
+    const g: GBuffer = {
+      width: 3,
+      height: 3,
+      part: new Int16Array(9).fill(EMPTY),
+      depth: new Float32Array(9).fill(1),
+      normal: new Float32Array(27),
+      coverage: new Float32Array(9)
+    }
+    for (let y = 0; y < 3; y++) {
+      for (const x of [0, 2]) {
+        g.part[y * 3 + x] = 1
+        g.depth[y * 3 + x] = sideDepth
+      }
+      g.part[y * 3 + 1] = 0
+    }
+    return g
+  }
+  assert.equal(thinParts(strip(0.5), m)[0].thinFraction, 0)
+  assert.equal(thinParts(strip(2), m)[0].thinFraction, 1)
+})

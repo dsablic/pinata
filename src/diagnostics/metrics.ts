@@ -46,16 +46,20 @@ export function paletteSize (images: Image[]): number {
 export function thinParts (g: GBuffer, m: Mannequin): ThinPart[] {
   const pixels = new Array<number>(m.parts.length).fill(0)
   const thin = new Array<number>(m.parts.length).fill(0)
-  const partAt = (x: number, y: number) => (x < 0 || y < 0 || x >= g.width || y >= g.height)
-    ? EMPTY
-    : g.part[y * g.width + x]
+  const isEdge = (x: number, y: number, p: number, depth: number) => {
+    if (x < 0 || y < 0 || x >= g.width || y >= g.height) return true
+    const j = y * g.width + x
+    return g.part[j] === EMPTY || (g.part[j] !== p && g.depth[j] > depth)
+  }
   for (let y = 0; y < g.height; y++) {
     for (let x = 0; x < g.width; x++) {
-      const p = partAt(x, y)
+      const i = y * g.width + x
+      const p = g.part[i]
       if (p === EMPTY) continue
       pixels[p]++
-      const narrowAcross = partAt(x - 1, y) !== p && partAt(x + 1, y) !== p
-      const narrowDown = partAt(x, y - 1) !== p && partAt(x, y + 1) !== p
+      const d = g.depth[i]
+      const narrowAcross = isEdge(x - 1, y, p, d) && isEdge(x + 1, y, p, d)
+      const narrowDown = isEdge(x, y - 1, p, d) && isEdge(x, y + 1, p, d)
       if (narrowAcross || narrowDown) thin[p]++
     }
   }

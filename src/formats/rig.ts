@@ -12,6 +12,7 @@ export type Gait = {
   bobAmplitude: number
   armSwingDegrees: number
   footSpacing: number
+  strideExponent?: number
 }
 export type Rig = { legs: Leg[], arms: Arm[], pelvis: string, upperBody: string[], gait: Gait }
 
@@ -19,7 +20,8 @@ const RIG_FIELDS = ['legs', 'arms', 'pelvis', 'upperBody', 'gait'] as const
 const LEG_FIELDS = ['side', 'hip', 'knee', 'ankle', 'toe'] as const
 const ARM_FIELDS = ['side', 'shoulder', 'elbow', 'wrist', 'hand'] as const
 const GAIT_FIELDS = [
-  'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing'
+  'strideLength', 'referenceSpeed', 'stanceFraction', 'stepHeight', 'bobAmplitude', 'armSwingDegrees', 'footSpacing',
+  'strideExponent'
 ] as const
 
 const GAIT_RANGES: Record<keyof Gait, { min: number, max: number, note: string }> = {
@@ -29,12 +31,14 @@ const GAIT_RANGES: Record<keyof Gait, { min: number, max: number, note: string }
   stepHeight: { min: 0, max: 2, note: 'metres of swing-foot lift, 0 to 2' },
   bobAmplitude: { min: 0, max: 1, note: 'metres of pelvis bob, 0 to 1' },
   armSwingDegrees: { min: 0, max: 90, note: 'degrees, 0 to 90' },
-  footSpacing: { min: 0, max: 2, note: 'metres between foot plants, 0 to 2' }
+  footSpacing: { min: 0, max: 2, note: 'metres between foot plants, 0 to 2' },
+  strideExponent: { min: 0.2, max: 1, note: 'how fast stride grows with speed, 0.2 to 1, default 0.5' }
 }
+const OPTIONAL_GAIT: ReadonlySet<string> = new Set(['strideExponent'])
 const EXCLUSIVE_MINIMUM: ReadonlySet<string> = new Set(['strideLength', 'referenceSpeed'])
 
 export function stride (gait: Gait, speed: number): number {
-  const ratio = Math.sqrt(Math.max(0, speed) / gait.referenceSpeed)
+  const ratio = (Math.max(0, speed) / gait.referenceSpeed) ** (gait.strideExponent ?? 0.5)
   return gait.strideLength * Math.min(1.5, Math.max(0.5, ratio))
 }
 
@@ -91,6 +95,7 @@ function validateGait (gait: unknown, errors: ValidationError[]): void {
   for (const field of GAIT_FIELDS) {
     const { min, max, note } = GAIT_RANGES[field]
     const v = gait[field]
+    if (v === undefined && OPTIONAL_GAIT.has(field)) continue
     const ok = isFiniteNumber(v) && (EXCLUSIVE_MINIMUM.has(field) ? v > min : v >= min) && v <= max
     if (!ok) errors.push({ path: `gait.${field}`, message: `expected a number: ${note}` })
   }

@@ -132,3 +132,27 @@ test('stride grows with the square root of speed and is clamped', () => {
   assertClose(stride(gait, 100), 1.4 * 1.5)
   assertClose(stride(gait, 0.01), 1.4 * 0.5)
 })
+
+test('strideExponent changes how stride grows with speed and defaults to one half', () => {
+  const { gait } = validateRig(rig()).value!
+  assertClose(stride({ ...gait, strideExponent: 1 }, 1.2 * 1.2), 1.4 * 1.2)
+  assertClose(stride({ ...gait, strideExponent: 0.5 }, 1.2 * 1.21), stride(gait, 1.2 * 1.21))
+  assertClose(stride({ ...gait, strideExponent: 1 }, 100), 1.4 * 1.5)
+})
+
+test('strideExponent is optional and must be within 0.2 to 1', () => {
+  const ok = rig()
+  Object.assign(ok.gait, { strideExponent: 0.75 })
+  assert.deepEqual(paths(ok), [])
+  assert.equal(validateRig(ok).value!.gait.strideExponent, 0.75)
+  for (const bad of [0.1, 1.1, Number.NaN, '1']) {
+    const input = rig()
+    Object.assign(input.gait, { strideExponent: bad })
+    assert.deepEqual(paths(input), ['gait.strideExponent'])
+  }
+  for (const edge of [0.2, 1]) {
+    const input = rig()
+    Object.assign(input.gait, { strideExponent: edge })
+    assert.deepEqual(paths(input), [])
+  }
+})

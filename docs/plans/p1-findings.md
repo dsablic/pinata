@@ -68,3 +68,23 @@ pairs (hand-made vs hand-made), each in both left/right orders. Packet builder, 
 Verdict: P1 fails the "looks hand-made" criterion at both 32px and 48px. Per the design, the fallback is per-part
 skins before declaring the procedural style approach dead. The judges' reasons point to specific renderer
 improvements (selective coloured outlines, hue-shifted ramps, accent decals) that have not been tried yet.
+
+## P1b plan (decided 2026-10-30, before any change)
+
+Goal: address the judges' cues in the procedural style without hand-drawing, then re-run the same panel.
+
+Changes, each logged as its own run:
+1. Selective outlines: an outline pixel takes the darkest shade of the part it borders instead of one global colour.
+2. Hue-shifted ramps: shadows shift toward cool/purple, highlights toward warm/yellow (style only, no new colours).
+3. Accent decals: belt buckle, chest emblem, visor slits visible from the side, with one accent colour.
+4. Pose: weight shift and asymmetric arms instead of a symmetric stance.
+
+The automated P1 gates and thresholds stay as they are, including paletteSize <= 16.
+
+Pass rule, fixed now. Same packet design, same 3 references, 3 fresh judges, every pair in both orders:
+- A/B passes if the reference is picked in at most 9 of the 18 real comparisons. 10-14 counts as improved but
+  failing; 15 or more is unchanged.
+- The panel is valid only if controls stay "can't tell" in at least 10 of 12; otherwise re-run with new judges.
+- Facing: at least 7 of 8 directions majority-correct at el30. el0 is reported but does not gate (judge noise was
+  high there).
+If A/B still fails, move to the skins fallback.

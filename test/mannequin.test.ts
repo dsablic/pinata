@@ -175,3 +175,10 @@ test('rejects a box shorter than twice its rounding', () => {
   assert.equal(rest.length, 0)
   assert.match(error.message, /at most 0\.015 \(half the a->b length\)/)
 })
+
+test('messages keep significant digits for tiny values', () => {
+  const input = valid()
+  input.joints.top = [0, 0.00012345, 0]
+  const [error] = validateMannequin(input).errors.filter(e => e.path === 'parts[0]')
+  assert.match(error.message, /distance 0\.0001234;/)
+})

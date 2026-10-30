@@ -93,7 +93,7 @@ export function validateMannequin (input: unknown): Validated<Mannequin> {
 }
 
 function round (n: number): number {
-  return Number(n.toFixed(4))
+  return Number(n.toPrecision(4))
 }
 
 function jointRef (value: unknown, path: string, ctx: Context): Vec3 | undefined {

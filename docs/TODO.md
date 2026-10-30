@@ -14,7 +14,8 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 - The balance gate applies to rigs with more than four legs (confirmed; even leg counts for now).
 - Direction (user, 2026-10-30): a character is an image plus any number of points; the engine animates the points and
   the image follows by a 2D mesh warp; templates are starting points to refine, never limits. Draft plan:
-  [image and points](plans/2026-10-30-image-points.md), approved; batch A (point model) is next, then P8 on top.
+  [image and points](plans/2026-10-30-image-points.md), approved. Batch A (joint hierarchy: transforms, `attached`
+  joints, appendages on any joint, rotating pins) is done and reviewed; next is P8 on top of it, then batch B.
 - Specs written, not started: live runtime spike P8 ([spec](plans/2026-10-30-runtime-spike.md)) and composable
   behaviours ([spec](plans/2026-10-30-composable-behaviours.md)).
 - Provisional logo: a hanging unicorn piñata, seamless loop, in [`docs/assets/`](assets). It was rendered by a

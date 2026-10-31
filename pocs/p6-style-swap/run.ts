@@ -1,15 +1,11 @@
-import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFileSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { loadCharacter, formatCharacterErrors } from '../../src/formats/character.ts'
 import type { Character } from '../../src/formats/character.ts'
 import { checkReferences } from '../../src/formats/references.ts'
 import { validateStyle } from '../../src/formats/style.ts'
 import type { Style } from '../../src/formats/style.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import { simulateCharacter } from '../../src/motion/character.ts'
 import { fitCamera } from '../../src/raster/camera.ts'
 import type { Camera } from '../../src/raster/camera.ts'
@@ -23,6 +19,7 @@ import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diag
 import { sheet } from '../../src/diagnostics/images.ts'
 import type { SheetCell } from '../../src/diagnostics/images.ts'
 import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { childHashes, startGatedRun } from '../harness.ts'
 import { flickerFraction } from '../../src/diagnostics/stability.ts'
 import { MIN_PIXELS_FOR_THIN } from '../p1-static-style/gates.ts'
 import { render, turntable } from '../p2-pixel-stability/sequences.ts'
@@ -51,46 +48,16 @@ const MAPPINGS: Record<string, Mapping> = {
   }
 }
 
-const here = dirname(fileURLToPath(import.meta.url))
+const { here, outDir, hashesMode, verify, fail, loadJson, requireValid } = startGatedRun(import.meta.url, 'p6')
 const root = join(here, '..', '..')
-const outDir = join(root, 'reports', 'p6')
-const hashesMode = process.argv.includes('--hashes')
-const verify = process.argv.includes('--verify')
-
-if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
-
-function fail (message: string): never {
-  console.error(message)
-  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
-  process.exit(2)
-}
-
-process.on('uncaughtException', err => {
-  try {
-    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
-  } catch {
-    process.exit(2)
-  }
-})
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) fail(formatErrors(file, result.errors))
-  return result.value
-}
 
 function readStyle (file: string): Style {
-  try {
-    return requireValid(file, validateStyle(JSON.parse(readFileSync(join(here, file), 'utf8'))))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
-    throw err
-  }
+  return requireValid(file, validateStyle(loadJson(file)))
 }
 
 function readCharacter (name: string): Character {
   const result = loadCharacter(join(root, 'examples', name))
-  if (result.value === undefined || result.errors.length > 0) fail(formatCharacterErrors(result.errors))
+  if (result.value === undefined || result.errors.length > 0) return fail(formatCharacterErrors(result.errors))
   return result.value
 }
 
@@ -187,15 +154,8 @@ if (hashesMode) {
   process.exit(0)
 }
 
-function childHashes (): Map<string, string> {
-  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--hashes'], {
-    encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024
-  })
-  return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
-}
-
 function mismatches (): number {
-  const other = childHashes()
+  const other = childHashes(import.meta.url, CHILD_TIMEOUT_MS)
   return hashLines().filter(([id, hash]) => other.get(id) !== hash).length
 }
 

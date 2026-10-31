@@ -12,6 +12,12 @@ export type Gate = {
 
 export type GateResult = Gate & { pass: boolean }
 
+export type GateSpec = Pick<Gate, 'op' | 'threshold' | 'rationale'>
+
+export function gateFrom<K extends string> (specs: Record<K, GateSpec>, name: K, value: number, label?: string): Gate {
+  return { name: label === undefined ? name : `${name}.${label}`, value, ...specs[name] }
+}
+
 export function optionalGate (g: Gate, enabled: boolean): Gate {
   return enabled ? g : { ...g, skipped: true }
 }

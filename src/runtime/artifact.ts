@@ -10,10 +10,6 @@ import type { ValidationError } from '../formats/validate.ts'
 import { validateBehaviours } from './behaviours.ts'
 import type { Behaviours } from './behaviours.ts'
 
-/**
- * A live character in one JSON file: the package's mannequin, style and rig as written, and its behaviours. It
- * carries no motion script, materials or cloth, which only offline renders use.
- */
 export type Artifact = {
   format: 'pinata-live'
   version: 1
@@ -36,7 +32,6 @@ function tagged (file: string, errors: ValidationError[]): ValidationError[] {
   return errors.map(e => ({ path: `${file}${e.path === '' ? '' : `.${e.path}`}`, message: e.message }))
 }
 
-/** Validates an artifact the way loading a package does; errors name the part of the file they are in. */
 export function readArtifact (input: unknown): { value?: LiveCharacter, errors: ValidationError[] } {
   if (!isRecord(input) || input.format !== 'pinata-live' || input.version !== 1) {
     const message = "expected a Piñata live artifact: { format: 'pinata-live', version: 1 }"

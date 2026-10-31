@@ -1,3 +1,4 @@
+import { gateFrom } from '../../src/diagnostics/report.ts'
 import type { Gate } from '../../src/diagnostics/report.ts'
 
 export const MIN_PIXELS_FOR_THIN = 4
@@ -32,5 +33,5 @@ export const P1_GATES = {
 } as const
 
 export function gate (name: keyof typeof P1_GATES, value: number): Gate {
-  return { name, value, ...P1_GATES[name] }
+  return gateFrom(P1_GATES, name, value)
 }

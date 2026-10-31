@@ -11,9 +11,7 @@ export { createLive } from './character.ts'
 export { createView, DEFAULT_VIEW, frameHash } from './render.ts'
 
 export type MountOptions = {
-  /** CSS pixels per character pixel. */
   scale: number
-  /** Sub-samples per pixel along each axis. */
   samples: number
   reduced: boolean
   fps: number
@@ -25,11 +23,8 @@ export type Mounted = {
   character: LiveCharacter
   live: Live
   view: View
-  /** Simulation and render time of the last frames, for a readout. */
   stats: () => Stats
-  /** Hash of the last drawn frame (for determinism checks). */
   lastHash: () => string
-  /** Advances one frame now, without waiting for the clock (tests). */
   tick: () => LiveFrame
   pause: () => void
   resume: () => void
@@ -46,11 +41,6 @@ function percentile (values: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] ?? 0
 }
 
-/**
- * Animates a live character on a canvas: the simulation steps at a fixed rate on the animation clock, every step is
- * drawn with putImageData and scaled up with crisp pixels by CSS. A click on the character hits it from that side;
- * dragging it pulls the rope and letting go swings it from there.
- */
 export function mount (
   canvas: HTMLCanvasElement,
   character: LiveCharacter,
@@ -191,12 +181,6 @@ export function mount (
   }
 }
 
-/**
- * `<pinata-character src="unicorn.json" scale="3" samples="3">`: loads a live artifact and animates it. Page events
- * drive it: dispatch `new CustomEvent('pinata', { detail: 'toolStart' })` on the element or the window (also
- * `loading`, `thinking`, `success`, `error`, `idle`); `element.hit()`, `element.play(name)`. It honours
- * `prefers-reduced-motion` unless `motion="full"` is set, and it covers only its own box.
- */
 export class PinataCharacter extends HTMLElement {
   mounted?: Mounted
   #canvas = document.createElement('canvas')

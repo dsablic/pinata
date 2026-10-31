@@ -4,6 +4,7 @@ import { validateStyle } from '../src/formats/style.ts'
 import type { Style } from '../src/formats/style.ts'
 import { checkReferences } from '../src/formats/references.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
+import { ball } from './rendering-fixtures.ts'
 
 function valid () {
   return {
@@ -62,7 +63,7 @@ test('cross-check reports materials and decal characters the style lacks', () =>
     name: 'm',
     height: 1,
     joints: { o: [0, 0, 0] },
-    parts: [{ name: 'p', shape: 'capsule', a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'metal' }],
+    parts: [ball('p', 'o', 1, 'metal')],
     decals: [{ name: 'd', anchor: 'o', normal: [0, 0, 1], pattern: ['x.y'] }]
   }
   const errors = checkReferences(mannequin, style)

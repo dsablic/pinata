@@ -13,17 +13,18 @@ import type { System } from '../src/sim/cloth.ts'
 import { step, windAt } from '../src/sim/solver.ts'
 import type { Environment } from '../src/sim/solver.ts'
 import { assertClose } from './helpers.ts'
+import { ball, rootAt } from './rendering-fixtures.ts'
 
 const DT = 1 / 240
 const env: Environment = { gravity: [0, -9.81, 0], particleRadius: 0.02 }
-const still: RootState = { position: [0, 0, 0], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 }
+const still: RootState = rootAt()
 const stillTrack = (): RootState => still
 
 const body: Mannequin = {
   name: 'test',
   height: 2,
   joints: { top: [0, 2, 0], origin: [0, 0, 0] },
-  parts: [{ name: 'ball', shape: 'capsule', a: 'origin', b: 'origin', radiusA: 0.5, radiusB: 0.5, material: 'm' }],
+  parts: [ball('ball', 'origin', 0.5)],
   decals: []
 }
 
@@ -115,14 +116,14 @@ test('wind pushes free particles toward the wind direction through drag', () => 
   assert.ok(system.particles.position[9] > 0.05, `x = ${system.particles.position[9]}`)
 })
 
-test('windAt is zero without wind, normalises the direction and is deterministic', () => {
+test('windAt is zero without wind, normalises the direction and gusts within its share of the speed', () => {
   assert.deepEqual(windAt(undefined, 1), [0, 0, 0])
   const steady = windAt({ direction: [3, 0, 4], speed: 10, gust: 0 }, 2)
   assertClose(steady[0], 6, 1e-9)
   assertClose(steady[2], 8, 1e-9)
-  const t = 0.7
-  const gust = 1 + 0.5 * (0.6 * Math.sin(1.3 * t) + 0.3 * Math.sin(3.1 * t + 1) + 0.1 * Math.sin(7.7 * t + 2))
-  assertClose(windAt({ direction: [0, 0, 2], speed: 4, gust: 0.5 }, t)[2], 4 * gust, 1e-9)
+  const speeds = Array.from({ length: 50 }, (_, i) => windAt({ direction: [0, 0, 2], speed: 4, gust: 0.5 }, i / 10)[2])
+  assert.ok(speeds.every(speed => speed >= 2 && speed <= 6), `speeds ${Math.min(...speeds)}..${Math.max(...speeds)}`)
+  assert.ok(Math.max(...speeds) - Math.min(...speeds) > 1)
 })
 
 test('two identical systems step to identical bytes', () => {

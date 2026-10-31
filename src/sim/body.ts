@@ -52,7 +52,6 @@ export function compileParts (m: Mannequin, exclude: string[]): Primitive[] {
 
 const posedCache = new WeakMap<Pose, { exclude: string[], parts: Primitive[] }>()
 
-/** Compiled parts of the mannequin in `pose`, cached by the identity of the pose object. */
 export function posedParts (m: Mannequin, exclude: string[], pose: Pose): Primitive[] {
   const cached = posedCache.get(pose)
   if (cached !== undefined && cached.exclude === exclude) return cached.parts

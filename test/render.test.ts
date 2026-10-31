@@ -7,6 +7,7 @@ import { toWorld } from '../src/sim/body.ts'
 import { clothParts, withClothParts } from '../src/sim/render.ts'
 import { assertClose } from './helpers.ts'
 import { mannequin } from './locomotion-fixtures.ts'
+import { rootAt } from './rendering-fixtures.ts'
 
 const scenario: Scenario = {
   name: 'walk',
@@ -32,7 +33,7 @@ const scenario: Scenario = {
 
 const count = 6 + 4 + 5
 const positions = Float64Array.from({ length: 3 * count }, (_, i) => i * 0.1)
-const root: RootState = { position: [1, 0, 2], yaw: 0.7, velocity: [0, 0, 0], angularVelocity: 0 }
+const root: RootState = rootAt([1, 0, 2], 0.7)
 
 test('draws only strands with a render entry, with one capsule per link and per grid edge', () => {
   const { joints, parts } = clothParts(scenario, positions, root)

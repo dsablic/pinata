@@ -30,13 +30,6 @@ export function windAt (wind: Wind | undefined, t: number): Vec3 {
   return [d[0] * s, d[1] * s, d[2] * s]
 }
 
-/**
- * Advances the system by one substep of length dt. `t` is the simulation time at the end of the substep: the pinned
- * particles move to the root pose at `t` and the wind is sampled there. The caller loops substeps. With `pose`, the
- * collider and pins use that body-local pose instead of the rest mannequin; it must return the same object for every
- * `t` within a frame so the collider is compiled once per frame. With `transforms`, a pin's offset also turns with
- * its joint's rotation.
- */
 export function step (system: System, options: StepOptions): void {
   const { env, dt } = options
   const root = options.track(options.t)
@@ -81,7 +74,6 @@ export function step (system: System, options: StepOptions): void {
   collide(system, options, root, pose)
 }
 
-// Each constraint is solved once per substep, so its multiplier starts at zero and never needs storing.
 function solveConstraints (system: System, dt: number): void {
   const { position, inverseMass } = system.particles
   const inverseDtSquared = 1 / (dt * dt)

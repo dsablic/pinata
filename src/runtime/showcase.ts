@@ -29,7 +29,6 @@ function tune (change: (settings: Settings) => void): void {
   if (settings !== undefined) change(settings)
 }
 
-/** Settings live in the running character; samples and reduced motion need a new one, so carry the sliders over. */
 function remount (attributes: Record<string, string>): void {
   const next = document.createElement('pinata-character') as PinataCharacter
   for (const { name, value } of character.attributes) next.setAttribute(name, value)

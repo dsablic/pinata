@@ -12,16 +12,12 @@ import { stylize } from '../style/stylize.ts'
 import type { LiveFrame } from './character.ts'
 
 export type ViewOptions = {
-  /** Height of the character in pixels (its mannequin height). */
   characterPx: number
-  /** Canvas size in pixels. */
   width: number
   height: number
-  /** Where the rope's anchor is drawn, in pixels from the top-left. */
   anchorAt: [number, number]
   azimuthDeg: number
   elevationDeg: number
-  /** Sub-samples per pixel along each axis (samples squared rays per pixel). */
   samples: number
 }
 
@@ -37,11 +33,6 @@ export const DEFAULT_VIEW: ViewOptions = {
   characterPx: 64, width: 128, height: 140, anchorAt: [64, 2], azimuthDeg: 40, elevationDeg: 10, samples: 3
 }
 
-/**
- * Draws live frames of one character with a fixed camera: the anchor stays at `anchorAt`, the rope is a thin part
- * from the anchor to the hook, decals turn with the body, and each frame keeps the previous one's buffer for
- * temporal hysteresis (edges do not flicker while the body sways slowly).
- */
 export function createView (character: { mannequin: Mannequin, style: Style }, options: ViewOptions): View {
   const { mannequin } = character
   const base = makeCamera({
@@ -82,7 +73,6 @@ export function createView (character: { mannequin: Mannequin, style: Style }, o
   return { camera, render }
 }
 
-/** A hash of an image's pixels (FNV-1a, 32-bit, hex), usable in Node and in the browser. */
 export function frameHash (image: Image): string {
   let hash = 0x811c9dc5
   const bytes = image.data
@@ -93,7 +83,6 @@ export function frameHash (image: Image): string {
   return `${image.width}x${image.height}:${hash.toString(16).padStart(8, '0')}`
 }
 
-/** The point on the rope's sphere under a canvas pixel (for dragging): the view's inverse at the hook's depth. */
 export function pickHook (view: View, frame: LiveFrame, options: ViewOptions, px: number, py: number): Vec3 {
   const { camera } = view
   const ppu = camera.pixelsPerUnit

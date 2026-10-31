@@ -16,17 +16,8 @@ export type SkinnedOptions = {
   pose: Pose
   skin: Skin
   camera: Camera
-  /**
-   * How limbs rotate: 'nearest' (the default) snaps to 22.5 degrees and samples the nearest pixel; 'clean' snaps to
-   * 11.25 degrees and rotates with RotSprite (see rotsprite.ts). With 'clean', `angles` keeps each part's last step
-   * between frames, so a bone near the middle of two steps does not flicker between them.
-   */
   rotation?: 'nearest' | 'clean'
   angles?: Map<string, number>
-  /**
-   * For an eight-direction skin: the character's yaw, and a place to keep the view between frames (its sector), so
-   * the view changes with hysteresis.
-   */
   yaw?: number
   view?: { sector?: number }
 }
@@ -35,11 +26,8 @@ type Screen = { x: number, y: number, depth: number }
 type Placement = {
   name: string
   layer?: number
-  /** The part's joints, to tell parts that join (no line between them) from parts that only overlap. */
   joints: [string, string]
-  /** The farther of a left and right pair, drawn a shade darker. */
   far?: boolean
-  /** For a mirrored two-joint part, the sprite before mirroring: clean rotation turns it and flips the result. */
   unmirrored?: { rows: string[], pivot: [number, number] }
   rows: string[]
   pivot: [number, number]
@@ -50,7 +38,6 @@ type Placement = {
 
 export const ANGLE_STEP = Math.PI / 8
 export const CLEAN_STEP = Math.PI / 16
-/** How far past the middle between two steps a bone must turn before a clean rotation moves to the next step. */
 const HYSTERESIS = 0.25
 const SNAP = 1e-9
 const NEIGHBOURS: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]]
@@ -68,10 +55,6 @@ function jointOf (m: Mannequin, pose: Pose, name: string): Vec3 {
   return pose[name] ?? m.joints[name]
 }
 
-/**
- * The sprite a part shows: for a one-view skin, its own; for an eight-direction skin, the chosen view's (the
- * counterpart's, mirrored, in a left-facing direction), fitted to the bone's length on screen.
- */
 type Shown = { sprite: SkinPart | undefined, unmirrored?: SkinPart }
 
 function spriteFor (
@@ -124,7 +107,6 @@ function placements (o: SkinnedOptions): Placement[] {
     })
   }
   if (choice !== undefined) {
-    // the farther of each left and right pair, where one is clearly behind the other
     const byName = new Map(found.map(p => [p.name, p]))
     for (const p of found) {
       const other = byName.get(counterpart(p.name))
@@ -134,13 +116,8 @@ function placements (o: SkinnedOptions): Placement[] {
   return found.sort((p, q) => (p.layer ?? 0) - (q.layer ?? 0) || q.depth - p.depth)
 }
 
-/** How much deeper (metres) a limb must be than its counterpart to count as the far one. */
 const FAR_DEPTH = 0.05
 
-/**
- * Each palette colour's next shade down: the darker palette colour nearest in hue and saturation (its colour less
- * its grey), the step closest in brightness breaking ties; the colour itself when none is darker.
- */
 export function darkerShades (colours: Map<string, number>): Map<number, number> {
   const rgb = (c: number): [number, number, number] => [(c >> 16) & 255, (c >> 8) & 255, c & 255]
   const tint = (c: number): [number, number, number] => {
@@ -160,7 +137,6 @@ export function darkerShades (colours: Map<string, number>): Map<number, number>
   }))
 }
 
-/** The 11.25-degree step nearest the angle, keeping the previous step until the angle is well past their middle. */
 export function cleanStep (radians: number, previous?: number): number {
   const nearest = Math.round(radians / CLEAN_STEP) * CLEAN_STEP
   if (previous === undefined) return nearest
@@ -169,11 +145,9 @@ export function cleanStep (radians: number, previous?: number): number {
 }
 
 const ROTATIONS = new Map<string, Rotated>()
-/** Most clean rotations kept; the oldest go first. */
 const ROTATIONS_KEPT = 4096
 const STEPS = Math.round(2 * Math.PI / CLEAN_STEP)
 
-/** A sprite turned cleanly by a number of steps, cached by sprite, pivot and step. */
 function rotatedBy (rows: string[], pivot: [number, number], turns: number): Rotated {
   const step = ((turns % STEPS) + STEPS) % STEPS
   const key = JSON.stringify([rows, pivot, step])
@@ -186,10 +160,6 @@ function rotatedBy (rows: string[], pivot: [number, number], turns: number): Rot
   return found
 }
 
-/**
- * A part's sprite turned cleanly. A mirrored two-joint part turns its unmirrored sprite by the mirrored angle and
- * flips the result, so left- and right-facing directions are exact mirrors of each other.
- */
 function rotated (p: Placement): Rotated {
   const steps = Math.round(p.angle / CLEAN_STEP)
   if (p.unmirrored === undefined) return rotatedBy(p.rows, p.pivot, steps)
@@ -198,7 +168,6 @@ function rotated (p: Placement): Rotated {
   return { grid: turned.grid.map(row => [...row].reverse()), pivot: [width - 1 - turned.pivot[0], turned.pivot[1]] }
 }
 
-/** Where an eight-direction skin's parts were painted, by placement index, and how to darken a colour. */
 type Ink = { owner: Int16Array, index: number, shade: Map<number, number> }
 
 function put (img: Image, x: number, y: number, colour: number, p: Placement, ink?: Ink): void {
@@ -234,10 +203,6 @@ function paint (img: Image, p: Placement, colours: Map<string, number>, ink?: In
   }
 }
 
-/**
- * Inner lines, as a pixel artist draws them where one part overlaps another: wherever a part's pixel borders an
- * earlier (farther) part it does not join at a joint, that farther pixel takes its next shade down.
- */
 function innerLines (img: Image, placed: Placement[], ink: Ink): void {
   const { owner, shade } = ink
   const joins = (p: Placement, q: Placement): boolean => p.joints.some(j => q.joints.includes(j))
@@ -283,7 +248,6 @@ export function renderSkinned (options: SkinnedOptions): Image {
   const img = createImage(options.camera.width, options.camera.height)
   const colours = new Map(Object.entries(options.skin.palette).map(([key, hex]) => [key, parseHex(hex)]))
   const placed = placements(options)
-  // eight-direction skins also get inner lines and darker far limbs; one-view skins render as they always have
   const ink: Ink | undefined = options.skin.views === undefined
     ? undefined
     : { owner: new Int16Array(img.width * img.height).fill(-1), index: 0, shade: darkerShades(colours) }

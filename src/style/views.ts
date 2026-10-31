@@ -4,30 +4,18 @@ import { dot } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import type { Camera } from '../raster/camera.ts'
 
-/** Which drawn view shows a direction, and whether it is mirrored (the character faces screen-left). */
 export type ViewChoice = { view: ViewName, mirror: boolean, sector: number }
 
 const SECTOR = Math.PI / 4
-/** How far past the edge between two sectors the facing must turn before the view changes. */
 const HYSTERESIS = 10 * Math.PI / 180
 const BY_SECTOR: ViewName[] = ['front', 'frontSide', 'side', 'backSide', 'back']
 
-/**
- * The character's facing seen from the camera, radians: 0 faces the viewer, +pi/2 faces screen-right, +-pi faces
- * away. Yaw is the character's, forward (sin yaw, 0, cos yaw) as the world uses.
- */
 export function facingAngle (camera: Camera, yaw: number): number {
   const forward: Vec3 = [Math.sin(yaw), 0, Math.cos(yaw)]
-  // measured across the ground, so the camera's tilt does not move the sectors' edges
   const toCamera: Vec3 = [-camera.forward[0], 0, -camera.forward[2]]
   return Math.atan2(dot(forward, camera.right), dot(forward, toCamera))
 }
 
-/**
- * The view for a facing, in eight 45-degree sectors (-4 and 4 are both the back); with the previous sector, the view
- * changes only once the facing is well past the edge between the two, so a character turning slowly does not flicker
- * between views.
- */
 export function chooseView (facing: number, previous?: number): ViewChoice {
   let sector = Math.round(facing / SECTOR)
   if (previous !== undefined) {
@@ -38,7 +26,6 @@ export function chooseView (facing: number, previous?: number): ViewChoice {
   return { view: BY_SECTOR[Math.abs(sector)], mirror: sector < 0, sector }
 }
 
-/** The part on the other side: a name ending in L or R, or containing Left or Right, swapped; others unchanged. */
 export function counterpart (name: string): string {
   if (/Left/.test(name)) return name.replace('Left', 'Right')
   if (/Right/.test(name)) return name.replace('Right', 'Left')
@@ -47,10 +34,6 @@ export function counterpart (name: string): string {
   return name
 }
 
-/**
- * A sprite as it looks mirrored left for right: a two-joint sprite, drawn along its bone, flips top for bottom (the
- * bone's direction is set by the joints); an upright one flips left for right.
- */
 export function mirrored (sprite: SkinPart, twoJoint: boolean): SkinPart {
   if (sprite.rows === undefined || sprite.pivotA === undefined) return sprite
   const rows = sprite.rows
@@ -72,14 +55,8 @@ export function mirrored (sprite: SkinPart, twoJoint: boolean): SkinPart {
   }
 }
 
-/** The shortest a limb is drawn, as a share of its drawn length: shorter, a foreshortened limb reads as a spike. */
 const MIN_FIT = 0.6
 
-/**
- * A two-joint sprite fitted to a bone of a given on-screen length: the end caps past each pivot are kept, and the
- * columns between the pivots are resampled (repeated or dropped evenly) so the pivots end that length apart. Within
- * a pixel of the drawn length the sprite is returned as it is; it is never shortened past MIN_FIT of its drawn length.
- */
 export function fitted (sprite: SkinPart, length: number): SkinPart {
   const { rows, pivotA, pivotB } = sprite
   if (rows === undefined || pivotA === undefined || pivotB === undefined) return sprite

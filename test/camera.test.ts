@@ -6,6 +6,7 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 import { add, scale } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
+import { capsule } from './rendering-fixtures.ts'
 
 const base = { targetHeightPx: 32, modelHeight: 2, margin: 4 }
 
@@ -47,10 +48,10 @@ const tPose: Mannequin = {
   height: 1,
   joints: { hip: [0, 0.5, 0], head: [0, 0.9, 0], handL: [-0.8, 0.8, 0], handR: [0.4, 0.8, 0], toe: [0, -0.3, 0] },
   parts: [
-    { name: 'torso', shape: 'capsule', a: 'hip', b: 'head', radiusA: 0.1, radiusB: 0.1, material: 'm' },
-    { name: 'armL', shape: 'capsule', a: 'head', b: 'handL', radiusA: 0.05, radiusB: 0.05, material: 'm' },
-    { name: 'armR', shape: 'capsule', a: 'head', b: 'handR', radiusA: 0.05, radiusB: 0.05, material: 'm' },
-    { name: 'sunk', shape: 'capsule', a: 'hip', b: 'toe', radiusA: 0.05, radiusB: 0.05, material: 'm' }
+    capsule('torso', 'hip', 'head', 0.1),
+    capsule('armL', 'head', 'handL', 0.05),
+    capsule('armR', 'head', 'handR', 0.05),
+    capsule('sunk', 'hip', 'toe', 0.05)
   ],
   decals: []
 }

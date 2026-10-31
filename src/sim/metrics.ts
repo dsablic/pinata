@@ -13,7 +13,6 @@ export type Frame = {
 }
 export type Recording = { constraints: DistanceConstraint[], frames: Frame[] }
 
-/** Hem particle indices and the cape's top-centre anchor in body-local space (joint position plus offset). */
 export type SwingOptions = { hem: number[], anchorLocal: Vec3 }
 
 export function createRecording (system: System): Recording {
@@ -28,11 +27,6 @@ export type RecordOptions = {
   particleRadius: number
 }
 
-/**
- * Copies the particle positions and stores per-particle penetration depth, max(0, particleRadius - distance), and
- * the same depth at the midpoint of each constraint. Pinned particles (inverse mass 0) are placed by the root, not
- * simulated, so their depth, and that of their constraints, is recorded as 0.
- */
 export function recordFrame (recording: Recording, options: RecordOptions): void {
   const { particles, distance, particleRadius } = options
   const penetration = new Float64Array(particles.count)
@@ -58,7 +52,6 @@ export function recordFrame (recording: Recording, options: RecordOptions): void
   })
 }
 
-/** Number of NaN or infinite particle coordinates over all frames. */
 export function nonFinite (recording: Recording): number {
   let count = 0
   for (const frame of recording.frames) {
@@ -82,14 +75,12 @@ function frameSpeed (recording: Recording, index: number, particles?: number[]):
   return best
 }
 
-/** Largest particle displacement between consecutive frames divided by the frame time step, in m/s. */
 export function maxSpeed (recording: Recording): number {
   let best = 0
   for (let i = 1; i < recording.frames.length; i++) best = Math.max(best, frameSpeed(recording, i))
   return best
 }
 
-/** Largest (current length - rest length) / rest length over all constraints and frames. */
 export function maxStrain (recording: Recording): number {
   let best = -Infinity
   for (const { positions } of recording.frames) {
@@ -102,10 +93,6 @@ export function maxStrain (recording: Recording): number {
   return best
 }
 
-/**
- * Fraction of frames in which any particle, or the midpoint of any constraint between free particles, has
- * penetration depth above the threshold (metres).
- */
 export function penetratingFrames (recording: Recording, threshold: number): number {
   if (recording.frames.length === 0) return 0
   const hits = recording.frames.filter(f => f.penetration.some(d => d > threshold) ||
@@ -115,10 +102,6 @@ export function penetratingFrames (recording: Recording, threshold: number): num
 
 export type SettleOptions = { fromTime: number, speedThreshold: number, particles?: number[] }
 
-/**
- * Time from fromTime until the frame-to-frame max particle speed is below speedThreshold and stays below for all
- * later frames; Infinity if the final frame is still moving faster. Only the listed particles count when given.
- */
 export function settleSeconds (recording: Recording, options: SettleOptions): number {
   const { frames } = recording
   const first = Math.max(1, frames.findIndex(f => f.time >= options.fromTime))
@@ -131,10 +114,6 @@ export function settleSeconds (recording: Recording, options: SettleOptions): nu
   return Math.max(0, frames[settled].time - options.fromTime)
 }
 
-/**
- * Per frame, in radians, the pendulum angles of the hem centroid about the anchor in body-local space with
- * d = R(-yaw) * (hem - anchor): forward = atan2(d.z, -d.y), sideways = atan2(d.x, -d.y).
- */
 export function swingAngles (recording: Recording, options: SwingOptions): { forward: number[], sideways: number[] } {
   const forward: number[] = []
   const sideways: number[] = []
@@ -152,7 +131,6 @@ export function swingAngles (recording: Recording, options: SwingOptions): { for
   return { forward, sideways }
 }
 
-/** Max forward swing over frames at or after stopTime minus the forward swing of the last frame, in degrees. */
 export function overshootDegrees (recording: Recording, options: { stopTime: number, swing: SwingOptions }): number {
   const { forward } = swingAngles(recording, options.swing)
   const after = forward.filter((_, i) => recording.frames[i].time >= options.stopTime)
@@ -171,11 +149,6 @@ function peakIndex (values: number[], recording: Recording, from: number, to: nu
   return best
 }
 
-/**
- * Frame index of peak |sideways swing| in [turnStart, turnEnd + 1 s] minus frame index of peak |body angular
- * velocity| in [turnStart, turnEnd]; first frame wins ties. -1 if either window is empty or the sideways peak is
- * below minPeakDegrees.
- */
 export function lagFrames (recording: Recording, options: LagOptions): number {
   const side = swingAngles(recording, options.swing).sideways.map(Math.abs)
   const omega = recording.frames.map(f => Math.abs(f.root.angularVelocity))
@@ -188,7 +161,6 @@ export function lagFrames (recording: Recording, options: LagOptions): number {
 
 export type WindDriftOptions = { hem: number[], restHem: Vec3 }
 
-/** Mean over frames of the horizontal (x, z) distance from restHem to the hem centroid, in metres. */
 export function windDriftMetres (recording: Recording, options: WindDriftOptions): number {
   if (recording.frames.length === 0) return 0
   let total = 0
@@ -201,10 +173,6 @@ export function windDriftMetres (recording: Recording, options: WindDriftOptions
 
 export type WindAlignmentOptions = { hem: number[], restHem: Vec3, windDirection: Vec3 }
 
-/**
- * Mean over frames of the cosine between the horizontal (x, z) hem-centroid displacement from restHem and the
- * horizontal wind direction; a frame with zero displacement counts as 0.
- */
 export function windAlignment (recording: Recording, options: WindAlignmentOptions): number {
   const wind = Math.hypot(options.windDirection[0], options.windDirection[2])
   if (recording.frames.length === 0 || wind === 0) return 0
@@ -220,7 +188,6 @@ export function windAlignment (recording: Recording, options: WindAlignmentOptio
   return total / recording.frames.length
 }
 
-/** SHA-256 hex digest of each frame's particle position bytes. */
 export function frameHashes (recording: Recording): string[] {
   return recording.frames.map(f => {
     const bytes = new Uint8Array(f.positions.buffer, f.positions.byteOffset, f.positions.byteLength)

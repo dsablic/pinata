@@ -1,3 +1,4 @@
+import { gateFrom } from '../../src/diagnostics/report.ts'
 import type { Gate } from '../../src/diagnostics/report.ts'
 
 export const MATERIALS = ['silk', 'wool', 'leather']
@@ -78,6 +79,5 @@ export const P3_GATES = {
 } as const
 
 export function gate (name: keyof typeof P3_GATES, value: number, material?: string): Gate {
-  const label = material === undefined ? name : `${name}.${material}`
-  return { name: label, value, ...P3_GATES[name] }
+  return gateFrom(P3_GATES, name, value, material)
 }

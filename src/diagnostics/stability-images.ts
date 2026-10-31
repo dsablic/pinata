@@ -20,7 +20,6 @@ export function differenceMap (before: Image, after: Image): Image {
   return out
 }
 
-/** Pixels that changed from the previous frame in red over the unchanged silhouette in grey, side by side. */
 export function differenceStrip (images: Image[], options: StripOptions): Image {
   const cells = Array.from({ length: options.count }, (_, i) => {
     const k = options.from + i

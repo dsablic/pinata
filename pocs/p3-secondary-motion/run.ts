@@ -1,13 +1,9 @@
-import { execFileSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { validateMannequin } from '../../src/formats/mannequin.ts'
 import type { Mannequin } from '../../src/formats/mannequin.ts'
 import { checkScenario, scenarioDuration, validateScenario, validateSimMaterials } from '../../src/formats/sim.ts'
 import type { Scenario, SimMaterial } from '../../src/formats/sim.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import type { Vec3 } from '../../src/math/vec.ts'
 import { createRootTrack, scriptDuration } from '../../src/motion/script.ts'
 import type { RootState } from '../../src/motion/script.ts'
@@ -19,6 +15,7 @@ import * as metrics from '../../src/sim/metrics.ts'
 import type { Recording, SwingOptions } from '../../src/sim/metrics.ts'
 import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../../src/diagnostics/motion-images.ts'
 import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { childHashes, nonFiniteAsText, startGatedRun } from '../harness.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { gate, MATERIALS } from './gates.ts'
 
@@ -35,12 +32,7 @@ const FOLLOW_SECONDS = 1.5
 const MIN_LAG_PEAK_DEGREES = 0.5
 const CHILD_TIMEOUT_MS = 120000
 
-const here = dirname(fileURLToPath(import.meta.url))
-const outDir = join(here, '..', '..', 'reports', 'p3')
-const hashesMode = process.argv.includes('--hashes')
-const verify = process.argv.includes('--verify')
-
-if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
+const { outDir, hashesMode, verify, fail, loadJson, requireValid } = startGatedRun(import.meta.url, 'p3')
 
 type Run = {
   id: string
@@ -49,35 +41,6 @@ type Run = {
   recording: Recording
   swing: SwingOptions
   hem: number[]
-}
-
-function fail (message: string): never {
-  console.error(message)
-  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
-  process.exit(2)
-}
-
-process.on('uncaughtException', err => {
-  try {
-    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
-  } catch {
-    process.exit(2)
-  }
-})
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) fail(formatErrors(file, result.errors))
-  return result.value
-}
-
-function loadJson (file: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(here, file), 'utf8'))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
-    throw err
-  }
 }
 
 const materials = requireValid('materials.json', validateSimMaterials(loadJson('materials.json')))
@@ -150,14 +113,6 @@ const runs: Run[] = scenarios.flatMap(scenario => MATERIALS.map(name => ({
   swing: swingOptions(scenario),
   hem: capeHemIndices(scenario.cape as NonNullable<Scenario['cape']>)
 })))
-
-function childHashes (): Map<string, string> {
-  const args = [fileURLToPath(import.meta.url), '--hashes']
-  const output = execFileSync(process.execPath, args, {
-    encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024
-  })
-  return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
-}
 
 function runHashes (run: Run): Array<[string, string]> {
   return metrics.frameHashes(run.recording).map((hash, i) => [`${run.id}#${i}`, hash])
@@ -274,7 +229,7 @@ function windDrift (material: string): number {
 
 const penetrationLimit = PENETRATION_PX * (bodies.get('turn-stop') as Mannequin).height / PX_SCALE
 function mismatches (): number {
-  const other = childHashes()
+  const other = childHashes(import.meta.url, CHILD_TIMEOUT_MS)
   return runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
 }
 
@@ -364,12 +319,8 @@ function writeStills (run: Run): void {
   }
 }
 
-function finite (key: string, value: unknown): unknown {
-  return typeof value === 'number' && !Number.isFinite(value) ? String(value) : value
-}
-
 for (const run of runs) writeStills(run)
-writeOutput(join(outDir, 'metrics.json'), JSON.stringify({ gates: results, perMaterial, perRun }, finite, 2))
+writeOutput(join(outDir, 'metrics.json'), JSON.stringify({ gates: results, perMaterial, perRun }, nonFiniteAsText, 2))
 writeOutput(join(outDir, 'summary.txt'), `${summary}\n`)
 
 console.log(summary)

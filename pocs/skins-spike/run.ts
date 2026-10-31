@@ -1,14 +1,12 @@
-import { readFileSync, rmSync } from 'node:fs'
+import { rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { validateMannequin } from '../../src/formats/mannequin.ts'
-import type { Mannequin } from '../../src/formats/mannequin.ts'
 import { checkRig, validateRig } from '../../src/formats/rig.ts'
 import { validateScenario } from '../../src/formats/sim.ts'
 import { checkSkin, validateSkin } from '../../src/formats/skin.ts'
 import type { Skin } from '../../src/formats/skin.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import { planGait } from '../../src/motion/gait.ts'
 import { recordLocomotion, steadySegments } from '../../src/motion/metrics.ts'
 import { posedMannequin, restPose } from '../../src/motion/pose.ts'
@@ -23,6 +21,7 @@ import { writeOutput } from '../../src/diagnostics/report.ts'
 import { imageHash } from '../../src/image-hash.ts'
 import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
+import { jsonReaders } from '../harness.ts'
 
 const AZIMUTH_DEG = 270
 const TARGET_HEIGHT_PX = 48
@@ -44,20 +43,7 @@ function fail (message: string): never {
   process.exit(2)
 }
 
-function loadJson (path: string): unknown {
-  try {
-    return JSON.parse(readFileSync(path, 'utf8'))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${path}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${path}: file not found`)
-    throw err
-  }
-}
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) fail(formatErrors(file, result.errors))
-  return result.value
-}
+const { loadJson, requireValid } = jsonReaders(fail)
 
 const skinArg = process.argv[2]
 if (skinArg === undefined) fail('usage: npm run skins -- <skin.json>')

@@ -1,3 +1,4 @@
+import { gateFrom } from '../../src/diagnostics/report.ts'
 import type { Gate } from '../../src/diagnostics/report.ts'
 import { P1_GATES } from '../p1-static-style/gates.ts'
 import { P2_GATES } from '../p2-pixel-stability/gates.ts'
@@ -22,6 +23,5 @@ export const P6_GATES = {
 } as const
 
 export function gate (name: keyof typeof P6_GATES, value: number, label?: string): Gate {
-  const full = label === undefined ? name : `${name}.${label}`
-  return { name: full, value, ...P6_GATES[name] }
+  return gateFrom(P6_GATES, name, value, label)
 }

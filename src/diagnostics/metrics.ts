@@ -18,7 +18,6 @@ export function outlineGaps (img: Image, outlineMask: Uint8Array): number {
   return gaps
 }
 
-/** Pixel indices (y * width + x) of coloured pixels outside `exclude` with no 8-neighbour of the same colour. */
 export function strayPixelIndices (img: Image, exclude: Uint8Array): number[] {
   const strays: number[] = []
   for (let y = 0; y < img.height; y++) {
@@ -76,7 +75,6 @@ export function thinParts (g: GBuffer, m: Mannequin): ThinPart[] {
     .filter((_, i) => m.parts[i].allowThin !== true)
 }
 
-/** Names of the parts that sit in front of the 1-px-wide pixels of `part`, most pixels first. */
 export function thinOccluders (g: GBuffer, m: Mannequin, part: string): string[] {
   const target = m.parts.findIndex(p => p.name === part)
   const counts = new Map<number, number>()

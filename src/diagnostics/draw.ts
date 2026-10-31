@@ -5,6 +5,27 @@ const BACKGROUND = 0xffffff
 const AXIS = 0x000000
 const ZERO_LINE = 0xbbbbbb
 
+export function filledImage (width: number, height: number, rgb: number): Image {
+  const img = createImage(width, height)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) setPixel(img, x, y, rgb)
+  }
+  return img
+}
+
+export function mixColour (from: number, to: number, t: number): number {
+  const channel = (shift: number): number => {
+    const a = (from >> shift) & 0xff
+    const b = (to >> shift) & 0xff
+    return Math.round(a + (b - a) * t)
+  }
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0)
+}
+
+export function onionShare (order: number, count: number): number {
+  return count === 1 ? 1 : order / (count - 1)
+}
+
 export function line (img: Image, x0: number, y0: number, x1: number, y1: number, rgb: number): void {
   let x = Math.round(x0)
   let y = Math.round(y0)
@@ -55,10 +76,7 @@ export type PlotOptions = { width: number, height: number, yMin: number, yMax: n
 
 export function plot (series: Series[], options: PlotOptions): Image {
   const { width, height, yMin, yMax } = options
-  const img = createImage(width, height)
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) setPixel(img, x, y, BACKGROUND)
-  }
+  const img = filledImage(width, height, BACKGROUND)
   const margin = Math.max(2, Math.round(Math.min(width, height) * 0.08))
   const left = margin
   const right = width - 1 - margin

@@ -57,7 +57,6 @@ function turn (v: Vec3, yaw: number): Vec3 {
   return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
 }
 
-/** The mannequin and cloth of one frame in world orientation, translated so the root's ground point is the origin. */
 function frameMannequin (run: CharacterRun, joints: Record<string, Vec3>[], frame: number): Mannequin {
   const { root } = run.frames[frame]
   const origin: Vec3 = [root.position[0], 0, root.position[2]]
@@ -93,7 +92,6 @@ function render (): Image[] {
   return images
 }
 
-/** Frames to render after the settle frames: DEMO_FRAMES, a whole number of at least 1, or all of them. */
 function demoFrames (): number {
   const value = process.env.DEMO_FRAMES
   if (value === undefined) return Infinity

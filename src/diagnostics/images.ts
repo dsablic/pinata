@@ -2,6 +2,7 @@ import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import { EMPTY } from '../raster/gbuffer.ts'
 import type { GBuffer } from '../raster/gbuffer.ts'
+import { filledImage } from './draw.ts'
 
 const PART_COLOURS = [
   0xe6194b, 0x3cb44b, 0xffe119, 0x4363d8, 0xf58231, 0x911eb4, 0x46f0f0, 0xf032e6,
@@ -24,10 +25,8 @@ export function sheet (rows: SheetCell[][], options: SheetOptions): Image {
   const cellWidth = (left + right) * scale
   const cellHeight = (above + below) * scale
   const cols = Math.max(...rows.map(r => r.length))
-  const out = createImage(cols * cellWidth + (cols + 1) * gap, rows.length * cellHeight + (rows.length + 1) * gap)
-  for (let y = 0; y < out.height; y++) {
-    for (let x = 0; x < out.width; x++) setPixel(out, x, y, background)
-  }
+  const out = filledImage(cols * cellWidth + (cols + 1) * gap, rows.length * cellHeight + (rows.length + 1) * gap,
+    background)
   rows.forEach((row, r) => {
     row.forEach(({ image, anchor }, c) => {
       const ox = gap + c * (cellWidth + gap) + (left - anchor[0]) * scale

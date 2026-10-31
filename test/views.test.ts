@@ -9,9 +9,9 @@ import { loadCharacter } from '../src/formats/character.ts'
 import { restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
-import type { Vec3 } from '../src/math/vec.ts'
 import { getPixel, TRANSPARENT } from '../src/image.ts'
 import type { Image } from '../src/image.ts'
+import { rootAt } from './rendering-fixtures.ts'
 
 test('facing: yaw 0 faces a camera at azimuth 0, a quarter turn faces screen-right', () => {
   const camera = makeCamera({ azimuthDeg: 0, elevationDeg: 14, targetHeightPx: 48, modelHeight: 1.8, margin: 4 })
@@ -61,16 +61,14 @@ test('eight-direction skins render left-facing directions as mirrors of right-fa
   const character = loadCharacter('examples/knight').value!
   const rest = restPose(character.mannequin)
   const turned = (yaw: number): Pose => {
-    const root = { position: [0, 0, 0] as Vec3, yaw, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+    const root = rootAt([0, 0, 0], yaw)
     return Object.fromEntries(Object.entries(rest).map(([name, p]) => [name, toWorld(p, root)]))
   }
   const camera = makeCamera({ azimuthDeg: 0, elevationDeg: 14, targetHeightPx: 48, modelHeight: 2, margin: 7 })
-  // the sword hangs from the right hand only, so a mirrored pose would not mirror it: leave it out
   const symmetric = { ...character.mannequin, parts: character.mannequin.parts.filter(p => p.name !== 'sword') }
   for (const rotation of ['nearest', 'clean'] as const) {
     for (const degrees of [45, 90, 135]) {
       const yaw = degrees * Math.PI / 180
-      // the mirror image of the scene: x negated, left and right joints swapped, facing the other way
       const posed = turned(yaw)
       const mirrorPose: Pose = Object.fromEntries(Object.entries(posed).map(([name, p]) => {
         const [x, y, z] = posed[counterpart(name)] ?? p
@@ -81,8 +79,6 @@ test('eight-direction skins render left-facing directions as mirrors of right-fa
       }
       const right = draw(posed, yaw)
       const left = draw(mirrorPose, -yaw)
-      // a pixel matches when its mirror image has the same colour within a pixel: sampling rounds down, so mirrored
-      // angles land parts up to a pixel apart
       let opaque = 0
       let differ = 0
       for (let y = 0; y < right.height; y++) {
@@ -120,7 +116,6 @@ test('an eight-direction skin needs the character\'s yaw, and keeps its view bet
 test('eight-direction sprites may be drawn upright, reuse another sprite, and set a layer', () => {
   const base = JSON.parse(readFileSync('pocs/p7-skins/knight/skin.json', 'utf8'))
   const skin = structuredClone(base)
-  // an upright thigh: A at the top, B below, the right-hand column becomes the lying sprite's top row
   const [a, b, c, d, e, f] = Object.keys(skin.palette)
   skin.views.front.parts.thighR = { rows: [a + b, c + d, e + f], pivotA: [0, 0], pivotB: [0, 2], upright: true }
   skin.views.back.parts.thighR = { from: 'front.thighR', layer: 2 }

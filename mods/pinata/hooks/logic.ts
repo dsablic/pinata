@@ -19,10 +19,6 @@ function clamp (n: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, n))
 }
 
-/**
- * The picture's box for the pane's body: an Image of the full 128x140 frame scaled into it, or a Raster drawn at a
- * smaller character size, one column per pixel and one row per two pixels. Two rows are kept for the caption.
- */
 export function layoutFor (mode: Mode, bodyColumns: number, bodyRows: number): Layout {
   const roomRows = Math.max(4, bodyRows - 2)
   const aspect = VIEW_HEIGHT / VIEW_WIDTH
@@ -45,7 +41,6 @@ export function labelFor (behaviour: string): string {
   return LABELS[behaviour] ?? behaviour
 }
 
-/** Raster cells of spaces in the terminal's default colours. */
 export function blankCells (columns: number, rows: number): string {
   const words = new Uint32Array(columns * rows * 3)
   for (let i = 0; i < words.length; i += 3) words.set([SPACE, DEFAULT_COLOR, DEFAULT_COLOR], i)
@@ -57,7 +52,6 @@ export function blankCells (columns: number, rows: number): string {
 
 export type TerminalEnv = { term?: string, termVersion?: string, kitty?: string, termName?: string }
 
-/** Terminal images where the terminal draws them (kitty, Ghostty, iTerm2 3.5+); half-block cells elsewhere. */
 export function guessMode (env: TerminalEnv): Mode {
   if (env.kitty !== undefined && env.kitty !== '') return 'image'
   if (env.termName === 'xterm-kitty' || env.termName === 'xterm-ghostty') return 'image'
@@ -69,7 +63,6 @@ export function guessMode (env: TerminalEnv): Mode {
   return 'raster'
 }
 
-/** A blit refused because the Image draws its alt text here (no image protocol, or tmux holding images back). */
 export function isAltDeny (deny: string, fix?: string): boolean {
   return fix === 'tmux-passthrough' || /\balt\b/i.test(deny)
 }

@@ -19,10 +19,8 @@ export type LiveOptions = {
   fps: number
   substeps: number
   reduced: boolean
-  /** Where the rope is tied, in world space. */
   anchor: Vec3
   gravity: number
-  /** Steady wind acceleration on the hook, m/s^2. */
   wind: Vec3
 }
 export type LiveFrame = {
@@ -36,7 +34,6 @@ export type LiveFrame = {
   twist: number
   behaviour: string
 }
-/** Tweakable settings, read every step (a demo page can change them live). */
 export type LiveSettings = HangSettings & { wind: Vec3, limbStiffness: number, limbDamping: number }
 
 export type Live = {
@@ -45,7 +42,6 @@ export type Live = {
   play: (name: string, blend?: number) => void
   dispatch: (event: string) => boolean
   hit: (impulse?: Vec3, spin?: number) => void
-  /** Holds the hook at a point (dragging), or lets go with undefined. */
   grab: (point: Vec3 | undefined) => void
   frame: () => LiveFrame
 }
@@ -54,7 +50,6 @@ const SPIN_GAIN = 8
 const DEFAULT_BLEND = 0.3
 const DEFAULT_HIT: Event = { at: 0, do: 'hit', impulse: [1.3, 0, 0], spin: 2.2 }
 
-/** Joints a mask names: 'body' is the pelvis and upperBody, a limb name its joints, a joint name its subtree. */
 export function maskJoints (mask: readonly string[], rig: Rig, parents: Parents): Set<string> {
   const joints = new Set<string>()
   const below = (joint: string): boolean => {
@@ -70,7 +65,6 @@ export function maskJoints (mask: readonly string[], rig: Rig, parents: Parents)
   return joints
 }
 
-/** Every leg and arm hangs limp: it becomes a spring chain from its first joint, like an appendage. */
 function hangingChains (rig: Rig, settings: LiveSettings): AppendageLimb[] {
   return rig.limbs.map(limb => {
     if (limb.kind === 'appendage') return limb
@@ -81,11 +75,6 @@ function hangingChains (rig: Rig, settings: LiveSettings): AppendageLimb[] {
   })
 }
 
-/**
- * A character hanging from a rope, driven live one frame at a time by a behaviours file: swing and twist from the
- * rope, limp legs, mane and tail as spring chains, behaviours as forces and offsets, and events such as hits.
- * Deterministic: the same calls in the same frames give the same frames.
- */
 export function createLive (
   character: { mannequin: Mannequin, rig: Rig },
   spec: Behaviours,
@@ -131,7 +120,6 @@ export function createLive (
     return joints
   }
 
-  /** World positions and rotations of every joint for the current hang state, stepping the chains by `step`. */
   const place = (time: number, step: number | undefined): { joints: Pose, rotation: Matrix } => {
     const rotation = hangRotation(state)
     const along = scale(sub(state.anchor, state.hook), 1 / settings.rope)

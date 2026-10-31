@@ -10,6 +10,7 @@ import type { LocomotionFrame, LocomotionRecording } from '../src/motion/metrics
 import { restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import { mannequin, rig } from './locomotion-fixtures.ts'
+import { rootAt } from './rendering-fixtures.ts'
 
 const rest = restPose(mannequin)
 const geometry = { rig, mannequin }
@@ -36,7 +37,7 @@ function walkRecording (): LocomotionRecording {
     const rightOn = i % 20 < 9
     frames.push({
       time: i / 24,
-      root: { position: [0, 0, z], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 },
+      root: rootAt([0, 0, z]),
       joints: pose(z, leftOn ? 0 : 0.3, rightOn ? 0 : 0.3, leftPlants[leftIndex], rightPlants[rightIndex]),
       clamped: 0,
       planted: { left: leftOn, right: rightOn }
@@ -116,7 +117,7 @@ const style: Style = {
 test('pixelStrip lays frames side by side with a fixed camera so the character moves across the strip', () => {
   const frames: LocomotionFrame[] = [0, 1, 2, 3].map(i => ({
     time: i / 24,
-    root: { position: [0, 0, i * 0.3], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 },
+    root: rootAt([0, 0, i * 0.3]),
     joints: pose(i * 0.3, 0, 0, i * 0.3, i * 0.3),
     clamped: 0,
     planted: { left: true, right: true }
@@ -149,7 +150,7 @@ test('pixelStrip lays frames side by side with a fixed camera so the character m
 test('pixelStrip draws the cloth parts of every frame beside the body, placed in the strip like the body', () => {
   const frames: LocomotionFrame[] = [0, 1].map(i => ({
     time: i / 24,
-    root: { position: [0, 0, i * 0.3], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 },
+    root: rootAt([0, 0, i * 0.3]),
     joints: pose(i * 0.3, 0, 0, i * 0.3, i * 0.3),
     clamped: 0,
     planted: { left: true, right: true }
@@ -199,7 +200,7 @@ function footprintRecording (yawRate: number): LocomotionRecording {
     joints.toeR = [-0.1 + x, rightOn ? 0.05 : 0.35, z + 0.15]
     frames.push({
       time: i / 24,
-      root: { position: [x, 0, z], yaw, velocity: [0, 0, 0], angularVelocity: 0 },
+      root: rootAt([x, 0, z], yaw),
       joints,
       clamped: 0,
       planted: { left: leftOn, right: rightOn }

@@ -44,11 +44,6 @@ function edges (strand: Strand): Array<[number, number]> {
   return out
 }
 
-/**
- * Thin capsule parts for the cape grid and for each chain with a `render` entry, from the particle `positions` of one
- * recorded frame (world space), expressed in the frame of `root`: pass the frame's root for body-local joints. Every
- * particle becomes a joint named `cape.<index>` or `chain<n>.<index>`. The parts are for drawing only, never colliders.
- */
 export function clothParts (scenario: Scenario, positions: Float64Array, root: RootState): ClothParts {
   const joints: Record<string, Vec3> = {}
   const parts: CapsulePart[] = []

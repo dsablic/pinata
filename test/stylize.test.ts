@@ -8,6 +8,7 @@ import { getPixel, TRANSPARENT } from '../src/image.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Style } from '../src/formats/style.ts'
 import type { Vec3 } from '../src/math/vec.ts'
+import { ball } from './rendering-fixtures.ts'
 
 const DARK = 0x000010
 const LIGHT = 0x0000ff
@@ -28,7 +29,7 @@ const mannequin: Mannequin = {
   name: 'm',
   height: 1,
   joints: { o: [0, 0, 0] },
-  parts: [{ name: 'p', shape: 'capsule', a: 'o', b: 'o', radiusA: 1, radiusB: 1, material: 'm' }],
+  parts: [ball('p', 'o', 1)],
   decals: []
 }
 
@@ -233,7 +234,6 @@ test('selective mode ignores decal colours when choosing the outline colour', ()
 
 const RED_OUTLINE = 0x100000
 
-/** A width x 5 buffer, filled with part 0 inside a one-pixel margin, with part 1 at the given top-row columns. */
 function strip (width: number, columns: number[]): GBuffer {
   const g: GBuffer = {
     width,

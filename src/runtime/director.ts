@@ -2,17 +2,11 @@ import { add, scale } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import type { Behaviour, Behaviours, Event } from './behaviours.ts'
 
-/** What the active behaviours ask of the body at one moment, already weighted by their blends. */
 export type Directions = {
-  /** Horizontal acceleration on the hook, m/s^2 (sway). */
   push: Vec3
-  /** A twist rate to drive toward, rad/s, with the weight of the spin layers asking for it (0: none). */
   spin: { rate: number, weight: number }
-  /** Offset of the whole body along the rope, metres (bounce). */
   bounce: number
-  /** Offsets of masked joints along the body's up axis, metres (breathe). */
   breathe: Array<{ mask: string[], offset: number }>
-  /** Events due since the previous update. */
   events: Event[]
   current: string
 }
@@ -20,9 +14,7 @@ export type Directions = {
 type Active = { name: string, behaviour: Behaviour, start: number, blend: number, end?: number, fadeOut?: number }
 
 const DEFAULT_THEN_BLEND = 0.3
-/** Offsets move joints directly, so they fade in and out over at least this long, even on a zero blend. */
 const MIN_OFFSET_BLEND = 0.2
-/** Reduced motion: amplitudes, impulses, spins and turns are scaled down, periods stretched. */
 const REDUCED_SCALE = 0.4
 const REDUCED_SLOWDOWN = 1.5
 
@@ -46,12 +38,6 @@ export type Director = {
   current: () => string
 }
 
-/**
- * Plays named behaviours with cross-fades: a new behaviour fades in over `blend` seconds while the previous ones fade
- * out over the same time (offsets over at least 0.2 s). Periodic primitives run on the shared clock, so a wave that
- * two behaviours share carries on across a switch. Behaviours with `then` hand over after `duration`; events in a
- * behaviour fire once, at their time after it starts. `reduced` applies the reduced-motion scaling.
- */
 export function createDirector (spec: Behaviours, options: { reduced: boolean }): Director {
   const factor = options.reduced ? REDUCED_SCALE : 1
   const slow = options.reduced ? REDUCED_SLOWDOWN : 1

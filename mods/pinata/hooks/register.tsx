@@ -8,7 +8,6 @@ import type { Layout } from './logic.ts'
 const PANE = 'pinata'
 const TITLE = 'Piñata'
 const KEY = 'frame'
-/** Where the Piñata repository is: two folders up when the mod is loaded from the repo's `mods/pinata`. */
 const FALLBACK_REPO = '/Users/denis/pinata'
 const IN_REPO = '/mods/pinata'
 
@@ -196,8 +195,9 @@ export const register: Register = on => {
       if (arg === 'pixels' || arg === 'blocks') {
         want = undefined
         stopChild()
-        await update($, mode, () => arg === 'pixels' ? 'image' : 'raster')
-        return { text: arg === 'pixels' ? 'Drawing the piñata as a terminal image.' : 'Drawing the piñata in half-block cells.' }
+        const pixels = arg === 'pixels'
+        await update($, mode, () => pixels ? 'image' : 'raster')
+        return { text: pixels ? 'Drawing the piñata as a terminal image.' : 'Drawing the piñata in half-block cells.' }
       }
       if (arg === 'open') return { text: await open($) }
       if (arg === 'close') {

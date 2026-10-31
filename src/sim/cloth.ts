@@ -22,7 +22,6 @@ function createParticles (points: Vec3[], material: SimMaterial, pinned: Set<num
     position.set(p, 3 * i)
     inverseMass[i] = pinned.has(i) ? 0 : 1 / material.particleMass
   })
-  // materialIndex: per-particle index into System.material.
   return { position, previous: position.slice(), inverseMass, materialIndex: new Uint32Array(count), count }
 }
 
@@ -68,8 +67,6 @@ export function buildCape (cape: Cape, m: Mannequin, material: SimMaterial): Sys
   constrain(constraints, points, stretch, material.stretchCompliance)
   constrain(constraints, points, shear, material.stretchCompliance)
   constrain(constraints, points, bend, material.bendCompliance)
-  // Every pin references anchorLeft: offsets are body-local, so one joint is enough because checkCapeAnchors
-  // requires both anchors to move rigidly together.
   const pins: Pin[] = []
   for (let i = 0; i < columns; i++) {
     pins.push({ particle: index(i, 0), joint: cape.anchorLeft, offset: sub(points[index(i, 0)], left) })
@@ -123,7 +120,6 @@ export function mergeSystems (systems: System[]): System {
   return merged
 }
 
-/** Particle indices of the cape's bottom row, left to right. */
 export function capeHemIndices (cape: Cape): number[] {
   return Array.from({ length: cape.columns }, (_, i) => (cape.rows - 1) * cape.columns + i)
 }
@@ -134,7 +130,6 @@ function material (materials: SimMaterial[], name: string): SimMaterial {
   return found
 }
 
-/** The scenario's cape and chains as one particle system, at rest in body-local space. */
 export function buildClothSystem (
   options: { mannequin: Mannequin, scenario: Scenario, materials: SimMaterial[] }
 ): System {

@@ -51,7 +51,6 @@ export function compile (m: Mannequin, part: Part): Primitive {
   return { sdf: p => dist(p[0], p[1], p[2]), dist, center, radius }
 }
 
-/** Where the ray enters the primitive's bounding sphere (0 if it starts inside), or Infinity if it misses. */
 function entry (prim: Primitive, ox: number, oy: number, oz: number, dir: Vec3): number {
   const ocx = ox - prim.center[0]
   const ocy = oy - prim.center[1]
@@ -103,11 +102,6 @@ type Scene = {
   order: Int32Array
 }
 
-/**
- * Traces the primitives in order of where the ray enters their bounding spheres and stops once the nearest hit lies
- * before the next entry: a primitive can only be hit inside its sphere. Equal hits go to the lower part index, as a
- * plain scan in index order would choose, so the result is the same as tracing every primitive.
- */
 function sample (scene: Scene, ox: number, oy: number, oz: number): void {
   const { prims, cam, acc, active, entries, order } = scene
   const dir = cam.forward
@@ -158,10 +152,6 @@ function screenDisc (cam: Camera, prim: Primitive): Disc {
   return { x, y, r2: r * r }
 }
 
-/**
- * The pixel rectangle [x0, x1) x [y0, y1) that any primitive's screen disc can touch; pixels outside it get no samples
- * and resolve to empty, exactly as a pixel with no hits does, so they are skipped.
- */
 function coveredRect (discs: Disc[], cam: Camera): [number, number, number, number] {
   if (discs.length === 0) return [0, 0, 0, 0]
   let [left, right, top, bottom] = [Infinity, -Infinity, Infinity, -Infinity]
@@ -190,11 +180,6 @@ function cull (discs: Disc[], px: number, py: number, active: Int32Array): numbe
   return count
 }
 
-/**
- * With the previous frame's buffer, a pixel keeps its state while the coverage is within a hysteresis band of the
- * threshold and keeps its part while that part is within a couple of samples of the winner, so edges and part
- * boundaries do not flip back and forth as a slow motion hovers on them.
- */
 export function rasterize (m: Mannequin, cam: Camera, samples = 4, previous?: GBuffer): GBuffer {
   const prims = m.parts.map(part => compile(m, part))
   const pixels = cam.width * cam.height

@@ -4,12 +4,13 @@ import { EMPTY, rasterize } from '../src/raster/gbuffer.ts'
 import { fitCamera, makeCamera } from '../src/raster/camera.ts'
 import type { Mannequin, Part } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
+import { ball, capsule } from './rendering-fixtures.ts'
 
 const sphere: Mannequin = {
   name: 'sphere',
   height: 2,
   joints: { o: [0, 1, 0] },
-  parts: [{ name: 'ball', shape: 'capsule', a: 'o', b: 'o', radiusA: 0.5, radiusB: 0.5, material: 'm' }],
+  parts: [ball('ball', 'o', 0.5)],
   decals: []
 }
 
@@ -36,8 +37,8 @@ test('the nearer part wins where parts overlap', () => {
     ...sphere,
     joints: { back: [0, 1, -0.5], front: [0, 1, 0.5] },
     parts: [
-      { name: 'back', shape: 'capsule', a: 'back', b: 'back', radiusA: 0.5, radiusB: 0.5, material: 'm' },
-      { name: 'front', shape: 'capsule', a: 'front', b: 'front', radiusA: 0.3, radiusB: 0.3, material: 'm' }
+      ball('back', 'back', 0.5),
+      ball('front', 'front', 0.3)
     ]
   }
   const g = rasterize(two, camera)
@@ -79,8 +80,8 @@ test('a fitted frame leaves the margin empty for a wide pose and a part below th
     height: 1,
     joints: { l: [-1, 0.8, 0], r: [1, 0.8, 0], low: [0, -0.3, 0], top: [0, 0.9, 0] },
     parts: [
-      { name: 'arms', shape: 'capsule', a: 'l', b: 'r', radiusA: 0.05, radiusB: 0.05, material: 'm' },
-      { name: 'spine', shape: 'capsule', a: 'low', b: 'top', radiusA: 0.05, radiusB: 0.05, material: 'm' }
+      capsule('arms', 'l', 'r', 0.05),
+      capsule('spine', 'low', 'top', 0.05)
     ],
     decals: []
   }
@@ -101,7 +102,7 @@ test('a fitted frame leaves the margin empty for a wide pose and a part below th
   }
 })
 
-function ball (radius: number): Mannequin {
+function sphereOf (radius: number): Mannequin {
   const part = { ...sphere.parts[0], radiusA: radius, radiusB: radius } as Part
   return { ...sphere, parts: [part] }
 }
@@ -109,8 +110,8 @@ function ball (radius: number): Mannequin {
 const countFilled = (g: { part: Int16Array }): number => g.part.filter(p => p !== EMPTY).length
 
 test('a previous buffer keeps edge pixels that were in and are marginally out', () => {
-  const big = rasterize(ball(0.5), camera)
-  const small = ball(0.43)
+  const big = rasterize(sphereOf(0.5), camera)
+  const small = sphereOf(0.43)
   const plain = countFilled(rasterize(small, camera))
   const held = countFilled(rasterize(small, camera, 4, big))
   assert.ok(held > plain, `expected more than ${plain} pixels, got ${held}`)
@@ -118,8 +119,8 @@ test('a previous buffer keeps edge pixels that were in and are marginally out', 
 })
 
 test('a previous buffer keeps edge pixels that were out and are marginally in', () => {
-  const small = rasterize(ball(0.5), camera)
-  const big = ball(0.55)
+  const small = rasterize(sphereOf(0.5), camera)
+  const big = sphereOf(0.55)
   const plain = countFilled(rasterize(big, camera))
   const held = countFilled(rasterize(big, camera, 4, small))
   assert.ok(held < plain, `expected fewer than ${plain} pixels, got ${held}`)

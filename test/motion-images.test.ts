@@ -5,12 +5,13 @@ import type { Vec3 } from '../src/math/vec.ts'
 import type { Recording } from '../src/sim/metrics.ts'
 import { getPixel } from '../src/image.ts'
 import { angleChart, bodyFrameOnionSkin, sideOnionSkin, topDownTrace } from '../src/diagnostics/motion-images.ts'
+import { ball, rootAt } from './rendering-fixtures.ts'
 
 const body: Mannequin = {
   name: 'test',
   height: 2,
   joints: { origin: [0, 1, 0] },
-  parts: [{ name: 'ball', shape: 'capsule', a: 'origin', b: 'origin', radiusA: 0.3, radiusB: 0.3, material: 'm' }],
+  parts: [ball('ball', 'origin', 0.3)],
   decals: []
 }
 
@@ -20,7 +21,7 @@ function walk (): Recording {
     const x = i * 0.2
     frames.push({
       time: i / 24,
-      root: { position: [x, 0, 0] as Vec3, yaw: i * 0.1, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 },
+      root: rootAt([x, 0, 0], i * 0.1),
       positions: Float64Array.from([x, 1.5, -0.3, x - 0.3, 0.6, -0.3 + 0.05 * i]),
       penetration: new Float64Array(2),
       linkPenetration: new Float64Array(0)
@@ -68,7 +69,7 @@ function fixedInBody (): Recording {
     }
     frames.push({
       time: i / 24,
-      root: { position, yaw, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 },
+      root: rootAt(position, yaw),
       positions,
       penetration: new Float64Array(2),
       linkPenetration: new Float64Array(0)
@@ -93,7 +94,7 @@ test('bodyFrameOnionSkin collapses a cape fixed in body space to one shape', () 
 
 test('bodyFrameOnionSkin front view puts the body-local +X side on the right', () => {
   const positions = new Float64Array([0.6, 1.5, -0.3, 0.6, 0.6, -0.3])
-  const root = { position: [0, 0, 0] as Vec3, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+  const root = rootAt()
   const rec: Recording = {
     constraints: [{ a: 0, b: 1, rest: 0.9, compliance: 0 }],
     frames: [{ time: 0, root, positions, penetration: new Float64Array(2), linkPenetration: new Float64Array(0) }]

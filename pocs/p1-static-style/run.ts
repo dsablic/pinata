@@ -1,12 +1,9 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { validateMannequin } from '../../src/formats/mannequin.ts'
 import { validateStyle } from '../../src/formats/style.ts'
 import { checkReferences } from '../../src/formats/references.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import { fitCamera } from '../../src/raster/camera.ts'
 import type { Camera } from '../../src/raster/camera.ts'
 import { rasterize } from '../../src/raster/gbuffer.ts'
@@ -18,6 +15,7 @@ import { encodePng } from '../../src/png/encode.ts'
 import { outlineGaps, paletteSize, strayPixels, thinParts } from '../../src/diagnostics/metrics.ts'
 import { depthImage, normalImage, partImage, sheet } from '../../src/diagnostics/images.ts'
 import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { childHashes, startGatedRun } from '../harness.ts'
 import { gate, MIN_PIXELS_FOR_THIN } from './gates.ts'
 import { pngHeight, planAb } from './ab.ts'
 import type { AbPlan } from './ab.ts'
@@ -42,14 +40,9 @@ const FACING = [
   'front, turned to screen-right'
 ]
 
-const here = dirname(fileURLToPath(import.meta.url))
+const { here, outDir, hashesMode, verify, fail, loadJson, requireValid } = startGatedRun(import.meta.url, 'p1')
 const root = join(here, '..', '..')
-const outDir = join(root, 'reports', 'p1')
 const refsDir = join(root, 'refs', 'p1')
-const hashesMode = process.argv.includes('--hashes')
-const verify = process.argv.includes('--verify')
-
-if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
 
 type Frame = {
   id: string
@@ -61,37 +54,6 @@ type Frame = {
   image: Image
   decalMask: Uint8Array
   outlineMask: Uint8Array
-}
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) {
-    fail(formatErrors(file, result.errors))
-  }
-  return result.value
-}
-
-function fail (message: string): never {
-  console.error(message)
-  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
-  process.exit(2)
-}
-
-process.on('uncaughtException', err => {
-  try {
-    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
-  } catch {
-    process.exit(2)
-  }
-})
-
-function loadJson (file: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(here, file), 'utf8'))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
-    throw err
-  }
 }
 
 function frameCamera (size: number, elevation: number, direction: number): Camera {
@@ -147,19 +109,8 @@ const frameMetrics = frames.map(f => {
   }
 })
 
-function childHashes (): Map<string, string> {
-  const args = [fileURLToPath(import.meta.url), '--hashes']
-  const output = execFileSync(process.execPath, args, { encoding: 'utf8', timeout: CHILD_TIMEOUT_MS })
-  const hashes = new Map<string, string>()
-  for (const line of output.split('\n').filter(l => l !== '')) {
-    const [id, hash] = line.split(' ')
-    hashes.set(id, hash)
-  }
-  return hashes
-}
-
 function mismatches (): number {
-  const other = childHashes()
+  const other = childHashes(import.meta.url, CHILD_TIMEOUT_MS)
   return frames.filter(f => other.get(f.id) !== imageHash(f.image)).length
 }
 

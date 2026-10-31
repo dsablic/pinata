@@ -1,7 +1,4 @@
-import { execFileSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { validateMannequin } from '../../src/formats/mannequin.ts'
 import type { Mannequin } from '../../src/formats/mannequin.ts'
 import { checkRig, validateRig } from '../../src/formats/rig.ts'
@@ -10,7 +7,6 @@ import { validateScenario } from '../../src/formats/sim.ts'
 import type { Scenario } from '../../src/formats/sim.ts'
 import { validateStyle } from '../../src/formats/style.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import { planGait } from '../../src/motion/gait.ts'
 import type { GaitFrame } from '../../src/motion/gait.ts'
 import * as metrics from '../../src/motion/metrics.ts'
@@ -25,6 +21,7 @@ import { stylize } from '../../src/style/stylize.ts'
 import { footprintTrace, legOnionSkin, pixelStrip } from '../../src/diagnostics/locomotion-images.ts'
 import { sheet } from '../../src/diagnostics/images.ts'
 import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { childHashes, nonFiniteAsText, startGatedRun } from '../harness.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { gate, SCENARIOS } from './gates.ts'
 
@@ -37,41 +34,7 @@ const STYLE_FILE = join('..', 'p1-static-style', 'style.json')
 const BACKGROUND = 0xf7f7f7
 const CHILD_TIMEOUT_MS = 120000
 
-const here = dirname(fileURLToPath(import.meta.url))
-const outDir = join(here, '..', '..', 'reports', 'p4')
-const hashesMode = process.argv.includes('--hashes')
-const verify = process.argv.includes('--verify')
-
-if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
-
-function fail (message: string): never {
-  console.error(message)
-  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
-  process.exit(2)
-}
-
-process.on('uncaughtException', err => {
-  try {
-    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
-  } catch {
-    process.exit(2)
-  }
-})
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) fail(formatErrors(file, result.errors))
-  return result.value
-}
-
-function loadJson (file: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(here, file), 'utf8'))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
-    throw err
-  }
-}
+const { outDir, hashesMode, verify, fail, loadJson, requireValid } = startGatedRun(import.meta.url, 'p4')
 
 const rig: Rig = requireValid('rig.json', validateRig(loadJson('rig.json')))
 const style = requireValid(STYLE_FILE, validateStyle(loadJson(STYLE_FILE)))
@@ -105,13 +68,6 @@ function runHashes (run: Run): Array<[string, string]> {
 if (hashesMode) {
   for (const run of runs) for (const [id, hash] of runHashes(run)) console.log(`${id} ${hash}`)
   process.exit(0)
-}
-
-function childHashes (): Map<string, string> {
-  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--hashes'], {
-    encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024
-  })
-  return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
 }
 
 function frameOf (run: Run, time: number): number {
@@ -163,7 +119,7 @@ for (const [name, counts] of planted) {
 }
 
 function mismatches (): number {
-  const other = childHashes()
+  const other = childHashes(import.meta.url, CHILD_TIMEOUT_MS)
   return runs.flatMap(runHashes).filter(([id, hash]) => other.get(id) !== hash).length
 }
 
@@ -254,10 +210,6 @@ writeOutput(join(outDir, 'walk-strip.png'), encodePng(pixelStrip(walkTurnStop.re
 writeOutput(join(outDir, 'skating-strip.png'), encodePng(pixelStrip(control.recording, stripOptions(walkTurnStop))))
 writeOutput(join(outDir, 'directions.png'), encodePng(directionsSheet(walkTurnStop)))
 
-function finite (key: string, value: unknown): unknown {
-  return typeof value === 'number' && !Number.isFinite(value) ? String(value) : value
-}
-
 const metricsReport = {
   gates: results,
   perScenario,
@@ -265,7 +217,7 @@ const metricsReport = {
   skatingControlSlidePx: controlSlide,
   planted: Object.fromEntries(planted)
 }
-writeOutput(join(outDir, 'metrics.json'), JSON.stringify(metricsReport, finite, 2))
+writeOutput(join(outDir, 'metrics.json'), JSON.stringify(metricsReport, nonFiniteAsText, 2))
 writeOutput(join(outDir, 'summary.txt'), `${summary}\n`)
 
 console.log(summary)

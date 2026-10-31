@@ -1,7 +1,4 @@
-import { execFileSync } from 'node:child_process'
-import { readFileSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { validateMannequin } from '../../src/formats/mannequin.ts'
 import type { Mannequin } from '../../src/formats/mannequin.ts'
 import { checkRig, validateRig } from '../../src/formats/rig.ts'
@@ -9,7 +6,6 @@ import type { Rig } from '../../src/formats/rig.ts'
 import { validateScenario } from '../../src/formats/sim.ts'
 import { validateStyle } from '../../src/formats/style.ts'
 import { formatErrors } from '../../src/formats/validate.ts'
-import type { Validated } from '../../src/formats/validate.ts'
 import { planGait } from '../../src/motion/gait.ts'
 import { recordLocomotion } from '../../src/motion/metrics.ts'
 import { restPose } from '../../src/motion/pose.ts'
@@ -18,6 +14,7 @@ import { imageHash } from '../../src/image-hash.ts'
 import type { Image } from '../../src/image.ts'
 import { encodePng } from '../../src/png/encode.ts'
 import { evaluate, optionalGate, summarize, writeOutput } from '../../src/diagnostics/report.ts'
+import { childHashes, startGatedRun } from '../harness.ts'
 import { flickerFraction, partAreaJump } from '../../src/diagnostics/stability.ts'
 import { differenceStrip } from '../../src/diagnostics/stability-images.ts'
 import { FLICKER_LIMIT, gate } from './gates.ts'
@@ -34,41 +31,7 @@ const P4 = join('..', 'p4-locomotion')
 const STYLE_FILE = join('..', 'p1-static-style', 'style.json')
 const CHILD_TIMEOUT_MS = 300000
 
-const here = dirname(fileURLToPath(import.meta.url))
-const outDir = join(here, '..', '..', 'reports', 'p2')
-const hashesMode = process.argv.includes('--hashes')
-const verify = process.argv.includes('--verify')
-
-if (!hashesMode) rmSync(outDir, { recursive: true, force: true })
-
-function fail (message: string): never {
-  console.error(message)
-  if (!hashesMode) writeOutput(join(outDir, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
-  process.exit(2)
-}
-
-process.on('uncaughtException', err => {
-  try {
-    fail(err instanceof Error ? (err.stack ?? err.message) : String(err))
-  } catch {
-    process.exit(2)
-  }
-})
-
-function requireValid<T> (file: string, result: Validated<T>): T {
-  if (result.value === undefined || result.errors.length > 0) fail(formatErrors(file, result.errors))
-  return result.value
-}
-
-function loadJson (file: string): unknown {
-  try {
-    return JSON.parse(readFileSync(join(here, file), 'utf8'))
-  } catch (err) {
-    if (err instanceof SyntaxError) fail(`${file}: invalid JSON: ${err.message}`)
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') fail(`${file}: file not found`)
-    throw err
-  }
-}
+const { outDir, hashesMode, verify, fail, loadJson, requireValid } = startGatedRun(import.meta.url, 'p2')
 
 const rigFile = join(P4, 'rig.json')
 const scenarioFile = join(P4, 'walk-turn-stop.json')
@@ -117,15 +80,8 @@ if (hashesMode) {
   process.exit(0)
 }
 
-function childHashes (): Map<string, string> {
-  const output = execFileSync(process.execPath, [fileURLToPath(import.meta.url), '--hashes'], {
-    encoding: 'utf8', timeout: CHILD_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024
-  })
-  return new Map(output.split('\n').filter(l => l !== '').map(l => l.split(' ') as [string, string]))
-}
-
 function mismatches (): number {
-  const other = childHashes()
+  const other = childHashes(import.meta.url, CHILD_TIMEOUT_MS)
   return hashes().filter(([id, hash]) => other.get(id) !== hash).length
 }
 

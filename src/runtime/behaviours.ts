@@ -3,14 +3,12 @@ import type { Validated, ValidationError } from '../formats/validate.ts'
 import type { Vec3 } from '../math/vec.ts'
 
 export type HangConfig = {
-  /** The joint the rope is tied to, and an offset from it in rest space (the hook). */
   joint: string
   offset: Vec3
   rope: number
   swingDamping: number
   twistStiffness: number
   twistDamping: number
-  /** Stiffness and damping of legs, which hang limp as spring chains. */
   limbStiffness: number
   limbDamping: number
 }
@@ -179,7 +177,6 @@ function validateStates (input: unknown, names: string[], errors: ValidationErro
   })
 }
 
-/** Validates a behaviours file; masks are checked against a rig separately (see maskJoints). */
 export function validateBehaviours (input: unknown): Validated<Behaviours> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
   const errors: ValidationError[] = []

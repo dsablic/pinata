@@ -1,3 +1,4 @@
+import { gateFrom } from '../../src/diagnostics/report.ts'
 import type { Gate } from '../../src/diagnostics/report.ts'
 
 export const FLICKER_LIMIT = 0.01
@@ -38,6 +39,5 @@ export const P2_GATES = {
 } as const
 
 export function gate (name: keyof typeof P2_GATES, value: number, label?: string): Gate {
-  const full = label === undefined ? name : `${name}.${label}`
-  return { name: full, value, ...P2_GATES[name] }
+  return gateFrom(P2_GATES, name, value, label)
 }

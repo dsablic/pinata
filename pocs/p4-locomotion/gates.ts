@@ -1,3 +1,4 @@
+import { gateFrom } from '../../src/diagnostics/report.ts'
 import type { Gate } from '../../src/diagnostics/report.ts'
 
 export const SCENARIOS = ['walk-turn-stop', 'slow-fast', 'pivot']
@@ -108,6 +109,5 @@ export const P4_GATES = {
 } as const
 
 export function gate (name: keyof typeof P4_GATES, value: number, scenario?: string): Gate {
-  const label = scenario === undefined ? name : `${name}.${scenario}`
-  return { name: label, value, ...P4_GATES[name] }
+  return gateFrom(P4_GATES, name, value, scenario)
 }

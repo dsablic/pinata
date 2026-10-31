@@ -181,12 +181,6 @@ function drawOutline (image: Image, g: GBuffer, m: Mannequin, style: Style): Uin
   return mask
 }
 
-/**
- * Recolours each outline pixel whose colour no neighbouring outline pixel shares with the most common colour of its
- * outline neighbours (ties go to the lowest colour value): a selective outline otherwise leaves single pixels where
- * the bordering part changes for one pixel. Reads from a copy, so the result does not depend on scan order. Returns
- * whether anything changed.
- */
 function outlinePass (image: Image, mask: Uint8Array): boolean {
   const source: Image = { width: image.width, height: image.height, data: new Uint8ClampedArray(image.data) }
   let changed = false
@@ -211,7 +205,6 @@ function outlinePass (image: Image, mask: Uint8Array): boolean {
   return changed
 }
 
-/** The most common value; ties go to the lowest, so the order of the values does not matter. */
 function modeColour (values: number[]): number {
   const counts = new Map<number, number>()
   for (const v of values) counts.set(v, (counts.get(v) ?? 0) + 1)

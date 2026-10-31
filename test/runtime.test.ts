@@ -30,7 +30,6 @@ function run (character: Live, frames: number, plan: Record<number, (l: Live) =>
   })
 }
 
-/** Largest distance of any spring-driven joint from where the rigid body alone would carry it. */
 function limbMotion (frames: LiveFrame[], joints: string[]): number {
   let most = 0
   for (let i = 1; i < frames.length; i++) {

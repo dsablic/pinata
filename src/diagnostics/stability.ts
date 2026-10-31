@@ -8,10 +8,6 @@ export const MIN_PART_PIXELS = 8
 type PartMap = Pick<GBuffer, 'width' | 'height' | 'part'>
 type Extent = { count: number, minX: number, maxX: number, minY: number, maxY: number }
 
-/**
- * Per frame k with neighbours, the pixels that are colour A at k-1, a different colour at k and A again at k+1,
- * as a fraction of the silhouette area at k. The worst frame; 0 for fewer than three frames.
- */
 export function flickerFraction (images: Image[]): number {
   let worst = 0
   for (let k = 1; k + 1 < images.length; k++) {
@@ -55,10 +51,6 @@ function boxMoved (a: Extent, b: Extent): boolean {
   return [a.minX - b.minX, a.maxX - b.maxX, a.minY - b.minY, a.maxY - b.maxY].some(d => Math.abs(d) >= 1)
 }
 
-/**
- * The largest relative change in a part's pixel count between consecutive frames, skipping parts under
- * MIN_PART_PIXELS in either frame and frames where the part's bounding box moves by a pixel or more.
- */
 export function partAreaJump (maps: PartMap[]): number {
   let worst = 0
   let previous = maps.length > 0 ? extents(maps[0]) : new Map<number, Extent>()

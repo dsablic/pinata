@@ -1,4 +1,4 @@
-import { createImage, setPixel } from '../image.ts'
+import { setPixel } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Vec3 } from '../math/vec.ts'
@@ -6,7 +6,7 @@ import type { RootState } from '../motion/script.ts'
 import { bodyCollider } from '../sim/body.ts'
 import { swingAngles } from '../sim/metrics.ts'
 import type { Frame, Recording, SwingOptions } from '../sim/metrics.ts'
-import { disc, line, plot } from './draw.ts'
+import { disc, filledImage, line, mixColour, onionShare, plot } from './draw.ts'
 
 const BACKGROUND = 0xf7f7f7
 const BODY_NEW = 0x333333
@@ -22,14 +22,6 @@ const BODY_MARGIN = 0.7
 const CELL = 4
 
 type View = { size: number, scale: number, offsetA: number, offsetB: number }
-
-function blank (size: number): Image {
-  const img = createImage(size, size)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) setPixel(img, x, y, BACKGROUND)
-  }
-  return img
-}
 
 function fit (points: Array<[number, number]>, size: number): View {
   const as = points.map(p => p[0])
@@ -49,15 +41,6 @@ function fit (points: Array<[number, number]>, size: number): View {
 
 function pixel (view: View, a: number, b: number): [number, number] {
   return [view.offsetA + a * view.scale, view.offsetB + b * view.scale]
-}
-
-function lerpColour (from: number, to: number, t: number): number {
-  const channel = (shift: number): number => {
-    const a = (from >> shift) & 0xff
-    const b = (to >> shift) & 0xff
-    return Math.round(a + (b - a) * t)
-  }
-  return (channel(16) << 16) | (channel(8) << 8) | channel(0)
 }
 
 type MaskOptions = {
@@ -94,13 +77,12 @@ function hemCentroid (frame: Frame, hem: number[]): Vec3 {
 
 export type TopDownOptions = { size: number, hem: number[], body: Mannequin, exclude: string[] }
 
-/** Top view (x right, z down): body footprint at the first and last frame, body path, and hem centroid path. */
 export function topDownTrace (recording: Recording, options: TopDownOptions): Image {
   const { frames } = recording
   const roots = frames.map(f => f.root.position)
   const hems = frames.map(f => hemCentroid(f, options.hem))
   const view = fit([...roots, ...hems].map(p => [p[0], p[2]]), options.size)
-  const img = blank(options.size)
+  const img = filledImage(options.size, options.size, BACKGROUND)
   const heights = steps(0, options.body.height, 8)
   const footprint = (root: RootState, rgb: number): void => {
     const collider = bodyCollider(options.body, options.exclude, root)
@@ -132,7 +114,6 @@ export type OnionOptions = {
   horizontal: 'x' | 'z'
 }
 
-/** Side view of every Nth frame (and the last): body silhouette and cape constraints, older frames lighter. */
 export function sideOnionSkin (recording: Recording, options: OnionOptions): Image {
   const axis = options.horizontal === 'x' ? 0 : 2
   const { frames } = recording
@@ -146,10 +127,10 @@ export function sideOnionSkin (recording: Recording, options: OnionOptions): Ima
     }
   }
   const view = fit(points, options.size)
-  const img = blank(options.size)
+  const img = filledImage(options.size, options.size, BACKGROUND)
   const toPoint = (a: number, b: number, s: number): Vec3 => axis === 0 ? [a, -b, s] : [s, -b, a]
   shown.forEach((index, order) => {
-    const t = shown.length === 1 ? 1 : order / (shown.length - 1)
+    const t = onionShare(order, shown.length)
     const root = frames[index].root
     const depth = root.position[2 - axis]
     const collider = bodyCollider(options.body, options.exclude, root)
@@ -157,13 +138,13 @@ export function sideOnionSkin (recording: Recording, options: OnionOptions): Ima
       distance: collider.distance,
       toPoint,
       depths: steps(depth - BODY_MARGIN, depth + BODY_MARGIN, 9),
-      rgb: lerpColour(BODY_OLD, BODY_NEW, t)
+      rgb: mixColour(BODY_OLD, BODY_NEW, t)
     })
   })
   shown.forEach((index, order) => {
-    const t = shown.length === 1 ? 1 : order / (shown.length - 1)
+    const t = onionShare(order, shown.length)
     const { positions } = frames[index]
-    const rgb = lerpColour(CAPE_OLD, CAPE_NEW, t)
+    const rgb = mixColour(CAPE_OLD, CAPE_NEW, t)
     for (const { a, b } of recording.constraints) {
       const [x0, y0] = pixel(view, positions[3 * a + axis], -positions[3 * a + 1])
       const [x1, y1] = pixel(view, positions[3 * b + axis], -positions[3 * b + 1])
@@ -194,10 +175,6 @@ function toLocal (positions: Float64Array, root: RootState, horizontal: 'x' | 'z
   return local
 }
 
-/**
- * View in the body's local frame: static silhouette plus cape constraints of chosen frames. `horizontal` 'z'
- * (default) is a side view with the body's front to the right; 'x' is a front view with the body's +X to the right.
- */
 export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOptions): Image {
   const { frames } = recording
   const horizontal = options.horizontal ?? 'z'
@@ -205,7 +182,7 @@ export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOpti
     return { index: i, local: toLocal(frames[i].positions, frames[i].root, horizontal) }
   })
   const view = fit([[0, 0], [0, -options.body.height], ...shown.flatMap(f => f.local)], options.size)
-  const img = blank(options.size)
+  const img = filledImage(options.size, options.size, BACKGROUND)
   const identity: RootState = { position: [0, 0, 0], yaw: 0, velocity: [0, 0, 0], angularVelocity: 0 }
   const collider = bodyCollider(options.body, options.exclude, identity)
   fillBody(img, view, {
@@ -215,8 +192,8 @@ export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOpti
     rgb: BODY_LOCAL
   })
   shown.forEach(({ local }, order) => {
-    const t = shown.length === 1 ? 1 : order / (shown.length - 1)
-    const rgb = lerpColour(CAPE_OLD, CAPE_NEW, t)
+    const t = onionShare(order, shown.length)
+    const rgb = mixColour(CAPE_OLD, CAPE_NEW, t)
     for (const { a, b } of recording.constraints) {
       const [x0, y0] = pixel(view, local[a][0], local[a][1])
       const [x1, y1] = pixel(view, local[b][0], local[b][1])
@@ -230,7 +207,6 @@ export function bodyFrameOnionSkin (recording: Recording, options: BodyFrameOpti
 
 export type AngleChartOptions = { width: number, height: number, swing: SwingOptions }
 
-/** Forward swing (red), sideways swing (blue) and body yaw (grey) in degrees over frame index. */
 export function angleChart (recording: Recording, options: AngleChartOptions): Image {
   const { forward, sideways } = swingAngles(recording, options.swing)
   const degrees = (values: number[]): number[] => values.map(v => v * 180 / Math.PI)

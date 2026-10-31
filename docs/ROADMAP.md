@@ -52,6 +52,13 @@ for previews, collision geometry and checks.
   a root with full 3D orientation (today it can only yaw), a `hang` behaviour (rope or spring from an anchor), scripted
   `hit` events (impulse and spin at a point), and limp limbs as low-stiffness appendages.
 
+## The page as the world (in progress)
+
+[Plan](plans/2026-10-31-page-world.md): characters live on an ordinary web page. Marked elements are ground and walls;
+characters walk, step up and drop between them over a click-through overlay, then react to the page (hovered,
+focused and nearby elements), and the world demo is rebuilt on its own page's elements instead of generated terrain.
+Surfaces and the overlay (A) and moving over the page (B) are built; perception (C) and the demo (D) remain.
+
 ## Next: live runtime spike (P8)
 
 Spec: [`docs/plans/2026-10-30-runtime-spike.md`](plans/2026-10-30-runtime-spike.md). Can a character be animated
@@ -125,6 +132,11 @@ readability layer (exaggerated contact and passing poses, holds). Gates to fix b
   least as high as the references on average.
 - A walk strip in every direction is preferred over the procedural renderer by a majority.
 - One human pixel artist reviews the results (the only human check kept in the plan).
+
+**Status:** built and released (v0.3.0): RotSprite rotation (off by default), eight-direction skins for the four
+humanoids, a readability layer, skins in the world. Passed: artist, view consistency, real-time, quality against
+references (second round). Failed: rotation preference, readability. Open: the size gate (needs per-size skins),
+live capes on skinned characters, the human review. Details in the [P7 plan](plans/2026-10-31-p7-skins.md).
 
 **Honest risk:** game-quality art is where the evidence is thinnest. If P7 cannot reach strong references even with
 clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics

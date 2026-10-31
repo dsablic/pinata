@@ -19,22 +19,23 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ### 0. P7: skins to a game-art bar
 
-[P7 plan](plans/2026-10-31-p7-skins.md): clean rotation (RotSprite), eight directions, AI-drawn skins for the four
-humanoids, a readability layer, judged against strong references, then skins in the world. Batch A (clean rotation)
-first.
+[P7 plan](plans/2026-10-31-p7-skins.md): built and released as v0.3.0 (eight-direction skins for the four humanoids,
+skins in the world). Left: the size gate (per-size skins), live capes on skinned characters, the human review.
 
 ### 0a. The page as the world
 
 [Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
 step and drop between them on a click-through overlay, react to the page, then the world demo is rebuilt on its own
-page. Batches A (surfaces and the overlay) and B (moving over the page) done; B misses the mid-air half of the standing gate
-(0.4-1% of frames; see the plan). C (perception) next.
+page. Batches A (surfaces and the overlay) and B (moving over the page) done and reviewed; B misses the mid-air half
+of the standing gate (0.4-1% of frames, from turn, start and stop clips; see the plan). Paused here; C (perception)
+is next. Open question: whether missed motion gates should fail `npm run test:browser` (they report `GATE MISSED`
+without failing it, so CI stays green).
 
 ### 0b. World showcase, remaining batches
 
 [World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
-into P7 batch D), physics engine spike (D), page-as-world (E). Once page-as-world works, rework the world demo to
-use the page's elements instead of the generated terrain (user, 2026-10-31).
+into P7 batch D), physics engine spike (D), page-as-world (E, now the page-world plan above). Once page-as-world
+works, the world demo is rebuilt on the page's elements instead of the generated terrain.
 
 ### 1. Leftovers from general limbs
 

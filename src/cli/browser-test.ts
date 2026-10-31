@@ -1,15 +1,19 @@
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { serve } from './serve.ts'
 
 const ROOT = resolve(import.meta.dirname, '..', '..')
 const SITE = join(ROOT, '_site')
+const TEST_PAGE = 'page-test.html'
 const PORT = 8791
 const DEBUG_PORT = 9341
-const PAGE = `http://127.0.0.1:${PORT}/page-test.html`
+const PAGE_URL = `http://127.0.0.1:${PORT}/${TEST_PAGE}`
+const PIXELS_PER_METRE = 54
 const SURFACE_TOLERANCE_PX = 1
+const REPLY_TIMEOUT_MS = 10000
+const SETTLE_MS = 250
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -18,12 +22,16 @@ const CHROME_CANDIDATES = [
   '/usr/bin/chromium',
   '/usr/bin/chromium-browser'
 ]
+const GROUND_IDS = ['a', 'b', 'c', 'card', 'outer-nest', 'inner-nest', 'scrolled', 'flow-ground', 'added']
 
 type Check = { name: string, pass: boolean, detail: string }
 type Session = {
   evaluate: <T>(expression: string) => Promise<T>
   send: (method: string, params?: object) => Promise<any>
+  exceptions: string[]
 }
+type Edge = { left: number, right: number, top: number }
+type Standing = { name: string, x: number, y: number, yaw: number, surface: number }
 
 const pause = async (ms: number): Promise<void> => await new Promise(done => setTimeout(done, ms))
 
@@ -35,6 +43,7 @@ async function openChrome (): Promise<{ session: Session, close: () => Promise<v
     '--headless=new', `--remote-debugging-port=${DEBUG_PORT}`, '--window-size=1200,900', '--no-first-run',
     '--no-default-browser-check', `--user-data-dir=${profile}`, 'about:blank'
   ], { stdio: 'ignore' })
+  const exited = new Promise(done => chrome.once('exit', done))
   let target: { webSocketDebuggerUrl: string } | undefined
   for (let tries = 0; tries < 100 && target === undefined; tries++) {
     await pause(100)
@@ -55,9 +64,14 @@ async function openChrome (): Promise<{ session: Session, close: () => Promise<v
     if (message.id !== undefined) pending.get(message.id)?.(message.result ?? message.error)
     if (message.method === 'Runtime.exceptionThrown') exceptions.push(message.params.exceptionDetails.text)
   })
-  const send = async (method: string, params: object = {}): Promise<any> => await new Promise(done => {
+  const send = async (method: string, params: object = {}): Promise<any> => await new Promise((done, fail) => {
     const id = ++lastId
-    pending.set(id, done)
+    const timeout = (): void => { fail(new Error(`no reply to ${method} in ${REPLY_TIMEOUT_MS} ms`)) }
+    const timer = setTimeout(timeout, REPLY_TIMEOUT_MS)
+    pending.set(id, value => {
+      clearTimeout(timer)
+      done(value)
+    })
     socket.send(JSON.stringify({ id, method, params }))
   })
   const evaluate = async <T>(expression: string): Promise<T> => {
@@ -68,49 +82,72 @@ async function openChrome (): Promise<{ session: Session, close: () => Promise<v
   await send('Runtime.enable')
   await send('Page.enable')
   const close = async (): Promise<void> => {
-    if (exceptions.length > 0) console.error(`page exceptions:\n${exceptions.join('\n')}`)
     socket.close()
-    const exited = new Promise(done => chrome.once('exit', done))
     chrome.kill()
-    await exited
+    await Promise.race([exited, pause(3000)])
     rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
   }
-  return { session: { evaluate, send }, close }
+  return { session: { evaluate, send, exceptions }, close }
 }
 
-async function load (session: Session, reducedMotion = false): Promise<void> {
-  await session.send('Emulation.setEmulatedMedia', {
-    features: [{ name: 'prefers-reduced-motion', value: reducedMotion ? 'reduce' : 'no-preference' }]
+type Screen = { reducedMotion?: boolean, deviceScale?: number }
+
+async function load (session: Session, screen: Screen = {}): Promise<void> {
+  const motion = screen.reducedMotion === true ? 'reduce' : 'no-preference'
+  await session.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: motion }] })
+  await session.send('Emulation.setDeviceMetricsOverride', {
+    width: 1200, height: 900, deviceScaleFactor: screen.deviceScale ?? 1, mobile: false
   })
-  await session.send('Page.navigate', { url: PAGE })
+  await session.send('Page.navigate', { url: PAGE_URL })
   for (let tries = 0; tries < 100; tries++) {
     await pause(100)
     if (await session.evaluate<boolean>('window.__pinata !== undefined')) return
   }
-  throw new Error(`${PAGE} did not start a page world`)
+  throw new Error(`${PAGE_URL} did not start a page world`)
 }
 
-const EXPECTED_SURFACES = `(() => {
-  const marked = [...document.querySelectorAll('#a, #b, #c, #card, #added')]
-  return marked.map(element => {
+const expectedSurfaces = async (session: Session): Promise<Edge[]> => await session.evaluate<Edge[]>(`(() => {
+  const scroller = document.getElementById('scroller').getBoundingClientRect()
+  return ${JSON.stringify(GROUND_IDS)}.map(id => document.getElementById(id)).filter(element => {
+    if (element === null) return false
+    if (element.id !== 'scrolled') return true
+    const top = element.getBoundingClientRect().top
+    return top >= scroller.top && top <= scroller.bottom
+  }).map(element => {
     const rect = element.getBoundingClientRect()
     return { left: rect.left + scrollX, right: rect.right + scrollX, top: rect.top + scrollY }
   })
-})()`
-const ACTUAL_SURFACES = `window.__pinata.ground().surfaces.map(s => ({
-  left: s.from * 54, right: s.to * 54, top: -s.height * 54
-}))`
+})()`)
+
+const actualSurfaces = async (session: Session): Promise<Edge[]> => await session.evaluate<Edge[]>(`
+  window.__pinata.ground().surfaces.map(s => ({
+    left: s.from * ${PIXELS_PER_METRE}, right: s.to * ${PIXELS_PER_METRE}, top: -s.height * ${PIXELS_PER_METRE}
+  }))`)
+
+const near = (a: Edge, b: Edge): boolean => (['left', 'right', 'top'] as const).every(key => {
+  return Math.abs(a[key] - b[key]) <= SURFACE_TOLERANCE_PX
+})
 
 async function surfacesMatch (session: Session, when: string): Promise<Check> {
-  type Edge = { left: number, right: number, top: number }
-  const expected = await session.evaluate<Edge[]>(EXPECTED_SURFACES)
-  const actual = await session.evaluate<Edge[]>(ACTUAL_SURFACES)
-  const unmatched = expected.filter(e => !actual.some(a => {
-    return Math.abs(a.left - e.left) <= SURFACE_TOLERANCE_PX && Math.abs(a.right - e.right) <= SURFACE_TOLERANCE_PX &&
-      Math.abs(a.top - e.top) <= SURFACE_TOLERANCE_PX
-  }))
-  const pass = unmatched.length === 0 && actual.length === expected.length
-  return { name: `surfaces ${when}`, pass, detail: `${actual.length} surfaces for ${expected.length} marked elements` }
+  await pause(SETTLE_MS)
+  const expected = await expectedSurfaces(session)
+  const actual = await actualSurfaces(session)
+  const pass = actual.length === expected.length && expected.every(e => actual.some(a => near(a, e)))
+  return { name: `surfaces ${when}`, pass, detail: `${actual.length} surfaces for ${expected.length} ground elements` }
+}
+
+async function charactersStand (session: Session, when: string): Promise<Check> {
+  const characters = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  const surfaces = await actualSurfaces(session)
+  const onSurface = (c: Standing): boolean => surfaces.some(s => {
+    return c.x >= s.left - 1 && c.x <= s.right + 1 && Math.abs(c.y - s.top) <= SURFACE_TOLERANCE_PX
+  })
+  const floating = characters.filter(c => !onSurface(c))
+  return {
+    name: `characters stand on live surfaces ${when}`,
+    pass: characters.length > 0 && floating.length === 0,
+    detail: `${characters.length} characters, ${floating.length} not on a surface`
+  }
 }
 
 async function click (session: Session, x: number, y: number): Promise<void> {
@@ -120,87 +157,130 @@ async function click (session: Session, x: number, y: number): Promise<void> {
   await pause(50)
 }
 
-type Standing = { name: string, x: number, y: number, yaw: number }
+type Target = { standing: Standing, x: number, y: number }
 
-async function pokeFirstVisible (session: Session): Promise<Standing | undefined> {
-  const scroll = await session.evaluate<number>('scrollY')
-  const characters = await session.evaluate<Standing[]>('window.__pinata.characters()')
-  const visible = characters.find(c => c.y - scroll > 60 && c.y - scroll < 880)
-  if (visible === undefined) return undefined
-  await click(session, visible.x, visible.y - scroll - 30)
-  return visible
+async function visibleCharacter (session: Session): Promise<Target | undefined> {
+  const [standing] = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  if (standing === undefined) return undefined
+  await session.evaluate(`scrollTo(0, ${Math.max(0, standing.y - 500)})`)
+  await pause(50)
+  const scrollY = await session.evaluate<number>('scrollY')
+  return { standing, x: standing.x, y: standing.y - scrollY - 30 }
 }
 
-async function run (): Promise<Check[]> {
-  const checks: Check[] = []
-  const { session, close } = await openChrome()
-  try {
-    await load(session)
-    checks.push(await surfacesMatch(session, 'after load'))
-    await session.evaluate('scrollTo(0, 700)')
-    await pause(100)
-    checks.push(await surfacesMatch(session, 'after scrolling'))
-    await session.evaluate('scrollTo(0, 0)')
-    await session.evaluate(`document.getElementById('a').style.width = '300px'`)
-    await pause(200)
-    checks.push(await surfacesMatch(session, 'after an element changes size'))
-    await session.evaluate(`(() => {
-      const added = document.createElement('div')
-      added.id = 'added'
-      added.className = 'box'
-      added.dataset.pinata = 'ground'
-      Object.assign(added.style, { left: '700px', top: '700px', width: '200px', height: '30px' })
-      document.body.appendChild(added)
-    })()`)
-    await pause(200)
-    checks.push(await surfacesMatch(session, 'after an element is added'))
-    await session.evaluate(`document.getElementById('b').remove()`)
-    await pause(200)
-    checks.push(await surfacesMatch(session, 'after an element is removed'))
+const pokes = async (session: Session): Promise<number> => await session.evaluate<number>('window.__pinata.pokes()')
 
-    const button = await session.evaluate<{ x: number, y: number }>(`(() => {
-      const rect = document.getElementById('button').getBoundingClientRect()
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-    })()`)
-    await click(session, button.x, button.y)
-    const reached = await session.evaluate<number>('window.__clicks')
-    checks.push({ name: 'a click on a page element reaches it', pass: reached === 1, detail: `${reached} clicks` })
-
-    const before = await session.evaluate<number>('window.__pinata.pokes()')
-    const poked = await pokeFirstVisible(session)
-    const after = await session.evaluate<number>('window.__pinata.pokes()')
-    const clicks = await session.evaluate<number>('window.__clicks')
-    checks.push({
-      name: 'a click on a character pokes it and goes no further',
-      pass: poked !== undefined && after === before + 1 && clicks === 1,
-      detail: `${poked?.name ?? 'no visible character'}: pokes ${before} -> ${after}, page clicks ${clicks}`
-    })
-
-    const shift = await session.evaluate<number>(`new Promise(done => {
-      let total = 0
-      new PerformanceObserver(list => { for (const entry of list.getEntries()) total += entry.value })
-        .observe({ type: 'layout-shift', buffered: true })
-      setTimeout(() => done(total), 200)
-    })`)
-    checks.push({ name: 'the overlay causes no layout shift', pass: shift === 0, detail: `CLS ${shift}` })
-
-    await load(session, true)
-    const still = await session.evaluate<Standing[]>('window.__pinata.characters()')
-    await pokeFirstVisible(session)
-    const stillAfter = await session.evaluate<Standing[]>('window.__pinata.characters()')
-    const moved = still.filter((c, i) => c.yaw !== stillAfter[i].yaw || c.x !== stillAfter[i].x).length
-    checks.push({ name: 'with reduced motion nothing moves', pass: moved === 0, detail: `${moved} characters moved` })
-  } finally {
-    await close()
+async function pokeCheck (session: Session, name: string, expectTurn: boolean): Promise<Check> {
+  const target = await visibleCharacter(session)
+  if (target === undefined) return { name, pass: false, detail: 'no character in view' }
+  await session.evaluate('window.__reached = []')
+  const before = await pokes(session)
+  await click(session, target.x, target.y)
+  const after = await pokes(session)
+  const reached = await session.evaluate<string[]>('window.__reached')
+  const characters = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  const turned = characters.some(c => c.name === target.standing.name && c.yaw !== target.standing.yaw)
+  return {
+    name,
+    pass: after === before + 1 && reached.length === 0 && turned === expectTurn,
+    detail: `${target.standing.name}: pokes ${before} -> ${after}, ` +
+      `events reaching the page: ${reached.join(', ') || 'none'}, turned: ${String(turned)}`
   }
+}
+
+async function pageChecks (session: Session): Promise<Check[]> {
+  const checks: Check[] = []
+  await load(session)
+  checks.push(await surfacesMatch(session, 'after load'))
+  checks.push(await charactersStand(session, 'after load'))
+  await session.evaluate('scrollTo(0, 700)')
+  await session.evaluate(`document.getElementById('c').style.width = '500px'`)
+  checks.push(await surfacesMatch(session, 'after an element changes while the page is scrolled'))
+  await session.evaluate('scrollTo(0, 0)')
+  const smaller = { width: 1000, height: 800, deviceScaleFactor: 1, mobile: false }
+  await session.send('Emulation.setDeviceMetricsOverride', smaller)
+  checks.push(await surfacesMatch(session, 'after the window resizes'))
+  await session.evaluate(`(() => {
+    const added = document.createElement('div')
+    added.id = 'added'
+    added.className = 'box'
+    added.dataset.pinata = 'ground'
+    Object.assign(added.style, { left: '700px', top: '700px', width: '200px', height: '30px' })
+    document.body.appendChild(added)
+    document.getElementById('a').remove()
+  })()`)
+  checks.push(await surfacesMatch(session, 'after an element is added and another removed'))
+  checks.push(await charactersStand(session, 'after elements are added and removed'))
+  await session.evaluate(`document.getElementById('scroller').scrollTop = 200`)
+  checks.push(await surfacesMatch(session, 'after an inner container scrolls'))
+  await session.evaluate(`document.getElementById('flow-text').firstChild.data = 'Much longer text. '.repeat(40)`)
+  checks.push(await surfacesMatch(session, 'after text pushes an element down'))
   return checks
 }
 
+async function clickChecks (session: Session): Promise<Check[]> {
+  const checks: Check[] = []
+  await session.evaluate('window.__clicks = 0; document.getElementById("button").click()')
+  const fromScript = await session.evaluate<number>('window.__clicks')
+  checks.push({ name: 'a click from script reaches the page', pass: fromScript === 1, detail: `${fromScript} clicks` })
+  const button = await session.evaluate<{ x: number, y: number }>(`(() => {
+    const rect = document.getElementById('button').getBoundingClientRect()
+    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+  })()`)
+  await click(session, button.x, button.y)
+  const reached = await session.evaluate<number>('window.__clicks')
+  checks.push({ name: 'a click on a page element reaches it', pass: reached === 2, detail: `${reached} clicks` })
+  checks.push(await pokeCheck(session, 'a click on a character pokes and turns it, and nothing reaches the page', true))
+  await session.evaluate(`document.getElementById('dialog').showModal()`)
+  const target = await visibleCharacter(session)
+  const before = await pokes(session)
+  if (target !== undefined) await click(session, target.x, target.y)
+  const after = await pokes(session)
+  checks.push({
+    name: 'with a modal dialog open, characters are not poked',
+    pass: target !== undefined && after === before,
+    detail: `pokes ${before} -> ${after}`
+  })
+  await session.evaluate(`document.getElementById('dialog').close()`)
+  const shift = await session.evaluate<number>(`new Promise(done => {
+    let total = 0
+    new PerformanceObserver(list => { for (const entry of list.getEntries()) total += entry.value })
+      .observe({ type: 'layout-shift', buffered: true })
+    setTimeout(() => done(total), 200)
+  })`)
+  checks.push({ name: 'the overlay causes no layout shift', pass: shift === 0, detail: `CLS ${shift}` })
+  return checks
+}
+
+async function screenChecks (session: Session): Promise<Check[]> {
+  await load(session, { reducedMotion: true })
+  const still = await pokeCheck(session, 'with reduced motion a poke registers but nothing turns', false)
+  await load(session, { deviceScale: 2 })
+  return [
+    still,
+    await surfacesMatch(session, 'on a high-density screen'),
+    await pokeCheck(session, 'pokes on a high-density screen', true)
+  ]
+}
+
+async function run (): Promise<Check[]> {
+  const { session, close } = await openChrome()
+  try {
+    const checks = [...await pageChecks(session), ...await clickChecks(session), ...await screenChecks(session)]
+    const exceptions = session.exceptions.join('; ')
+    return [...checks, { name: 'the page throws nothing', pass: exceptions === '', detail: exceptions || 'none' }]
+  } finally {
+    await close()
+  }
+}
+
 async function main (): Promise<number> {
-  if (!existsSync(join(SITE, 'page-test.html'))) {
-    console.error('_site is missing the page test: run npm run site first')
+  if (!existsSync(join(SITE, 'js', 'page', 'page.js'))) {
+    console.error('_site is missing the page world: run npm run site first')
     return 2
   }
+  const pageCopy = join(SITE, TEST_PAGE)
+  copyFileSync(join(ROOT, 'test', 'pages', TEST_PAGE), pageCopy)
   const server = serve(SITE, PORT)
   try {
     const checks = await run()
@@ -208,6 +288,7 @@ async function main (): Promise<number> {
     return checks.every(c => c.pass) ? 0 : 1
   } finally {
     server.close()
+    rmSync(pageCopy, { force: true })
   }
 }
 

@@ -11,12 +11,11 @@ export function groundOf (boxes: Box[], pixelsPerMetre: number): Ground {
   const surfaces: Surface[] = []
   const walls: Wall[] = []
   for (const box of boxes) {
-    if (box.width < NARROWEST_GROUND_PX || box.height < 0) continue
     const top = -toMetres(box.top)
     const bottom = -toMetres(box.top + box.height)
-    if (box.mark === 'ground') {
+    if (box.mark === 'ground' && box.width >= NARROWEST_GROUND_PX) {
       surfaces.push({ id: box.id, from: toMetres(box.left), to: toMetres(box.left + box.width), height: top })
-    } else {
+    } else if (box.mark === 'wall' && box.height > 0) {
       walls.push({ id: box.id, x: toMetres(box.left), bottom, top })
       walls.push({ id: box.id, x: toMetres(box.left + box.width), bottom, top })
     }

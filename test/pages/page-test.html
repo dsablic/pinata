@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piñata page test</title>
+<style>
+  body { margin: 0; height: 2600px; background: #f4ecd8; font: 15px/1.5 system-ui, sans-serif; position: relative; }
+  .box { position: absolute; background: #e2d4b8; border: 1px solid #b9a682; box-sizing: border-box; }
+  .shelf { --pinata: ground; }
+  .card { --pinata: ground; }
+  #a { left: 80px; top: 300px; width: 420px; height: 60px; }
+  #b { left: 560px; top: 420px; width: 300px; height: 40px; }
+  #c { left: 120px; top: 900px; width: 600px; height: 50px; }
+  #wall { left: 520px; top: 200px; width: 2px; height: 200px; }
+  #hidden { left: 900px; top: 300px; width: 200px; height: 200px; }
+  #inner { position: absolute; left: 10px; top: 20px; width: 160px; height: 30px; background: #ccc; }
+  #invisible { left: 900px; top: 600px; width: 200px; height: 30px; visibility: hidden; }
+  #card { left: 300px; top: 1400px; width: 360px; height: 160px; }
+  #card p { margin: 40px 20px; }
+  #outer-nest { left: 760px; top: 1100px; width: 300px; height: 160px; }
+  #inner-nest { position: absolute; left: 20px; top: 80px; width: 200px; height: 40px; }
+  #sticky { position: sticky; top: 0; height: 40px; background: #ddd; }
+  #scroller { left: 80px; top: 1700px; width: 400px; height: 200px; overflow: auto; }
+  #scroller-content { height: 600px; position: relative; }
+  #scrolled { position: absolute; left: 20px; top: 120px; width: 300px; height: 30px; background: #ccc; }
+  #flow { position: absolute; left: 600px; top: 1700px; width: 400px; }
+  #flow-ground { height: 30px; background: #ccc; }
+  #button { position: absolute; left: 140px; top: 600px; padding: 8px 16px; }
+</style>
+</head>
+<body>
+  <header id="sticky" data-pinata="ground">A sticky header: it moves with the viewport, so it is not ground</header>
+  <div id="a" class="box" data-pinata="ground"></div>
+  <div id="b" class="box shelf"></div>
+  <div id="c" class="box shelf"></div>
+  <div id="wall" class="box" data-pinata="wall"></div>
+  <div id="hidden" class="box" data-pinata="none"><div id="inner" data-pinata="ground"></div></div>
+  <div id="invisible" class="box shelf"></div>
+  <div id="card" class="box card"><p>A card whose paragraph is not ground itself.</p></div>
+  <div id="outer-nest" class="box shelf"><div id="inner-nest" class="box shelf"></div></div>
+  <div id="scroller" class="box"><div id="scroller-content"><div id="scrolled" data-pinata="ground"></div></div></div>
+  <div id="flow"><p id="flow-text">Short text.</p><div id="flow-ground" data-pinata="ground"></div></div>
+  <button id="button" type="button">Click me</button>
+  <dialog id="dialog"><p>A modal dialog</p></dialog>
+  <script type="module">
+    import { createPageWorld } from './js/page/page.js'
+    window.__clicks = 0
+    window.__reached = []
+    document.getElementById('button').addEventListener('click', () => { window.__clicks++ })
+    for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+      document.addEventListener(type, event => { window.__reached.push(event.type) })
+    }
+    window.__pinata = await createPageWorld({ bundle: 'world.bundle.json', pixelsPerMetre: 54, scale: 2, seed: 7 })
+  </script>
+</body>
+</html>

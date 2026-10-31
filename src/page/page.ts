@@ -11,186 +11,233 @@ import { renderSkinned } from '../style/skins.ts'
 import { getPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import { scan, watch } from './dom.ts'
+import type { Marked } from './dom.ts'
 import { groundOf } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 
 export type PageWorldOptions = {
-    bundle: string
-    pixelsPerMetre: number
+  bundle: string
+  pixelsPerMetre: number
   scale: number
   seed: number
-    count?: number
+  count?: number
 }
 
+type Skinned = Look & { skin: NonNullable<Look['skin']> }
+type Placement = { x: number, surface: Surface, element: Element }
+type Sprite = { image: Image, camera: Camera, yaw: number, canvas: HTMLCanvasElement }
+type Drawn = { left: number, top: number, pixel: number }
 type Character = {
   name: string
-  look: Look & { skin: NonNullable<Look['skin']> }
-    x: number
-  surface: Surface
-    element: Element
+  look: Skinned
   yaw: number
   view: { sector?: number }
-  image?: Image
-    drawn?: { left: number, top: number }
+  placed?: Placement
+  sprite?: Sprite
+  drawn?: Drawn
 }
 
-export type PageWorldState = {
+export type CharacterState = { name: string, x: number, y: number, surface: number, yaw: number }
+export type PageWorld = {
   ground: () => Ground
-  characters: () => Array<{ name: string, x: number, y: number, surface: number, yaw: number }>
+  characters: () => CharacterState[]
   pokes: () => number
   rebuilds: () => number
+  destroy: () => void
 }
 
 const CAMERA_ELEVATION_DEGREES = 8
 const SPRITE_BOX_IN_CHARACTER_HEIGHTS = 1.6
 const FEET_LINE_SHARE_OF_BOX = 0.85
 const MARGIN_FROM_SURFACE_ENDS = 0.3
+const GESTURE_EVENTS = ['mousedown', 'pointerup', 'mouseup', 'click', 'dblclick', 'auxclick', 'contextmenu']
+const GESTURE_TIMEOUT_MS = 800
 
-export async function createPageWorld (options: PageWorldOptions): Promise<PageWorldState> {
-  const read = readWorldBundle(await (await fetch(options.bundle)).json())
-  if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
-  const { cast, looks } = read.value
-  const skinned = looks.flatMap((look, i) => look.skin === undefined
-    ? []
-    : [{ name: cast[i].name, look: look as Character['look'] }])
-  const next = random(options.seed)
-  const spritePerMetre = options.pixelsPerMetre / options.scale
-  const base = makeCamera({
-    azimuthDeg: 0, elevationDeg: CAMERA_ELEVATION_DEGREES, targetHeightPx: spritePerMetre, modelHeight: 1, margin: 0
-  })
-
-  let marked = scan()
-  let ground = groundOf(marked.map(m => m.box), options.pixelsPerMetre)
-  let rebuilds = 0
-  let pokes = 0
-  const place = (): Character['surface'] | undefined => {
-    const wide = ground.surfaces.filter(s => s.to - s.from > 2 * MARGIN_FROM_SURFACE_ENDS)
-    if (wide.length === 0) return undefined
-    const total = wide.reduce((sum, s) => sum + s.to - s.from, 0)
-    let pick = next() * total
-    for (const s of wide) {
-      pick -= s.to - s.from
-      if (pick <= 0) return s
-    }
-    return wide[wide.length - 1]
-  }
-  const characters: Character[] = []
-  for (const { name, look } of skinned.slice(0, options.count ?? skinned.length)) {
-    const surface = place()
-    if (surface === undefined) break
-    const usable = surface.to - surface.from - 2 * MARGIN_FROM_SURFACE_ENDS
-    const x = surface.from + MARGIN_FROM_SURFACE_ENDS + usable * next()
-    const element = marked[surface.id].element
-    const yaw = next() < 0.5 ? Math.PI / 2 : -Math.PI / 2
-    characters.push({ name, look, x, surface, element, yaw, view: {} })
-  }
-
+function overlayCanvas (): HTMLCanvasElement {
   const canvas = document.createElement('canvas')
   canvas.setAttribute('aria-hidden', 'true')
   Object.assign(canvas.style, {
     position: 'fixed',
-    left: '0',
-    top: '0',
-    width: '100vw',
-    height: '100vh',
+    inset: '0',
+    margin: '0',
+    padding: '0',
+    border: '0',
+    background: 'transparent',
+    overflow: 'visible',
     pointerEvents: 'none',
     zIndex: '2147483646',
     imageRendering: 'pixelated'
   })
-  document.body.appendChild(canvas)
-  const context = canvas.getContext('2d')
-  if (context === null) throw new Error('no 2d context')
-  const draw2d = context
-  const sprite = document.createElement('canvas')
-  const spriteContext = sprite.getContext('2d')
-  if (spriteContext === null) throw new Error('no 2d context')
+  if ('showPopover' in canvas) {
+    canvas.popover = 'manual'
+    document.body.appendChild(canvas)
+    canvas.showPopover()
+  } else document.documentElement.appendChild(canvas)
+  return canvas
+}
 
-    const render = (c: Character): { image: Image, camera: Camera } => {
-    const { mannequin } = c.look.skin
-    const height = Math.max(...Object.values(mannequin.joints).map(p => p[1]))
-    const size = Math.ceil(SPRITE_BOX_IN_CHARACTER_HEIGHTS * height * spritePerMetre)
-    const camera: Camera = { ...base, width: size, height: size, baseline: Math.round(size * FEET_LINE_SHARE_OF_BOX) }
-    const root: RootState = { position: [0, 0, 0], yaw: c.yaw, velocity: [0, 0, 0], angularVelocity: 0 }
-    const pose: Pose = Object.fromEntries(Object.entries(restPose(mannequin)).map(([n, p]) => [n, toWorld(p, root)]))
-    const image = renderSkinned({ mannequin, pose, skin: c.look.skin.skin, camera, yaw: c.yaw, view: c.view })
-    return { image, camera }
+function somethingCoversThePage (overlay: Element): boolean {
+  const covering = document.querySelector(':modal') ?? document.fullscreenElement
+  const popovers = [...document.querySelectorAll(':popover-open')].filter(element => element !== overlay)
+  return covering !== null || popovers.length > 0
+}
+
+function standingPose (look: Skinned, yaw: number): Pose {
+  const root: RootState = { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
+  return Object.fromEntries(Object.entries(restPose(look.skin.mannequin)).map(([name, p]) => [name, toWorld(p, root)]))
+}
+
+export async function createPageWorld (options: PageWorldOptions): Promise<PageWorld> {
+  const read = readWorldBundle(await (await fetch(options.bundle)).json())
+  if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
+  const { cast, looks } = read.value
+  const next = random(options.seed)
+  const spritePerMetre = options.pixelsPerMetre / options.scale
+  const camera = makeCamera({
+    azimuthDeg: 0, elevationDeg: CAMERA_ELEVATION_DEGREES, targetHeightPx: spritePerMetre, modelHeight: 1, margin: 0
+  })
+  const characters: Character[] = looks
+    .flatMap((look, i) => look.skin === undefined ? [] : [{ name: cast[i].name, look: look as Skinned }])
+    .slice(0, options.count)
+    .map(({ name, look }) => ({ name, look, yaw: next() < 0.5 ? Math.PI / 2 : -Math.PI / 2, view: {} }))
+
+  let marked: Marked[] = []
+  let ground: Ground = { surfaces: [], walls: [] }
+  let rebuilds = 0
+  let pokes = 0
+
+  const placeAnywhere = (): Placement | undefined => {
+    const wide = ground.surfaces.filter(s => s.to - s.from > 2 * MARGIN_FROM_SURFACE_ENDS)
+    const total = wide.reduce((sum, s) => sum + s.to - s.from, 0)
+    let pick = next() * total
+    const surface = wide.find(s => (pick -= s.to - s.from) <= 0) ?? wide.at(-1)
+    if (surface === undefined) return undefined
+    const usable = surface.to - surface.from - 2 * MARGIN_FROM_SURFACE_ENDS
+    const x = surface.from + MARGIN_FROM_SURFACE_ENDS + usable * next()
+    return { x, surface, element: marked[surface.id].element }
   }
-
-  const redraw = (): void => {
-    const width = window.innerWidth
-    const height = window.innerHeight
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width
-      canvas.height = height
-    }
-    draw2d.clearRect(0, 0, width, height)
-    draw2d.imageSmoothingEnabled = false
-    for (const c of characters) {
-      const { image, camera } = render(c)
-      c.image = image
-      const left = c.x * options.pixelsPerMetre - camera.width / 2 * options.scale
-      const top = -c.surface.height * options.pixelsPerMetre - camera.baseline * options.scale
-      c.drawn = { left, top }
-      const screenLeft = left - window.scrollX
-      const screenTop = top - window.scrollY
-      const w = image.width * options.scale
-      const h = image.height * options.scale
-      if (screenLeft > width || screenTop > height || screenLeft + w < 0 || screenTop + h < 0) continue
-      sprite.width = image.width
-      sprite.height = image.height
-      spriteContext.putImageData(new ImageData(new Uint8ClampedArray(image.data), image.width, image.height), 0, 0)
-      draw2d.drawImage(sprite, Math.round(screenLeft), Math.round(screenTop), w, h)
-    }
+  const keepOnItsElement = (placed: Placement): Placement | undefined => {
+    const index = marked.findIndex(m => m.element === placed.element)
+    const surface = ground.surfaces.find(s => s.id === index)
+    if (surface === undefined) return undefined
+    const share = (placed.x - placed.surface.from) / Math.max(1e-9, placed.surface.to - placed.surface.from)
+    const x = surface.from + Math.min(1, Math.max(0, share)) * (surface.to - surface.from)
+    return { x, surface, element: placed.element }
   }
-
-    const hit = (pageX: number, pageY: number): Character | undefined => {
-    for (let i = characters.length - 1; i >= 0; i--) {
-      const c = characters[i]
-      if (c.image === undefined || c.drawn === undefined) continue
-      const x = Math.floor((pageX - c.drawn.left) / options.scale)
-      const y = Math.floor((pageY - c.drawn.top) / options.scale)
-      if (getPixel(c.image, x, y) !== TRANSPARENT) return c
-    }
-    return undefined
-  }
-
-  document.addEventListener('click', event => {
-    const c = hit(event.clientX + window.scrollX, event.clientY + window.scrollY)
-    if (c === undefined) return
-    event.preventDefault()
-    event.stopPropagation()
-    pokes++
-    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) c.yaw = -c.yaw
-    redraw()
-  }, true)
-
-    watch(() => {
-    rebuilds++
+  const rescan = (): void => {
     marked = scan()
     ground = groundOf(marked.map(m => m.box), options.pixelsPerMetre)
     for (const c of characters) {
-      const before = c.surface
-      const index = marked.findIndex(m => m.element === c.element)
-      const now = ground.surfaces.find(s => s.id === index) ?? place()
-      if (now === undefined) continue
-      const share = (c.x - before.from) / Math.max(1e-9, before.to - before.from)
-      c.surface = now
-      c.element = marked[now.id].element
-      c.x = now.from + Math.min(1, Math.max(0, share)) * (now.to - now.from)
+      c.placed = (c.placed === undefined ? undefined : keepOnItsElement(c.placed)) ?? placeAnywhere()
+      if (c.placed === undefined) c.drawn = undefined
     }
-    redraw()
+  }
+
+  const canvas = overlayCanvas()
+  const context = canvas.getContext('2d')
+  if (context === null) throw new Error('the page world needs a 2d canvas context')
+  const draw2d = context
+
+  const spriteOf = (c: Character): Sprite => {
+    if (c.sprite !== undefined && c.sprite.yaw === c.yaw) return c.sprite
+    const { mannequin, skin } = c.look.skin
+    const height = Math.max(...Object.values(mannequin.joints).map(p => p[1]))
+    const size = Math.ceil(SPRITE_BOX_IN_CHARACTER_HEIGHTS * height * spritePerMetre)
+    const box: Camera = { ...camera, width: size, height: size, baseline: Math.round(size * FEET_LINE_SHARE_OF_BOX) }
+    const pose = standingPose(c.look, c.yaw)
+    const image = renderSkinned({ mannequin, pose, skin, camera: box, yaw: c.yaw, view: c.view })
+    const sprite = document.createElement('canvas')
+    sprite.width = image.width
+    sprite.height = image.height
+    const pixels = new ImageData(new Uint8ClampedArray(image.data), image.width, image.height)
+    sprite.getContext('2d')?.putImageData(pixels, 0, 0)
+    c.sprite = { image, camera: box, yaw: c.yaw, canvas: sprite }
+    return c.sprite
+  }
+
+  const redraw = (): void => {
+    const ratio = window.devicePixelRatio || 1
+    const width = window.innerWidth
+    const height = window.innerHeight
+    if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+      canvas.width = Math.round(width * ratio)
+      canvas.height = Math.round(height * ratio)
+      canvas.style.width = `${width}px`
+      canvas.style.height = `${height}px`
+    }
+    draw2d.clearRect(0, 0, canvas.width, canvas.height)
+    draw2d.imageSmoothingEnabled = false
+    const devicePixel = Math.max(1, Math.round(options.scale * ratio))
+    for (const c of characters) {
+      c.drawn = undefined
+      if (c.placed === undefined) continue
+      const footX = (c.placed.x * options.pixelsPerMetre - window.scrollX) * ratio
+      const footY = (-c.placed.surface.height * options.pixelsPerMetre - window.scrollY) * ratio
+      const reach = SPRITE_BOX_IN_CHARACTER_HEIGHTS * 2 * options.pixelsPerMetre * ratio
+      if (footX < -reach || footY < -reach || footX > canvas.width + reach || footY > canvas.height + reach) continue
+      const sprite = spriteOf(c)
+      const left = Math.round(footX - sprite.camera.width / 2 * devicePixel)
+      const top = Math.round(footY - sprite.camera.baseline * devicePixel)
+      draw2d.drawImage(sprite.canvas, left, top, sprite.image.width * devicePixel, sprite.image.height * devicePixel)
+      c.drawn = { left: left / ratio + window.scrollX, top: top / ratio + window.scrollY, pixel: devicePixel / ratio }
+    }
+  }
+
+  const hit = (pageX: number, pageY: number): Character | undefined => characters.findLast(c => {
+    if (c.drawn === undefined || c.sprite === undefined) return false
+    const x = Math.floor((pageX - c.drawn.left) / c.drawn.pixel)
+    const y = Math.floor((pageY - c.drawn.top) / c.drawn.pixel)
+    return getPixel(c.sprite.image, x, y) !== TRANSPARENT
   })
-  window.addEventListener('scroll', redraw, { passive: true })
+
+  let gestureUntil = 0
+  const swallow = (event: Event): void => {
+    if (performance.now() > gestureUntil) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    if (event.type === 'click') gestureUntil = 0
+  }
+  const onPointerDown = (event: PointerEvent): void => {
+    if (!event.isTrusted || !event.isPrimary || somethingCoversThePage(canvas)) return
+    const c = hit(event.clientX + window.scrollX, event.clientY + window.scrollY)
+    if (c === undefined) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    gestureUntil = performance.now() + GESTURE_TIMEOUT_MS
+    pokes++
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) c.yaw = -c.yaw
+    redraw()
+  }
+  document.addEventListener('pointerdown', onPointerDown, true)
+  for (const type of GESTURE_EVENTS) document.addEventListener(type, swallow, true)
+
+  const stopWatching = watch(() => {
+    rebuilds++
+    rescan()
+    redraw()
+  }, () => marked.map(m => m.element))
+  const onScroll = (): void => { redraw() }
+  window.addEventListener('scroll', onScroll, { passive: true })
+  rescan()
   redraw()
 
   return {
     ground: () => ground,
-    characters: () => characters.map(c => {
+    characters: () => characters.flatMap(c => {
+      if (c.placed === undefined) return []
       const { pixelsPerMetre } = options
-      const { name, yaw } = c
-      return { name, x: c.x * pixelsPerMetre, y: -c.surface.height * pixelsPerMetre, surface: c.surface.id, yaw }
+      const { x, surface } = c.placed
+      const y = -surface.height * pixelsPerMetre
+      return [{ name: c.name, x: x * pixelsPerMetre, y, surface: surface.id, yaw: c.yaw }]
     }),
     pokes: () => pokes,
-    rebuilds: () => rebuilds
+    rebuilds: () => rebuilds,
+    destroy: () => {
+      stopWatching()
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      for (const type of GESTURE_EVENTS) document.removeEventListener(type, swallow, true)
+      window.removeEventListener('scroll', onScroll)
+      canvas.remove()
+    }
   }
 }

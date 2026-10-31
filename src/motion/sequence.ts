@@ -9,10 +9,6 @@ import type { Transforms } from './skeleton.ts'
 export type PosedSequence = { poses: Pose[], transforms: Transforms[], clamped: number[] }
 type Options = { rig: Rig, rest: Pose, mannequin: Mannequin, fps: number, substeps?: number }
 
-/**
- * Body-local poses and transforms of every frame: each frame posed on its own (poseAt), then the appendage springs
- * run over the whole sequence at `substeps` steps per frame (default 8).
- */
 export function poseSequence (frames: GaitFrame[], options: Options): PosedSequence {
   const { rig, rest, mannequin, fps } = options
   const posed = frames.map(frame => poseAt({ frame, rig, rest, mannequin }))

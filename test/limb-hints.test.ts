@@ -5,34 +5,25 @@ import type { Character } from '../src/formats/character.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { locomotionChecks } from '../src/cli/locomotion.ts'
 import { runChecks } from '../src/cli/summary.ts'
-import { planGait } from '../src/motion/gait.ts'
-import * as metrics from '../src/motion/metrics.ts'
-import { restPose } from '../src/motion/pose.ts'
-import { walkTrack } from './locomotion-fixtures.ts'
-import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
+import type { LocomotionRecording } from '../src/motion/metrics.ts'
+import { FPS } from './locomotion-fixtures.ts'
+import { hexMannequin, hexRecording, hexRig, sideBySideRig } from './hexapod-fixtures.ts'
 
 const base = loadCharacter(new URL('./fixtures/character-ok', import.meta.url).pathname).value!
-const FPS = 24
 
-function hexapod (rig: Rig): { character: Character, recording: metrics.LocomotionRecording } {
+function hexapod (rig: Rig): { character: Character, recording: LocomotionRecording } {
   const character: Character = { ...base, mannequin: hexMannequin, rig, scenario: { ...base.scenario, fps: FPS } }
-  const rest = restPose(hexMannequin)
-  const frames = planGait({ track: walkTrack(0.5, 5), rig, rest, mannequin: hexMannequin, duration: 7, fps: FPS })
-  return { character, recording: metrics.recordLocomotion(frames, { rig, rest, mannequin: hexMannequin, fps: FPS }) }
+  return { character, recording: hexRecording(rig) }
 }
 
-function result (character: Character, recording: metrics.LocomotionRecording, name: string) {
+function result (character: Character, recording: LocomotionRecording, name: string) {
   return runChecks(locomotionChecks(character, recording)).find(r => r.name === name)
 }
 
 test('a hexapod gets the balance gate, and lifting a whole side fails it with a hint naming the planted legs', () => {
   const { character, recording } = hexapod(hexRig)
   assert.equal(result(character, recording, 'unbalancedFrames')?.pass, true)
-  const sides = {
-    ...hexRig,
-    limbs: hexRig.limbs.map(limb => limb.kind === 'leg' ? { ...limb, phase: limb.side === 'left' ? 0 : 0.5 } : limb)
-  }
-  const tipped = hexapod(sides)
+  const tipped = hexapod(sideBySideRig)
   const failed = result(tipped.character, tipped.recording, 'unbalancedFrames')
   assert.equal(failed?.pass, false)
   assert.match(failed?.hint ?? '', /body centre is more than 2 cm outside .* standing on: (left|right) 1 \(limb 'leg/)

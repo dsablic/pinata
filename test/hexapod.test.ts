@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { checkRig, legsOf, validateRig } from '../src/formats/rig.ts'
-import { planGait } from '../src/motion/gait.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
 import { kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
@@ -11,15 +10,12 @@ import { toLocal, toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
-import { walkTrack } from './locomotion-fixtures.ts'
-import { hexMannequin as mannequin, hexRig as rig } from './hexapod-fixtures.ts'
+import { landings, plan, record, walkTrack, widestArmSwing } from './locomotion-fixtures.ts'
+import {
+  hexapod, hexMannequin as mannequin, hexRecording, hexRig as rig, hexWalk as walk, splayedHexMannequin as splayed
+} from './hexapod-fixtures.ts'
 
-const FPS = 24
 const rest = restPose(mannequin)
-
-function walk (): GaitFrame[] {
-  return planGait({ track: walkTrack(0.5, 5), rig, rest, mannequin, duration: 7, fps: FPS })
-}
 
 function bone (pose: Record<string, Vec3>, a: string, b: string): number {
   return length(sub(pose[a], pose[b]))
@@ -64,15 +60,9 @@ test('hexapod planted feet stay put in world space', () => {
 
 test('hexapod feet land in phase order, tripod group after tripod group', () => {
   const frames = walk()
-  const recording = metrics.recordLocomotion(frames, { rig, rest, mannequin, fps: FPS })
-  const geometry = { rig, mannequin }
-  assert.equal(metrics.alternationViolations(recording, geometry, [{ start: 0, end: 7 }]), 0)
-  const groups: number[] = []
-  for (let i = 1; i < frames.length; i++) {
-    frames[i].feet.forEach((foot, k) => {
-      if (foot.planted && !frames[i - 1].feet[k].planted) groups.push(legsOf(rig)[k].phase ?? 0)
-    })
-  }
+  const recording = record(hexapod, frames)
+  assert.equal(metrics.alternationViolations(recording, hexapod, [{ start: 0, end: 7 }]), 0)
+  const groups = landings(frames).map(({ leg }) => legsOf(rig)[leg].phase ?? 0)
   assert.ok(groups.length >= 12)
   const changes = groups.filter((phase, i) => i === 0 || phase !== groups[i - 1]).length
   assert.ok(changes >= 4, `landing groups: ${groups.join(' ')}`)
@@ -80,7 +70,7 @@ test('hexapod feet land in phase order, tripod group after tripod group', () => 
 })
 
 test('hexapod at rest stands in the rest pose', () => {
-  const [frame] = planGait({ track: walkTrack(0, 0), rig, rest, mannequin, duration: 1, fps: FPS })
+  const [frame] = plan(hexapod, walkTrack(0, 0), 1)
   const { pose } = poseAt({ frame, rig, rest, mannequin })
   for (const name of Object.keys(rest)) {
     for (let k = 0; k < 3; k++) assertClose(pose[name][k], rest[name][k], 1e-4)
@@ -101,8 +91,7 @@ test('hexapod joints bend to their sides: knees forward, hocks backward', () => 
 })
 
 test('arms swing as a whole chain about the shoulder, counter to the nearest leg on their side', () => {
-  const frames = walk()
-  const frame = frames.reduce((best, f) => Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best)
+  const frame = widestArmSwing(walk())
   assert.ok(Math.abs(frame.armSwings[0]) > 10)
   const { pose } = poseAt({ frame, rig, rest, mannequin })
   const angle = frame.armSwings[0] * Math.PI / 180
@@ -131,19 +120,19 @@ test('appendages are placed with the pelvis offset', () => {
 })
 
 test('hexapod joint speeds are reported for every intermediate joint of every leg', () => {
-  const recording = metrics.recordLocomotion(walk(), { rig, rest, mannequin, fps: FPS })
-  const speeds = metrics.jointSpeedsDegPerSec(recording, { rig, mannequin })
+  const recording = hexRecording()
+  const speeds = metrics.jointSpeedsDegPerSec(recording, hexapod)
   assert.equal(speeds.length, 12)
   assert.deepEqual(speeds.slice(0, 2).map(s => [s.leg, s.joint]), [[0, 'kneeLF'], [0, 'hockLF']])
   assert.ok(speeds.every(s => s.value > 0))
-  assert.equal(metrics.kneeSpeedDegPerSec(recording, { rig, mannequin }), Math.max(...speeds.map(s => s.value)))
-  assert.equal(metrics.kneeLimitViolations(recording, { rig, mannequin }), 0)
-  assert.equal(metrics.boneLengthError(recording, { rig, mannequin }, rest) < 1e-9, true)
+  assert.equal(metrics.kneeSpeedDegPerSec(recording, hexapod), Math.max(...speeds.map(s => s.value)))
+  assert.equal(metrics.kneeLimitViolations(recording, hexapod), 0)
+  assert.ok(metrics.boneLengthError(recording, hexapod, rest) < 1e-9)
 })
 
 test('leg limits given on a limb bound every intermediate joint', () => {
   const limited = { ...rig, limbs: rig.limbs.map(l => l.kind === 'leg' ? { ...l, limits: { min: 0, max: 70 } } : l) }
-  const recording = metrics.recordLocomotion(walk(), { rig: limited, rest, mannequin, fps: FPS })
+  const recording = record({ rig: limited, mannequin }, walk())
   assert.equal(metrics.kneeLimitViolations(recording, { rig: limited, mannequin }), 0)
   for (const { joints } of recording.frames) {
     for (const leg of legsOf(limited)) {
@@ -152,20 +141,6 @@ test('leg limits given on a limb bound every intermediate joint', () => {
     }
   }
 })
-
-function splayed (): typeof mannequin {
-  const joints = structuredClone(mannequin.joints)
-  for (const { tag, x, z } of [
-    { tag: 'LF', x: 0.1, z: 0.3 }, { tag: 'LM', x: 0.1, z: 0 }, { tag: 'LH', x: 0.1, z: -0.3 },
-    { tag: 'RF', x: -0.1, z: 0.3 }, { tag: 'RM', x: -0.1, z: 0 }, { tag: 'RH', x: -0.1, z: -0.3 }
-  ]) {
-    joints[`knee${tag}`] = [x * 1.5, 0.75, z]
-    joints[`hock${tag}`] = [x * 2.2, 0.4, z]
-    joints[`ankle${tag}`] = [x * 2.8, 0.03, z]
-    joints[`toe${tag}`] = [x * 2.8, 0.03, z + 0.08]
-  }
-  return { ...mannequin, joints }
-}
 
 test('bend up puts every knee above its hip on a splayed leg', () => {
   const wide = splayed()
@@ -192,9 +167,7 @@ test('a splayed hexapod keeps its spread while walking and at the stop when late
   const wide = splayed()
   const wideRest = restPose(wide)
   const spread = { ...rig, gait: { ...rig.gait, lateral: 'rest' as const } }
-  const frames = planGait({
-    track: walkTrack(0.5, 5), rig: spread, rest: wideRest, mannequin: wide, duration: 8, fps: FPS
-  })
+  const frames = plan({ rig: spread, mannequin: wide }, walkTrack(0.5, 5), 8)
   const last = frames[frames.length - 1]
   let planted = 0
   for (const frame of frames) {
@@ -212,10 +185,7 @@ test('a splayed hexapod keeps its spread while walking and at the stop when late
 })
 
 test('without lateral rest the feet plant footSpacing / 2 from the centre line', () => {
-  const wide = splayed()
-  const frames = planGait({
-    track: walkTrack(0.5, 5), rig, rest: restPose(wide), mannequin: wide, duration: 8, fps: FPS
-  })
+  const frames = plan({ rig, mannequin: splayed() }, walkTrack(0.5, 5), 8)
   const spacing = rig.gait.footSpacing
   for (const frame of frames.slice(120)) {
     frame.feet.forEach(foot => {
@@ -232,8 +202,7 @@ test('with lateral rest, feet plant at their rest ankle offset along the body as
   }
   const fannedRest = restPose(fanned)
   const restRig = { ...rig, gait: { ...rig.gait, lateral: 'rest' as const } }
-  const track = walkTrack(0.5, 5)
-  const frames = planGait({ track, rig: restRig, rest: fannedRest, mannequin: fanned, duration: 7, fps: FPS })
+  const frames = plan({ rig: restRig, mannequin: fanned }, walkTrack(0.5, 5), 7)
   legsOf(restRig).forEach((leg, k) => {
     const planted = frames.filter(f => f.root.position[2] > 1 && f.feet[k].planted)
       .map(f => toLocal(f.feet[k].ankle, f.root)[2])

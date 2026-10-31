@@ -2,7 +2,16 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 import { translateLegacy } from '../src/formats/limbs.ts'
 import type { LegacyArm, LegacyLeg } from '../src/formats/limbs.ts'
 import type { Gait, Rig } from '../src/formats/rig.ts'
+import type { SimMaterial } from '../src/formats/sim.ts'
+import { planGait } from '../src/motion/gait.ts'
+import type { GaitFrame } from '../src/motion/gait.ts'
+import { recordLocomotion } from '../src/motion/metrics.ts'
+import type { Geometry, LocomotionRecording } from '../src/motion/metrics.ts'
+import { restPose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
+import type { Vec3 } from '../src/math/vec.ts'
+
+export const FPS = 24
 
 export const mannequin: Mannequin = {
   name: 'synthetic',
@@ -143,3 +152,37 @@ export const quadRig: Rig = legacyRig({
     footSpacing: 0.16
   }
 })
+
+export const biped: Geometry = { rig, mannequin }
+export const quad: Geometry = { rig: quadRig, mannequin: quadMannequin }
+
+export function plan (body: Geometry, track: (t: number) => RootState, duration: number): GaitFrame[] {
+  const { rig, mannequin } = body
+  return planGait({ track, rig, rest: restPose(mannequin), mannequin, duration, fps: FPS })
+}
+
+export function record (body: Geometry, frames: GaitFrame[]): LocomotionRecording {
+  const { rig, mannequin } = body
+  return recordLocomotion(frames, { rig, rest: restPose(mannequin), mannequin, fps: FPS })
+}
+
+export type Landing = { frame: number, leg: number, side: string, ankle: Vec3 }
+
+export function landings (frames: GaitFrame[]): Landing[] {
+  const found: Landing[] = []
+  for (let i = 1; i < frames.length; i++) {
+    frames[i].feet.forEach((foot, leg) => {
+      if (!foot.planted || frames[i - 1].feet[leg].planted) return
+      found.push({ frame: i, leg, side: foot.side, ankle: foot.ankle })
+    })
+  }
+  return found
+}
+
+export function widestArmSwing (frames: GaitFrame[]): GaitFrame {
+  return frames.reduce((best, f) => Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best)
+}
+
+export const silk: SimMaterial = {
+  name: 'silk', particleMass: 0.01, stretchCompliance: 1e-6, bendCompliance: 1e-3, damping: 0.3, drag: 0.02
+}

@@ -4,26 +4,32 @@ import type { Mannequin } from '../src/formats/mannequin.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { kneeBendsBackward, kneeFlexionDegrees } from '../src/motion/ik.ts'
-import { planGait } from '../src/motion/gait.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
 import * as metrics from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
+import type { Pose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
 import {
-  mannequin, quadMannequin, quadRig, rig, straightMannequin, turnTrack, walkTrack
+  biped, mannequin, plan, quad, quadMannequin, quadRig, record, rig, straightMannequin, turnTrack, walkTrack,
+  widestArmSwing
 } from './locomotion-fixtures.ts'
 
 const rest = restPose(mannequin)
+const straight = { rig, mannequin: straightMannequin }
 
 function frames (speed: number, walkSeconds: number, duration: number) {
-  return planGait({ track: walkTrack(speed, walkSeconds), rig, rest, mannequin, duration, fps: 24 })
+  return plan(biped, walkTrack(speed, walkSeconds), duration)
 }
 
-function distance (pose: Record<string, Vec3>, a: string, b: string): number {
+function distance (pose: Pose, a: string, b: string): number {
   return length(sub(pose[a], pose[b]))
+}
+
+function sideFlexions (pose: Pose): number[] {
+  return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
 }
 
 const BONES: [string, string][] = [
@@ -76,8 +82,7 @@ test('the swing toe pitches up with lift, the planted toe stays flat', () => {
 })
 
 test('arms swing in opposite directions and the upper body follows the pelvis', () => {
-  const walk = frames(1.2, 4, 7)
-  const frame = walk.reduce((best, f) => (Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best))
+  const frame = widestArmSwing(frames(1.2, 4, 7))
   const { pose } = poseAt({ frame, rig, rest, mannequin })
   const left = pose.handL[2] - rest.handL[2]
   const right = pose.handR[2] - rest.handR[2]
@@ -87,13 +92,12 @@ test('arms swing in opposite directions and the upper body follows the pelvis', 
 })
 
 test('a straight-legged rig at rest stays within 1 cm of its rest pose', () => {
-  const straight = restPose(straightMannequin)
-  const [frame] = planGait({
-    track: walkTrack(0, 0), rig, rest: straight, mannequin: straightMannequin, duration: 1, fps: 24
-  })
-  const { pose, clamped } = poseAt({ frame, rig, rest: straight, mannequin: straightMannequin })
+  const straightRest = restPose(straightMannequin)
+  const [frame] = plan(straight, walkTrack(0, 0), 1)
+  const { pose, clamped } = poseAt({ frame, rig, rest: straightRest, mannequin: straightMannequin })
   assert.equal(clamped, 0)
-  assert.ok(Math.abs(pose.pelvis[1] - straight.pelvis[1]) < 0.01, `pelvis moved ${pose.pelvis[1] - straight.pelvis[1]}`)
+  const moved = pose.pelvis[1] - straightRest.pelvis[1]
+  assert.ok(Math.abs(moved) < 0.01, `pelvis moved ${moved}`)
 })
 
 test('a carried joint keeps its distance to the hand during an arm swing', () => {
@@ -103,19 +107,14 @@ test('a carried joint keeps its distance to the hand during an arm swing', () =>
     limbs: rig.limbs.map(l => (l.kind === 'arm' && l.side === 'right' ? { ...l, carried: ['tip'] } : l))
   }
   const swordRest = restPose(sword)
-  const track = walkTrack(1.2, 4)
-  const walk = planGait({ track, rig: carrying, rest: swordRest, mannequin: sword, duration: 7, fps: 24 })
-  const frame = walk.reduce((best, f) => (Math.abs(f.armSwings[0]) > Math.abs(best.armSwings[0]) ? f : best))
+  const frame = widestArmSwing(plan({ rig: carrying, mannequin: sword }, walkTrack(1.2, 4), 7))
   const { pose } = poseAt({ frame, rig: carrying, rest: swordRest, mannequin: sword })
   assertClose(distance(pose, 'tip', 'handR'), distance(swordRest, 'tip', 'handR'), 1e-9)
   assert.ok(Math.abs(pose.tip[1] - swordRest.tip[1] - frame.pelvisOffset[1]) > 0.05)
 })
 
 function kneeFlexions (speed: number): number[][] {
-  return frames(speed, 4, 7).map(frame => {
-    const { pose } = poseAt({ frame, rig, rest, mannequin })
-    return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
-  })
+  return frames(speed, 4, 7).map(frame => sideFlexions(poseAt({ frame, rig, rest, mannequin }).pose))
 }
 
 test('knees stay at least 25 degrees bent while walking at the reference speed', () => {
@@ -133,22 +132,17 @@ test('knee flexion speed stays under 600 degrees per second at 24 fps in a brisk
 })
 
 test('knees stay at least 25 degrees bent while stepping around in place', () => {
-  const straight = restPose(straightMannequin)
-  const turning = planGait({
-    track: turnTrack(Math.PI, 2), rig, rest: straight, mannequin: straightMannequin, duration: 3, fps: 24
-  })
+  const straightRest = restPose(straightMannequin)
+  const turning = plan(straight, turnTrack(Math.PI, 2), 3)
   const flexions = turning.slice(0, 48).flatMap(frame => {
-    const { pose } = poseAt({ frame, rig, rest: straight, mannequin: straightMannequin })
-    return ['L', 'R'].map(side => kneeFlexionDegrees(pose[`hip${side}`], pose[`knee${side}`], pose[`ankle${side}`]))
+    return sideFlexions(poseAt({ frame, rig, rest: straightRest, mannequin: straightMannequin }).pose)
   })
   assert.ok(Math.min(...flexions) >= 25, `knee reached ${Math.min(...flexions)} degrees`)
 })
 
 test('each leg bends toward its own side: forward legs and backward legs of a quadruped', () => {
   const quadRest = restPose(quadMannequin)
-  const gait = planGait({
-    track: walkTrack(0.9, 4), rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 6, fps: 24
-  })
+  const gait = plan(quad, walkTrack(0.9, 4), 6)
   let bent = 0
   for (const frame of gait) {
     const { pose, clamped } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
@@ -169,9 +163,7 @@ test('each leg bends toward its own side: forward legs and backward legs of a qu
 
 test('four feet are assigned to the legs by index, not by side', () => {
   const quadRest = restPose(quadMannequin)
-  const [frame] = planGait({
-    track: walkTrack(0, 0), rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 1, fps: 24
-  })
+  const [frame] = plan(quad, walkTrack(0, 0), 1)
   const { pose } = poseAt({ frame, rig: quadRig, rest: quadRest, mannequin: quadMannequin })
   for (const leg of legsOf(quadRig)) {
     for (let k = 0; k < 3; k++) assertClose(pose[leg.ankle][k], quadRest[leg.ankle][k], 1e-6)
@@ -183,12 +175,12 @@ test('limits on two-bone legs clamp the knee and the missed target counts as cla
     return l.kind === 'leg' ? { ...l, limits: { min: 0, max: 20 } } : l
   }
   const limited: Rig = { ...rig, limbs: rig.limbs.map(capped) }
-  const walked = planGait({ track: walkTrack(1.2, 4), rig: limited, rest, mannequin, duration: 6, fps: 24 })
-  const recording = metrics.recordLocomotion(walked, { rig: limited, rest, mannequin, fps: 24 })
+  const body = { rig: limited, mannequin }
+  const recording = record(body, plan(body, walkTrack(1.2, 4), 6))
   assert.ok(recording.frames.every(f => f.clamped > 0))
   assert.ok(metrics.reachViolations(recording) > 0)
   for (const { joints } of recording.frames) {
     assert.ok(kneeFlexionDegrees(joints.hipL, joints.kneeL, joints.ankleL) <= 20 + 1e-6)
   }
-  assert.equal(metrics.kneeLimitViolations(recording, { rig: limited, mannequin }), 0)
+  assert.equal(metrics.kneeLimitViolations(recording, body), 0)
 })

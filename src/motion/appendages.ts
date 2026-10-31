@@ -15,7 +15,7 @@ type Segment = { length: number, rest: Vec3, tip: Vec3, velocity: Vec3, target: 
 export const DEFAULT_APPENDAGE_SUBSTEPS = 8
 const MIN_FREQUENCY = 0.3
 const FREQUENCY_RANGE = 2.7
-/** Natural frequency in Hz of an appendage spring: 0.3 Hz at stiffness 0 up to 3 Hz at stiffness 1. */
+
 export function springFrequency (stiffness: number): number {
   return MIN_FREQUENCY + FREQUENCY_RANGE * stiffness
 }
@@ -30,22 +30,16 @@ function oscillation (limb: AppendageLimb, time: number): number {
   return oscillate.degrees * Math.PI / 180 * Math.sin(2 * Math.PI * (time / oscillate.period + oscillate.phase))
 }
 
-/**
- * Rotation from body rest space to world for the first segment's target: the oscillator, then `body` (the rotation
- * of the joint the chain hangs from, rest space to world).
- */
 function rootFrame (limb: AppendageLimb, body: Matrix, time: number): Matrix {
   const angle = oscillation(limb, time)
   if (angle === 0 || limb.oscillate === undefined) return body
   return multiply(body, axisAngle(normalize(limb.oscillate.axis), angle))
 }
 
-/** The yaw of the body after a parent joint's rotation within the body (none for a joint rigid with the body). */
 export function bodyFrame (yaw: number, parent: Matrix | undefined): Matrix {
   return parent === undefined ? yawMatrix(yaw) : multiply(yawMatrix(yaw), parent)
 }
 
-/** A spring chain's state: one rigid segment per bone, each with its tip, velocity, target and rotation. */
 export type SpringChain = { limb: AppendageLimb, segments: Segment[] }
 
 export function createSpringChain (limb: AppendageLimb, rest: Pose): SpringChain {
@@ -57,10 +51,6 @@ export function createSpringChain (limb: AppendageLimb, rest: Pose): SpringChain
   return { limb, segments }
 }
 
-/**
- * Places the chain at rest on its targets (step undefined; tips start with `velocity(tip)`), or advances it one
- * spring step of `step` seconds, with its root at `base` and `body` the rotation of the joint it hangs from.
- */
 function placeChain (
   chain: SpringChain,
   base: Vec3,
@@ -111,7 +101,6 @@ function parentRotation (from: Matrix | undefined, to: Matrix | undefined, u: nu
   return interpolate(from ?? IDENTITY, to ?? IDENTITY, u)
 }
 
-/** An outside acceleration on a segment's tip (m/s^2) given its velocity, such as gravity or wind drag. */
 export type Force = (velocity: Vec3) => Vec3
 
 function springStep (segment: Segment, base: Vec3, goal: Vec3, limb: AppendageLimb, dt: number, force?: Force): void {
@@ -175,21 +164,13 @@ function animate (limb: AppendageLimb, sequence: Sequence, parent: string, optio
   }
 }
 
-/**
- * Moves the joints of every appendage in the body-local poses and transforms (one per frame, from poseAt) with a
- * damped angular spring toward each segment's rest direction relative to its parent, plus the optional oscillator on
- * the first segment. The first segment's parent is the joint the appendage hangs from, so it turns with that joint.
- * Each segment carries the rotation from rest to its current direction (its target's rotation followed by the
- * smallest swing to where the spring put it), and its children aim through that rotation. The tips are integrated in
- * world space at `substeps` steps per frame, with the root joint, the parent's rotation and yaw interpolated between
- * frames, and each tip is projected back to its bone length. Every appendage joint turns with the segment that leaves
- * it (the tip with the last segment), as leg joints do. Appendages run parents first; after each, the joints attached
- * below it are placed again. An appendage on a joint that turns starts moving with that joint's first-frame velocity.
- * Deterministic; changes the poses and transforms in place.
- */
+export function appendagesOf (rig: Rig): AppendageLimb[] {
+  return rig.limbs.filter((limb): limb is AppendageLimb => limb.kind === 'appendage')
+}
+
 export function animateAppendages (sequence: Sequence, options: Options): void {
   const { rig, rest } = options
-  const appendages = rig.limbs.filter((limb): limb is AppendageLimb => limb.kind === 'appendage')
+  const appendages = appendagesOf(rig)
   if (appendages.length === 0 || sequence.frames.length === 0) return
   const parents = parentsOf(rig)
   const order = hierarchyOrder(parents)

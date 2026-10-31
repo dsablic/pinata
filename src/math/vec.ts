@@ -32,3 +32,9 @@ export function normalize (a: Vec3): Vec3 {
   const l = length(a)
   return l === 0 ? [0, 0, 0] : scale(a, 1 / l)
 }
+
+export function rotateY (v: Vec3, angle: number): Vec3 {
+  const c = Math.cos(angle)
+  const s = Math.sin(angle)
+  return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
+}

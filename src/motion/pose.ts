@@ -26,7 +26,6 @@ export function footRadii (leg: Leg, mannequin: Mannequin): { ankle: number, toe
 
 export type JointTriple = [string, string, string]
 
-/** Every intermediate joint of the leg's hip-to-ankle chain with the joints on either side of it. */
 export function bendingJoints (leg: Leg): JointTriple[] {
   return leg.chain.slice(1, -1).map((joint, i): JointTriple => [leg.chain[i], joint, leg.chain[i + 2]])
 }
@@ -35,7 +34,6 @@ export function chainLength (chain: string[], rest: Pose): number {
   return chain.slice(1).reduce((total, joint, i) => total + length(sub(rest[joint], rest[chain[i]])), 0)
 }
 
-/** For each arm, the index in legsOf of the leg on its side whose hip is nearest the shoulder along the body. */
 export function nearestLegs (rig: Rig, rest: Pose): number[] {
   const legs = legsOf(rig)
   return armsOf(rig).map(arm => {
@@ -51,10 +49,6 @@ export function soleHeight (leg: Leg, rest: Pose, mannequin: Mannequin): number 
   return Math.min(rest[leg.ankle][1] - radii.ankle, rest[leg.toe][1] - radii.toe)
 }
 
-/**
- * Leg names for messages and keys, with front the larger rest hip z: the side for two legs, side and front or hind
- * for two per side, and side and a number from the front for three or more per side.
- */
 export function legLabels (rig: Rig, rest: Pose): string[] {
   const legs = legsOf(rig)
   if (legs.length <= 2) return legs.map(leg => leg.side)
@@ -70,10 +64,6 @@ export function legLabels (rig: Rig, rest: Pose): string[] {
   return legs.map(leg => labels[leg.index])
 }
 
-/**
- * Arm names for messages: the side for one arm per side, and side and a number from the front (larger rest shoulder
- * z) for several per side.
- */
 export function armLabels (rig: Rig, rest: Pose): string[] {
   const arms = armsOf(rig)
   const labels: string[] = []

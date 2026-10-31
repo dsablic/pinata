@@ -1,7 +1,7 @@
 import { legPhases, legsOf, stride } from '../formats/rig.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
-import { planGait } from './gait.ts'
+import { horizontalSpeed, planGait } from './gait.ts'
 import type { FootState, GaitFrame } from './gait.ts'
 import { chainLength, soleHeight } from './pose.ts'
 
@@ -10,20 +10,12 @@ const REACH_FRACTION = 0.98
 
 type Options = Parameters<typeof planGait>[0]
 
-/**
- * Control: the planned gait with the feet placed relative to the root every frame. Each ankle swings forward and
- * back by stride / 4 * sin(2 pi (phase + 1/4)) under its hip and lifts while it moves forward relative to the
- * body, so nothing is planted in world space. The quarter-cycle shift puts the foot cycle in step with the
- * planner's pelvis bob, and the ankle stays within the leg's reach of the bobbing hip so the legs are never locked
- * straight. Root, pelvis, arms and phase come from the planner unchanged.
- */
 export function planSkating (options: Options): GaitFrame[] {
   const { rig, rest, mannequin } = options
   const { gait } = rig
   const phases = legPhases(rig)
   return planGait(options).map(frame => {
-    const speed = Math.hypot(frame.root.velocity[0], frame.root.velocity[2])
-    const amplitude = stride(gait, speed) / 4
+    const amplitude = stride(gait, horizontalSpeed(frame.root)) / 4
     const feet = legsOf(rig).map((leg, index): FootState => {
       const phase = frame.phase + phases[index] + PHASE_SHIFT
       const wave = Math.sin(2 * Math.PI * phase)

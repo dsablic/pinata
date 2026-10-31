@@ -6,6 +6,7 @@ import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
 import type { GaitFrame } from './gait.ts'
+import { appendagesOf } from './appendages.ts'
 import { kneeBendsBackward, kneeFlexionDegrees, MAX_FLEXION_DEGREES } from './ik.ts'
 import { verticalExtent } from './extent.ts'
 import { poseSequence } from './sequence.ts'
@@ -54,7 +55,6 @@ export function recordLocomotion (
   }
 }
 
-/** World-space sole points of a foot: the ankle and toe joints lowered by the foot capsule's radii. */
 export function solePoints (joints: Pose, leg: Leg, mannequin: Mannequin): Vec3[] {
   const radii = footRadii(leg, mannequin)
   const ankle = joints[leg.ankle]
@@ -76,10 +76,6 @@ function footPlanted (recording: LocomotionRecording, leg: Leg, mannequin: Manne
   return plantedPairs(soles(recording, leg, mannequin)).map(flags => flags.some(Boolean))
 }
 
-/**
- * Per foot, keyed by its leg label (see legLabels), the frames at which a sole point is within 2 cm of the ground in
- * that and the previous frame.
- */
 export function plantedFrames (recording: LocomotionRecording, geometry: Geometry): Record<string, number> {
   const labels = legLabels(geometry.rig, restPose(geometry.mannequin))
   const counts: Record<string, number> = {}
@@ -89,7 +85,6 @@ export function plantedFrames (recording: LocomotionRecording, geometry: Geometr
   return counts
 }
 
-/** Runs of consecutive planted frames per foot, as inclusive frame indices. */
 export function plantedRuns (recording: LocomotionRecording, geometry: Geometry): PlantedRun[] {
   const runs: PlantedRun[] = []
   for (const [index, leg] of legsOf(geometry.rig).entries()) {
@@ -107,7 +102,6 @@ export function plantedRuns (recording: LocomotionRecording, geometry: Geometry)
   return runs.sort((a, b) => a.start - b.start || a.end - b.end)
 }
 
-/** Largest horizontal movement of a planted sole point between consecutive frames, in pixels. */
 export function footSlidePx (recording: LocomotionRecording, geometry: Geometry, metresPerPixel: number): number {
   let worst = 0
   for (const leg of legsOf(geometry.rig)) {
@@ -124,7 +118,6 @@ export function footSlidePx (recording: LocomotionRecording, geometry: Geometry,
   return worst
 }
 
-/** Deepest a sole point goes below y = 0 in any frame, in pixels. */
 export function groundPenetrationPx (
   recording: LocomotionRecording,
   geometry: Geometry,
@@ -143,7 +136,6 @@ function isFoot (part: Part, rig: Rig): boolean {
   return part.shape === 'capsule' && legsOf(rig).some(leg => part.a === leg.ankle && part.b === leg.toe)
 }
 
-/** Deepest any non-foot part (capsule end spheres, box corners) goes below y = 0 in any frame, in pixels. */
 export function partGroundPenetrationPx (
   recording: LocomotionRecording,
   options: { mannequin: Mannequin, rig: Rig, metresPerPixel: number }
@@ -156,7 +148,6 @@ export function partGroundPenetrationPx (
   return Math.max(0, -lowest) / options.metresPerPixel
 }
 
-/** Frames in which at least one IK target was clamped. */
 export function reachViolations (recording: LocomotionRecording): number {
   return recording.frames.filter(f => f.clamped > 0).length
 }
@@ -174,10 +165,6 @@ function flexions (recording: LocomotionRecording, triple: JointTriple): number[
   return recording.frames.map(f => kneeFlexionDegrees(f.joints[a], f.joints[b], f.joints[c]))
 }
 
-/**
- * Joint-frames, over every intermediate joint of every leg, with flexion outside the leg's limits (default
- * [0, 150] degrees) or a joint on the wrong side of its bend direction.
- */
 export function kneeLimitViolations (recording: LocomotionRecording, geometry: Geometry): number {
   let count = 0
   for (const leg of legsOf(geometry.rig)) {
@@ -195,7 +182,6 @@ export function kneeLimitViolations (recording: LocomotionRecording, geometry: G
   return count
 }
 
-/** Largest flexion change between consecutive frames of each intermediate joint of each leg, in degrees per second. */
 export function jointSpeedsDegPerSec (recording: LocomotionRecording, geometry: Geometry): JointSpeed[] {
   const speeds: JointSpeed[] = []
   for (const [index, leg] of legsOf(geometry.rig).entries()) {
@@ -209,29 +195,41 @@ export function jointSpeedsDegPerSec (recording: LocomotionRecording, geometry: 
   return speeds
 }
 
-/** Largest flexion change of any leg joint between consecutive frames, in degrees per second. */
 export function kneeSpeedDegPerSec (recording: LocomotionRecording, geometry: Geometry): number {
   return Math.max(0, ...jointSpeedsDegPerSec(recording, geometry).map(speed => speed.value))
 }
 
-function bones (rig: Rig): Array<[string, string]> {
-  const pairs = (joints: string[]): Array<[string, string]> => joints.slice(1).map((j, i) => [joints[i], j])
+type Bone = [string, string]
+
+function consecutivePairs (joints: string[]): Bone[] {
+  return joints.slice(1).map((j, i) => [joints[i], j])
+}
+
+function bones (rig: Rig): Bone[] {
   return [
-    ...legsOf(rig).flatMap(leg => pairs(leg.joints)),
-    ...armsOf(rig).flatMap(arm => pairs(arm.joints.slice(0, Math.max(2, arm.joints.length - 1))))
+    ...legsOf(rig).flatMap(leg => consecutivePairs(leg.joints)),
+    ...armsOf(rig).flatMap(arm => consecutivePairs(arm.joints.slice(0, Math.max(2, arm.joints.length - 1))))
   ]
 }
 
-/** Largest relative change of any leg bone, or any arm bone other than the last, from the rest pose. */
-export function boneLengthError (recording: LocomotionRecording, geometry: Geometry, rest: Pose): number {
+function worstBoneChange (
+  pairs: Bone[],
+  recording: LocomotionRecording,
+  rest: Pose,
+  score: (error: number) => number
+): number {
   let worst = 0
-  for (const [a, b] of bones(geometry.rig)) {
+  for (const [a, b] of pairs) {
     const expected = length(sub(rest[a], rest[b]))
     for (const { joints } of recording.frames) {
-      worst = Math.max(worst, Math.abs(length(sub(joints[a], joints[b])) - expected) / expected)
+      worst = Math.max(worst, score(Math.abs(length(sub(joints[a], joints[b])) - expected) / expected))
     }
   }
   return worst
+}
+
+export function boneLengthError (recording: LocomotionRecording, geometry: Geometry, rest: Pose): number {
+  return worstBoneChange(bones(geometry.rig), recording, rest, error => error)
 }
 
 function plantCentre (recording: LocomotionRecording, leg: Leg, mannequin: Mannequin, run: PlantedRun) {
@@ -249,12 +247,6 @@ function plantCentre (recording: LocomotionRecording, leg: Leg, mannequin: Manne
   return { time, x: x / n, z: z / n }
 }
 
-/**
- * Largest relative difference, over each foot in each steady segment, between the foot's advance along the path
- * from its first to its last plant in the segment, per second between those plants, and the script speed. The path
- * direction is the root's displacement over the segment. A foot or segment without two plants measures nothing and
- * gives Infinity.
- */
 export function rootSpeedError (recording: LocomotionRecording, geometry: Geometry, segments: SteadySegment[]): number {
   const runs = plantedRuns(recording, geometry)
   const { frames } = recording
@@ -283,10 +275,6 @@ export function rootSpeedError (recording: LocomotionRecording, geometry: Geomet
   return worst
 }
 
-/**
- * Windows in which the script walks steadily: each 'move' segment after its first accelSeconds, minus any that
- * overlap a 'turn'.
- */
 export function steadySegments (script: Script): SteadySegment[] {
   const turns: Array<[number, number]> = []
   const moves: SteadySegment[] = []
@@ -300,7 +288,6 @@ export function steadySegments (script: Script): SteadySegment[] {
   return moves.filter(m => m.end > m.start && !turns.some(([a, b]) => m.start < b && m.end > a))
 }
 
-/** Frames in which no sole point of either foot is within 2 cm of the ground. */
 export function unsupportedFrames (recording: LocomotionRecording, geometry: Geometry): number {
   return recording.frames.filter(({ joints }) => {
     return !legsOf(geometry.rig).some(leg => {
@@ -309,10 +296,6 @@ export function unsupportedFrames (recording: LocomotionRecording, geometry: Geo
   }).length
 }
 
-/**
- * Plants inside the windows (geometric plants, time of first frame) by a leg other than the one whose phase comes
- * next after the previous plant's leg. With two legs this counts the same foot planting twice in a row.
- */
 export function alternationViolations (recording: LocomotionRecording, geometry: Geometry, windows: Window[]): number {
   const phases = legPhases(geometry.rig)
   const order = phases.map((_, leg) => leg).sort((a, b) => phases[a] - phases[b] || a - b)
@@ -330,7 +313,6 @@ export function alternationViolations (recording: LocomotionRecording, geometry:
   return count
 }
 
-/** SHA-256 hex digest of each frame's joint positions, in joint-name order. */
 export function frameHashes (recording: LocomotionRecording): string[] {
   return recording.frames.map(f => {
     const names = Object.keys(f.joints).sort()
@@ -348,7 +330,6 @@ function cross2 (o: Point, a: Point, b: Point): number {
   return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 }
 
-/** Convex hull in counter-clockwise order (Andrew's monotone chain), without collinear points. */
 export function convexHull (points: readonly Point[]): Point[] {
   const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1])
   if (sorted.length <= 2) return sorted
@@ -372,10 +353,6 @@ function segmentDistance (p: Point, a: Point, b: Point): number {
   return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
 }
 
-/**
- * Signed distance from p to a convex hull (counter-clockwise): positive outside, negative inside (minus the distance
- * to the nearest edge). A hull of one or two points has no inside.
- */
 export function hullDistance (p: Point, hull: readonly Point[]): number {
   if (hull.length === 1) return Math.hypot(p[0] - hull[0][0], p[1] - hull[0][1])
   const edges = hull.map((a, i): [Point, Point] => [a, hull[(i + 1) % hull.length]])
@@ -391,10 +368,6 @@ function partVolume (part: Part, joints: Pose): number {
   return Math.PI * radius * radius * (span + 4 / 3 * radius)
 }
 
-/**
- * Ground projection of the body centre: the volume-weighted centroid of the parts whose joints are all pelvis or
- * upperBody joints (each part's volume at its midpoint), or the mean of those joints when no part qualifies.
- */
 export function bodyCentre (joints: Pose, geometry: Geometry): Point {
   const group = new Set([geometry.rig.pelvis, ...geometry.rig.upperBody])
   const parts = geometry.mannequin.parts.filter(part => group.has(part.a) && group.has(part.b))
@@ -413,10 +386,6 @@ export function bodyCentre (joints: Pose, geometry: Geometry): Point {
   return [sum[0] / names.length, sum[1] / names.length]
 }
 
-/**
- * Per frame, the signed ground distance (metres, positive outside) from the body centre to the convex hull of the
- * sole points within 2 cm of the ground, or undefined in frames with no such point (see unsupportedFrames).
- */
 export function balanceDistances (recording: LocomotionRecording, geometry: Geometry): Array<number | undefined> {
   const legs = legsOf(geometry.rig)
   return recording.frames.map(({ joints }) => {
@@ -427,36 +396,17 @@ export function balanceDistances (recording: LocomotionRecording, geometry: Geom
   })
 }
 
-/**
- * Frames in which the body centre lies more than 2 cm outside the convex hull of the sole points within 2 cm of the
- * ground. Frames without any support count under unsupportedFrames instead.
- */
 export function unbalancedFrames (recording: LocomotionRecording, geometry: Geometry): number {
   return balanceDistances(recording, geometry).filter(d => d !== undefined && d > BALANCE_TOLERANCE).length
 }
 
-function appendageBones (rig: Rig): Array<{ limb: string, a: string, b: string }> {
-  return rig.limbs.filter(limb => limb.kind === 'appendage').flatMap(limb => {
-    return limb.joints.slice(1).map((b, i) => ({ limb: limb.name, a: limb.joints[i], b }))
-  })
-}
-
-/** Largest relative change of any appendage bone from the rest pose; non-finite lengths count as Infinity. */
 export function appendageBoneLengthError (recording: LocomotionRecording, geometry: Geometry, rest: Pose): number {
-  let worst = 0
-  for (const { a, b } of appendageBones(geometry.rig)) {
-    const expected = length(sub(rest[a], rest[b]))
-    for (const { joints } of recording.frames) {
-      const error = Math.abs(length(sub(joints[a], joints[b])) - expected) / expected
-      worst = Math.max(worst, Number.isFinite(error) ? error : Infinity)
-    }
-  }
-  return worst
+  const pairs = appendagesOf(geometry.rig).flatMap(limb => consecutivePairs(limb.joints))
+  return worstBoneChange(pairs, recording, rest, error => Number.isFinite(error) ? error : Infinity)
 }
 
-/** Joint-frames in which an appendage joint has a coordinate that is not a finite number. */
 export function appendageNonFinite (recording: LocomotionRecording, geometry: Geometry): number {
-  const names = geometry.rig.limbs.filter(limb => limb.kind === 'appendage').flatMap(limb => limb.joints)
+  const names = appendagesOf(geometry.rig).flatMap(limb => limb.joints)
   return recording.frames.reduce((count, { joints }) => {
     return count + names.filter(name => !joints[name].every(Number.isFinite)).length
   }, 0)

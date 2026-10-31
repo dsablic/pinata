@@ -20,7 +20,6 @@ function rigWith (tail: Partial<AppendageLimb>): Rig {
   return { ...hexRig, limbs: [limb] }
 }
 
-/** Frames whose root follows position(t) and yaw(t), with no pelvis offset; feet are unused by appendages. */
 function frames (seconds: number, position: (t: number) => Vec3, yaw: (t: number) => number = () => 0): GaitFrame[] {
   return Array.from({ length: Math.round(seconds * FPS) + 1 }, (_, i) => {
     const t = i / FPS
@@ -43,17 +42,15 @@ function animate (rig: Rig, gait: GaitFrame[], from: Pose = rest): Pose[] {
   return poses
 }
 
-function angleBetween (a: Vec3, b: Vec3): number {
-  const cos = (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (length(a) * length(b))
-  return Math.acos(Math.min(1, Math.max(-1, cos))) * 180 / Math.PI
+function bend (pose: Pose): number {
+  return kneeFlexionDegrees(pose.tail1, pose.tail2, pose.tail3)
 }
 
 function deviation (pose: Pose): number {
   return Math.max(...TAIL.map(name => length(sub(pose[name], rest[name]))))
 }
 
-/** Speeds up sideways (across the tail) from 0 to 1 m/s over 0.5 s, then moves on at 1 m/s. */
-function accelerate (t: number): Vec3 {
+function accelerateSideways (t: number): Vec3 {
   const ramp = 0.5
   return [t < ramp ? t * t / (2 * ramp) : ramp / 2 + (t - ramp), 0, 0]
 }
@@ -63,7 +60,7 @@ test('a still body leaves the tail at rest', () => {
 })
 
 test('the tail lags behind a body that speeds up, then settles back to rest', () => {
-  const poses = animate(rigWith({}), frames(4, accelerate))
+  const poses = animate(rigWith({}), frames(4, accelerateSideways))
   const early = Math.max(...poses.slice(0, 12).map(deviation))
   assert.ok(early > 0.01, `deviation while speeding up: ${early}`)
   assert.ok(poses[6].tail3[0] < rest.tail3[0], 'the tip trails behind the body')
@@ -71,7 +68,7 @@ test('the tail lags behind a body that speeds up, then settles back to rest', ()
 })
 
 test('a softer tail swings further, and stiffness 1 is rigid', () => {
-  const peak = (stiffness: number): number => Math.max(...animate(rigWith({ stiffness }), frames(2, accelerate))
+  const peak = (stiffness: number): number => Math.max(...animate(rigWith({ stiffness }), frames(2, accelerateSideways))
     .map(deviation))
   assert.ok(peak(0.2) > peak(0.8))
   assert.ok(peak(1) < 1e-12)
@@ -100,7 +97,6 @@ test('the oscillator swings the first segment by degrees at the period and the r
   assert.ok(Math.abs(Math.abs(yawOf(poses[6])) - 30) < 1e-6, `quarter period: ${yawOf(poses[6])}`)
   assert.ok(Math.abs(yawOf(poses[12])) < 1e-6)
   assert.ok(Math.abs(yawOf(poses[24])) < 1e-6)
-  const bend = (pose: Pose): number => kneeFlexionDegrees(pose.tail1, pose.tail2, pose.tail3)
   assert.ok(Math.abs(bend(poses[6]) - bend(rest)) < 1e-6)
 })
 
@@ -134,7 +130,7 @@ test('a soft tail through a half turn in one second keeps its bend changing smoo
   const poses = animate(rigWith({ stiffness: 0.2, damping: 0.4 }), frames(3, () => [0, 0, 0], t => {
     return Math.PI * Math.min(1, t)
   }))
-  const bends = poses.map(p => angleBetween(sub(p.tail2, p.tail1), sub(p.tail3, p.tail2)))
+  const bends = poses.map(bend)
   const jumps = bends.slice(1).map((b, i) => Math.abs(b - bends[i]))
   assert.ok(Math.max(...jumps) < 25, `largest bend change per frame: ${Math.max(...jumps)}`)
 })

@@ -3,31 +3,22 @@ import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import { legsOf, stride } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
-import { planGait } from '../src/motion/gait.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
 import { restPose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
 import { length, sub } from '../src/math/vec.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { assertClose } from './helpers.ts'
-import { mannequin, quadMannequin, quadRig, rig, walkTrack } from './locomotion-fixtures.ts'
-
-const FPS = 24
+import {
+  biped, FPS, landings, mannequin, plan as planBody, quad, quadMannequin, quadRig, rig, walkTrack
+} from './locomotion-fixtures.ts'
 
 function plan (track: (t: number) => RootState, duration: number, gaitRig: Rig = rig): GaitFrame[] {
-  return planGait({ track, rig: gaitRig, rest: restPose(mannequin), mannequin, duration, fps: FPS })
+  return planBody({ ...biped, rig: gaitRig }, track, duration)
 }
 
-type Landing = { frame: number, side: string, ankle: Vec3 }
-
-function landings (frames: GaitFrame[]): Landing[] {
-  const found: Landing[] = []
-  for (let i = 1; i < frames.length; i++) {
-    frames[i].feet.forEach((foot, k) => {
-      if (foot.planted && !frames[i - 1].feet[k].planted) found.push({ frame: i, side: foot.side, ankle: foot.ankle })
-    })
-  }
-  return found
+function planQuad (track: (t: number) => RootState, duration: number, gaitRig: Rig = quadRig): GaitFrame[] {
+  return planBody({ ...quad, rig: gaitRig }, track, duration)
 }
 
 test('one frame per tick including both ends, with the root from the track', () => {
@@ -162,8 +153,7 @@ test('planted feet put the lowest sole point on the ground', () => {
     ...mannequin,
     parts: mannequin.parts.map(part => (part.shape === 'capsule' ? { ...part, radiusA: 0.12 } : part))
   }
-  const track = walkTrack(1, 3)
-  const frames = planGait({ track, rig, rest: restPose(mannequin), mannequin: thick, duration: 5, fps: FPS })
+  const frames = planBody({ rig, mannequin: thick }, walkTrack(1, 3), 5)
   let planted = 0
   for (const frame of frames) {
     for (const foot of frame.feet) {
@@ -218,33 +208,15 @@ test('the side of each foot comes from the leg, not from the rest ankle position
       toeR: [0, 0.05, 0.15]
     }
   }
-  const frames = planGait({
-    track: walkTrack(1, 8), rig, rest: restPose(centred), mannequin: centred, duration: 10, fps: FPS
-  })
+  const frames = planBody({ rig, mannequin: centred }, walkTrack(1, 8), 10)
   const found = landings(frames).filter(l => l.frame > FPS && l.frame < 7 * FPS)
   assert.ok(found.length >= 6)
   for (const l of found) assertClose(l.ankle[0], (l.side === 'left' ? 1 : -1) * rig.gait.footSpacing / 2, 1e-9)
 })
 
-function planQuad (track: (t: number) => RootState, duration: number, gaitRig: Rig = quadRig): GaitFrame[] {
-  return planGait({
-    track, rig: gaitRig, rest: restPose(quadMannequin), mannequin: quadMannequin, duration, fps: FPS
-  })
-}
-
-function legLandings (frames: GaitFrame[]): Array<{ frame: number, leg: number }> {
-  const found: Array<{ frame: number, leg: number }> = []
-  for (let i = 1; i < frames.length; i++) {
-    frames[i].feet.forEach((foot, leg) => {
-      if (foot.planted && !frames[i - 1].feet[leg].planted) found.push({ frame: i, leg })
-    })
-  }
-  return found
-}
-
 test('four legs plant in phase order, a quarter cycle apart', () => {
   const frames = planQuad(walkTrack(0.9, 8), 10)
-  const found = legLandings(frames).filter(l => l.frame > 2 * FPS && l.frame < 7 * FPS)
+  const found = landings(frames).filter(l => l.frame > 2 * FPS && l.frame < 7 * FPS)
   assert.ok(found.length >= 12, `landings: ${found.length}`)
   for (let i = 1; i < found.length; i++) assert.equal(found[i].leg, (found[i - 1].leg + 1) % 4)
   const cycleFrames = (stride(quadRig.gait, 0.9) / 0.9) * FPS
@@ -266,7 +238,7 @@ test('four legs start planted at the rest pose', () => {
 test('each foot is planted under its own hip at mid-stance and on its own lateral line', () => {
   const frames = planQuad(walkTrack(0.9, 8), 10)
   const rest = restPose(quadMannequin)
-  const found = legLandings(frames).filter(l => l.frame > 2 * FPS && l.frame < 6 * FPS)
+  const found = landings(frames).filter(l => l.frame > 2 * FPS && l.frame < 6 * FPS)
   assert.ok(found.length >= 8)
   for (const { frame, leg } of found) {
     let end = frame
@@ -345,11 +317,8 @@ test('arm swing per leg is cos(2 pi (phase - leg phase)): a biped swings left an
 })
 
 test('arm swing follows each leg phase for a quadruped, a quarter cycle apart', () => {
-  const rest = restPose(quadMannequin)
   const swinging = { ...quadRig, gait: { ...quadRig.gait, armSwingDegrees: 20 } }
-  const frames = planGait({
-    track: walkTrack(0.9, 4), rig: swinging, rest, mannequin: quadMannequin, duration: 6, fps: FPS
-  })
+  const frames = planQuad(walkTrack(0.9, 4), 6, swinging)
   const { armSwingDegrees, referenceSpeed } = swinging.gait
   const phases = [0, 0.25, 0.5, 0.75]
   for (const frame of frames) {

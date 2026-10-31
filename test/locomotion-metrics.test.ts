@@ -1,7 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
-import { planGait } from '../src/motion/gait.ts'
 import {
   alternationViolations, boneLengthError, footSlidePx, frameHashes, groundPenetrationPx, kneeLimitViolations,
   kneeSpeedDegPerSec, partGroundPenetrationPx, plantedFrames, plantedRuns, reachViolations, recordLocomotion,
@@ -12,10 +11,11 @@ import { legLabels, restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
 import { assertClose } from './helpers.ts'
-import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
-import { mannequin, quadMannequin, quadRig, rig, walkTrack } from './locomotion-fixtures.ts'
+import { hexapod, hexMannequin, hexRig } from './hexapod-fixtures.ts'
+import {
+  biped as geometry, FPS, mannequin, plan, quad as quadGeometry, quadMannequin, quadRig, record, rig, walkTrack
+} from './locomotion-fixtures.ts'
 
-const geometry = { rig, mannequin }
 const rest = restPose(mannequin)
 const SCALE = 1.8 / 48
 
@@ -24,11 +24,11 @@ function rootAt (z: number, yaw = 0): RootState {
 }
 
 function frame (i: number, joints: Pose, extra: Partial<LocomotionFrame> = {}): LocomotionFrame {
-  return { time: i / 24, root: rootAt(0), joints, clamped: 0, planted: { left: false, right: false }, ...extra }
+  return { time: i / FPS, root: rootAt(0), joints, clamped: 0, planted: { left: false, right: false }, ...extra }
 }
 
 function recording (frames: LocomotionFrame[]): LocomotionRecording {
-  return { fps: 24, frames }
+  return { fps: FPS, frames }
 }
 
 function withFeet (left: number, right: number, dx = 0): Pose {
@@ -138,7 +138,7 @@ test('kneeLimitViolations uses the body yaw as forward', () => {
 
 test('kneeSpeedDegPerSec is the largest flexion change between consecutive frames times the frame rate', () => {
   const frames = [0, 10, 40, 45].map((f, i) => frame(i, legPose(f)))
-  assertClose(kneeSpeedDegPerSec(recording(frames), geometry), 30 * 24, 1e-6)
+  assertClose(kneeSpeedDegPerSec(recording(frames), geometry), 30 * FPS, 1e-6)
 })
 
 test('boneLengthError is the largest relative change of a bone from the rest pose', () => {
@@ -168,7 +168,7 @@ function stepping (step: number, rootSpeed: number, count = 48): LocomotionRecor
     const right = Math.floor((i + PERIOD / 2) / PERIOD)
     const leftUp = i % PERIOD < STANCE ? 0 : 0.3
     const rightUp = (i + PERIOD / 2) % PERIOD < STANCE ? 0 : 0.3
-    return frame(i, stepPose(left * step, leftUp, right * step, rightUp), { root: rootAt(rootSpeed * i / 24) })
+    return frame(i, stepPose(left * step, leftUp, right * step, rightUp), { root: rootAt(rootSpeed * i / FPS) })
   })
   return recording(frames)
 }
@@ -218,18 +218,16 @@ test('frameHashes give one stable hash per frame that changes with any joint', (
 })
 
 test('recordLocomotion stores world-space joints, clamp counts and planner planted flags', () => {
-  const frames = planGait({ track: walkTrack(1.2, 4), rig, rest, mannequin, duration: 2, fps: 24 })
-  const rec = recordLocomotion(frames, { rig, rest, mannequin, fps: 24 })
+  const frames = plan(geometry, walkTrack(1.2, 4), 2)
+  const rec = recordLocomotion(frames, { rig, rest, mannequin, fps: FPS })
   assert.equal(rec.frames.length, frames.length)
-  assert.equal(rec.fps, 24)
-  assertClose(rec.frames[10].time, 10 / 24)
+  assertClose(rec.frames[10].time, 10 / FPS)
   assertClose(rec.frames[10].joints.chest[2], frames[10].root.position[2] + rest.chest[2], 1e-9)
   assertClose(rec.frames[10].joints.chest[1], rest.chest[1] + frames[10].pelvisOffset[1], 1e-9)
   assert.equal(rec.frames[10].planted.left, frames[10].feet[0].planted)
   assert.equal(rec.frames[10].clamped, 0)
 })
 
-const quadGeometry = { rig: quadRig, mannequin: quadMannequin }
 const quadRest = restPose(quadMannequin)
 const QUAD_NAMES = ['LH', 'LF', 'RH', 'RF']
 
@@ -264,14 +262,9 @@ test('legLabels number three or more legs per side from front to back, whatever 
 })
 
 test('plantedFrames keys and gate names use the leg labels of a hexapod', () => {
-  const hexFrames = planGait({
-    track: walkTrack(0.5, 3), rig: hexRig, rest: restPose(hexMannequin), mannequin: hexMannequin, duration: 4, fps: 24
-  })
-  const walked = recordLocomotion(hexFrames, {
-    rig: hexRig, rest: restPose(hexMannequin), mannequin: hexMannequin, fps: 24
-  })
+  const walked = record(hexapod, plan(hexapod, walkTrack(0.5, 3), 4))
   const expected = ['left 1', 'left 2', 'left 3', 'right 1', 'right 2', 'right 3']
-  assert.deepEqual(Object.keys(plantedFrames(walked, { rig: hexRig, mannequin: hexMannequin })), expected)
+  assert.deepEqual(Object.keys(plantedFrames(walked, hexapod)), expected)
   assert.deepEqual(Object.keys(walked.frames[10].planted), expected)
 })
 
@@ -326,9 +319,8 @@ test('kneeLimitViolations uses each leg bend as its forward', () => {
 })
 
 test('a recorded quadruped walk has per-leg planted flags and passes the leg metrics', () => {
-  const track = walkTrack(0.9, 8)
-  const frames = planGait({ track, rig: quadRig, rest: quadRest, mannequin: quadMannequin, duration: 10, fps: 24 })
-  const rec = recordLocomotion(frames, { rig: quadRig, rest: quadRest, mannequin: quadMannequin, fps: 24 })
+  const frames = plan(quadGeometry, walkTrack(0.9, 8), 10)
+  const rec = record(quadGeometry, frames)
   assert.deepEqual(Object.keys(rec.frames[10].planted), ['left hind', 'left front', 'right hind', 'right front'])
   assert.equal(rec.frames[10].planted['left front'], frames[10].feet[1].planted)
   assert.equal(kneeLimitViolations(rec, quadGeometry), 0)

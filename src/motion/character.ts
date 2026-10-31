@@ -32,12 +32,6 @@ export type CharacterRun = {
   timing: { planSeconds: number, simulateSeconds: number }
 }
 
-/**
- * Plans the gait for the scenario's script, poses every frame and simulates the scenario's cape and chains on the
- * posed body with the P3 conventions: `substeps` substeps per frame, frame 0 recorded before stepping. Frame i's
- * pose is held for the substeps that end in frame i. Appendages swing at the same substep rate. Poses are body-local;
- * joints the rig does not move keep their rest positions.
- */
 export function simulateCharacter (options: CharacterOptions): CharacterRun {
   const { mannequin, rig, scenario } = options
   const fps = scenario.fps

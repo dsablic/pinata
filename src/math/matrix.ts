@@ -1,7 +1,6 @@
 import { cross, dot, length, scale } from './vec.ts'
 import type { Vec3 } from './vec.ts'
 
-/** A 3x3 rotation matrix, as rows. */
 export type Matrix = [Vec3, Vec3, Vec3]
 
 const PARALLEL_EPSILON = 1e-12
@@ -21,14 +20,12 @@ export function transpose (m: Matrix): Matrix {
   return [[m[0][0], m[1][0], m[2][0]], [m[0][1], m[1][1], m[2][1]], [m[0][2], m[1][2], m[2][2]]]
 }
 
-/** Rotation about the y axis by yaw, matching toWorld. */
 export function yawMatrix (yaw: number): Matrix {
   const c = Math.cos(yaw)
   const s = Math.sin(yaw)
   return [[c, 0, s], [0, 1, 0], [-s, 0, c]]
 }
 
-/** Rotation about the unit axis by angle radians (Rodrigues). */
 export function axisAngle (axis: Vec3, angle: number): Matrix {
   const c = Math.cos(angle)
   const s = Math.sin(angle)
@@ -41,10 +38,6 @@ export function axisAngle (axis: Vec3, angle: number): Matrix {
   ]
 }
 
-/**
- * The smallest rotation that takes unit vector from onto unit vector to; for opposite vectors, a half turn about an
- * axis at right angles to them.
- */
 export function between (from: Vec3, to: Vec3): Matrix {
   const axis = cross(from, to)
   const sin = length(axis)
@@ -55,7 +48,6 @@ export function between (from: Vec3, to: Vec3): Matrix {
   return axisAngle(scale(perpendicular, 1 / length(perpendicular)), Math.PI)
 }
 
-/** The axis and angle of a rotation matrix; the axis is [1, 0, 0] for (near) identity. */
 export function toAxisAngle (m: Matrix): { axis: Vec3, angle: number } {
   const axis: Vec3 = [m[2][1] - m[1][2], m[0][2] - m[2][0], m[1][0] - m[0][1]]
   const sin = length(axis) / 2
@@ -71,19 +63,16 @@ export function toAxisAngle (m: Matrix): { axis: Vec3, angle: number } {
   return { axis: scale(axis, 1 / (2 * sin)), angle }
 }
 
-/** The rotation a fraction u of the way from a to b, about the single axis that takes a to b. */
 export function interpolate (a: Matrix, b: Matrix, u: number): Matrix {
   const { axis, angle } = toAxisAngle(multiply(b, transpose(a)))
   if (angle === 0) return a
   return multiply(axisAngle(axis, angle * u), a)
 }
 
-/** Rotation by x, then y, then z radians about the fixed axes (Rz · Ry · Rx), as ASF and AMC files compose them. */
 export function eulerXyz (x: number, y: number, z: number): Matrix {
   return multiply(axisAngle([0, 0, 1], z), multiply(axisAngle([0, 1, 0], y), axisAngle([1, 0, 0], x)))
 }
 
-/** The rotation of a unit quaternion [w, x, y, z]; the quaternion is normalized first. */
 export function fromQuaternion (q: readonly number[]): Matrix {
   const size = Math.hypot(q[0], q[1], q[2], q[3])
   const [w, x, y, z] = q.map(v => v / size)
@@ -94,7 +83,6 @@ export function fromQuaternion (q: readonly number[]): Matrix {
   ]
 }
 
-/** The unit quaternion [w, x, y, z] of a rotation matrix, with w >= 0. */
 export function toQuaternion (m: Matrix): [number, number, number, number] {
   const trace = m[0][0] + m[1][1] + m[2][2]
   let q: [number, number, number, number]

@@ -1,3 +1,4 @@
+import { smoothstep } from '../math/ease.ts'
 import type { Vec3 } from '../math/vec.ts'
 
 export type Segment =
@@ -16,11 +17,6 @@ type Turn = { start: number, duration: number, radians: number }
 
 export function scriptDuration (script: Script): number {
   return script.segments.reduce((total, segment) => total + segment.duration, 0)
-}
-
-function smoothstep (x: number): number {
-  const c = Math.min(1, Math.max(0, x))
-  return c * c * (3 - 2 * c)
 }
 
 function smoothstepSlope (x: number): number {
@@ -116,24 +112,4 @@ export function createRootTrack (script: Script): (t: number) => RootState {
     const [dx, dz] = h > 0 ? advance(model, k, h) : [0, 0]
     return stateAt(model, t, xs[k] + dx, zs[k] + dz)
   }
-}
-
-export function rootAt (script: Script, t: number): RootState {
-  const model = buildModel(script)
-  const end = Math.min(Math.max(t, 0), model.duration)
-  const count = wholeSteps(end)
-  let x = 0
-  let z = 0
-  for (let k = 0; k < count; k++) {
-    const [dx, dz] = advance(model, k, STEP)
-    x += dx
-    z += dz
-  }
-  const h = end - count * STEP
-  if (h > 0) {
-    const [dx, dz] = advance(model, count, h)
-    x += dx
-    z += dz
-  }
-  return stateAt(model, t, x, z)
 }

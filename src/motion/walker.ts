@@ -1,29 +1,21 @@
 import type { Mannequin } from '../formats/mannequin.ts'
 import { legPhases, legsOf } from '../formats/rig.ts'
 import type { Rig } from '../formats/rig.ts'
-import { add, length, scale, sub } from '../math/vec.ts'
+import { smoothstep } from '../math/ease.ts'
+import { add, length, rotateY, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import type { FootState, GaitFrame } from './gait.ts'
 import { chainLength, soleHeight } from './pose.ts'
 import type { Pose } from './pose.ts'
 
-/** What the walker wants: a forward speed along a heading (radians, as yaw), or to stand still facing it. */
 export type Command = { speed: number, heading: number }
-/** Tuning of the body's control: how hard it tracks speed and heading, and how its torso tilts. */
 export type WalkerTuning = {
-  /** Most horizontal acceleration the legs can give with every foot planted, m/s^2. */
   traction: number
-  /** How fast the speed error closes, per second. */
   speedGain: number
-  /** Heading spring (Hz) and damping ratio. */
   turn: { frequency: number, damping: number }
-  /** Ride height spring (Hz) and damping ratio, on the planted legs. */
   ride: { frequency: number, damping: number }
-  /** Torso pitch spring (Hz), damping, and degrees of lean per m/s^2 of acceleration. */
   tilt: { frequency: number, damping: number, perAcceleration: number }
-  /** Wind drag on the body, per second. */
   drag: number
-  /** A foot steps when it is this far from its target, as a fraction of the stride. */
   trigger: number
 }
 export type WalkerOptions = {
@@ -37,9 +29,7 @@ export type WalkerOptions = {
 }
 export type Walker = {
   command: (command: Command) => void
-  /** An instant change of the body's velocity (m/s), as from a shove. */
   push: (impulse: Vec3) => void
-  /** Wind velocity felt by the body (m/s), read every substep. */
   wind: Vec3
   step: () => GaitFrame
 }
@@ -65,30 +55,14 @@ const FREEZE_TARGET = 0.7
 const REACH_LIMIT = 0.97
 const STAND_SPEED = 0.05
 
-function smoothstep (u: number): number {
-  const c = Math.min(1, Math.max(0, u))
-  return c * c * (3 - 2 * c)
+function facing (yaw: number): Vec3 {
+  return [Math.sin(yaw), 0, Math.cos(yaw)]
 }
 
 function turnBetween (a: number, b: number): number {
   return Math.atan2(Math.sin(b - a), Math.cos(b - a))
 }
 
-/** A body-local offset turned by yaw, as toWorld does. */
-function turned (v: Vec3, yaw: number): Vec3 {
-  const c = Math.cos(yaw)
-  const s = Math.sin(yaw)
-  return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
-}
-
-/**
- * A walking character as a physical body: it has mass and momentum, planted legs hold it up and push it toward the
- * commanded velocity (harder the more feet are down), it turns with a heading spring, its torso pitches with its
- * acceleration, and wind and shoves move it. Each foot aims under its hip plus half a stance of travel, and lifts
- * when it falls too far from that aim or its leg nears full reach, provided no other gait group is mid-swing (legs
- * with the same phase swing together). Each frame becomes a GaitFrame, so posing, IK and everything downstream work as
- * for planned walking. Deterministic.
- */
 export function createWalker (options: WalkerOptions, start: { position: Vec3, yaw: number }): Walker {
   const { rig, rest, mannequin, fps, substeps, tuning } = options
   const ground = options.ground ?? (() => 0)
@@ -114,7 +88,7 @@ export function createWalker (options: WalkerOptions, start: { position: Vec3, y
   const feet: Foot[] = legs.map((leg, k) => {
     const sole = rest[leg.ankle][1] - soleHeight(leg, rest, mannequin)
     const local = sub(rest[leg.ankle], [pelvis[0], 0, pelvis[2]])
-    const at = add([start.position[0], 0, start.position[2]], turned([local[0], 0, local[2]], start.yaw))
+    const at = add([start.position[0], 0, start.position[2]], rotateY([local[0], 0, local[2]], start.yaw))
     return {
       ankle: [at[0], ground(at[0], at[2]) + sole, at[2]],
       planted: true,
@@ -127,21 +101,19 @@ export function createWalker (options: WalkerOptions, start: { position: Vec3, y
     }
   })
 
-  const forward = (): Vec3 => [Math.sin(body.yaw), 0, Math.cos(body.yaw)]
   const horizontal = (v: Vec3): Vec3 => [v[0], 0, v[2]]
   const swingSeconds = (): number => {
     const speed = Math.max(length(horizontal(body.velocity)), STAND_SPEED)
     return Math.min(MAX_SWING_SECONDS, Math.max(MIN_SWING_SECONDS, SWING_FRACTION * stride / 2 / speed))
   }
   const stanceSeconds = (): number => swingSeconds() * rig.gait.stanceFraction / (1 - rig.gait.stanceFraction)
-  /** Where a foot wants to land: under its hip, plus half a stance of travel, on the ground. */
   const targetOf = (foot: Foot): Vec3 => {
-    const under = add(horizontal(body.position), turned([foot.restAnkle[0], 0, foot.restAnkle[2]], body.yaw))
+    const under = add(horizontal(body.position), rotateY([foot.restAnkle[0], 0, foot.restAnkle[2]], body.yaw))
     const lead = scale(horizontal(body.velocity), stanceSeconds() / 2)
     const at = add(under, lead)
     return [at[0], ground(at[0], at[2]) + foot.sole, at[2]]
   }
-  const hipOf = (foot: Foot): Vec3 => add(body.position, turned([foot.restHip[0], 0, foot.restHip[2]], body.yaw))
+  const hipOf = (foot: Foot): Vec3 => add(body.position, rotateY([foot.restHip[0], 0, foot.restHip[2]], body.yaw))
 
   const stepFeet = (): void => {
     for (const foot of feet) {
@@ -193,7 +165,7 @@ export function createWalker (options: WalkerOptions, start: { position: Vec3, y
     const planted = feet.filter(f => f.planted)
     const share = planted.length / feet.length
     const grip = planted.length === 0 ? 0 : Math.max(MIN_TRACTION, share)
-    const want = scale([Math.sin(command.heading), 0, Math.cos(command.heading)], command.speed)
+    const want = scale(facing(command.heading), command.speed)
     const error = sub(want, horizontal(body.velocity))
     const push = scale(error, tuning.speedGain)
     const limit = tuning.traction * grip
@@ -234,7 +206,7 @@ export function createWalker (options: WalkerOptions, start: { position: Vec3, y
     })
     const half = stride / 2
     const armSwings = feet.map(foot => {
-      const offset = turned(sub(foot.ankle, hipOf(foot)), -body.yaw)[2]
+      const offset = rotateY(sub(foot.ankle, hipOf(foot)), -body.yaw)[2]
       return rig.gait.armSwingDegrees * Math.max(-1, Math.min(1, offset / half))
     })
     const speed = length(horizontal(body.velocity))

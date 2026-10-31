@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import type { Scenario, SimMaterial } from '../src/formats/sim.ts'
+import type { Scenario } from '../src/formats/sim.ts'
 import type { Vec3 } from '../src/math/vec.ts'
 import { simulateCharacter } from '../src/motion/character.ts'
 import { recordLocomotion } from '../src/motion/metrics.ts'
@@ -9,11 +9,7 @@ import { toWorld } from '../src/sim/body.ts'
 import { frameHashes } from '../src/sim/metrics.ts'
 import { assertClose } from './helpers.ts'
 import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
-import { mannequin, rig } from './locomotion-fixtures.ts'
-
-const silk: SimMaterial = {
-  name: 'silk', particleMass: 0.01, stretchCompliance: 1e-6, bendCompliance: 1e-3, damping: 0.3, drag: 0.02
-}
+import { mannequin, rig, silk } from './locomotion-fixtures.ts'
 
 const scenario: Scenario = {
   name: 'walk',

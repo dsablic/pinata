@@ -1,7 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createRootTrack, rootAt, scriptDuration } from '../src/motion/script.ts'
-import type { Script } from '../src/motion/script.ts'
+import { createRootTrack, scriptDuration } from '../src/motion/script.ts'
+import type { RootState, Script } from '../src/motion/script.ts'
+
+function rootAt (script: Script, t: number): RootState {
+  return createRootTrack(script)(t)
+}
 
 test('a zero-length script stays at the origin', () => {
   const script: Script = { segments: [], accelSeconds: 0.5 }
@@ -24,12 +28,13 @@ test('moving at a constant speed without acceleration time covers speed times du
 test('easing the speed ends slightly short and keeps the velocity continuous', () => {
   const accelSeconds = 0.5
   const script: Script = { segments: [{ action: 'move', speed: 1, duration: 2 }], accelSeconds }
-  const z = rootAt(script, 2).position[2]
+  const track = createRootTrack(script)
+  const z = track(2).position[2]
   assert.ok(z < 2 && z > 1.7, `z = ${z}`)
   const limit = 1 * 0.001 / accelSeconds * 2
-  let previous = rootAt(script, 0).velocity[2]
+  let previous = track(0).velocity[2]
   for (let t = 0.001; t < 2; t += 0.001) {
-    const speed = rootAt(script, t).velocity[2]
+    const speed = track(t).velocity[2]
     assert.ok(Math.abs(speed - previous) <= limit, `jump at t = ${t}`)
     previous = speed
   }
@@ -64,14 +69,6 @@ test('the root stays at its final position after the script ends', () => {
   const script: Script = { segments: [{ action: 'move', speed: 1, duration: 1 }], accelSeconds: 0.2 }
   assert.deepEqual(rootAt(script, 1).position, rootAt(script, 10).position)
   assert.deepEqual(rootAt(script, 10).velocity, [0, 0, 0])
-})
-
-test('the same time gives identical results', () => {
-  const script: Script = {
-    segments: [{ action: 'move', speed: 1.2, duration: 1 }, { action: 'turn', degrees: 90, duration: 0.8 }],
-    accelSeconds: 0.3
-  }
-  assert.deepEqual(rootAt(script, 1.3), rootAt(script, 1.3))
 })
 
 test('zero acceleration time moves at exactly the requested speed', () => {
@@ -140,22 +137,6 @@ const mixed: Script = {
   accelSeconds: 0.4
 }
 
-test('createRootTrack matches rootAt at fixed times, including past the ends', () => {
-  const track = createRootTrack(mixed)
-  const times = [-1, 0, scriptDuration(mixed), scriptDuration(mixed) + 3]
-  for (let i = 1; i <= 200; i++) times.push(scriptDuration(mixed) * i / 201)
-  for (const t of times) {
-    const a = track(t)
-    const b = rootAt(mixed, t)
-    for (let i = 0; i < 3; i++) {
-      assert.ok(Math.abs(a.position[i] - b.position[i]) < 1e-6, `position at t = ${t}`)
-      assert.ok(Math.abs(a.velocity[i] - b.velocity[i]) < 1e-6, `velocity at t = ${t}`)
-    }
-    assert.ok(Math.abs(a.yaw - b.yaw) < 1e-6)
-    assert.ok(Math.abs(a.angularVelocity - b.angularVelocity) < 1e-6)
-  }
-})
-
 test('createRootTrack is a pure function of t', () => {
   const track = createRootTrack(mixed)
   const first = track(3.3)
@@ -163,8 +144,4 @@ test('createRootTrack is a pure function of t', () => {
   track(7)
   assert.deepEqual(track(3.3), first)
   assert.deepEqual(createRootTrack(mixed)(3.3), first)
-})
-
-test('createRootTrack handles an empty script', () => {
-  assert.deepEqual(createRootTrack({ segments: [], accelSeconds: 0.3 })(1).position, [0, 0, 0])
 })

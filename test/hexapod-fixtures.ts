@@ -1,5 +1,8 @@
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import type { Limb, Rig } from '../src/formats/rig.ts'
+import type { GaitFrame } from '../src/motion/gait.ts'
+import type { LocomotionRecording } from '../src/motion/metrics.ts'
+import { plan, record, walkTrack } from './locomotion-fixtures.ts'
 
 const LEGS = [
   { tag: 'LF', side: 'left', x: 0.1, z: 0.3, phase: 0 },
@@ -82,4 +85,30 @@ export const hexRig: Rig = {
     armSwingDegrees: 20,
     footSpacing: 0.2
   }
+}
+
+export const hexapod = { rig: hexRig, mannequin: hexMannequin }
+
+export const sideBySideRig: Rig = {
+  ...hexRig,
+  limbs: hexRig.limbs.map(limb => limb.kind === 'leg' ? { ...limb, phase: limb.side === 'left' ? 0 : 0.5 } : limb)
+}
+
+export function hexWalk (rig: Rig = hexRig): GaitFrame[] {
+  return plan({ rig, mannequin: hexMannequin }, walkTrack(0.5, 5), 7)
+}
+
+export function hexRecording (rig: Rig = hexRig): LocomotionRecording {
+  return record({ rig, mannequin: hexMannequin }, hexWalk(rig))
+}
+
+export function splayedHexMannequin (): Mannequin {
+  const joints = structuredClone(hexMannequin.joints)
+  for (const { tag, x, z } of LEGS) {
+    joints[`knee${tag}`] = [x * 1.5, 0.75, z]
+    joints[`hock${tag}`] = [x * 2.2, 0.4, z]
+    joints[`ankle${tag}`] = [x * 2.8, 0.03, z]
+    joints[`toe${tag}`] = [x * 2.8, 0.03, z + 0.08]
+  }
+  return { ...hexMannequin, joints }
 }

@@ -18,7 +18,6 @@ function distanceAtFlexion (upper: number, lower: number, degrees: number): numb
   return Math.sqrt(Math.max(0, upper * upper + lower * lower + 2 * upper * lower * Math.cos(degrees * DEGREES)))
 }
 
-/** Two bones with the knee flexion kept within `flexion` (degrees, positive toward the pole side, at least 0). */
 export function twoBoneIk (options: IkOptions): { knee: Vec3, end: Vec3, clamped: boolean } {
   const { hip, target, upper, lower, pole, flexion } = options
   const toTarget = sub(target, hip)
@@ -50,14 +49,6 @@ export type ChainIkOptions = {
 }
 type Plane = [number, number]
 
-/**
- * Places a chain of two or more bones with its first joint at `root` (default `joints[0]`) and its last joint at
- * `target`; `joints` supply the bone lengths. Two bones use `twoBoneIk`, with the knee flexion held within `limits`
- * when given. More bones use FABRIK in the plane through root, target and pole, started from a zigzag on the bend
- * sides, run for at most MAX_ITERATIONS and ending on a forward pass, so lengths are exact and flexion limits hold.
- * A bend of 1 bulges a joint toward the pole, -1 away from it; flexion is positive when a joint bends toward its bend
- * side. `missed` is the distance from the end to the target after the solve.
- */
 export function chainIk (options: ChainIkOptions): { joints: Vec3[], clamped: boolean, missed: number } {
   const { joints, target, pole } = options
   const root = options.root ?? joints[0]
@@ -114,7 +105,6 @@ function limitRanges (limits: FlexionLimits | FlexionLimits[] | undefined, count
 
 type Shape = { pole: Vec3, signs: number[], reach: number, total: number }
 
-/** The rest shape in the solution plane where its joints already bend to their sides, else a zigzag on the sides. */
 function startShape (joints: Vec3[], { pole, signs, reach, total }: Shape): Plane[] {
   const count = joints.length - 1
   const slack = Math.sqrt(Math.max(0, total * total - reach * reach))

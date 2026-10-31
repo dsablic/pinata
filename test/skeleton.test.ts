@@ -3,11 +3,10 @@ import assert from 'node:assert/strict'
 import { checkCapeAnchors, checkRig, validateRig } from '../src/formats/rig.ts'
 import type { AppendageLimb, Rig } from '../src/formats/rig.ts'
 import type { Mannequin } from '../src/formats/mannequin.ts'
-import { planGait } from '../src/motion/gait.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
 import { poseAt } from '../src/motion/locomotion.ts'
 import { restPose } from '../src/motion/pose.ts'
-import type { Scenario, SimMaterial } from '../src/formats/sim.ts'
+import type { Scenario } from '../src/formats/sim.ts'
 import { simulateCharacter } from '../src/motion/character.ts'
 import { poseSequence } from '../src/motion/sequence.ts'
 import { toWorld } from '../src/sim/body.ts'
@@ -18,11 +17,8 @@ import type { Vec3 } from '../src/math/vec.ts'
 import { createRootTrack } from '../src/motion/script.ts'
 import { assertClose } from './helpers.ts'
 import { hexMannequin, hexRig } from './hexapod-fixtures.ts'
-import { mannequin, rig, walkTrack } from './locomotion-fixtures.ts'
+import { FPS, mannequin, plan, rig, silk, walkTrack } from './locomotion-fixtures.ts'
 
-const FPS = 24
-
-/** The biped fixture with a tassel hanging from the left hand and a badge attached to the left forearm. */
 const tasselled: Mannequin = {
   ...mannequin,
   joints: {
@@ -39,7 +35,7 @@ const armed: Rig = { ...rig, limbs: [...rig.limbs, tassel], attached: { badge: '
 const rest = restPose(tasselled)
 
 function walk (r: Rig): GaitFrame[] {
-  return planGait({ track: walkTrack(1.2, 4), rig: r, rest, mannequin: tasselled, duration: 2, fps: FPS })
+  return plan({ rig: r, mannequin: tasselled }, walkTrack(1.2, 4), 2)
 }
 
 test('parents follow the rig: upperBody and limb roots under the pelvis, chains in order, attached and carried', () => {
@@ -125,9 +121,6 @@ test('a cloth chain pinned to a swinging hand turns with it', () => {
     particleRadius: 0.02,
     durationSeconds: 1.5
   }
-  const silk: SimMaterial = {
-    name: 'silk', particleMass: 0.01, stretchCompliance: 1e-6, bendCompliance: 1e-3, damping: 0.3, drag: 0.02
-  }
   const run = simulateCharacter({ mannequin: tasselled, rig: armed, scenario, materials: [silk] })
   const step: Vec3 = [0, -0.05, 0]
   let turned = 0
@@ -188,9 +181,7 @@ test('on a turning walk, joints attached to a soft tail stay on the segment that
   const script = { accelSeconds: 0.5, segments: [
     { action: 'move' as const, speed: 0.3, duration: 1.5 }, { action: 'turn' as const, degrees: 120, duration: 1.5 }
   ] }
-  const frames = planGait({
-    track: createRootTrack(script), rig: tailRig, rest: tailRest, mannequin: tailed, duration: 3, fps: FPS
-  })
+  const frames = plan({ rig: tailRig, mannequin: tailed }, createRootTrack(script), 3)
   const { poses } = poseSequence(frames, { rig: tailRig, rest: tailRest, mannequin: tailed, fps: FPS })
   let bent = 0
   poses.forEach(pose => {

@@ -1,14 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { armsOf, checkRig, legsOf, validateRig } from '../src/formats/rig.ts'
-import { validateMannequin } from '../src/formats/mannequin.ts'
+import { mannequinWithJoints, RIG_GAIT } from './formats-fixtures.ts'
 
 type Input = Record<string, any>
-
-const GAIT = {
-  strideLength: 1.4, referenceSpeed: 1.2, stanceFraction: 0.6, stepHeight: 0.1, bobAmplitude: 0.03,
-  armSwingDegrees: 25, footSpacing: 0.2
-}
 
 function leg (side: string, tag: string, count = 4, extra: Input = {}): Input {
   const names = ['hip', 'knee', 'hock', 'fetlock', 'pastern', 'toe']
@@ -17,7 +12,7 @@ function leg (side: string, tag: string, count = 4, extra: Input = {}): Input {
 }
 
 function limbsRig (limbs: Input[], extra: Input = {}): Input {
-  return { limbs, pelvis: 'pelvis', upperBody: ['chest'], gait: { ...GAIT }, ...extra }
+  return { limbs, pelvis: 'pelvis', upperBody: ['chest'], gait: { ...RIG_GAIT }, ...extra }
 }
 
 function errorsOf (input: unknown): Array<[string, string]> {
@@ -223,7 +218,7 @@ function legacy (): Input {
     arms: [{ side: 'left', shoulder: 'shL', elbow: 'elL', wrist: 'wrL', hand: 'haL', carried: ['sword'] }],
     pelvis: 'pelvis',
     upperBody: ['chest'],
-    gait: { ...GAIT }
+    gait: { ...RIG_GAIT }
   }
 }
 
@@ -286,14 +281,6 @@ test('legsOf takes the foot from the last two joints of a longer leg', () => {
   assert.deepEqual([first.hip, first.knee, first.ankle, first.toe], ['hipL', 'kneeL', 'fetlockL', 'toeL'])
 })
 
-function mannequinOf (names: string[]) {
-  const joints = Object.fromEntries(names.map((n, i) => [n, [i, 0, 0]]))
-  const parts = [{ name: 'p', shape: 'capsule', a: 'pelvis', b: 'chest', radiusA: 0.1, radiusB: 0.1, material: 'm' }]
-  const result = validateMannequin({ name: 'm', height: 2, joints, parts })
-  assert.deepEqual(result.errors, [])
-  return result.value!
-}
-
 const FIVE_JOINTS = (tag: string): string[] => ['hip', 'knee', 'hock', 'fetlock', 'toe'].map(n => `${n}${tag}`)
 
 test('checkRig counts every joint of every limb, carried joints and appendages included', () => {
@@ -307,8 +294,8 @@ test('checkRig counts every joint of every limb, carried joints and appendages i
     { kind: 'appendage', joints: ['t1', 't2', 't3'] }
   ])
   const rig = validateRig(input).value!
-  assert.deepEqual(checkRig(rig, mannequinOf(names)), [])
-  const missing = checkRig(rig, mannequinOf([...names, 'extra', 'fetlockX']))
+  assert.deepEqual(checkRig(rig, mannequinWithJoints(names)), [])
+  const missing = checkRig(rig, mannequinWithJoints([...names, 'extra', 'fetlockX']))
   assert.deepEqual(missing.map(e => e.path), ['upperBody'])
   assert.match(missing[0].message, /'extra', 'fetlockX'/)
 })
@@ -320,11 +307,11 @@ test('checkRig reports unknown, reused and zero-length limb joints with limb pat
     { kind: 'leg', joints: FIVE_JOINTS('R'), side: 'right' },
     { kind: 'appendage', joints: ['t1', 'kneeR'] }
   ])
-  const errors = checkRig(validateRig(input).value!, mannequinOf(names))
+  const errors = checkRig(validateRig(input).value!, mannequinWithJoints(names))
   assert.deepEqual(errors.slice(0, 2).map(e => e.path), ['limbs[0].joints[4]', 'limbs[2].joints[1]'])
   assert.match(errors[0].message, /unknown joint 'ghost'/)
   assert.match(errors[1].message, /already used by limbs\[1\]\.joints\[1\]/)
-  const flat = mannequinOf(names)
+  const flat = mannequinWithJoints(names)
   flat.joints.hockL = [...flat.joints.kneeL]
   const zero = checkRig(validateRig(limbsRig(twoLegsOf5())).value!, flat)
   assert.match(zero[0].message, /'kneeL' and 'hockL' of 'legL' are at the same position/)
@@ -340,12 +327,12 @@ function twoLegsOf5 (): Input[] {
 test('checkRig needs a leg and as many left legs as right legs', () => {
   const names = ['pelvis', 'chest', 'sh', 'el']
   const noLegs = limbsRig([{ kind: 'arm', joints: ['sh', 'el'], side: 'left' }])
-  const errors = checkRig(validateRig(noLegs).value!, mannequinOf(names))
+  const errors = checkRig(validateRig(noLegs).value!, mannequinWithJoints(names))
   assert.deepEqual(errors.map(e => e.path), ['limbs'])
   assert.match(errors[0].message, /at least one limb of kind 'leg'/)
   const lopsided = limbsRig(twoLegsOf5().map(l => ({ ...l, side: 'left' })))
   const all = ['pelvis', 'chest', ...FIVE_JOINTS('L'), ...FIVE_JOINTS('R')]
-  const sides = checkRig(validateRig(lopsided).value!, mannequinOf(all))
+  const sides = checkRig(validateRig(lopsided).value!, mannequinWithJoints(all))
   assert.deepEqual(sides.map(e => e.path), ['limbs'])
   assert.match(sides[0].message, /one left and one right leg; found 2 left and 0 right/)
 })

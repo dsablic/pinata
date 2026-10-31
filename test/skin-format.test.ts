@@ -32,6 +32,10 @@ const mannequin = {
   decals: []
 } as Mannequin
 
+function crossErrors (skin: unknown): ReturnType<typeof checkSkin> {
+  return checkSkin(validateSkin(skin).value as never, mannequin)
+}
+
 test('a valid skin passes and keeps its fields', () => {
   const { value, errors } = validateSkin(valid())
   assert.deepEqual(errors, [])
@@ -82,14 +86,13 @@ test('a hidden part needs no rows, a visible one does', () => {
 })
 
 test('checkSkin passes a complete skin', () => {
-  const { value } = validateSkin(valid())
-  assert.deepEqual(checkSkin(value as never, mannequin), [])
+  assert.deepEqual(crossErrors(valid()), [])
 })
 
 test('checkSkin names a missing part and suggests hidden', () => {
   const skin = valid() as { parts: Record<string, unknown> }
   delete skin.parts.head
-  const errors = checkSkin(validateSkin(skin).value as never, mannequin)
+  const errors = crossErrors(skin)
   assert.equal(errors.length, 1)
   assert.equal(errors[0].path, 'parts.head')
   assert.match(errors[0].message, /hidden/)
@@ -98,16 +101,16 @@ test('checkSkin names a missing part and suggests hidden', () => {
 test('checkSkin rejects a sprite for an unknown part', () => {
   const skin = valid() as { parts: Record<string, unknown> }
   skin.parts.wing = { rows: ['a'], pivotA: [0, 0] }
-  const errors = checkSkin(validateSkin(skin).value as never, mannequin)
+  const errors = crossErrors(skin)
   assert.deepEqual(errors.map(e => e.path), ['parts.wing'])
 })
 
 test('checkSkin needs pivotB to lie to the right of pivotA on the same row for two-joint parts', () => {
   const skin = valid()
   skin.parts.arm.pivotB = [1, 1]
-  const errors = checkSkin(validateSkin(skin).value as never, mannequin)
+  const errors = crossErrors(skin)
   assert.deepEqual(errors.map(e => e.path), ['parts.arm.pivotB'])
   const missing = valid() as { parts: Record<string, Record<string, unknown>> }
   delete missing.parts.arm.pivotB
-  assert.deepEqual(checkSkin(validateSkin(missing).value as never, mannequin).map(e => e.path), ['parts.arm.pivotB'])
+  assert.deepEqual(crossErrors(missing).map(e => e.path), ['parts.arm.pivotB'])
 })

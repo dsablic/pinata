@@ -1,8 +1,8 @@
 import { inflateSync } from 'node:zlib'
 import { createImage } from '../image.ts'
 import type { Image } from '../image.ts'
+import { PNG_SIGNATURE } from './encode.ts'
 
-const SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
 const CHANNELS: Record<number, number> = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 }
 
 type Header = { width: number, height: number, depth: number, colour: number, interlace: number }
@@ -16,7 +16,6 @@ function paeth (a: number, b: number, c: number): number {
   return pb <= pc ? b : c
 }
 
-/** Undoes the per-row filters; returns the raw samples, one row of `stride` bytes after another. */
 function unfilter (data: Buffer, header: Header): Uint8Array {
   const bits = CHANNELS[header.colour] * header.depth
   const stride = Math.ceil(header.width * bits / 8)
@@ -50,13 +49,9 @@ function sample (raw: Uint8Array, header: Header, x: number, y: number, channel:
   return (byte >> shift) & ((1 << header.depth) - 1)
 }
 
-/**
- * Decodes a non-interlaced PNG of any colour type and bit depth into an RGBA image, scaling samples to 8 bits and
- * applying tRNS transparency (palette alpha, or the transparent grey or RGB colour).
- */
 export function decodePng (bytes: Uint8Array): Image {
   const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-  if (!SIGNATURE.every((b, i) => buffer[i] === b)) throw new Error('not a PNG file')
+  if (!PNG_SIGNATURE.every((b, i) => buffer[i] === b)) throw new Error('not a PNG file')
   let header: Header | undefined
   let palette: Uint8Array = new Uint8Array(0)
   let alpha: Uint8Array = new Uint8Array(0)

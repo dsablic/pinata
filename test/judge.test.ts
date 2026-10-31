@@ -38,6 +38,10 @@ const spec: PanelSpec = {
   pairs: [{ id: 'ours', a: 'red', b: 'blue' }, { id: 'control', a: 'blue', b: 'green', control: true }]
 }
 
+function packetFor (panel: PanelSpec = spec): ReturnType<typeof buildPacket> {
+  return buildPacket(panel, name => IMAGES[name])
+}
+
 function colourOn (image: Image, side: 'left' | 'right'): number {
   const x0 = side === 'left' ? 0 : Math.floor(image.width / 2)
   for (let y = 0; y < image.height; y++) {
@@ -50,7 +54,7 @@ function colourOn (image: Image, side: 'left' | 'right'): number {
 }
 
 test('a packet shows every pair in both orders under neutral names, and the key says where a is', () => {
-  const packet = buildPacket(spec, name => IMAGES[name])
+  const packet = packetFor()
   assert.deepEqual(Object.keys(packet.images), ['item-01.png', 'item-02.png', 'item-03.png', 'item-04.png'])
   const sides = Object.values(packet.key.items).map(e => `${e.pair}/${e.aSide}`).sort()
   assert.deepEqual(sides, ['control/left', 'control/right', 'ours/left', 'ours/right'])
@@ -61,8 +65,8 @@ test('a packet shows every pair in both orders under neutral names, and the key 
   }
   assert.match(packet.questions, /Which looks more hand-made\?/)
   assert.doesNotMatch(packet.questions, /ours|control|red|blue/)
-  assert.notDeepEqual(buildPacket({ ...spec, seed: 'two' }, name => IMAGES[name]).key, packet.key)
-  assert.deepEqual(buildPacket(spec, name => IMAGES[name]).key, packet.key)
+  assert.notDeepEqual(packetFor({ ...spec, seed: 'two' }).key, packet.key)
+  assert.deepEqual(packetFor().key, packet.key)
 })
 
 test('pair images are trimmed, stand on one baseline and sit in equal cells', () => {
@@ -83,12 +87,12 @@ test('the spec needs a control pair and unique ids', () => {
 })
 
 function answersFor (pick: (pair: string, aSide: 'left' | 'right') => Answer['choice']): JudgeAnswers {
-  const { key } = buildPacket(spec, name => IMAGES[name])
+  const { key } = packetFor()
   return Object.fromEntries(Object.entries(key.items).map(([item, e]) => [item, { choice: pick(e.pair, e.aSide) }]))
 }
 
 test('scoring resolves left and right back to a and b and measures position bias and controls', () => {
-  const { key } = buildPacket(spec, name => IMAGES[name])
+  const { key } = packetFor()
   const faithful = answersFor((pair, aSide) => pair === 'ours' ? aSide : 'cant_tell')
   const leftie = answersFor(() => 'left')
   const score = scorePanel(key, [faithful, faithful, leftie])
@@ -101,7 +105,7 @@ test('scoring resolves left and right back to a and b and measures position bias
 })
 
 test('judges who each separate a control, in opposite directions, do not count as neutral', () => {
-  const { key } = buildPacket(spec, name => IMAGES[name])
+  const { key } = packetFor()
   const forA = answersFor((pair, aSide) => pair === 'control' ? aSide : 'cant_tell')
   const forB = answersFor((pair, aSide) => pair === 'control' ? (aSide === 'left' ? 'right' : 'left') : 'cant_tell')
   const score = scorePanel(key, [forA, forB])
@@ -114,7 +118,7 @@ test('judges who each separate a control, in opposite directions, do not count a
 
 test('ratings are checked and averaged per side', () => {
   const rated = { ...spec, rating: 'Rate each 1-5.' }
-  const { key } = buildPacket(rated, name => IMAGES[name])
+  const { key } = packetFor(rated)
   assert.equal(key.rating, true)
   const items = Object.keys(key.items)
   const unrated = Object.fromEntries(items.map(item => [item, { choice: 'cant_tell' }]))
@@ -131,7 +135,7 @@ test('ratings are checked and averaged per side', () => {
 })
 
 test('answerProblems lists missing, malformed and unknown items', () => {
-  const { key } = buildPacket(spec, name => IMAGES[name])
+  const { key } = packetFor()
   const problems = answerProblems({ 'item-01': { choice: 'maybe' }, 'item-09': { choice: 'left' } }, key)
   assert.deepEqual(problems, [
     'item-01: expected { "choice": "left" | "right" | "cant_tell" }',

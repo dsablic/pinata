@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { serve } from './serve.ts'
+import { ROOT } from './paths.ts'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
 const SITE = join(ROOT, '_site')
 const TEST_PAGE = 'page-test.html'
 const PORT = 8791

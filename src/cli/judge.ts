@@ -19,8 +19,7 @@ function readJson (path: string): unknown {
 const CASE_INSENSITIVE = process.platform === 'darwin' || process.platform === 'win32'
 const PACKET_FILE = /^(item-\d+\.png|questions\.md)$/
 
-/** Whether the file at `path` would land inside `dir`, after following symlinks (both folders must exist). */
-function isInside (path: string, dir: string): boolean {
+function wouldLandInside (path: string, dir: string): boolean {
   const fold = (p: string): string => CASE_INSENSITIVE ? p.toLowerCase() : p
   const rel = relative(fold(realpathSync(dir)), fold(join(realpathSync(dirname(path)), basename(path))))
   return rel === '' || !(rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel))
@@ -30,7 +29,7 @@ function build (specPath: string, packetDir: string, keyPath: string): number {
   const [spec, packet, key] = [specPath, packetDir, keyPath].map(p => resolve(p))
   mkdirSync(packet, { recursive: true })
   mkdirSync(dirname(key), { recursive: true })
-  if (isInside(key, packet)) {
+  if (wouldLandInside(key, packet)) {
     console.error(`the key '${key}' must not be inside the packet folder '${packet}': judges would see it`)
     return 2
   }

@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { writeOutput } from '../diagnostics/report.ts'
+import { ROOT } from './paths.ts'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
 const OUT = resolve(process.argv[2] ?? join(ROOT, '_site'))
 
 function commit (): string {
@@ -14,10 +14,6 @@ function commit (): string {
   }
 }
 
-/**
- * The world config with every cast member's mannequin, style and rig, and the motion capture of the members that have
- * a retarget.json, as one file for the browser.
- */
 function worldBundle (examples: string): unknown {
   const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
   const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
@@ -41,10 +37,6 @@ function worldBundle (examples: string): unknown {
   return { config, cast, capture: { clips, base: read(join(ROOT, 'motion', 'humanoid.json')), members } }
 }
 
-/**
- * Assembles the showcase: the pages, the compiled browser code (npm run build:web first), the world bundle, and one
- * live artifact for every example that has a behaviours.json.
- */
 function main (): number {
   const web = join(ROOT, 'dist', 'web')
   if (!existsSync(join(web, 'runtime', 'showcase.js'))) {

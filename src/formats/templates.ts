@@ -94,10 +94,6 @@ export function applyGaitDefaults (name: TemplateName, gait: TemplateGait): void
   gait.lateral ??= defaults.lateral
 }
 
-/**
- * Fills the phase and bend a leg leaves out. A leg's position counts the legs of its side behind it by rest hip z
- * (hind first): a left leg gets phase position * phaseStep, a right leg half a cycle later. Explicit values win.
- */
 export function applyLegDefaults (name: TemplateName, limbs: Limb[], hipZ: (leg: LegLimb) => number): void {
   const defaults = TEMPLATES[name]
   for (const side of ['left', 'right']) {

@@ -1,7 +1,7 @@
 import { length, sub } from '../math/vec.ts'
 import type { Mannequin } from './mannequin.ts'
 import type { Cape } from './sim.ts'
-import { legsOf, translateLegacy, validateLegPhase, validateLimbList } from './limbs.ts'
+import { isSide, legsOf, translateLegacy, validateCarried, validateLegPhase, validateLimbList } from './limbs.ts'
 import type { Bend, Leg, Limb, Side } from './limbs.ts'
 import { applyGaitDefaults, applyLegDefaults, isTemplateName, TEMPLATE_NAMES } from './templates.ts'
 import type { TemplateName } from './templates.ts'
@@ -32,7 +32,6 @@ export type Rig = {
   legacy?: LegacyRef[]
   pelvis: string
   upperBody: string[]
-  /** Joints that move rigidly with another joint, by name: { joint: parent }. */
   attached?: Record<string, string>
   gait: Gait
 }
@@ -68,8 +67,6 @@ export function stride (gait: Gait, speed: number): number {
   return gait.strideLength * Math.min(1.5, Math.max(0.5, ratio))
 }
 
-
-/** Gait cycle offset of every leg: the leg's `phase`, else 0 for a left and 0.5 for a right leg. */
 export function legPhases (rig: Rig): number[] {
   return legsOf(rig).map(leg => leg.phase ?? (leg.side === 'left' ? 0 : 0.5))
 }
@@ -106,10 +103,6 @@ export function validateRig (input: unknown): Validated<Rig> {
   return { value: rig, errors }
 }
 
-/**
- * Fills each leg's phase and bend from the rig's template, ordering the legs of a side by the rest hip z of the
- * mannequin so the order of the file does not matter. A rig without a template is returned unchanged.
- */
 export function resolveRig (rig: Rig, mannequin: Pick<Mannequin, 'joints'>): Rig {
   if (rig.template === undefined) return rig
   const limbs = structuredClone(rig.limbs)
@@ -179,17 +172,14 @@ function validateLegacy (
       return
     }
     checkKnownKeys(limb, fields, here, errors)
-    if (limb.side !== 'left' && limb.side !== 'right') {
+    if (!isSide(limb.side)) {
       errors.push({ path: `${here}.side`, message: "expected 'left' or 'right'" })
     }
     if (path === 'legs') validateLegacyLeg(limb, here, value.length, hasTemplate, errors)
     for (const field of fields.filter(f => !NON_JOINT_FIELDS.has(f))) {
       if (!isNonEmptyString(limb[field])) errors.push({ path: `${here}.${field}`, message: 'expected a joint name' })
     }
-    if (fields.includes('carried') && limb.carried !== undefined) {
-      const ok = Array.isArray(limb.carried) && limb.carried.every(isNonEmptyString)
-      if (!ok) errors.push({ path: `${here}.carried`, message: 'expected an array of joint names' })
-    }
+    if (fields.includes('carried')) validateCarried(limb, here, errors)
   })
 }
 
@@ -231,7 +221,6 @@ function validateGait (gait: unknown, hasTemplate: boolean, errors: ValidationEr
 
 const LEGACY_FIELDS = { legs: LEG_JOINTS, arms: ARM_JOINTS }
 
-/** The path of a limb in the file the rig was written in: `legs[1]` for a legs and arms rig, else `limbs[1]`. */
 export function limbPath (rig: Rig, index: number): string {
   const ref = rig.legacy?.[index]
   return ref === undefined ? `limbs[${index}]` : `${ref.list}[${ref.index}]`
@@ -334,7 +323,6 @@ function checkLegs (rig: Rig): ValidationError[] {
   return errors
 }
 
-/** The smallest stanceFraction with which some foot is always planted: 1 minus the widest gap between leg phases. */
 export function minimumStance (rig: Rig): number {
   const phases = legPhases(rig).sort((a, b) => a - b)
   const widest = Math.max(...phases.map((p, i) => (phases[(i + 1) % phases.length] - p + 1) % 1 || 1))

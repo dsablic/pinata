@@ -1,6 +1,6 @@
 import type { Vec3 } from '../math/vec.ts'
 import {
-  checkKnownKeys, copyKnownKeys, isDirection, isFiniteNumber, isNonEmptyString, isPositive, isRecord
+  checkKnownKeys, copyKnownKeys, isDirection, isFiniteNumber, isHexColour, isNonEmptyString, isPositive, isRecord
 } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
@@ -22,12 +22,6 @@ const KNOWN_FIELDS = [
   'name', 'light', 'bands', 'outline', 'outlineMode', 'innerLineDepth', 'decalMinFacing', 'materials', 'decalColors'
 ] as const
 
-const HEX = /^#[0-9a-fA-F]{6}$/
-
-function isHex (v: unknown): v is string {
-  return typeof v === 'string' && HEX.test(v)
-}
-
 export function validateStyle (input: unknown): Validated<Style> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
   const errors: ValidationError[] = []
@@ -40,7 +34,7 @@ export function validateStyle (input: unknown): Validated<Style> {
   if (bands === undefined || bands.some((t, i) => t < -1 || t > 1 || (i > 0 && t <= bands[i - 1]))) {
     errors.push({ path: 'bands', message: 'expected strictly ascending numbers between -1 and 1' })
   }
-  if (!isHex(input.outline)) errors.push({ path: 'outline', message: 'expected a colour like #1b1421' })
+  if (!isHexColour(input.outline)) errors.push({ path: 'outline', message: 'expected a colour like #1b1421' })
   if (input.outlineMode !== undefined && input.outlineMode !== 'uniform' && input.outlineMode !== 'selective') {
     errors.push({ path: 'outlineMode', message: "expected 'uniform' or 'selective'; omit it for 'uniform'" })
   }
@@ -63,7 +57,7 @@ function validateMaterials (materials: unknown, bands: number[] | undefined, err
   }
   for (const [name, ramp] of Object.entries(materials)) {
     const path = `materials.${name}`
-    if (!Array.isArray(ramp) || !ramp.every(isHex)) {
+    if (!Array.isArray(ramp) || !ramp.every(isHexColour)) {
       errors.push({ path, message: 'expected an array of colours like #1b1421, darkest first' })
     } else if (bands !== undefined && ramp.length !== bands.length + 1) {
       errors.push({
@@ -82,7 +76,7 @@ function validateDecalColors (decalColors: unknown, errors: ValidationError[]): 
   for (const [ch, colour] of Object.entries(decalColors)) {
     if (ch.length !== 1 || ch === '.') {
       errors.push({ path: `decalColors.${ch}`, message: "keys must be single characters other than '.'" })
-    } else if (!isHex(colour)) {
+    } else if (!isHexColour(colour)) {
       errors.push({ path: `decalColors.${ch}`, message: 'expected a colour like #1b1421' })
     }
   }

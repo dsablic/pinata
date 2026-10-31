@@ -21,6 +21,18 @@ export function isPositive (v: unknown): v is number {
   return isFiniteNumber(v) && v > 0
 }
 
+export function isHexColour (v: unknown): v is string {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v)
+}
+
+export function childPath (path: string, key: string): string {
+  return path === '' ? key : `${path}.${key}`
+}
+
+export function displayPath (path: string): string {
+  return path === '' ? '(root)' : path
+}
+
 export function isVec3 (v: unknown): v is Vec3 {
   return Array.isArray(v) && v.length === 3 && v.every(isFiniteNumber)
 }
@@ -40,7 +52,7 @@ export function checkKnownKeys (
   for (const key of Object.keys(record)) {
     if (known.includes(key)) continue
     errors.push({
-      path: path === '' ? key : `${path}.${key}`,
+      path: childPath(path, key),
       message: `unknown field '${key}'; known fields: ${known.join(', ')}`
     })
   }
@@ -52,5 +64,5 @@ export function copyKnownKeys<T> (record: Record<string, unknown>, known: readon
 }
 
 export function formatErrors (file: string, errors: ValidationError[]): string {
-  return errors.map(e => `${file}: ${e.path === '' ? '(root)' : e.path}: ${e.message}`).join('\n')
+  return errors.map(e => `${file}: ${displayPath(e.path)}: ${e.message}`).join('\n')
 }

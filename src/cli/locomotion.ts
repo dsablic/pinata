@@ -10,6 +10,7 @@ import { armLabels, bendingJoints, chainLength, footRadii, legLabels, restPose }
 import type { JointTriple, Pose } from '../motion/pose.ts'
 import type { CharacterRun } from '../motion/character.ts'
 import type { Check } from './summary.ts'
+import { firstWorstFrame, frameTime } from './frames.ts'
 
 const PIXEL_HEIGHT = 48
 const PLANT_METRES = 0.02
@@ -41,23 +42,6 @@ export function walkingWindows (character: Character): SteadySegment[] {
   return metrics.steadySegments(character.scenario.script).filter(s => s.speed > 0)
 }
 
-function upTo (recording: LocomotionRecording, frame: number): LocomotionRecording {
-  return { fps: recording.fps, frames: recording.frames.slice(Math.max(0, frame - 1), frame + 1) }
-}
-
-function firstWorstFrame (recording: LocomotionRecording, measure: (r: LocomotionRecording) => number): number {
-  let best = 0
-  let bestValue = -Infinity
-  recording.frames.forEach((_, i) => {
-    const value = measure(upTo(recording, i))
-    if (value > bestValue) {
-      best = i
-      bestValue = value
-    }
-  })
-  return best
-}
-
 function legGeometry (character: Character, leg: Leg): Geometry {
   const { rig, mannequin } = character
   return { rig: withLimbs(rig, rig.limbs.filter(l => l.kind !== 'leg' || l === leg.limb)), mannequin }
@@ -81,7 +65,7 @@ function worstLeg (ctx: Context, measure: Measure, limb: Limb = 'foot'): Worst {
 }
 
 function at (ctx: Context, frame: number): string {
-  return `frame ${frame} (t = ${(frame / ctx.recording.fps).toFixed(2)} s)`
+  return frameTime(frame, ctx.recording.fps)
 }
 
 function legLength (character: Character, leg: Leg): number {
@@ -249,7 +233,6 @@ function stanceFloor (ctx: Context): string {
   return floor > 0.5 ? `${floor.toFixed(2)} with these leg phases` : '0.5'
 }
 
-/** ' or footSpacing (now x)' when the feet land by footSpacing, else '' (lateral 'rest' ignores it). */
 function spacingOption (ctx: Context, before: string): string {
   const { gait } = ctx.character.rig
   return gait.lateral === 'rest' ? '' : `${before}footSpacing (now ${gait.footSpacing})`
@@ -268,7 +251,6 @@ function kneeSpeedHint (ctx: Context): string {
     'reliably help.'
 }
 
-/** Advice to bend a joint more at rest when it is nearly straight there, or '' when it is bent enough. */
 function restBendAdvice (ctx: Context, leg: Leg, joint: string): string {
   const triple = bendingJoints(leg).find(([, b]) => b === joint)
   if (triple === undefined) return ''

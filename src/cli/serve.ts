@@ -7,7 +7,6 @@ const TYPES: Record<string, string> = {
   '.png': 'image/png', '.svg': 'image/svg+xml'
 }
 
-/** Serves a folder on localhost for manual viewing and browser tests; prints the URL. */
 export function serve (folder: string, port: number): ReturnType<typeof createServer> {
   const root = resolve(folder)
   const server = createServer((request, response) => {

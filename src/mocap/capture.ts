@@ -10,10 +10,6 @@ import type { MotionDatabase } from './database.ts'
 import { mergeRetargeting, validateRetargeting } from './retarget.ts'
 import { validateStyle } from './style.ts'
 
-/**
- * Motion capture for a set of characters, as written: the clips, the retargeting every character shares, and per
- * character its own (`hang`, and an optional `style`). A character without its own entry does not use capture.
- */
 export type CaptureData = { clips: unknown[], base: unknown, members: Record<string, unknown> }
 
 export function readClips (clips: unknown[], errors: ValidationError[], path: string): Clip[] {
@@ -26,10 +22,6 @@ export function readClips (clips: unknown[], errors: ValidationError[], path: st
   return read
 }
 
-/**
- * A character's motion database from its retargeting (the shared one with its own merged over it) and style,
- * checked against its rig and the clips; undefined, with errors, when they do not fit.
- */
 export function captureFor (
   character: { rig: Rig, mannequin: Mannequin },
   clips: Clip[],

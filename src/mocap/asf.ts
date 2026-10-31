@@ -9,21 +9,16 @@ const AXES = ['rx', 'ry', 'rz'] as const
 
 type Axis = typeof AXES[number]
 
-/** A bone of an ASF skeleton, in metres and radians; direction is its unit rest direction in the global frame. */
 export type AsfBone = {
   name: string
   parent: string
   direction: Vec3
   length: number
-  /** The bone's local axes (C in the ASF convention); motion rotates about them. */
   axis: Matrix
   dof: Axis[]
 }
-/** An ASF skeleton: the root, then every bone with its parent before it. */
 export type AsfSkeleton = { bones: AsfBone[], metresPerUnit: number }
-/** One AMC frame: the root's position and rotation channels, then each bone's channels in its dof order. */
 export type AmcFrame = Record<string, number[]>
-/** A posed skeleton: every bone's global rotation from its rest pose, and where it starts and ends, in metres. */
 export type AsfPose = Record<string, { rotation: Matrix, start: Vec3, end: Vec3 }>
 
 function sections (text: string): Map<string, string[]> {
@@ -45,54 +40,71 @@ function numbers (line: string): number[] {
   return line.split(/\s+/).slice(1).map(Number)
 }
 
-/** Reads an ASF skeleton file: units, bone data and hierarchy. Lengths become metres and angles radians. */
-export function parseAsf (text: string): AsfSkeleton {
-  const parts = sections(text)
-  const units = parts.get('units') ?? []
+function metresPerUnitOf (units: string[]): number {
   const lengthUnit = Number(units.find(line => line.startsWith('length'))?.split(/\s+/)[1] ?? 1)
   const angle = units.find(line => line.startsWith('angle'))?.split(/\s+/)[1] ?? 'deg'
   if (angle !== 'deg') throw new Error(`ASF angles in '${angle}' are not supported; expected deg`)
-  const metresPerUnit = INCH / lengthUnit
-  const rootData = new Map((parts.get('root') ?? []).map(line => {
+  return INCH / lengthUnit
+}
+
+const SUPPORTED_ROOT: Array<[string, string]> = [
+  ['order', 'TX TY TZ RX RY RZ'], ['axis', 'XYZ'], ['orientation', '0 0 0']
+]
+
+function checkRoot (lines: string[]): void {
+  const rootData = new Map(lines.map(line => {
     const [key, ...rest] = line.split(/\s+/)
     return [key, rest.join(' ')]
   }))
-  const expected: Array<[string, string]> = [['order', 'TX TY TZ RX RY RZ'], ['axis', 'XYZ'], ['orientation', '0 0 0']]
-  for (const [key, value] of expected) {
+  for (const [key, value] of SUPPORTED_ROOT) {
     const found = rootData.get(key)
     const normal = found?.split(/\s+/).map(v => key === 'orientation' ? String(Number(v)) : v).join(' ')
     if (found !== undefined && normal !== value) {
       throw new Error(`ASF root ${key} '${found}' is not supported; expected '${value}'`)
     }
   }
+}
+
+function parentsFrom (hierarchy: string[]): Map<string, string> {
   const parents = new Map<string, string>()
-  for (const line of parts.get('hierarchy') ?? []) {
+  for (const line of hierarchy) {
     if (line === 'begin' || line === 'end') continue
     const [parent, ...children] = line.split(/\s+/)
     for (const child of children) parents.set(child, parent)
   }
+  return parents
+}
+
+function boneFrom (bone: Record<string, string>, metresPerUnit: number): Omit<AsfBone, 'parent'> {
+  const direction = normalize(numbers(`d ${bone.direction}`) as Vec3)
+  const [x, y, z] = numbers(`a ${bone.axis}`)
+  const order = bone.axis.split(/\s+/)[3]
+  if (order !== 'XYZ') throw new Error(`bone '${bone.name}': axis order ${order} is not supported; expected XYZ`)
+  const dof = (bone.dof ?? '').split(/\s+/).filter((d): d is Axis => (AXES as readonly string[]).includes(d))
+  return {
+    name: bone.name,
+    direction,
+    length: Number(bone.length) * metresPerUnit,
+    axis: eulerXyz(x * DEGREES, y * DEGREES, z * DEGREES),
+    dof
+  }
+}
+
+function boneData (lines: string[], metresPerUnit: number): Map<string, Omit<AsfBone, 'parent'>> {
   const data = new Map<string, Omit<AsfBone, 'parent'>>()
   let bone: Record<string, string> = {}
-  for (const line of parts.get('bonedata') ?? []) {
+  for (const line of lines) {
     if (line === 'begin') bone = {}
-    else if (line === 'end') {
-      const direction = normalize(numbers(`d ${bone.direction}`) as Vec3)
-      const [x, y, z] = numbers(`a ${bone.axis}`)
-      const order = bone.axis.split(/\s+/)[3]
-      if (order !== 'XYZ') throw new Error(`bone '${bone.name}': axis order ${order} is not supported; expected XYZ`)
-      const dof = (bone.dof ?? '').split(/\s+/).filter((d): d is Axis => (AXES as readonly string[]).includes(d))
-      data.set(bone.name, {
-        name: bone.name,
-        direction,
-        length: Number(bone.length) * metresPerUnit,
-        axis: eulerXyz(x * DEGREES, y * DEGREES, z * DEGREES),
-        dof
-      })
-    } else {
+    else if (line === 'end') data.set(bone.name, boneFrom(bone, metresPerUnit))
+    else {
       const [key, ...rest] = line.split(/\s+/)
       if (key !== 'limits' && !line.startsWith('(')) bone[key] = rest.join(' ')
     }
   }
+  return data
+}
+
+function parentsFirst (parents: Map<string, string>, data: Map<string, Omit<AsfBone, 'parent'>>): AsfBone[] {
   const root: AsfBone = { name: 'root', parent: '', direction: [0, 0, 0], length: 0, axis: IDENTITY, dof: [] }
   const bones: AsfBone[] = [root]
   const visit = (name: string): void => {
@@ -105,10 +117,18 @@ export function parseAsf (text: string): AsfSkeleton {
     }
   }
   visit('root')
-  return { bones, metresPerUnit }
+  return bones
 }
 
-/** Reads an AMC motion file: one frame per numbered block, each bone's channel values in file order. */
+export function parseAsf (text: string): AsfSkeleton {
+  const parts = sections(text)
+  const metresPerUnit = metresPerUnitOf(parts.get('units') ?? [])
+  checkRoot(parts.get('root') ?? [])
+  const parents = parentsFrom(parts.get('hierarchy') ?? [])
+  const data = boneData(parts.get('bonedata') ?? [], metresPerUnit)
+  return { bones: parentsFirst(parents, data), metresPerUnit }
+}
+
 export function parseAmc (text: string): AmcFrame[] {
   const frames: AmcFrame[] = []
   for (const raw of text.split(/\r?\n/)) {
@@ -126,11 +146,6 @@ export function parseAmc (text: string): AmcFrame[] {
   return frames
 }
 
-/**
- * Forward kinematics of one AMC frame: each bone's global rotation is its parent's times C · M · C⁻¹, where M
- * turns by the frame's channels in the bone's dof order (missing channels are zero), and the bone runs from its
- * parent's end along its rest direction turned by that rotation. The root's channels are TX TY TZ RX RY RZ.
- */
 export function posed (skeleton: AsfSkeleton, frame: AmcFrame): AsfPose {
   const pose: AsfPose = {}
   const root = frame.root ?? [0, 0, 0, 0, 0, 0]

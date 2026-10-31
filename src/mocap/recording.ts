@@ -4,7 +4,6 @@ import type { Pose } from '../motion/pose.ts'
 import { toWorld } from '../sim/body.ts'
 import type { RetargetedFrame, RetargetOptions } from './retarget.ts'
 
-/** A retargeted clip as a locomotion recording, so the locomotion metrics and strips apply to it. */
 export function retargetedRecording (
   frames: RetargetedFrame[],
   options: RetargetOptions & { fps: number }

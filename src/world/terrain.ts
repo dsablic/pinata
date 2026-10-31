@@ -1,27 +1,17 @@
-/**
- * A side-on walking surface: a profile of flat runs at different heights joined by ramps and stairs, along the x
- * axis. Heights are in metres; the walking direction is x, depth (z) does not change the height.
- */
 export type Span =
   | { kind: 'flat', from: number, to: number, height: number }
   | { kind: 'ramp', from: number, to: number, start: number, end: number }
   | { kind: 'stairs', from: number, to: number, start: number, end: number, steps: number }
 export type Terrain = { spans: Span[], from: number, to: number, ground: (x: number, z: number) => number }
 export type TerrainOptions = {
-  /** Length of the course, metres. */
   length: number
-  /** Highest stair rise and steepest ramp the characters can manage. */
   maxRise: number
   maxSlopeDegrees: number
-  /** Range of heights for flat runs. */
   maxHeight: number
-  /** Shortest stair tread: at least the longest foot on the course, so a foot fits on one tread. */
   minTread?: number
-  /** Heights of flat runs come in multiples of this (default half the largest rise). */
   heightStep?: number
 }
 
-/** A small, fast, seeded random generator (mulberry32): the same seed gives the same sequence everywhere. */
 export function random (seed: number): () => number {
   let a = seed >>> 0
   return () => {
@@ -44,7 +34,6 @@ function heightIn (span: Span, x: number): number {
   return span.start + rise * (step + 1)
 }
 
-/** A terrain from explicit spans, which must be contiguous along x, each running forward with a positive length. */
 export function terrainOf (spans: Span[]): Terrain {
   if (spans.length === 0) throw new Error('a terrain needs at least one span')
   spans.forEach((span, i) => {
@@ -76,15 +65,8 @@ export function terrainOf (spans: Span[]): Terrain {
 const MIN_FLAT = 1.2
 const MAX_FLAT = 3.5
 const MIN_TREAD = 0.28
-/** Longest flight of stairs; bigger height changes become ramps where ramps are allowed. */
 const MAX_FLIGHT = 6
 
-/**
- * A random course: flat runs at heights in [0, maxHeight] (whole multiples of heightStep), each joined to
- * the next by a ramp no steeper than maxSlopeDegrees or a flight of stairs whose rises do not exceed maxRise and whose
- * treads are at least minTread (default 0.28 m); flights longer than six steps become ramps. With no room for two
- * heights it is one flat run; with no slope allowed, transitions are stairs.
- */
 export function generateTerrain (seed: number, options: TerrainOptions): Terrain {
   const next = random(seed)
   const spans: Span[] = []

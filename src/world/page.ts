@@ -1,4 +1,4 @@
-import { readWorldBundle } from './bundle.ts'
+import { fetchWorldBundle } from './bundle.ts'
 import type { ReadWorld } from './bundle.ts'
 import type { Palette } from './config.ts'
 import { createWorldView } from './render.ts'
@@ -33,7 +33,6 @@ let running: Running | undefined
 let last: WorldFrame | undefined
 const times: number[] = []
 
-/** Builds a world from the controls: the seed, how many of the cast, and the render samples. */
 function build (): void {
   if (data === undefined) return
   const seed = Number(byId<HTMLInputElement>('seed').value) || 1
@@ -97,17 +96,12 @@ function loop (now: number): void {
   requestAnimationFrame(loop)
 }
 
-canvas.addEventListener('click', event => {
-  if (running === undefined || last === undefined) return
-  const box = canvas.getBoundingClientRect()
-  const x = (event.clientX - box.left) * canvas.width / box.width
-  const y = (event.clientY - box.top) * canvas.height / box.height
+function actorWithJointNear (frame: WorldFrame, view: Running, x: number, y: number): number {
   let best = -1
   let bestDistance = POKE_RADIUS_PX
-  // the actor with a joint nearest the click: the root sits at height 0, below the feet on a hill
-  last.actors.forEach((actor, i) => {
+  frame.actors.forEach((actor, i) => {
     for (const joint of Object.values(actor.joints)) {
-      const [px, py] = running!.screen(joint)
+      const [px, py] = view.screen(joint)
       const distance = Math.hypot(px - x, py - y)
       if (distance < bestDistance) {
         best = i
@@ -115,13 +109,21 @@ canvas.addEventListener('click', event => {
       }
     }
   })
+  return best
+}
+
+canvas.addEventListener('click', event => {
+  if (running === undefined || last === undefined) return
+  const box = canvas.getBoundingClientRect()
+  const x = (event.clientX - box.left) * canvas.width / box.width
+  const y = (event.clientY - box.top) * canvas.height / box.height
+  const best = actorWithJointNear(last, running, x, y)
   if (best < 0) return
   const poked = last.actors[best].root.position
   const side = x < running.screen(poked)[0] ? -1 : 1
   running.world.poke(best, poked[0] + side * 0.5)
 })
 
-/** Copies the environment sliders into the running world; cloth reads them every frame. */
 function weather (world: World): void {
   world.environment.wind.speed = Math.abs(Number(byId<HTMLInputElement>('wind').value))
   world.environment.wind.direction = [Math.sign(Number(byId<HTMLInputElement>('wind').value)) || 1, 0, 0]
@@ -167,9 +169,7 @@ window.setInterval(() => {
 }, 500)
 
 void (async () => {
-  const read = readWorldBundle(await (await fetch('world.bundle.json')).json())
-  if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
-  data = read.value
+  data = await fetchWorldBundle('world.bundle.json')
   const scene = byId<HTMLSelectElement>('scene')
   scene.replaceChildren(...Object.keys(data.config.scenes).map(name => {
     const option = document.createElement('option')

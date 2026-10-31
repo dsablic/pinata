@@ -1,4 +1,4 @@
-import { readWorldBundle } from '../world/bundle.ts'
+import { fetchWorldBundle } from '../world/bundle.ts'
 import type { Look } from '../world/render.ts'
 import { random } from '../world/terrain.ts'
 import { restPose } from '../motion/pose.ts'
@@ -88,9 +88,7 @@ function standingPose (look: Skinned, yaw: number): Pose {
 }
 
 export async function createPageWorld (options: PageWorldOptions): Promise<PageWorld> {
-  const read = readWorldBundle(await (await fetch(options.bundle)).json())
-  if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
-  const { cast, looks } = read.value
+  const { cast, looks } = await fetchWorldBundle(options.bundle)
   const next = random(options.seed)
   const spritePerMetre = options.pixelsPerMetre / options.scale
   const camera = makeCamera({

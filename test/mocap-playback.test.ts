@@ -1,18 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { loadCharacter } from '../src/formats/character.ts'
 import type { Character } from '../src/formats/character.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import { toAxisAngle, multiply, transpose } from '../src/math/matrix.ts'
-import { validateClip } from '../src/mocap/clip.ts'
 import type { Clip } from '../src/mocap/clip.ts'
 import { buildDatabase } from '../src/mocap/database.ts'
 import { createPlayer } from '../src/mocap/player.ts'
 import type { Command, PlayerFrame } from '../src/mocap/player.ts'
-import { mergeRetargeting, retargetRotations } from '../src/mocap/retarget.ts'
-import type { RetargetOptions } from '../src/mocap/retarget.ts'
+import { retargetRotations } from '../src/mocap/retarget.ts'
 import type { MotionStyle } from '../src/mocap/style.ts'
 import * as metrics from '../src/motion/metrics.ts'
 import type { LocomotionRecording } from '../src/motion/metrics.ts'
@@ -21,40 +16,30 @@ import type { Pose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
 import { generateTerrain, random } from '../src/world/terrain.ts'
 import type { Terrain } from '../src/world/terrain.ts'
+import { character, HUMANOIDS, loadClips, retargetOptions } from './mocap-fixtures.ts'
+import { aboveGround, assertFeetStay } from './world-fixtures.ts'
 
 const FPS = 24
-const HUMANOIDS = ['knight', 'rogue', 'dwarf', 'wizard']
 const METRES_PER_PIXEL = 1 / 34
 const EAST = Math.PI / 2
 
-const clips: Clip[] = readdirSync('motion/clips').filter(f => f.endsWith('.json')).sort().map(file => {
-  return validateClip(JSON.parse(readFileSync(join('motion/clips', file), 'utf8'))).value as Clip
-})
-const characters = new Map(HUMANOIDS.map(name => [name, loadCharacter(join('examples', name)).value as Character]))
-const base = JSON.parse(readFileSync('motion/humanoid.json', 'utf8'))
+const clips = loadClips()
 
-function options (name: string, style?: MotionStyle): RetargetOptions {
-  const { rig, mannequin } = characters.get(name) as Character
-  const own = JSON.parse(readFileSync(join('examples', name, 'retarget.json'), 'utf8'))
-  return { rig, rest: restPose(mannequin), mannequin, map: mergeRetargeting(base, own), style: style ?? own.style }
+function legLength (body: Character): number {
+  const rest = restPose(body.mannequin)
+  return Math.min(...legsOf(body.rig).map(leg => chainLength(leg.chain, rest)))
 }
 
-function legLength (character: Character): number {
-  const rest = restPose(character.mannequin)
-  return Math.min(...legsOf(character.rig).map(leg => chainLength(leg.chain, rest)))
-}
-
-function footLength (character: Character): number {
-  const rest = restPose(character.mannequin)
+function footLength (body: Character): number {
+  const rest = restPose(body.mannequin)
   const lengthOf = (leg: { toe: string, ankle: string }): number => {
     return Math.hypot(...[0, 1, 2].map(i => rest[leg.toe][i] - rest[leg.ankle][i]))
   }
-  return Math.max(...legsOf(character.rig).map(lengthOf))
+  return Math.max(...legsOf(body.rig).map(lengthOf))
 }
 
-/** A course like the world's, with stairs as high as the shortest humanoid's legs allow. */
 function course (seed: number): Terrain {
-  const cast = [...characters.values()]
+  const cast = HUMANOIDS.map(character)
   return generateTerrain(seed, {
     length: 16,
     maxSlopeDegrees: 14,
@@ -67,7 +52,6 @@ function course (seed: number): Terrain {
 
 type Run = { world: LocomotionRecording, relative: LocomotionRecording, frames: PlayerFrame[] }
 
-/** Plays a character for a while under commands, recording joints in the world and above the ground under them. */
 function play (
   name: string,
   terrain: Pick<Terrain, 'ground'>,
@@ -75,39 +59,34 @@ function play (
   steer: (frame: number, x: number) => Command,
   setup?: (player: ReturnType<typeof createPlayer>, frame: number) => void
 ): Run {
-  const character = characters.get(name) as Character
-  const settings = options(name)
+  const { rig } = character(name)
+  const settings = retargetOptions(name)
   const player = createPlayer({ database: buildDatabase(clips, settings), fps: FPS, ground: terrain.ground }, {
     position: [2, 0, 0], yaw: EAST
   })
-  const labels = legLabels(character.rig, settings.rest)
-  const run: Run = { world: { fps: FPS, frames: [] }, relative: { fps: FPS, frames: [] }, frames: [] }
+  const labels = legLabels(rig, settings.rest)
+  const world: LocomotionRecording = { fps: FPS, frames: [] }
+  const frames: PlayerFrame[] = []
   let x = 2
   for (let i = 0; i < seconds * FPS; i++) {
     setup?.(player, i)
     player.command(steer(i, x))
     const frame = player.step()
     x = frame.root.position[0]
-    const world: Pose = {}
-    const relative: Pose = {}
+    const joints: Pose = {}
     for (const [joint, local] of Object.entries({ ...settings.rest, ...frame.pose })) {
-      const p = toWorld(local, frame.root)
-      world[joint] = p
-      relative[joint] = [p[0], p[1] - terrain.ground(p[0], p[2]), p[2]]
+      joints[joint] = toWorld(local, frame.root)
     }
     const planted = Object.fromEntries(labels.map((label, k) => [label, frame.planted[k]]))
-    const common = { time: i / FPS, root: frame.root, clamped: frame.clamped, planted }
-    run.world.frames.push({ ...common, joints: world })
-    run.relative.frames.push({ ...common, joints: relative })
-    run.frames.push(frame)
+    world.frames.push({ time: i / FPS, root: frame.root, clamped: frame.clamped, planted, joints })
+    frames.push(frame)
   }
-  return run
+  return { world, relative: aboveGround(world, terrain.ground), frames }
 }
 
-/** Wanders the course: walks at varied speeds scaled to the legs, turns at the ends, stops now and then. */
 function wander (name: string, terrain: Terrain, seed: number): (frame: number, x: number) => Command {
   const next = random(seed)
-  const scaleToLegs = legLength(characters.get(name) as Character) / 0.75
+  const scaleToLegs = legLength(character(name)) / 0.75
   let direction = 1
   let until = 0
   let speed = 0
@@ -126,17 +105,16 @@ function wander (name: string, terrain: Terrain, seed: number): (frame: number, 
 
 for (const name of HUMANOIDS) {
   test(`${name}: a minute of motion-matched walking on generated terrain keeps the locomotion gates`, () => {
-    const character = characters.get(name) as Character
-    const geometry = { rig: character.rig, mannequin: character.mannequin }
+    const { rig, mannequin } = character(name)
+    const geometry = { rig, mannequin }
     for (const seed of [3, 11]) {
       const terrain = course(seed)
       const run = play(name, terrain, 60, wander(name, terrain, seed + 7))
       const where = `seed ${seed}`
-      assert.ok(metrics.footSlidePx(run.relative, geometry, METRES_PER_PIXEL) <= 0.25, `${where}: slide`)
-      assert.ok(metrics.groundPenetrationPx(run.relative, geometry, METRES_PER_PIXEL) <= 0.5, `${where}: penetration`)
+      assertFeetStay(run.relative, geometry, METRES_PER_PIXEL, where)
       assert.equal(metrics.reachViolations(run.world), 0, `${where}: reach`)
       assert.equal(metrics.kneeLimitViolations(run.world, geometry), 0, `${where}: knees`)
-      assert.ok(metrics.boneLengthError(run.world, geometry, restPose(character.mannequin)) <= 1e-9, `${where}: bones`)
+      assert.ok(metrics.boneLengthError(run.world, geometry, restPose(mannequin)) <= 1e-9, `${where}: bones`)
       assert.ok(run.frames.filter(f => f.switched).length > 20, `${where}: matching switches between clips`)
     }
   })
@@ -159,8 +137,8 @@ test('a 4 m/s headwind slows the walk by at least 10%, and a shove moves the bod
 
 test('style: the neutral style changes nothing; two styles on one clip differ by at least 5 degrees RMS', () => {
   const walk = clips.find(c => c.name === 'walk') as Clip
-  const plain = retargetRotations(walk, { ...options('rogue'), style: undefined })
-  const neutral = retargetRotations(walk, options('rogue', {}))
+  const plain = retargetRotations(walk, { ...retargetOptions('rogue'), style: undefined })
+  const neutral = retargetRotations(walk, retargetOptions('rogue', {}))
   assert.deepEqual(neutral, plain)
   const swagger: MotionStyle = {
     amplitude: { shoulderL: 1.5, shoulderR: 1.5 }, offset: { chest: [-6, 0, 0] }, variation: 2, seed: 4
@@ -168,8 +146,8 @@ test('style: the neutral style changes nothing; two styles on one clip differ by
   const stiff: MotionStyle = {
     amplitude: { shoulderL: 0.5, shoulderR: 0.5 }, offset: { chest: [8, 0, 0] }, variation: 2, seed: 9
   }
-  const a = retargetRotations(walk, options('rogue', swagger))
-  const b = retargetRotations(walk, options('rogue', stiff))
+  const a = retargetRotations(walk, retargetOptions('rogue', swagger))
+  const b = retargetRotations(walk, retargetOptions('rogue', stiff))
   for (const joint of ['shoulderL', 'shoulderR', 'chest']) {
     const squares = a.map((frame, i) => {
       const angle = toAxisAngle(multiply(frame.rotations[joint], transpose(b[i].rotations[joint]))).angle
@@ -193,20 +171,15 @@ test('pushed far past its legs, the body stays finite and the locomotion gates h
     ['wizard', () => ({ speed: 1.2, heading: EAST }), player => { player.wind[0] = -6 }]
   ]
   for (const [name, steer, setup] of cases) {
-    const character = characters.get(name) as Character
-    const geometry = { rig: character.rig, mannequin: character.mannequin }
+    const { rig, mannequin } = character(name)
+    const geometry = { rig, mannequin }
     const run = play(name, flat, 6, steer, setup)
     assert.ok(finite(run), `${name}: every joint finite`)
-    assert.ok(metrics.footSlidePx(run.relative, geometry, METRES_PER_PIXEL) <= 0.25, `${name}: slide`)
-    assert.ok(metrics.groundPenetrationPx(run.relative, geometry, METRES_PER_PIXEL) <= 0.5, `${name}: penetration`)
+    assertFeetStay(run.relative, geometry, METRES_PER_PIXEL, name)
     assert.equal(metrics.kneeLimitViolations(run.world, geometry), 0, `${name}: knees`)
   }
 })
 
-/**
- * The worst ratio, over every joint, of its movement into a frame (relative to the root) to its median per-frame
- * movement over the surrounding second.
- */
 function lumpiness (run: Run, frame: number): number {
   const local = (i: number, joint: string): number[] => {
     const f = run.world.frames[i]

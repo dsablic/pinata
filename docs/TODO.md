@@ -23,6 +23,12 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 humanoids, a readability layer, judged against strong references, then skins in the world. Batch A (clean rotation)
 first.
 
+### 0a. The page as the world
+
+[Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
+step and drop between them on a click-through overlay, react to the page, then the world demo is rebuilt on its own
+page. Batch A (surfaces and the overlay) next.
+
 ### 0b. World showcase, remaining batches
 
 [World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds

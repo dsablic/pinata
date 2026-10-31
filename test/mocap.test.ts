@@ -1,22 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { loadCharacter } from '../src/formats/character.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import { eulerXyz, fromQuaternion, toQuaternion } from '../src/math/matrix.ts'
 import { parseAmc, parseAsf, posed } from '../src/mocap/asf.ts'
-import { validateClip } from '../src/mocap/clip.ts'
-import type { Clip } from '../src/mocap/clip.ts'
 import { validateStyle } from '../src/mocap/style.ts'
-import { mergeRetargeting, retargetClip, validateRetargeting } from '../src/mocap/retarget.ts'
+import { retargetClip, validateRetargeting } from '../src/mocap/retarget.ts'
 import { retargetedRecording } from '../src/mocap/recording.ts'
 import { boneLengthError, solePoints } from '../src/motion/metrics.ts'
-import { restPose } from '../src/motion/pose.ts'
 import { assertClose } from './helpers.ts'
+import { clipFiles, HUMANOIDS, loadClip, ownRetargeting, readJson, retargetOptions } from './mocap-fixtures.ts'
 
-const CLIPS = 'motion/clips'
-const HUMANOIDS = ['knight', 'rogue', 'dwarf', 'wizard']
 const STANDING_METRES = 0.02
 const LENGTH_TOLERANCE = 1e-9
 
@@ -60,12 +53,6 @@ thigh -90
 shin 90
 `
 
-function clip (name: string): Clip {
-  const read = validateClip(JSON.parse(readFileSync(join(CLIPS, `${name}.json`), 'utf8')))
-  assert.deepEqual(read.errors, [])
-  return read.value as Clip
-}
-
 test('quaternions round-trip rotations', () => {
   const m = eulerXyz(0.3, -1.1, 2.4)
   const back = fromQuaternion(toQuaternion(m))
@@ -81,7 +68,6 @@ test('ASF and AMC: bones chain from the root, turned by their channels, in metre
   const standing = posed(skeleton, frames[0])
   assertClose(standing.shin.end[1], 0, 1e-12)
   const raised = posed(skeleton, frames[1])
-  // the root faces +x; the thigh lifts forward to horizontal, the shin hangs straight down again
   const knee = raised.thigh.end
   assertClose(knee[0], 9 * unit, 1e-9)
   assertClose(knee[1], 18 * unit, 1e-9)
@@ -89,37 +75,29 @@ test('ASF and AMC: bones chain from the root, turned by their channels, in metre
 })
 
 test('every committed clip is valid and names the CMU take it came from', () => {
-  const takes = JSON.parse(readFileSync('motion/takes.json', 'utf8')) as { takes: Array<{ name: string }> }
-  const files = readdirSync(CLIPS).filter(f => f.endsWith('.json')).sort()
-  assert.deepEqual(files, takes.takes.map(t => `${t.name}.json`).sort())
-  for (const file of files) {
-    const read = clip(file.replace(/\.json$/, ''))
+  const takes = readJson('motion/takes.json') as { takes: Array<{ name: string }> }
+  assert.deepEqual(clipFiles, takes.takes.map(t => `${t.name}.json`).sort())
+  for (const file of clipFiles) {
+    const read = loadClip(file.replace(/\.json$/, ''))
     assert.match(read.source, /^CMU Graphics Lab Motion Capture Database, .*subject \d+, trial \d+/)
   }
 })
 
 for (const name of HUMANOIDS) {
-  const character = loadCharacter(join('examples', name)).value
-  assert.ok(character !== undefined)
-  const { rig, mannequin } = character
-  const rest = restPose(mannequin)
-  const own = JSON.parse(readFileSync(join('examples', name, 'retarget.json'), 'utf8'))
-  const map = mergeRetargeting(JSON.parse(readFileSync('motion/humanoid.json', 'utf8')), own)
-  const options = { rig, rest, mannequin, map, style: own.style, fps: 24 }
+  const options = { ...retargetOptions(name), fps: 24 }
+  const { rig, rest, mannequin, map } = options
 
-  test(`${name}: its retarget.json style, if any, is valid`, () => {
-    if (own.style !== undefined) assert.deepEqual(validateStyle(own.style).errors, [])
-  })
-
-  test(`${name}: the retargeting is valid and keeps bone lengths`, () => {
-    const walk = clip('walk')
+  test(`${name}: the retargeting and its style are valid, and it keeps bone lengths`, () => {
+    const { style } = ownRetargeting(name)
+    if (style !== undefined) assert.deepEqual(validateStyle(style).errors, [])
+    const walk = loadClip('walk')
     assert.deepEqual(validateRetargeting(map, rig, rest, walk).errors, [])
     const recording = retargetedRecording(retargetClip(walk, options), options)
     assert.ok(boneLengthError(recording, { rig, mannequin }, rest) <= LENGTH_TOLERANCE)
   })
 
   test(`${name}: standing at the end of a stop keeps both feet within 2 cm of the ground`, () => {
-    const frames = retargetClip(clip('walk-stop'), options)
+    const frames = retargetClip(loadClip('walk-stop'), options)
     const last = retargetedRecording(frames, options).frames[frames.length - 1]
     for (const leg of legsOf(rig)) {
       const sole = Math.min(...solePoints(last.joints, leg, mannequin).map(p => p[1]))

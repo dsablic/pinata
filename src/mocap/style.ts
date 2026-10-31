@@ -6,13 +6,6 @@ import type { Matrix } from '../math/matrix.ts'
 import { random } from '../world/terrain.ts'
 import type { BodyFrame } from './retarget.ts'
 
-/**
- * How one character moves differently from the clip it plays. `amplitude` scales a joint's movement about its mean in
- * the clip (1 unchanged, 1.4 wider, 0.6 stiffer); `offset` turns a joint by fixed degrees [x, y, z] in the body frame
- * (a forward hunch is a positive x on the chest); `variation` adds up to that many degrees of fixed, seeded offset to
- * every aimed or turned joint, so two characters with the same style still differ; `rate` scales playback speed and
- * `stride` the length of the path, both 1 by default.
- */
 export type MotionStyle = {
   amplitude?: Record<string, number>
   offset?: Record<string, [number, number, number]>
@@ -43,7 +36,6 @@ export function validateStyle (input: unknown): Validated<MotionStyle> {
   return errors.length > 0 ? { errors } : { value: input as MotionStyle, errors }
 }
 
-/** The mean of rotations: their quaternions, turned to one hemisphere, summed and normalized. */
 export function meanRotation (rotations: Matrix[]): Matrix {
   const sum = [0, 0, 0, 0]
   const first = toQuaternion(rotations[0])
@@ -55,7 +47,6 @@ export function meanRotation (rotations: Matrix[]): Matrix {
   return fromQuaternion(sum)
 }
 
-/** Shapes the rotations of a clip's body frames by a style, in place: amplitude about the mean, then offsets. */
 export function applyStyle (frames: BodyFrame[], style: MotionStyle): void {
   if (frames.length === 0) return
   const joints = Object.keys(frames[0].rotations).sort()

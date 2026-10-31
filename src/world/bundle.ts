@@ -14,7 +14,6 @@ import type { CastMember } from './world.ts'
 import { captureFor, readClips } from '../mocap/capture.ts'
 import type { CaptureData } from '../mocap/capture.ts'
 
-/** A world in one file for the browser: its config and every cast member's mannequin, style and rig as written. */
 export type WorldBundle = {
   config: unknown
   cast: Array<{
@@ -26,12 +25,10 @@ export type WorldBundle = {
     motion?: unknown
     skin?: unknown
   }>
-  /** Motion capture for the cast members it names. */
   capture?: CaptureData
 }
 export type ReadWorld = { config: WorldConfig, cast: CastMember[], looks: Look[] }
 
-/** Validates a world bundle the way loading the packages does; errors name the member and file they are in. */
 export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: ValidationError[] } {
   if (!isRecord(input) || !Array.isArray(input.cast)) {
     return { errors: [{ path: '', message: 'expected { config, cast }' }] }
@@ -97,10 +94,12 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
   return { value: { config: config.value, cast, looks }, errors }
 }
 
-/**
- * The member's cape and chains from its motion file and materials, or undefined when it has none; the motion's script
- * is not used (the world plans its own walking).
- */
+export async function fetchWorldBundle (url: string): Promise<ReadWorld> {
+  const read = readWorldBundle(await (await fetch(url)).json())
+  if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
+  return read.value
+}
+
 function readCloth (
   member: Record<string, unknown>,
   mannequin: Mannequin,
@@ -125,7 +124,6 @@ function readCloth (
   return cross.length > 0 ? undefined : { scenario: scenario.value, materials: materials.value }
 }
 
-/** The scenario with the world's dress: how its cape and chains are drawn. */
 function dressed (scenario: Scenario, dress: Dress): Scenario {
   return {
     ...scenario,
@@ -139,7 +137,6 @@ function dressed (scenario: Scenario, dress: Dress): Scenario {
   }
 }
 
-/** The bundle's motion capture, when it has any: clips, the shared retargeting and each member's, each checked. */
 function readCapture (input: unknown, errors: ValidationError[]): CaptureData | undefined {
   if (input === undefined) return undefined
   if (!isRecord(input)) {

@@ -2,7 +2,7 @@ import { check } from '../formats/schema.ts'
 import type { Schema } from '../formats/schema.ts'
 import type { Mannequin } from '../formats/mannequin.ts'
 import { legsOf } from '../formats/rig.ts'
-import type { Rig } from '../formats/rig.ts'
+import type { Leg, Rig } from '../formats/rig.ts'
 import type { Validated, ValidationError } from '../formats/validate.ts'
 import { apply, between, multiply, transpose, yawMatrix } from '../math/matrix.ts'
 import type { Matrix } from '../math/matrix.ts'
@@ -13,29 +13,21 @@ import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { hierarchyOrder, parentsOf, placed, transformTo } from '../motion/skeleton.ts'
 import type { Parents, Transforms } from '../motion/skeleton.ts'
-import { clipPose } from './clip.ts'
+import { clipPose, lowestFootPoints, SOURCE_FEET } from './clip.ts'
+import type { AsfPose } from './asf.ts'
 import { applyStyle } from './style.ts'
 import type { MotionStyle } from './style.ts'
 import type { Clip } from './clip.ts'
+import { turnBetween } from '../world/yaw.ts'
 
-/**
- * How a character follows a clip's source skeleton. `aim` joints point the bone to the next joint of their limb
- * where the source bone points, keeping the character's bone lengths (legs and arms, whose rest poses differ from the
- * source's); `turn` joints turn as the source bone turns from its rest pose (pelvis, spine, head, feet); `hang` moves
- * joints to hang from another joint while retargeted, grouped by that joint, so a visor follows the head. Every other
- * joint moves rigidly with its parent.
- */
 export type Retargeting = {
   aim: Record<string, string>
   turn: Record<string, string>
   hang?: Record<string, string[]>
 }
-/** A retargeted frame: the root, body-local joint positions and transforms, and which feet are on the ground. */
 export type RetargetedFrame = { root: RootState, pose: Pose, transforms: Transforms, contact: boolean[] }
 
-/** Metres over which the weight of the body's height moves from one foot to the other. */
 const LIFT_SOFTNESS = 0.01
-const FOOT_POINTS = { left: ['ltibia', 'ltoes'], right: ['rtibia', 'rtoes'] } as const
 
 const RETARGETING_SCHEMA: Schema = {
   kind: 'object',
@@ -47,7 +39,6 @@ const RETARGETING_SCHEMA: Schema = {
   optional: ['hang']
 }
 
-/** Merges retargetings, later ones adding to and overriding earlier ones. */
 export function mergeRetargeting (...maps: Array<Partial<Retargeting>>): Retargeting {
   const result: Retargeting = { aim: {}, turn: {}, hang: {} }
   for (const map of maps) {
@@ -58,10 +49,6 @@ export function mergeRetargeting (...maps: Array<Partial<Retargeting>>): Retarge
   return result
 }
 
-/**
- * Checks a retargeting against a character and a clip: its shape, that every joint it names is one of the
- * character's, every bone one of the clip's, the pelvis turns, and each aimed joint has a next joint in a limb.
- */
 export function validateRetargeting (input: unknown, rig: Rig, rest: Pose, clip: Clip): Validated<Retargeting> {
   const errors: ValidationError[] = []
   check(input, RETARGETING_SCHEMA, '', errors)
@@ -98,11 +85,6 @@ function nextInLimb (rig: Rig, joint: string): string | undefined {
 
 export type RetargetOptions = { rig: Rig, rest: Pose, mannequin: Mannequin, map: Retargeting, style?: MotionStyle }
 
-/**
- * A clip frame in the character's terms, before it is assembled into joint positions: the body-local rotation of
- * every aimed and turned joint, the root (its path scaled to the character), how far each foot (left, right) is above
- * its planted level in the character's scale, and which feet are on the ground, per leg.
- */
 export type BodyFrame = {
   rotations: Record<string, Matrix>
   root: RootState
@@ -110,7 +92,6 @@ export type BodyFrame = {
   contact: boolean[]
 }
 
-/** The joint hierarchy a retargeting poses: the rig's, with the `hang` joints moved, parents first. */
 export type Hierarchy = { parents: Parents, order: string[] }
 
 export function hierarchyOf (rig: Rig, map: Retargeting): Hierarchy {
@@ -119,7 +100,6 @@ export function hierarchyOf (rig: Rig, map: Retargeting): Hierarchy {
   return { parents, order: hierarchyOrder(parents) }
 }
 
-/** The ratio of the character's leg (hip to ankle, the left one) to the source's, from the bones its joints aim. */
 export function legRatio (clip: Clip, options: RetargetOptions): number {
   const { rig, rest, map } = options
   const legs = legsOf(rig)
@@ -132,35 +112,51 @@ export function legRatio (clip: Clip, options: RetargetOptions): number {
   return chainLength(left.chain, rest) / sourceLength
 }
 
-/**
- * The body frames of a clip: each turned joint takes its source bone's rotation from rest, each aimed joint the
- * rotation that points its limb bone along the source bone, both relative to the clip's heading, then shaped by the
- * style. The root's path scales by the leg ratio (times the style's stride) and turns with the heading.
- */
-export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFrame[] {
+function rotationsFrom (
+  source: AsfPose,
+  heading: number,
+  directions: Map<string, Vec3>,
+  options: RetargetOptions
+): Record<string, Matrix> {
   const { rig, rest, map } = options
-  const legs = legsOf(rig)
+  const unturn = transpose(yawMatrix(heading))
+  const local = (bone: string): Matrix => multiply(unturn, source[bone].rotation)
+  const rotations: Record<string, Matrix> = {}
+  for (const [joint, bone] of Object.entries(map.turn)) rotations[joint] = local(bone)
+  for (const [joint, bone] of Object.entries(map.aim)) {
+    const next = nextInLimb(rig, joint) as string
+    const from = normalize(sub(rest[next], rest[joint]))
+    rotations[joint] = between(from, normalize(apply(local(bone), directions.get(bone) as Vec3)))
+  }
+  return rotations
+}
+
+function setRootVelocities (frames: BodyFrame[], fps: number): void {
+  frames.forEach((frame, i) => {
+    const before = Math.max(0, i - 1)
+    const after = Math.min(frames.length - 1, i + 1)
+    const a = frames[before].root
+    const b = frames[after].root
+    const dt = (after - before) / fps
+    if (dt === 0) return
+    frame.root.velocity = scale(sub(b.position, a.position), 1 / dt)
+    frame.root.angularVelocity = turnBetween(a.yaw, b.yaw) / dt
+  })
+}
+
+export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFrame[] {
+  const legs = legsOf(options.rig)
   const ratio = legRatio(clip, options) * (options.style?.stride ?? 1)
   const directions = new Map(clip.bones.map(bone => [bone.name, bone.direction]))
   const sources = clip.frames.map(frame => clipPose(clip, frame))
-  const points = Object.values(FOOT_POINTS).flat()
-  const floor = Object.fromEntries(points.map(name => [name, Math.min(...sources.map(pose => pose[name].end[1]))]))
+  const floor = lowestFootPoints(sources)
   const frames = clip.frames.map((frame, i): BodyFrame => {
     const source = sources[i]
-    const unturn = transpose(yawMatrix(frame.heading))
-    const local = (bone: string): Matrix => multiply(unturn, source[bone].rotation)
-    const rotations: Record<string, Matrix> = {}
-    for (const [joint, bone] of Object.entries(map.turn)) rotations[joint] = local(bone)
-    for (const [joint, bone] of Object.entries(map.aim)) {
-      const next = nextInLimb(rig, joint) as string
-      const from = normalize(sub(rest[next], rest[joint]))
-      rotations[joint] = between(from, normalize(apply(local(bone), directions.get(bone) as Vec3)))
-    }
     const clearance = (side: 'left' | 'right'): number => {
-      return ratio * Math.min(...FOOT_POINTS[side].map(name => source[name].end[1] - floor[name]))
+      return ratio * Math.min(...SOURCE_FEET[side].map(name => source[name].end[1] - floor[name]))
     }
     return {
-      rotations,
+      rotations: rotationsFrom(source, frame.heading, directions, options),
       root: {
         position: [ratio * frame.root[0], 0, ratio * frame.root[2]],
         yaw: frame.heading,
@@ -168,35 +164,32 @@ export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFr
         angularVelocity: 0
       },
       clearance: { left: clearance('left'), right: clearance('right') },
-      contact: legs.map(leg => leg.side === 'right' ? frame.contact.right : frame.contact.left)
+      contact: legs.map(leg => frame.contact[sideOf(leg)])
     }
   })
-  frames.forEach((frame, i) => {
-    const before = Math.max(0, i - 1)
-    const after = Math.min(frames.length - 1, i + 1)
-    const a = frames[before].root
-    const b = frames[after].root
-    const dt = (after - before) / clip.fps
-    if (dt === 0) return
-    frame.root.velocity = scale(sub(b.position, a.position), 1 / dt)
-    frame.root.angularVelocity = Math.atan2(Math.sin(b.yaw - a.yaw), Math.cos(b.yaw - a.yaw)) / dt
-  })
+  setRootVelocities(frames, clip.fps)
   if (options.style !== undefined) applyStyle(frames, options.style)
   return frames
 }
 
-/**
- * Body-local joint positions and transforms from a body frame's rotations: the pelvis at its rest place, each joint
- * placed by its parent's transform, turned and aimed joints turning by their rotations, the rest moving rigidly with
- * their parent; then the body lifted so the feet are as far above the ground as the source's, the foot nearer its
- * planted level counting most (a soft minimum, so the height does not jump as the weight passes between the feet).
- */
-export function assemble (
-  frame: Pick<BodyFrame, 'rotations' | 'clearance'>,
+export function sideOf (leg: Leg): 'left' | 'right' {
+  return leg.side === 'right' ? 'right' : 'left'
+}
+
+export function raise (pose: Pose, transforms: Transforms, joints: string[], lift: number): void {
+  for (const joint of joints) {
+    pose[joint] = add(pose[joint], [0, lift, 0])
+    const t = transforms[joint]
+    transforms[joint] = { ...t, translation: add(t.translation, [0, lift, 0]) }
+  }
+}
+
+function placeJoints (
+  rotations: Record<string, Matrix>,
   options: RetargetOptions,
   hierarchy: Hierarchy
 ): { pose: Pose, transforms: Transforms } {
-  const { rig, rest, mannequin } = options
+  const { rig, rest } = options
   const { parents, order } = hierarchy
   const pose: Pose = {}
   const transforms: Transforms = {}
@@ -204,36 +197,37 @@ export function assemble (
     const parent = parents[joint]
     const at = parent === undefined ? rest[rig.pelvis] : placed(transforms[parent], rest[joint])
     pose[joint] = at
-    const rotation = frame.rotations[joint]
+    const rotation = rotations[joint]
     if (rotation !== undefined) transforms[joint] = transformTo(rotation, rest[joint], at)
     else if (parent !== undefined) transforms[joint] = transforms[parent]
     else transforms[joint] = { translation: [0, 0, 0] }
   }
-  const lift = legsOf(rig).map(leg => {
-    const above = leg.side === 'right' ? frame.clearance.right : frame.clearance.left
-    const radii = footRadii(leg, mannequin)
-    const sole = Math.min(pose[leg.ankle][1] - radii.ankle, pose[leg.toe][1] - radii.toe)
-    return { above, shift: above - sole }
-  })
-  // a soft minimum: the foot nearer its planted level counts most, and the weight moves smoothly between feet
-  const nearest = Math.min(...lift.map(l => l.above))
-  const weights = lift.map(l => Math.exp(-(l.above - nearest) / LIFT_SOFTNESS))
-  const total = weights.reduce((a, b) => a + b, 0)
-  const shift = lift.reduce((sum, l, i) => sum + l.shift * weights[i], 0) / total
-  for (const joint of order) {
-    pose[joint] = add(pose[joint], [0, shift, 0])
-    const t = transforms[joint]
-    transforms[joint] = { ...t, translation: add(t.translation, [0, shift, 0]) }
-  }
   return { pose, transforms }
 }
 
-/**
- * Retargets every frame of a clip onto a character. Bones keep the character's lengths; the root's path scales by
- * the ratio of the character's leg (hip to ankle) to the source's, and turns with the clip's heading. The body is
- * placed so the foot nearer its planted level stands as far above the ground as the source's, scaled, which puts a
- * planted foot on the ground.
- */
+function softLift (pose: Pose, clearance: BodyFrame['clearance'], options: RetargetOptions): number {
+  const lift = legsOf(options.rig).map(leg => {
+    const above = clearance[sideOf(leg)]
+    const radii = footRadii(leg, options.mannequin)
+    const sole = Math.min(pose[leg.ankle][1] - radii.ankle, pose[leg.toe][1] - radii.toe)
+    return { above, shift: above - sole }
+  })
+  const nearest = Math.min(...lift.map(l => l.above))
+  const weights = lift.map(l => Math.exp(-(l.above - nearest) / LIFT_SOFTNESS))
+  const total = weights.reduce((a, b) => a + b, 0)
+  return lift.reduce((sum, l, i) => sum + l.shift * weights[i], 0) / total
+}
+
+export function assemble (
+  frame: Pick<BodyFrame, 'rotations' | 'clearance'>,
+  options: RetargetOptions,
+  hierarchy: Hierarchy
+): { pose: Pose, transforms: Transforms } {
+  const { pose, transforms } = placeJoints(frame.rotations, options, hierarchy)
+  raise(pose, transforms, hierarchy.order, softLift(pose, frame.clearance, options))
+  return { pose, transforms }
+}
+
 export function retargetClip (clip: Clip, options: RetargetOptions): RetargetedFrame[] {
   const hierarchy = hierarchyOf(options.rig, options.map)
   return retargetRotations(clip, options).map(frame => ({

@@ -26,16 +26,15 @@ import type { Terrain } from './terrain.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
 import { createPlayer } from '../mocap/player.ts'
 import type { Command, Player } from '../mocap/player.ts'
-import { trackOf, turnBetween } from './track.ts'
+import { trackOf } from './track.ts'
+import { turnBetween } from './yaw.ts'
 import type { Move } from './track.ts'
 
-/** A character in the world; `cloth` is its cape and chains, simulated live on the moving body. */
 export type CastMember = {
   name: string
   mannequin: Mannequin
   rig: Rig
   cloth?: { scenario: Scenario, materials: SimMaterial[] }
-  /** Its motion-capture database: when present, it moves by motion matching instead of planned footsteps. */
   capture?: MotionDatabase
 }
 export type ActorFrame = {
@@ -44,32 +43,22 @@ export type ActorFrame = {
   root: RootState
   activity: string
   say?: string
-  /** True in the first frame of a new plan, where the previous one handed over. */
   handover?: true
-  /** World positions of the cape and chain particles (x, y, z per particle), when the character has cloth. */
   cloth?: Float64Array
 }
 export type WorldFrame = { index: number, time: number, actors: ActorFrame[] }
 export type WorldOptions = { seed: number, cast: CastMember[], config: WorldConfig, fps: number }
 export type World = {
   terrain: Terrain
-  /** Gravity and wind for cloth, read every frame: change them to change the weather. */
   environment: WorldConfig['environment']
-  /** How far the depth lanes reach either side of z = 0, metres, and the stretch of x the world uses. */
   lanes: number
   extent: [number, number]
   step: () => WorldFrame
-  /** Startles an actor, as a click on it from a side does: it reacts with the poke steps. */
   poke: (actor: number, fromX: number) => void
 }
 
 type Plant = { ankle: Vec3, yaw: number, pitch?: number }
 
-/** Captured actors: how near (m) a walk's target counts as reached, and how near once they have stopped (m/s) there;
- * how long past its time a walk may take (s); how hard they slow toward the target (1/s); how strongly they steer
- * back to their lane; how long past its time a turn may take (s); the speed a poke's shove adds and the speed pokes
- * cannot push past (m/s); and how many
- * finished moves one frame may skip past. */
 const CAPTURE_ARRIVAL = 0.08
 const CAPTURE_NEAR = 0.3
 const CAPTURE_STOPPED = 0.05
@@ -95,27 +84,19 @@ type Actor = {
   poked?: number
   chains: Array<{ chain: SpringChain, parent: string, started: boolean, base: Vec3, yaw: number }>
   cloth?: { system: System, scenario: Scenario, previous?: RootState }
-  /** The upper body's lean (radians forward and sideways) and its rates, the last forward speed, a phase for idling. */
   lean: { forward: number, side: number, forwardRate: number, sideRate: number, speed: number, phase: number }
-  /** Joints the lean moves: everything above the legs except the pelvis, which it pivots about. */
   upper: string[]
-  /** The lagging head's angle and rate, the torso's last lean rate, and the pelvis's last height and rate. */
   head: { angle: number, rate: number, leanRate: number, lift: number, liftRate: number }
   headJoints: string[]
-  /** When a foot last landed (for squash), and which feet were planted in the previous frame. */
   squashed: number
   wasPlanted: boolean[]
-  /** A captured actor's player, the moves it is carrying out, and when the first of them began. */
   player?: Player
   moves: Move[]
   moveStart: number
-  /** Where along x the current move began. */
   moveFrom: number
-  /** The heading it last chose, which it keeps while standing. */
   facing?: number
 }
 
-/** The upper-body and attached joints whose rest height is above the given fraction of the character's height. */
 function headOf (member: CastMember, upper: string[], above: number): string[] {
   const rest = restPose(member.mannequin)
   const chains = new Set(member.rig.limbs.flatMap(limb => limb.joints))
@@ -123,7 +104,6 @@ function headOf (member: CastMember, upper: string[], above: number): string[] {
   return upper.filter(joint => !chains.has(joint) && rest[joint][1] >= above * top)
 }
 
-/** Turns smaller than this (radians) are skipped; characters keep this far (metres) from the world's ends. */
 const FACING_TOLERANCE = 0.05
 const EDGE = 1
 
@@ -132,7 +112,6 @@ function legLength (member: CastMember): number {
   return Math.min(...legsOf(member.rig).map(leg => rest[leg.hip][1] - rest[leg.ankle][1]))
 }
 
-/** Length of the longest foot, heel capsule to toe capsule, at rest. */
 function footLength (member: CastMember): number {
   const rest = restPose(member.mannequin)
   return Math.max(...legsOf(member.rig).map(leg => {
@@ -143,17 +122,11 @@ function footLength (member: CastMember): number {
   }))
 }
 
-/** Half the character's size along x at rest, for spacing visits. */
 function halfLength (member: CastMember): number {
   const zs = Object.values(member.mannequin.joints).map(p => p[2])
   return (Math.max(...zs) - Math.min(...zs)) / 2
 }
 
-/**
- * A world of characters on a seeded terrain, each living its own day: it picks an activity by weight, and each step
- * of the activity becomes a short plan (a root track planned into footsteps on the terrain from where its feet stand),
- * so the plans join without a jump. Deterministic for a seed.
- */
 export function createWorld (options: WorldOptions): World {
   const { cast, config, fps } = options
   const { motion, targets } = config
@@ -221,10 +194,13 @@ export function createWorld (options: WorldOptions): World {
   }
 
   const facing = (actor: Actor, x: number): number => x >= actor.root.position[0] ? Math.PI / 2 : -Math.PI / 2
+  const turnSeconds = (radians: number): number => {
+    return Math.max(motion.minTurnSeconds, radians * motion.turnSecondsPerRadian)
+  }
   const turnTo = (actor: Actor, yaw: number, moves: Move[]): void => {
     const turn = Math.abs(turnBetween(actor.root.yaw, yaw))
     if (turn < FACING_TOLERANCE) return
-    moves.push({ kind: 'turn', yaw, seconds: Math.max(motion.minTurnSeconds, turn * motion.turnSecondsPerRadian) })
+    moves.push({ kind: 'turn', yaw, seconds: turnSeconds(turn) })
   }
 
   const targetX = (actor: Actor, step: Extract<Step, { do: 'walk' }>): number => {
@@ -255,7 +231,6 @@ export function createWorld (options: WorldOptions): World {
     return clamp(x + away * Math.min(reach(targets.far), near + (far - near) * next()))
   }
 
-  /** Turns the actor's next step into moves; stand steps also set what it says. */
   const movesOf = (actor: Actor, step: Step, time: number): Move[] => {
     const moves: Move[] = []
     const speedOf = (factor: number): number => actor.member.rig.gait.referenceSpeed * factor
@@ -276,7 +251,7 @@ export function createWorld (options: WorldOptions): World {
       moves.push({
         kind: 'turn',
         yaw: actor.root.yaw + step.degrees * Math.PI / 180,
-        seconds: Math.max(motion.minTurnSeconds, Math.abs(step.degrees) * Math.PI / 180 * motion.turnSecondsPerRadian)
+        seconds: turnSeconds(Math.abs(step.degrees) * Math.PI / 180)
       })
     } else {
       const seconds = step.seconds[0] + (step.seconds[1] - step.seconds[0]) * next()
@@ -287,14 +262,22 @@ export function createWorld (options: WorldOptions): World {
     return moves
   }
 
+  const startActivity = (actor: Actor): void => {
+    actor.activity = pickActivity(config.activities, next())
+    actor.steps = [...config.activities[actor.activity].steps]
+    let friend = Math.floor(next() * (actors.length - 1))
+    if (friend >= actors.indexOf(actor)) friend++
+    actor.friend = actors.length > 1 ? friend : 0
+  }
+
+  const startle = (actor: Actor, time: number): void => {
+    actor.steps = [...config.reactions.poke.steps]
+    actor.activity = 'startled'
+    actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
+  }
+
   const plan = (actor: Actor, time: number): void => {
-    if (actor.steps.length === 0) {
-      actor.activity = pickActivity(config.activities, next())
-      actor.steps = [...config.activities[actor.activity].steps]
-      let friend = Math.floor(next() * (actors.length - 1))
-      if (friend >= actors.indexOf(actor)) friend++
-      actor.friend = actors.length > 1 ? friend : 0
-    }
+    if (actor.steps.length === 0) startActivity(actor)
     const step = actor.steps.shift() as Step
     const { track, seconds } = trackOf(actor.root, movesOf(actor, step, time))
     const { member, rest } = actor
@@ -345,23 +328,16 @@ export function createWorld (options: WorldOptions): World {
 
   const environment = structuredClone(config.environment)
 
-  /** The forward speed of a root along its facing. */
   const forwardSpeed = (root: RootState): number => {
     return root.velocity[0] * Math.sin(root.yaw) + root.velocity[2] * Math.cos(root.yaw)
   }
 
-  /** One semi-implicit step of a damped spring toward a target; returns the new value and rate. */
   const spring = (value: number, rate: number, target: number, hz: number, damping: number, push = 0) => {
     const omega = 2 * Math.PI * hz
     const next = rate + (omega * omega * (target - value) - 2 * damping * omega * rate + push) / fps
     return { value: value + next / fps, rate: next }
   }
 
-  /**
-   * Gives the upper body life, updating the pose and transforms in place: a lean spring toward the body's forward
-   * acceleration (looking ahead in the plan for anticipation), its turning, the wind, and a slow sway while standing;
-   * squash at footfalls; breathing; and a head that lags on its own spring. The legs and pelvis are not moved.
-   */
   const live = (actor: Actor, frame: GaitFrame, pose: Pose, transforms: Turns, time: number): void => {
     const { lean, sway, breathe, squash, head, anticipation } = config.life
     const state = actor.lean
@@ -376,13 +352,13 @@ export function createWorld (options: WorldOptions): World {
     const facing: Vec3 = [Math.sin(yaw), 0, Math.cos(yaw)]
     const right: Vec3 = [Math.cos(yaw), 0, -Math.sin(yaw)]
     const limit = lean.max * degrees
-    const clamp = (v: number): number => Math.min(limit, Math.max(-limit, v))
+    const clampLean = (v: number): number => Math.min(limit, Math.max(-limit, v))
     const idle = Math.abs(speed) < 0.05 && Math.abs(frame.root.angularVelocity) < 0.05
     const wave = (period: number): number => Math.sin(2 * Math.PI * (time / period + state.phase))
     const target = {
-      forward: clamp((acceleration - anticipation * upcoming) * lean.perAcceleration * degrees -
+      forward: clampLean((acceleration - anticipation * upcoming) * lean.perAcceleration * degrees -
         dot(wind, facing) * lean.perWind * degrees),
-      side: clamp(frame.root.angularVelocity * lean.perTurn * degrees - dot(wind, right) * lean.perWind * degrees +
+      side: clampLean(frame.root.angularVelocity * lean.perTurn * degrees - dot(wind, right) * lean.perWind * degrees +
         (idle ? sway.degrees * degrees * wave(sway.period) : 0))
     }
     const forward = spring(state.forward, state.forwardRate, target.forward, lean.frequency, lean.damping)
@@ -403,7 +379,7 @@ export function createWorld (options: WorldOptions): World {
     actor.head.lift = lift
     const push = -head.gain * degrees * (leanAcceleration + liftAcceleration)
     const nod = spring(actor.head.angle, actor.head.rate, 0, head.frequency, head.damping, push)
-    actor.head.angle = Math.min(limit, Math.max(-limit, nod.value))
+    actor.head.angle = clampLean(nod.value)
     actor.head.rate = nod.rate
     const turn = multiply(axisAngle([0, 0, 1], -state.side), axisAngle([1, 0, 0], state.forward))
     const pivot = pose[actor.member.rig.pelvis]
@@ -430,7 +406,6 @@ export function createWorld (options: WorldOptions): World {
     }
   }
 
-  /** Steps the actor's cape and chains on its posed body; on the first frame, carries the rest cloth to the body. */
   const weather = (actor: Actor, root: RootState, pose: Pose, transforms: Turns): Float64Array | undefined => {
     const cloth = actor.cloth
     if (cloth === undefined) return undefined
@@ -473,7 +448,31 @@ export function createWorld (options: WorldOptions): World {
     return particles.position.slice(0, 3 * particles.count)
   }
 
-  /** The command that carries out a captured actor's current move, or undefined when the move is done. */
+  const actorFrame = (
+    actor: Actor,
+    root: RootState,
+    pose: Pose,
+    transforms: Turns,
+    time: number,
+    handover: boolean
+  ): ActorFrame => {
+    const body: Pose = { ...actor.rest, ...pose }
+    const joints: Pose = {}
+    for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, root)
+    springs(actor, root, joints, transforms)
+    const cloth = weather(actor, root, body, transforms)
+    const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
+    return {
+      name: actor.member.name,
+      joints,
+      root,
+      activity: actor.activity,
+      ...(say === undefined ? {} : { say }),
+      ...(cloth === undefined ? {} : { cloth }),
+      ...(handover && frameIndex > 0 ? { handover: true as const } : {})
+    }
+  }
+
   const commandFor = (actor: Actor, move: Move, time: number): Command | undefined => {
     const { position, yaw } = actor.root
     const elapsed = time - actor.moveStart
@@ -482,7 +481,6 @@ export function createWorld (options: WorldOptions): World {
       const stopped = Math.hypot(actor.root.velocity[0], actor.root.velocity[2]) < CAPTURE_STOPPED
       const late = elapsed > CAPTURE_WALK_GRACE + Math.abs(move.x - actor.moveFrom) / Math.max(move.speed, 0.1)
       if (Math.abs(dx) < CAPTURE_ARRIVAL || (Math.abs(dx) < CAPTURE_NEAR && stopped) || late) return undefined
-      // heads for the target along its lane, slowing as it nears it; it keeps facing along the walk afterwards
       actor.facing = dx > 0 ? Math.PI / 2 : -Math.PI / 2
       const pull = Math.abs(dx) > CAPTURE_NEAR ? (actor.lane - position[2]) * CAPTURE_LANE_PULL : 0
       return { speed: Math.min(move.speed, CAPTURE_APPROACH * Math.abs(dx)), heading: Math.atan2(dx, pull) }
@@ -495,33 +493,20 @@ export function createWorld (options: WorldOptions): World {
     return elapsed >= move.seconds ? undefined : { speed: 0, heading: actor.facing ?? yaw }
   }
 
-  /**
-   * Steps an actor that moves by motion capture: its next step becomes moves as for planned actors, each carried out
-   * as commands to its player, which the wind pushes; a poke shoves it away before it reacts.
-   */
   const stepCaptured = (actor: Actor, player: Player, time: number): ActorFrame => {
     let handover = false
     if (actor.poked !== undefined) {
-      // shoved away, but repeated pokes do not add up past a top speed; the startled walk goes away too
       const away = Math.sign(actor.root.position[0] - actor.poked) || 1
       const along = actor.root.velocity[0] * away
       const shoved = Math.min(along + CAPTURE_SHOVE, Math.max(along, CAPTURE_SHOVE_TOP))
       player.push([away * (shoved - along), 0, 0])
-      actor.steps = [...config.reactions.poke.steps]
-      actor.activity = 'startled'
+      startle(actor, time)
       actor.moves = []
-      actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
     }
     let command: Command | undefined
     for (let guard = 0; guard < CAPTURE_MOVES_PER_FRAME && command === undefined; guard++) {
       if (actor.moves.length === 0) {
-        if (actor.steps.length === 0) {
-          actor.activity = pickActivity(config.activities, next())
-          actor.steps = [...config.activities[actor.activity].steps]
-          let friend = Math.floor(next() * (actors.length - 1))
-          if (friend >= actors.indexOf(actor)) friend++
-          actor.friend = actors.length > 1 ? friend : 0
-        }
+        if (actor.steps.length === 0) startActivity(actor)
         actor.moves = movesOf(actor, actor.steps.shift() as Step, time)
         actor.moveStart = time
         actor.moveFrom = actor.root.position[0]
@@ -544,21 +529,7 @@ export function createWorld (options: WorldOptions): World {
     player.wind[2] = wind[2]
     const frame = player.step()
     actor.root = frame.root
-    const body: Pose = { ...actor.rest, ...frame.pose }
-    const joints: Pose = {}
-    for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, frame.root)
-    springs(actor, frame.root, joints, frame.transforms)
-    const cloth = weather(actor, frame.root, body, frame.transforms)
-    const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
-    return {
-      name: actor.member.name,
-      joints,
-      root: frame.root,
-      activity: actor.activity,
-      ...(say === undefined ? {} : { say }),
-      ...(cloth === undefined ? {} : { cloth }),
-      ...(handover && frameIndex > 0 ? { handover: true as const } : {})
-    }
+    return actorFrame(actor, frame.root, frame.pose, frame.transforms, time, handover)
   }
 
   const stepActor = (actor: Actor, time: number): ActorFrame => {
@@ -569,11 +540,9 @@ export function createWorld (options: WorldOptions): World {
         actor.root = { ...frame.root, velocity: [0, 0, 0], angularVelocity: 0 }
         actor.plants = frame.feet.map(foot => ({ ankle: foot.ankle, yaw: foot.toeYaw }))
       }
-      actor.steps = [...config.reactions.poke.steps]
-      actor.activity = 'startled'
+      startle(actor, time)
       actor.frames = []
       actor.next = 0
-      actor.say = { glyph: config.reactions.poke.say, until: time + 1 }
       plan(actor, time)
       actor.poked = undefined
     }
@@ -586,21 +555,7 @@ export function createWorld (options: WorldOptions): World {
     const { member } = actor
     const { pose, transforms } = poseAt({ frame, rig: member.rig, rest: actor.rest, mannequin: member.mannequin })
     live(actor, frame, pose, transforms, time)
-    const body: Pose = { ...actor.rest, ...pose }
-    const joints: Pose = {}
-    for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, frame.root)
-    springs(actor, frame.root, joints, transforms)
-    const cloth = weather(actor, frame.root, body, transforms)
-    const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
-    return {
-      name: actor.member.name,
-      joints,
-      root: frame.root,
-      activity: actor.activity,
-      ...(say === undefined ? {} : { say }),
-      ...(cloth === undefined ? {} : { cloth }),
-      ...(handover && frameIndex > 0 ? { handover: true as const } : {})
-    }
+    return actorFrame(actor, frame.root, pose, transforms, time, handover)
   }
 
   return {

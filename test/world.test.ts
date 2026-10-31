@@ -1,28 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { loadCharacter } from '../src/formats/character.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import { solePoints } from '../src/motion/metrics.ts'
 import { validateWorldConfig } from '../src/world/config.ts'
 import { createWorld } from '../src/world/world.ts'
-import type { CastMember, World, WorldFrame } from '../src/world/world.ts'
+import type { World } from '../src/world/world.ts'
+import { activityStarts, distanceAlongX, FPS, plainCast, run, showcaseConfig as config } from './world-fixtures.ts'
 
-const FPS = 24
-const config = validateWorldConfig(
-  JSON.parse(readFileSync(new URL('../site/world.json', import.meta.url), 'utf8'))
-).value!
-const cast: CastMember[] = config.cast.map(name => {
-  const character = loadCharacter(new URL(`../examples/${name}`, import.meta.url).pathname).value!
-  return { name, mannequin: character.mannequin, rig: character.rig }
-})
+const cast = plainCast()
 
 function world (seed = 3): World {
   return createWorld({ seed, cast, config, fps: FPS })
-}
-
-function run (w: World, frames: number): WorldFrame[] {
-  return Array.from({ length: frames }, () => w.step())
 }
 
 test('the showcase world config validates, and mistakes name their path', () => {
@@ -42,13 +30,9 @@ test('the showcase world config validates, and mistakes name their path', () => 
 test('over a minute every character keeps busy, covers ground for its speed, and visits happen', () => {
   const frames = run(world(), 60 * FPS)
   cast.forEach((member, k) => {
-    const activities = frames.map(f => f.actors[k].activity)
-    const started = activities.filter((a, i) => i === 0 || a !== activities[i - 1] || frames[i].actors[k].handover)
-    const distinct = new Set(activities)
-    let moved = 0
-    for (let i = 1; i < frames.length; i++) {
-      moved += Math.abs(frames[i].actors[k].root.position[0] - frames[i - 1].actors[k].root.position[0])
-    }
+    const started = activityStarts(frames, k)
+    const distinct = new Set(frames.map(f => f.actors[k].activity))
+    const moved = distanceAlongX(frames, k)
     const nonStop = member.rig.gait.referenceSpeed * 60
     assert.ok(distinct.size >= 2, `${member.name}: ${[...distinct].join(', ')}`)
     assert.ok(new Set(started).size >= 2 && started.length >= 4, `${member.name} started ${started.length}`)

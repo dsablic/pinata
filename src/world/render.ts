@@ -15,25 +15,17 @@ import type { Scenario } from '../formats/sim.ts'
 import { clothParts, withClothParts } from '../sim/render.ts'
 import type { Palette, WorldConfig } from './config.ts'
 import type { Terrain } from './terrain.ts'
-import type { WorldFrame } from './world.ts'
+import type { ActorFrame, WorldFrame } from './world.ts'
+import type { Pose } from '../motion/pose.ts'
+import { turnToWorld } from './yaw.ts'
 
-/** The config's view, plus the depth of the walkable band (metres either side of z = 0) and the bubble glyphs. */
-/**
- * The config's view, plus the depth of the walkable band (metres either side of z = 0), the stretch of x the world
- * uses, the bubble glyphs and the palette; the canvas size follows from them.
- */
 export type WorldViewOptions = WorldConfig['view'] & {
-  /** Draw cast members that have a skin with it (the default), or all of them procedurally. */
   skins?: boolean
   depth: number
   extent: [number, number]
   glyphs: WorldConfig['glyphs']
   palette: Palette
 }
-/**
- * How a cast member is drawn: its mannequin and style, and its cloth scenario when it has a cape or chains; with a
- * skin, its sprites drawn on its whole mannequin (the skin draws its own cape).
- */
 export type Look = {
   mannequin: Mannequin
   style: Style
@@ -46,10 +38,6 @@ type Sprite = { camera: Camera, previous?: GBuffer, size: number, view: { sector
 const SPRITE_MARGIN = 1.15
 const MARGIN_PX = 8
 
-/**
- * How far a character can reach from its root in any direction, metres: its farthest joint plus the thickest part,
- * plus the full length of its cape or chains (which can swing anywhere).
- */
 function reachOf (look: Look): number {
   const joints = Object.values(look.mannequin.joints)
   const farthest = Math.max(...joints.map(p => Math.hypot(p[0], p[1], p[2])))
@@ -61,12 +49,6 @@ function reachOf (look: Look): number {
   return farthest + thickest + hanging
 }
 
-
-
-/**
- * Draws a world frame: the terrain from the side with its top band and front face, then every character rendered
- * live in its own box that follows it (keeping its own temporal hysteresis), back to front, with speech bubbles.
- */
 export function createWorldView (terrain: Terrain, looks: Look[], options: WorldViewOptions) {
   const ppu = options.pixelsPerMetre
   const base = makeCamera({
@@ -103,11 +85,24 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
   let skinned = options.skins !== false
   let backdrop = drawTerrain(terrain, options, options.palette, screen, [width, height])
 
-  /** Where an actor's render box sits on the canvas: centred on its root's screen point. */
   const boxOf = (i: number, root: Vec3): { left: number, top: number, size: number } => {
     const anchor = screen(root)
     const { size } = sprites[i]
     return { left: Math.round(anchor[0] - size / 2), top: Math.round(anchor[1] - size / 2), size }
+  }
+
+  const drawProcedural = (actor: ActorFrame, look: Look, sprite: Sprite, joints: Pose, shift: Vec3): Image => {
+    const decals = look.mannequin.decals.map(d => ({ ...d, normal: turnToWorld(d.normal, actor.root.yaw) }))
+    let posed: Mannequin = { ...look.mannequin, joints, decals }
+    if (look.cloth !== undefined && actor.cloth !== undefined) {
+      const here = { position: actor.root.position, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
+      const cloth = clothParts(look.cloth, actor.cloth, here)
+      for (const name of Object.keys(cloth.joints)) cloth.joints[name] = add(cloth.joints[name], shift)
+      posed = withClothParts(posed, cloth)
+    }
+    const g = rasterize(posed, sprite.camera, options.samples, sprite.previous)
+    sprite.previous = g
+    return stylize(g, posed, sprite.camera, look.style).image
   }
 
   const render = (frame: WorldFrame): Image => {
@@ -126,33 +121,19 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
         scale(sprite.camera.right, (anchor[0] - left - sprite.size / 2) / ppu),
         scale(sprite.camera.up, (sprite.size - (anchor[1] - top)) / ppu)
       )
-      const joints: Record<string, Vec3> = {}
+      const joints: Pose = {}
       for (const [name, p] of Object.entries(actor.joints)) {
         joints[name] = add([p[0] - root[0], p[1] - root[1], p[2] - root[2]], shift)
       }
-      const yaw = actor.root.yaw
-      if (skinned && look.skin !== undefined) {
-        const pose = { ...look.skin.mannequin.joints, ...joints }
-        const { skin, mannequin } = look.skin
-        const image = renderSkinned({ mannequin, pose, skin, camera: sprite.camera, yaw, view: sprite.view })
-        blit(out, image, left, top)
-        if (actor.say !== undefined) {
-          bubble(out, options.glyphs[actor.say] ?? Object.values(options.glyphs)[0], Math.round(anchor[0]),
-            top + Math.round(sprite.size * 0.1))
-        }
-        continue
-      }
-      const decals = look.mannequin.decals.map(d => ({ ...d, normal: turnY(d.normal, yaw) }))
-      let posed: Mannequin = { ...look.mannequin, joints, decals }
-      if (look.cloth !== undefined && actor.cloth !== undefined) {
-        const here = { position: actor.root.position, yaw: 0, velocity: [0, 0, 0] as Vec3, angularVelocity: 0 }
-        const cloth = clothParts(look.cloth, actor.cloth, here)
-        for (const name of Object.keys(cloth.joints)) cloth.joints[name] = add(cloth.joints[name], shift)
-        posed = withClothParts(posed, cloth)
-      }
-      const g = rasterize(posed, sprite.camera, options.samples, sprite.previous)
-      sprite.previous = g
-      const image = stylize(g, posed, sprite.camera, look.style).image
+      const image = skinned && look.skin !== undefined
+        ? renderSkinned({
+          ...look.skin,
+          pose: { ...look.skin.mannequin.joints, ...joints },
+          camera: sprite.camera,
+          yaw: actor.root.yaw,
+          view: sprite.view
+        })
+        : drawProcedural(actor, look, sprite, joints, shift)
       blit(out, image, left, top)
       if (actor.say !== undefined) {
         bubble(out, options.glyphs[actor.say] ?? Object.values(options.glyphs)[0], Math.round(anchor[0]),
@@ -161,20 +142,12 @@ export function createWorldView (terrain: Terrain, looks: Look[], options: World
     }
     return out
   }
-  /** Redraws the terrain in another scene's palette. */
   const setPalette = (palette: Palette): void => {
     backdrop = drawTerrain(terrain, options, palette, screen, [width, height])
   }
   const boxes = (frame: WorldFrame) => frame.actors.map((actor, i) => boxOf(i, actor.root.position))
-  /** Draws skinned cast members with their skins, or procedurally. */
   const setSkins = (on: boolean): void => { skinned = on }
   return { render, screen, setPalette, setSkins, boxes, camera: world }
-}
-
-function turnY (v: Vec3, yaw: number): Vec3 {
-  const c = Math.cos(yaw)
-  const s = Math.sin(yaw)
-  return [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
 }
 
 function blit (out: Image, image: Image, left: number, top: number): void {
@@ -186,7 +159,6 @@ function blit (out: Image, image: Image, left: number, top: number): void {
   }
 }
 
-/** A speech bubble with a glyph (rows of '#' ink and '.' paper) above a point. */
 function bubble (out: Image, rows: string[], cx: number, bottom: number): void {
   const w = Math.max(...rows.map(r => r.length)) + 4
   const h = rows.length + 4
@@ -207,7 +179,6 @@ function bubble (out: Image, rows: string[], cx: number, bottom: number): void {
   })
 }
 
-/** The terrain as pixel art: sky, the top band between the back and front of the lanes, and the front face below it. */
 function drawTerrain (
   terrain: Terrain,
   options: WorldViewOptions,

@@ -3,21 +3,18 @@ import assert from 'node:assert/strict'
 import type { Mannequin } from '../src/formats/mannequin.ts'
 import { legsOf } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
-import type { Vec3 } from '../src/math/vec.ts'
 import { planGait } from '../src/motion/gait.ts'
 import * as metrics from '../src/motion/metrics.ts'
-import type { LocomotionRecording } from '../src/motion/metrics.ts'
 import { restPose } from '../src/motion/pose.ts'
 import type { RootState } from '../src/motion/script.ts'
 import { generateTerrain, terrainOf } from '../src/world/terrain.ts'
 import type { Terrain } from '../src/world/terrain.ts'
 import { mannequin, quadMannequin, quadRig, rig } from './locomotion-fixtures.ts'
+import { aboveGround, assertFeetStay, FPS } from './world-fixtures.ts'
 
-const FPS = 24
 const SPEED = 0.4
 const WALK = 18
 
-/** Ramps of 20 degrees and flights of four stairs of the given rise, up and down. */
 function course (rise: number): Terrain {
   const ramp = 0.5 / Math.tan(20 * Math.PI / 180)
   const top = 0.5 + 4 * rise
@@ -41,41 +38,27 @@ function track (t: number): RootState {
   }
 }
 
-/** The recording with every joint's height measured from the ground under it, so the flat-ground metrics apply. */
-function aboveGround (recording: LocomotionRecording, terrain: Terrain): LocomotionRecording {
-  return {
-    fps: recording.fps,
-    frames: recording.frames.map(frame => ({
-      ...frame,
-      joints: Object.fromEntries(Object.entries(frame.joints).map(([name, p]): [string, Vec3] => {
-        return [name, [p[0], p[1] - terrain.ground(p[0], p[2]), p[2]]]
-      }))
-    }))
-  }
-}
-
 function legLength (m: Mannequin, r: Rig): number {
   const rest = restPose(m)
   const leg = legsOf(r)[0]
   return rest[leg.hip][1] - rest[leg.ankle][1]
 }
 
+function walkOver (body: Mannequin, bodyRig: Rig, terrain: Terrain, path: (t: number) => RootState, duration: number) {
+  const rest = restPose(body)
+  const ground = terrain.ground
+  const frames = planGait({ track: path, rig: bodyRig, rest, mannequin: body, duration, fps: FPS, ground })
+  const recording = metrics.recordLocomotion(frames, { rig: bodyRig, rest, mannequin: body, fps: FPS })
+  const relative = aboveGround(recording, terrain.ground)
+  return { frames, recording, relative, geometry: { rig: bodyRig, mannequin: body }, mpp: body.height / 48 }
+}
+
 for (const [name, body, bodyRig] of [['biped', mannequin, rig], ['quadruped', quadMannequin, quadRig]] as const) {
   test(`a ${name} walks up and down 20-degree ramps and stairs rising 0.35 leg lengths without slipping`, () => {
     const terrain = course(0.35 * legLength(body, bodyRig))
-    const rest = restPose(body)
-    const frames = planGait({
-      track, rig: bodyRig, rest, mannequin: body, duration: WALK + 2, fps: FPS, ground: terrain.ground
-    })
-    const recording = metrics.recordLocomotion(frames, { rig: bodyRig, rest, mannequin: body, fps: FPS })
-    const relative = aboveGround(recording, terrain)
-    const geometry = { rig: bodyRig, mannequin: body }
-    const mpp = body.height / 48
+    const { recording, relative, geometry, mpp } = walkOver(body, bodyRig, terrain, track, WALK + 2)
     assert.ok(recording.frames[recording.frames.length - 1].root.position[0] > 6, 'the walk crosses the course')
-    const slide = metrics.footSlidePx(relative, geometry, mpp)
-    assert.ok(slide <= 0.25, `slide ${slide}`)
-    const penetration = metrics.groundPenetrationPx(relative, geometry, mpp)
-    assert.ok(penetration <= 0.5, `penetration ${penetration}`)
+    assertFeetStay(relative, geometry, mpp, name)
     assert.equal(metrics.reachViolations(recording), 0)
     assert.equal(metrics.kneeLimitViolations(recording, geometry), 0)
     assert.equal(metrics.alternationViolations(relative, geometry, [{ start: 2, end: WALK - 1 }]), 0)
@@ -136,19 +119,12 @@ for (const seed of [3, 8, 15]) {
       const terrain = generateTerrain(seed, {
         length: 12, maxRise: 0.3 * leg, maxSlopeDegrees: 18, maxHeight: 4 * 0.3 * leg, minTread: 0.4
       })
-      const rest = restPose(body)
       for (const [from, to] of [[0.5, 11], [11, 0.5]]) {
-        const track = walkAlong(from, to)
         const duration = Math.abs(to - from) / SPEED + 2
-        const ground = terrain.ground
-        const frames = planGait({ track, rig: bodyRig, rest, mannequin: body, duration, fps: FPS, ground })
-        const recording = metrics.recordLocomotion(frames, { rig: bodyRig, rest, mannequin: body, fps: FPS })
-        const relative = aboveGround(recording, terrain)
-        const geometry = { rig: bodyRig, mannequin: body }
-        const mpp = body.height / 48
+        const walk = walkOver(body, bodyRig, terrain, walkAlong(from, to), duration)
+        const { frames, recording } = walk
         const where = `seed ${seed}, ${from} to ${to}`
-        assert.ok(metrics.footSlidePx(relative, geometry, mpp) <= 0.25, `${where}: slide`)
-        assert.ok(metrics.groundPenetrationPx(relative, geometry, mpp) <= 0.5, `${where}: penetration`)
+        assertFeetStay(walk.relative, walk.geometry, walk.mpp, where)
         assert.equal(metrics.reachViolations(recording), 0, `${where}: reach`)
         assert.ok(frames.every(f => Math.abs(f.pelvisPitch ?? 0) <= 35 * Math.PI / 180), `${where}: lean`)
         const nominal = bodyRig.gait.strideLength / 2

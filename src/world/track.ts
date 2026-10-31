@@ -1,7 +1,7 @@
 import type { Vec3 } from '../math/vec.ts'
 import type { RootState } from '../motion/script.ts'
+import { turnBetween } from './yaw.ts'
 
-/** One piece of a root's motion: turn in place to a yaw, walk straight to a point on the x axis, or stand. */
 export type Move =
   | { kind: 'turn', yaw: number, seconds: number }
   | { kind: 'walk', x: number, speed: number }
@@ -16,18 +16,11 @@ function smoothstep (u: number): number {
   return c * c * (3 - 2 * c)
 }
 
-/** Integral of smoothstep from 0 to u, for u in [0, 1]. */
 function smoothstepArea (u: number): number {
   const c = Math.min(1, Math.max(0, u))
   return c * c * c - c * c * c * c / 2
 }
 
-/** The shortest signed angle from a to b. */
-export function turnBetween (a: number, b: number): number {
-  return Math.atan2(Math.sin(b - a), Math.cos(b - a))
-}
-
-/** The easing time of a walk: ACCEL_SECONDS, or less for a walk too short to reach its speed. */
 function easeOf (distance: number, speed: number): number {
   return Math.min(ACCEL_SECONDS, distance / speed)
 }
@@ -56,11 +49,6 @@ function stateIn (piece: Piece, t: number): RootState {
   return { position, yaw: from.yaw, velocity: [sign * speed, 0, 0], angularVelocity: 0 }
 }
 
-/**
- * A root track through a list of moves from a starting state, and its length in seconds. Walks ease in and out, so a
- * walk of distance d at speed v takes d / v + e seconds (e is 0.6 s, or d / v if shorter) and covers exactly d; turns
- * ease over their seconds.
- */
 export function trackOf (start: RootState, moves: Move[]): { track: (t: number) => RootState, seconds: number } {
   const pieces: Piece[] = []
   let time = 0

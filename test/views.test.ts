@@ -116,3 +116,26 @@ test('an eight-direction skin needs the character\'s yaw, and keeps its view bet
   renderSkinned({ ...options, yaw: 10 * Math.PI / 180, view })
   assert.deepEqual(view, { sector: 0 })
 })
+
+test('eight-direction sprites may be drawn upright, reuse another sprite, and set a layer', () => {
+  const base = JSON.parse(readFileSync('pocs/p7-skins/knight/skin.json', 'utf8'))
+  const skin = structuredClone(base)
+  // an upright thigh: A at the top, B below, the right-hand column becomes the lying sprite's top row
+  const [a, b, c, d, e, f] = Object.keys(skin.palette)
+  skin.views.front.parts.thighR = { rows: [a + b, c + d, e + f], pivotA: [0, 0], pivotB: [0, 2], upright: true }
+  skin.views.back.parts.thighR = { from: 'front.thighR', layer: 2 }
+  skin.views.back.parts.thighL = { from: 'thighR' }
+  const read = validateSkin(skin)
+  assert.deepEqual(read.errors, [])
+  const front = read.value!.views!.front.parts.thighR
+  assert.deepEqual(front, { rows: [b + d + f, a + c + e], pivotA: [0, 1], pivotB: [2, 1] })
+  assert.deepEqual(read.value!.views!.back.parts.thighR, { ...front, layer: 2 })
+  assert.deepEqual(read.value!.views!.back.parts.thighL, front)
+  const loop = structuredClone(base)
+  loop.views.side.parts.thighR = { from: 'thighL' }
+  loop.views.side.parts.thighL = { from: 'thighR' }
+  assert.ok(validateSkin(loop).errors.some(e => e.path === 'views.side.parts.thighR.from'))
+  const sideways = structuredClone(skin)
+  sideways.views.front.parts.thighR.pivotB = [1, 2]
+  assert.ok(validateSkin(sideways).errors.some(e => e.path === 'views.front.parts.thighR.pivotB'))
+})

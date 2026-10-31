@@ -34,6 +34,7 @@ export type SkinnedOptions = {
 type Screen = { x: number, y: number, depth: number }
 type Placement = {
   name: string
+  layer?: number
   /** The part's joints, to tell parts that join (no line between them) from parts that only overlap. */
   joints: [string, string]
   /** The farther of a left and right pair, drawn a shade darker. */
@@ -111,6 +112,7 @@ function placements (o: SkinnedOptions): Placement[] {
     found.push({
       name: part.name,
       joints: [part.a, part.b],
+      ...(sprite.layer === undefined ? {} : { layer: sprite.layer }),
       ...(unmirrored?.rows === undefined || unmirrored.pivotA === undefined
         ? {}
         : { unmirrored: { rows: unmirrored.rows, pivot: unmirrored.pivotA } }),
@@ -129,7 +131,7 @@ function placements (o: SkinnedOptions): Placement[] {
       if (other !== undefined && other !== p && p.depth - other.depth > FAR_DEPTH) p.far = true
     }
   }
-  return found.sort((p, q) => q.depth - p.depth)
+  return found.sort((p, q) => (p.layer ?? 0) - (q.layer ?? 0) || q.depth - p.depth)
 }
 
 /** How much deeper (metres) a limb must be than its counterpart to count as the far one. */

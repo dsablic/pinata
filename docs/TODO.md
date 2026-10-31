@@ -26,7 +26,8 @@ first.
 ### 0b. World showcase, remaining batches
 
 [World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
-into P7 batch D), physics engine spike (D), page-as-world (E).
+into P7 batch D), physics engine spike (D), page-as-world (E). Once page-as-world works, rework the world demo to
+use the page's elements instead of the generated terrain (user, 2026-10-31).
 
 ### 1. Leftovers from general limbs
 

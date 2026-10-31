@@ -53,6 +53,17 @@ right side is on screen-left.
   limb of each left and right pair one shade darker. So give overlapping parts different values (not only different
   hues) and include a darker shade for each main colour.
 
+## Drawing helpers
+
+- `"upright": true` on a two-joint sprite: draw it standing, joint A at the top and joint B straight below it
+  (`pivotB` in the same column as `pivotA`, further down); the tool turns it to lie along +x for you. Shade it as it
+  hangs (for a leg or an arm at rest, that is how it is seen most).
+- `"layer": n` (a whole number, default 0): parts on a higher layer are always drawn over parts on a lower one,
+  whatever their depth. Use it where the depth order picks the wrong part (a beard over the robe, a hand over a
+  handle).
+- `"from": "thighR"` or `"from": "side.thighR"`: reuse another sprite (in the same view, or `view.part`) instead of
+  copying it; add `"layer"` beside it to change only the layer.
+
 ## Pivots
 
 `pivotA` is the pixel `[x, y]` (column, row, 0-based from the top-left) that sits on joint A. For a two-joint part,

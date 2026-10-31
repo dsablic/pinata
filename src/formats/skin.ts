@@ -7,6 +7,14 @@ export type SkinPart = {
   pivotA?: [number, number]
   pivotB?: [number, number]
   hidden?: boolean
+  /**
+   * Eight-direction skins only. `upright`: a two-joint sprite drawn standing, joint A at the top and B straight below
+   * it (the reader turns it to lie along +x). `layer`: parts on a higher layer are drawn over lower ones, whatever
+   * their depth (default 0). `from`: reuse another sprite, by part name in the same view or as `view.part`.
+   */
+  upright?: boolean
+  layer?: number
+  from?: string
 }
 
 /**
@@ -30,7 +38,7 @@ export const MAX_COLOURS = 16
 export const MAX_SPRITE_SIZE = 64
 
 const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
-const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden'] as const
+const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden', 'upright', 'layer', 'from'] as const
 const HEX = /^#[0-9a-fA-F]{6}$/
 
 export function validateSkin (input: unknown): Validated<Skin> {
@@ -48,21 +56,33 @@ export function validateSkin (input: unknown): Validated<Skin> {
       errors.push({ path: 'views', message: `expected an object with ${VIEWS.join(', ')}` })
     } else {
       checkKnownKeys(input.views, VIEWS, 'views', errors)
-      for (const view of VIEWS) {
-        const drawn = input.views[view]
+      const views = structuredClone(input.views) as Record<string, unknown>
+      const drawnViews = VIEWS.filter(view => {
+        const drawn = views[view]
         if (!isRecord(drawn) || !isRecord(drawn.parts)) {
           errors.push({ path: `views.${view}`, message: 'expected { parts: { partName: sprite } }' })
-          continue
+          return false
         }
         checkKnownKeys(drawn, ['parts'], `views.${view}`, errors)
-        for (const [name, part] of Object.entries(drawn.parts)) {
-          validatePart(part, `views.${view}.parts.${name}`, palette, errors)
+        return true
+      })
+      if (errors.length > 0) return { errors }
+      const partsOf = (view: string): Record<string, unknown> => (views[view] as { parts: Record<string, unknown> }).parts
+      for (const view of drawnViews) resolveFrom(partsOf, view, errors)
+      for (const view of drawnViews) {
+        for (const [name, part] of Object.entries(partsOf(view))) {
+          const path = `views.${view}.parts.${name}`
+          validatePart(part, path, palette, errors)
+          if (isRecord(part) && part.upright === true && errors.every(e => !e.path.startsWith(path))) {
+            partsOf(view)[name] = laidDown(part as SkinPart, path, errors)
+          }
         }
       }
+      if (errors.length > 0) return { errors }
+      const skin = { ...(structuredClone(input) as unknown as Skin), views: views as Skin['views'] }
+      return { value: { ...skin, parts: skin.views!.side.parts }, errors }
     }
     if (errors.length > 0) return { errors }
-    const skin = structuredClone(input) as unknown as Skin
-    return { value: { ...skin, parts: skin.views!.side.parts }, errors }
   }
   if (input.view !== 'side-right') {
     errors.push({ path: 'view', message: "expected 'side-right', or 'views' for an eight-direction skin" })
@@ -109,6 +129,12 @@ function validatePart (part: unknown, path: string, palette: Set<string>, errors
   checkKnownKeys(part, PART_FIELDS, path, errors)
   if (part.hidden !== undefined && typeof part.hidden !== 'boolean') {
     errors.push({ path: `${path}.hidden`, message: 'expected true or false' })
+  }
+  if (part.layer !== undefined && !Number.isInteger(part.layer)) {
+    errors.push({ path: `${path}.layer`, message: 'expected a whole number; higher layers draw over lower ones' })
+  }
+  if (part.upright !== undefined && typeof part.upright !== 'boolean') {
+    errors.push({ path: `${path}.upright`, message: 'expected true or false' })
   }
   if (part.hidden === true) return
   const size = validateRows(part.rows, `${path}.rows`, palette, errors)
@@ -213,4 +239,55 @@ function checkTwoJoint (sprite: SkinPart, path: string, errors: ValidationError[
         '(the bone points along +x in the sprite)'
     })
   }
+}
+
+/**
+ * Replaces every sprite that has `from` with a copy of the sprite it names (its own `layer` kept), following chains of
+ * references; a missing or circular reference is an error.
+ */
+function resolveFrom (partsOf: (view: string) => Record<string, unknown>, view: string, errors: ValidationError[]): void {
+  const parts = partsOf(view)
+  for (const [name, part] of Object.entries(parts)) {
+    if (!isRecord(part) || part.from === undefined) continue
+    const path = `views.${view}.parts.${name}.from`
+    let target: unknown = part
+    const seen = new Set<string>()
+    while (isRecord(target) && target.from !== undefined) {
+      const ref = String(target.from)
+      const [refView, refPart] = ref.includes('.') ? ref.split('.', 2) : [view, ref]
+      if (seen.has(`${refView}.${refPart}`) || !(VIEWS as readonly string[]).includes(refView)) {
+        target = undefined
+        break
+      }
+      seen.add(`${refView}.${refPart}`)
+      target = partsOf(refView)[refPart]
+    }
+    if (!isRecord(target)) {
+      errors.push({ path, message: `'${String(part.from)}' is not a sprite (expected 'part' or 'view.part', no loops)` })
+      continue
+    }
+    const { from, ...copied } = target
+    parts[name] = { ...structuredClone(copied), ...(part.layer === undefined ? {} : { layer: part.layer }) }
+  }
+}
+
+/**
+ * An upright two-joint sprite (A at the top, B straight below) turned to lie along +x from A to B, its top row being
+ * the left of travel: the upright sprite's right-hand column becomes the top row.
+ */
+function laidDown (part: SkinPart, path: string, errors: ValidationError[]): SkinPart {
+  const rows = (part.rows ?? []).map(row => [...row])
+  const { pivotA, pivotB } = part
+  if (pivotA === undefined || pivotB === undefined || pivotB[0] !== pivotA[0] || pivotB[1] <= pivotA[1]) {
+    errors.push({
+      path: `${path}.pivotB`,
+      message: 'an upright sprite needs pivotB in the same column as pivotA and below it (the bone points down)'
+    })
+    return part
+  }
+  const width = rows[0].length
+  const turned = Array.from({ length: width }, (_, y) => rows.map(row => row[width - 1 - y]).join(''))
+  const turn = (p: [number, number]): [number, number] => [p[1], width - 1 - p[0]]
+  const { upright, ...rest } = part
+  return { ...rest, rows: turned, pivotA: turn(pivotA), pivotB: turn(pivotB) }
 }

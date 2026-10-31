@@ -171,3 +171,6 @@ agent wiring stays out of it.
   is unchanged.
 - `dress` in the config draws the simulated capes and chains in the world (material and radius) and hides the fixed
   mannequin parts they replace (the knight's rigid cape boxes).
+
+- **2026-10-31, user direction.** Once page-as-world works (batch E: DOM elements as platforms), rework the world demo
+  to stand on the page's own elements instead of the generated terrain.

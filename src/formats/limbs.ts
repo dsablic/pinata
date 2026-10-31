@@ -111,7 +111,6 @@ export function legsOf ({ limbs }: Source): Leg[] {
   return legs
 }
 
-/** Rank of each value from the largest (0); equal values rank the later one first. */
 export function rankFromFront (values: readonly number[]): number[] {
   return values.map((value, i) => {
     return values.filter((other, k) => other > value || (other === value && k > i)).length
@@ -161,7 +160,11 @@ function isKind (v: unknown): v is LimbKind {
   return v === 'leg' || v === 'arm' || v === 'appendage'
 }
 
-function isSide (v: unknown): v is Side {
+function isCycleOffset (v: unknown): v is number {
+  return isFiniteNumber(v) && v >= 0 && v < 1
+}
+
+export function isSide (v: unknown): v is Side {
   return v === 'left' || v === 'right'
 }
 
@@ -208,7 +211,6 @@ export function validateLimbList (value: unknown, phaseRequired: boolean, errors
   return limbs
 }
 
-/** `leg2` for the second unnamed leg, or the next free number when a limb already uses that name. */
 function defaultName (kind: LimbKind, count: number, taken: Set<string>): string {
   let n = count
   while (taken.has(`${kind}${n}`)) n++
@@ -259,7 +261,7 @@ function validateSide (limb: Record<string, unknown>, kind: LimbKind, here: stri
   errors.push({ path: `${here}.side`, message: `expected 'left' or 'right'${note}` })
 }
 
-function validateCarried (limb: Record<string, unknown>, here: string, errors: ValidationError[]): void {
+export function validateCarried (limb: Record<string, unknown>, here: string, errors: ValidationError[]): void {
   if (limb.carried === undefined) return
   const ok = Array.isArray(limb.carried) && limb.carried.every(isNonEmptyString)
   if (!ok) errors.push({ path: `${here}.carried`, message: 'expected an array of joint names' })
@@ -278,7 +280,7 @@ export function validateLegPhase (phase: unknown, here: string, context: Context
       message: `expected a number from 0 up to 1: ${context.legCount} legs need a phase each (the usual walk ` +
         'order for four is left hind 0, left front 0.25, right hind 0.5, right front 0.75), or name a template'
     })
-  } else if (phase !== undefined && !(isFiniteNumber(phase) && phase >= 0 && phase < 1)) {
+  } else if (phase !== undefined && !isCycleOffset(phase)) {
     const message = "expected a number from 0 up to 1: the leg's offset in the gait cycle"
     errors.push({ path: `${here}.phase`, message })
   }
@@ -365,7 +367,7 @@ function validateAppendage (limb: Record<string, unknown>, here: string, errors:
       message: `expected seconds per full swing, above 0 and at most ${MAX_PERIOD_SECONDS}${note}`
     })
   }
-  if (phase !== undefined && !(isFiniteNumber(phase) && phase >= 0 && phase < 1)) {
+  if (phase !== undefined && !isCycleOffset(phase)) {
     errors.push({ path: `${path}.phase`, message: 'expected a number from 0 up to 1: the offset in the cycle' })
   }
 }

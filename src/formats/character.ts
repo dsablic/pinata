@@ -12,7 +12,7 @@ import { checkCapeAnchors, checkRig, legsOf, limbPath, resolveRig, validateRig }
 import type { Rig } from './rig.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
-import { checkKnownKeys, isNonEmptyString, isRecord } from './validate.ts'
+import { checkKnownKeys, displayPath, isNonEmptyString, isRecord } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type CharacterFiles = { mannequin: string, style: string, rig: string, materials: string, motion: string }
@@ -46,23 +46,25 @@ const MOTION_FIELDS = [
 type Errors = ValidationError[]
 
 function tag (file: string, errors: Errors): Errors {
-  return errors.map(e => ({ path: `${file}: ${e.path === '' ? '(root)' : e.path}`, message: e.message }))
+  return errors.map(e => ({ path: `${file}: ${displayPath(e.path)}`, message: e.message }))
 }
 
-/** One line per error: `file: path: message`. The file name is the first part of each error's path. */
 export function formatCharacterErrors (errors: Errors): string {
   return errors.map(e => `${e.path}: ${e.message}`).join('\n')
+}
+
+function fileError (file: string, message: string): ValidationError {
+  return tag(file, [{ path: '', message }])[0]
 }
 
 function readJson (dir: string, file: string, errors: Errors): unknown {
   try {
     return JSON.parse(readFileSync(join(dir, file), 'utf8'))
   } catch (err) {
-    if (err instanceof SyntaxError) errors.push(...tag(file, [{ path: '', message: `invalid JSON: ${err.message}` }]))
-    else if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      errors.push(...tag(file, [{ path: '', message: 'file not found' }]))
-    } else if ((err as NodeJS.ErrnoException).code === 'EISDIR') {
-      errors.push(...tag(file, [{ path: '', message: 'expected a file, found a directory' }]))
+    if (err instanceof SyntaxError) errors.push(fileError(file, `invalid JSON: ${err.message}`))
+    else if ((err as NodeJS.ErrnoException).code === 'ENOENT') errors.push(fileError(file, 'file not found'))
+    else if ((err as NodeJS.ErrnoException).code === 'EISDIR') {
+      errors.push(fileError(file, 'expected a file, found a directory'))
     } else throw err
     return undefined
   }
@@ -93,7 +95,7 @@ function resolveFiles (manifest: Record<string, unknown>, errors: Errors): Chara
 
 function validateManifest (input: unknown, errors: Errors): Record<string, unknown> | undefined {
   if (!isRecord(input)) {
-    errors.push(...tag(MANIFEST_FILE, [{ path: '', message: 'expected a JSON object' }]))
+    errors.push(fileError(MANIFEST_FILE, 'expected a JSON object'))
     return undefined
   }
   const found: Errors = []
@@ -166,18 +168,13 @@ function crossChecks (parts: Omit<Character, 'name' | 'description' | 'dir' | 'f
     ]),
     ...tag(files.rig, [...checkRig(rig, mannequin), ...feet]),
     ...tag(files.motion, [
-      ...fromExclude(checkScenario(scenario, mannequin, materials)), 
+      ...fromExclude(checkScenario(scenario, mannequin, materials)),
       ...checkRenderMaterials(scenario, Object.keys(style.materials)),
       ...capeErrors, ...checkWalk(scenario)
     ])
   ]
 }
 
-/**
- * Loads `character.json` and the files it names (defaults: mannequin.json, style.json, rig.json, materials.json,
- * motion.json), validates each with its format's validator and then cross-checks them. Every error's path starts
- * with the file name: `file: path`.
- */
 export function loadCharacter (dir: string): Validated<Character> {
   const errors: Errors = []
   const input = readJson(dir, MANIFEST_FILE, errors)

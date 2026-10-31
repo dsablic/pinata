@@ -22,10 +22,6 @@ function steadyRange (character: Character, recording: LocomotionRecording): { f
   return { first: clamp(Math.round(window.start * fps)), last: clamp(Math.round(window.end * fps)) }
 }
 
-/**
- * The body with the rendered cloth strands of the middle frame of the first steady walk, in body-local space, for
- * the static views: the cloth has settled into the walk there and hangs where it does while the character moves.
- */
 export function withSettledCloth (
   character: Character,
   locomotion: LocomotionRecording,

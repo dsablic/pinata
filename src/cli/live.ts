@@ -6,10 +6,10 @@ import { encodePng } from '../png/encode.ts'
 import { validateBehaviours } from '../runtime/behaviours.ts'
 import { createLive } from '../runtime/character.ts'
 import { createView, DEFAULT_VIEW } from '../runtime/render.ts'
+import { ROOT } from './paths.ts'
 
 const USAGE = 'usage: node src/cli/live.ts [--character <dir>] [--events <file>] [--start <event>] ' +
   '[--format png|cells] [--px <n>] [--fps <n>] [--samples <n>] [--frames <n>]'
-const ROOT = resolve(import.meta.dirname, '..', '..')
 const UPPER_HALF = 0x2580
 const LOWER_HALF = 0x2584
 const SPACE = 0x20
@@ -64,7 +64,6 @@ export function parseArgs (argv: string[]): LiveArgs | string {
   return args
 }
 
-/** Packs an RGBA image as Raster cells: one cell is two vertical pixels, transparent pixels the default colour. */
 export function toCells (img: Image): { columns: number, rows: number, cells: Buffer } {
   const columns = img.width
   const rows = Math.ceil(img.height / 2)
@@ -94,7 +93,6 @@ function isLittleEndian (): boolean {
   return new Uint8Array(Uint32Array.of(1).buffer)[0] === 1
 }
 
-/** Reads the events file: whole lines of `<seq> <name>` (a line still being written is left), those after `seen`. */
 export function readEvents (path: string, seen: number): Array<{ seq: number, name: string }> {
   let text: string
   try {
@@ -111,7 +109,6 @@ export function readEvents (path: string, seen: number): Array<{ seq: number, na
   return events.sort((a, b) => a.seq - b.seq)
 }
 
-/** One line of the frame stream: the behaviour playing and the frame as a PNG or as Raster cells, base64. */
 export function frameLine (format: Format, behaviour: string, image: Image): Record<string, string | number> {
   if (format === 'png') {
     return { behaviour, width: image.width, height: image.height, png: encodePng(image).toString('base64') }

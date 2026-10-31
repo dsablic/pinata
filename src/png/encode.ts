@@ -1,7 +1,13 @@
 import { deflateSync } from 'node:zlib'
 import type { Image } from '../image.ts'
 
-const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const BIT_DEPTH = 8
+const COLOUR_TYPE_RGBA = 6
+const NO_OFFSET = 0
+const DISPOSE_NONE = 0
+const BLEND_SOURCE = 0
+const LOOP_FOREVER = 0
 const CRC_TABLE = buildCrcTable()
 
 function buildCrcTable (): Uint32Array {
@@ -37,8 +43,8 @@ function header (img: Image): Buffer {
   const out = Buffer.alloc(13)
   out.writeUInt32BE(img.width, 0)
   out.writeUInt32BE(img.height, 4)
-  out[8] = 8
-  out[9] = 6
+  out[8] = BIT_DEPTH
+  out[9] = COLOUR_TYPE_RGBA
   return out
 }
 
@@ -53,7 +59,7 @@ function compressed (img: Image): Buffer {
 
 export function encodePng (img: Image): Buffer {
   return Buffer.concat([
-    SIGNATURE,
+    PNG_SIGNATURE,
     chunk('IHDR', header(img)),
     chunk('IDAT', compressed(img)),
     chunk('IEND', new Uint8Array(0))
@@ -72,14 +78,10 @@ function frameControl (sequence: number, img: Image, options: ApngOptions): Buff
   const delay = Buffer.alloc(4)
   delay.writeUInt16BE(options.delayNum, 0)
   delay.writeUInt16BE(options.delayDen, 2)
-  // x offset, y offset, then delay, dispose_op NONE and blend_op SOURCE: every frame replaces the whole canvas.
-  return chunk('fcTL', Buffer.concat([u32(sequence, img.width, img.height, 0, 0), delay, Buffer.from([0, 0])]))
+  const placement = u32(sequence, img.width, img.height, NO_OFFSET, NO_OFFSET)
+  return chunk('fcTL', Buffer.concat([placement, delay, Buffer.from([DISPOSE_NONE, BLEND_SOURCE])]))
 }
 
-/**
- * Animated PNG: every frame must have the first frame's size and replaces the whole canvas. The first frame is also
- * the default image, so decoders without APNG support show it. `plays` of 0 loops forever.
- */
 export function encodeApng (frames: Image[], options: ApngOptions): Buffer {
   if (frames.length === 0) throw new RangeError('an animation needs at least one frame')
   const [first] = frames
@@ -87,9 +89,9 @@ export function encodeApng (frames: Image[], options: ApngOptions): Buffer {
     throw new RangeError('all frames must have the same size')
   }
   const chunks = [
-    SIGNATURE,
+    PNG_SIGNATURE,
     chunk('IHDR', header(first)),
-    chunk('acTL', u32(frames.length, options.plays ?? 0))
+    chunk('acTL', u32(frames.length, options.plays ?? LOOP_FOREVER))
   ]
   let sequence = 0
   frames.forEach((frame, i) => {

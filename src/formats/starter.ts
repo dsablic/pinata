@@ -14,18 +14,22 @@ type Body = {
   appendages: Array<{ name: string, joints: string[] }>
   upperBody: string[]
   legLength: number
-  /** Gait values tuned so that this starter passes check, over the template's. */
-  gait?: Record<string, number>
+  tunedGait?: Record<string, number>
 }
 
 const LEG_RADIUS = 0.035
 const FOOT_RADIUS = 0.045
 const MIN_STEP_HEIGHT = 0.05
 const SIDES = [{ side: 'left', sign: 1, tag: 'L' }, { side: 'right', sign: -1, tag: 'R' }] as const
-const ROUND = 1e6
+const JOINT_PRECISION = 1e6
+const SIZE_PRECISION = 1000
+
+function roundTo (value: number, precision: number): number {
+  return Math.round(value * precision) / precision
+}
 
 function round (v: Vec3): Vec3 {
-  return v.map(x => Math.round(x * ROUND) / ROUND) as Vec3
+  return v.map(x => roundTo(x, JOINT_PRECISION)) as Vec3
 }
 
 function capsule (name: string, a: string, b: string, radiusA: number, radiusB: number, material: string): Part {
@@ -40,10 +44,6 @@ type LegShape = {
   radius?: number
 }
 
-/**
- * A leg: hip, a knee halfway down and `knee` metres forward (negative: backward), an ankle `splay` metres further out
- * than the hip, and a toe `toe` metres ahead. Each sole point sits on the ground.
- */
 function addLeg (body: Body, tag: string, hip: Vec3, shape: LegShape): void {
   const [x, y, z] = hip
   const [ankleRadius, toeRadius] = shape.foot ?? [FOOT_RADIUS, FOOT_RADIUS]
@@ -74,7 +74,7 @@ function biped (): Body {
     appendages: [],
     upperBody: ['chest', 'head', 'headTop'],
     legLength: 0.52,
-    gait: { stanceFraction: 0.55, stepHeight: 0.066 }
+    tunedGait: { stanceFraction: 0.55, stepHeight: 0.066 }
   }
   for (const { side, sign, tag } of SIDES) {
     addLeg(body, tag, [sign * 0.08, 0.55, 0], { knee: 0.03, toe: 0.13, foot: [0.07, 0.05], radius: 0.06 })
@@ -156,13 +156,9 @@ const BODIES: Record<TemplateName, () => Body> = {
   octopod: () => manyLegged(8, 0.24)
 }
 
-/**
- * The template's gait scaled by leg length, with a step height of at least 5 cm: a foot within 2 cm of the floor
- * counts as planted, so short legs need the extra lift to leave the floor cleanly.
- */
 function gaitOf (template: TemplateDefaults, legLength: number): Record<string, number> {
   const scaled = Object.entries(template.gaitPerLegLength).map(([key, ratio]) => {
-    return [key, Math.round(ratio * legLength * 1000) / 1000]
+    return [key, roundTo(ratio * legLength, SIZE_PRECISION)]
   })
   const gait = Object.fromEntries(scaled)
   gait.stepHeight = Math.max(gait.stepHeight, MIN_STEP_HEIGHT)
@@ -191,7 +187,6 @@ function motionOf (gait: Record<string, number>): unknown {
   }
 }
 
-/** The files of a minimal character package for a template, as JSON values keyed by file name. */
 export function starterPackage (name: TemplateName): StarterFiles {
   const template = listTemplates().find(t => t.name === name)
   if (template === undefined) throw new Error(`unknown template '${name}'`)
@@ -200,7 +195,7 @@ export function starterPackage (name: TemplateName): StarterFiles {
     if (part.shape !== 'capsule') return 0
     return Math.max(body.joints[part.a][1] + part.radiusA, body.joints[part.b][1] + part.radiusB)
   }
-  const height = Math.round(Math.max(...body.parts.map(top)) * 1000) / 1000
+  const height = roundTo(Math.max(...body.parts.map(top)), SIZE_PRECISION)
   const limbs = [
     ...body.legs.map(({ tag, side }) => {
       return { kind: 'leg', name: `leg${tag}`, side, joints: ['hip', 'knee', 'ankle', 'toe'].map(n => `${n}${tag}`) }
@@ -208,7 +203,7 @@ export function starterPackage (name: TemplateName): StarterFiles {
     ...body.arms.map(({ tag, side, joints }) => ({ kind: 'arm', name: `arm${tag}`, side, joints })),
     ...body.appendages.map(({ name, joints }) => ({ kind: 'appendage', name, joints, stiffness: 0.4, damping: 0.3 }))
   ]
-  const gait = { ...gaitOf(template, body.legLength), ...body.gait }
+  const gait = { ...gaitOf(template, body.legLength), ...body.tunedGait }
   return {
     'character.json': { name: `${name}-starter`, description: `A starter ${name}: ${template.description}.` },
     'mannequin.json': { name: `${name}-starter`, height, joints: body.joints, parts: body.parts, decals: [] },

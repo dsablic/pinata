@@ -1,9 +1,6 @@
+import { childPath, isHexColour, isRecord } from './validate.ts'
 import type { ValidationError } from './validate.ts'
 
-/**
- * A declarative description of a JSON value, checked by `check`. Each kind says what it accepts; `note` is added to the
- * message so it says what the value is for.
- */
 export type Schema =
   | { kind: 'number', min?: number, max?: number, integer?: true, note?: string }
   | { kind: 'string', oneOf?: readonly string[], maxLength?: number, note?: string }
@@ -16,12 +13,7 @@ export type Schema =
   | { kind: 'map', of: Schema, minItems?: number, note?: string }
   | { kind: 'union', by: string, cases: Record<string, Fields>, note?: string }
 
-/** The fields of an object or of one case of a union, and which of them may be left out. */
 export type Fields = { fields: Record<string, Schema>, optional?: readonly string[] }
-
-function isRecord (v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null && !Array.isArray(v)
-}
 
 function inRange (v: unknown, min = -Infinity, max = Infinity): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max
@@ -64,18 +56,16 @@ function checkFields (
   path: string,
   errors: ValidationError[]
 ): void {
-  const at = (key: string): string => path === '' ? key : `${path}.${key}`
   for (const key of Object.keys(value)) {
     if (key in fields) continue
-    errors.push({ path: at(key), message: `unknown field; expected ${Object.keys(fields).join(', ')}` })
+    errors.push({ path: childPath(path, key), message: `unknown field; expected ${Object.keys(fields).join(', ')}` })
   }
   for (const [key, schema] of Object.entries(fields)) {
     if (value[key] === undefined && optional.includes(key)) continue
-    check(value[key], schema, at(key), errors)
+    check(value[key], schema, childPath(path, key), errors)
   }
 }
 
-/** Checks a value against a schema; pushes one error per problem, each with its path. */
 export function check (value: unknown, schema: Schema, path: string, errors: ValidationError[]): void {
   const fail = (): void => { errors.push({ path, message: expected(schema) }) }
   switch (schema.kind) {
@@ -97,7 +87,7 @@ export function check (value: unknown, schema: Schema, path: string, errors: Val
       if (!(Array.isArray(value) && value.length === 3 && value.every(v => inRange(v)))) fail()
       return
     case 'colour':
-      if (!(typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value))) fail()
+      if (!isHexColour(value)) fail()
       return
     case 'array':
       if (!Array.isArray(value) || value.length < (schema.minItems ?? 0)) {
@@ -119,14 +109,14 @@ export function check (value: unknown, schema: Schema, path: string, errors: Val
         return
       }
       for (const [key, item] of Object.entries(value)) {
-        check(item, schema.of, path === '' ? key : `${path}.${key}`, errors)
+        check(item, schema.of, childPath(path, key), errors)
       }
       return
     case 'union': {
       const tag = isRecord(value) ? value[schema.by] : undefined
       const fields = typeof tag === 'string' ? schema.cases[tag] : undefined
       if (!isRecord(value) || fields === undefined) {
-        errors.push({ path: path === '' ? schema.by : `${path}.${schema.by}`, message: expected(schema) })
+        errors.push({ path: childPath(path, schema.by), message: expected(schema) })
         return
       }
       checkFields(value, { [schema.by]: { kind: 'string' }, ...fields.fields }, fields.optional ?? [], path, errors)

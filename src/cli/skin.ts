@@ -28,24 +28,26 @@ import { toWorld } from '../sim/body.ts'
 import type { RootState } from '../motion/script.ts'
 import { renderSkinned } from '../style/skins.ts'
 import { stylize } from '../style/stylize.ts'
+import { ROOT } from './paths.ts'
 
-const ROOT = resolve(import.meta.dirname, '..', '..')
 const HEIGHT_PX = 48
 const MARGIN = 6
 const ELEVATION_DEG = 14
 const SCALE = 4
 const BACKGROUND = 0xc8c8c8
 const FPS = 24
-/** The drawn views' facings, degrees: 0 faces the viewer, 90 faces screen-right. */
 const VIEW_FACING: Record<typeof VIEWS[number], number> = {
   front: 0, frontSide: 45, side: 90, backSide: 135, back: 180
 }
 const USAGE = 'usage: node src/cli/skin.ts guide <character dir> <out dir>\n' +
   '       node src/cli/skin.ts preview <character dir> <skin.json> <out dir> [--clean]'
 
-/** A pose turned to face the given yaw about the pelvis's vertical axis, standing at the origin. */
+function standingAtOrigin (yaw: number): RootState {
+  return { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
+}
+
 function turned (pose: Pose, yaw: number): Pose {
-  const root: RootState = { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
+  const root = standingAtOrigin(yaw)
   return Object.fromEntries(Object.entries(pose).map(([name, p]) => [name, toWorld(p, root)]))
 }
 
@@ -63,11 +65,9 @@ function compass (dx: number, dy: number): string {
   return names[(Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8]
 }
 
-/** How wide a box part looks across its bone on screen, px: its width and thickness axes projected across the bone. */
 function boxAcross (camera: Camera, pose: Pose, part: Extract<Part, { shape: 'box' }>, yaw: number): number {
   const bone = normalize(sub(pose[part.b], pose[part.a]))
-  const facing: RootState = { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
-  const widthAxis = normalize(toWorld(part.widthAxis, facing))
+  const widthAxis = normalize(toWorld(part.widthAxis, standingAtOrigin(yaw)))
   const thicknessAxis = normalize(cross(bone, widthAxis))
   const screenBone = normalize([dot(bone, camera.right), dot(bone, camera.up), 0])
   const across = (v: Vec3, size: number): number => {
@@ -78,7 +78,6 @@ function boxAcross (camera: Camera, pose: Pose, part: Extract<Part, { shape: 'bo
   return across(widthAxis, part.width) + across(thicknessAxis, part.thickness)
 }
 
-/** Guide images and a table for the artist: the character's mannequin in each drawn view, and every part's numbers. */
 function guide (character: Character, out: string): void {
   const rest = restPose(character.mannequin)
   const lines: string[] = [`# ${character.name}: drawing guide`, '',
@@ -122,7 +121,6 @@ function guide (character: Character, out: string): void {
   console.log(`guide: ${out}`)
 }
 
-/** A walk in a direction, from motion capture, as poses at the origin and yaws, a stride's worth from the middle. */
 type Posed = { pose: Pose, yaw: number }
 
 function capturedWalk (character: Character, dir: string, yaw: number, frames: number): Posed[] {
@@ -151,7 +149,6 @@ function capturedWalk (character: Character, dir: string, yaw: number, frames: n
   return recorded
 }
 
-/** The skin in eight directions, a turntable and a walk in every direction, with any errors. */
 function preview (character: Character, dir: string, skinFile: string, out: string, clean: boolean): number {
   const read = validateSkin(JSON.parse(readFileSync(skinFile, 'utf8')))
   const crossed = read.value === undefined ? [] : checkSkin(read.value, character.mannequin)

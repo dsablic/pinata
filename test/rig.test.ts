@@ -1,8 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { checkCapeAnchors, checkRig, legBend, legPhases, legsOf, stride, validateRig } from '../src/formats/rig.ts'
-import { validateMannequin } from '../src/formats/mannequin.ts'
 import { assertClose } from './helpers.ts'
+import { mannequinWithJoints, RIG_GAIT } from './formats-fixtures.ts'
 
 function rig () {
   return {
@@ -13,27 +13,14 @@ function rig () {
     arms: [{ side: 'left', shoulder: 'shL', elbow: 'elL', wrist: 'wrL', hand: 'haL' }],
     pelvis: 'pelvis',
     upperBody: ['chest'],
-    gait: {
-      strideLength: 1.4,
-      referenceSpeed: 1.2,
-      stanceFraction: 0.6,
-      stepHeight: 0.1,
-      bobAmplitude: 0.03,
-      armSwingDegrees: 25,
-      footSpacing: 0.2
-    }
+    gait: { ...RIG_GAIT }
   }
 }
 
 function mannequin () {
-  const names = [
+  return mannequinWithJoints([
     'hipL', 'kneeL', 'ankleL', 'toeL', 'hipR', 'kneeR', 'ankleR', 'toeR', 'shL', 'elL', 'wrL', 'haL', 'pelvis', 'chest'
-  ]
-  const joints = Object.fromEntries(names.map((n, i) => [n, [i, 0, 0]]))
-  const parts = [{ name: 'p', shape: 'capsule', a: 'pelvis', b: 'chest', radiusA: 0.1, radiusB: 0.1, material: 'm' }]
-  const result = validateMannequin({ name: 'm', height: 2, joints, parts })
-  assert.deepEqual(result.errors, [])
-  return result.value!
+  ])
 }
 
 function paths (input: unknown): string[] {

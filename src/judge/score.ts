@@ -10,9 +10,7 @@ export type PairScore = {
   a: number
   b: number
   cantTell: number
-  /** Judges who picked the same image (not cant_tell) in both orders, out of judges who answered both. */
   consistent: number
-  /** Judges who answered cant_tell in both orders, or picked the same side (so a different image) in each. */
   neutral: number
   judges: number
   ratingA?: number
@@ -20,11 +18,8 @@ export type PairScore = {
 }
 export type PanelScore = {
   pairs: PairScore[]
-  /** Share of picks (not cant_tell) for `a` over all real pairs. */
   aShare: number
-  /** Share of picks for the left image over all pairs: 0.5 means no position bias. */
   leftShare: number
-  /** Share of judges, over control pairs, who did not separate the two images (see PairScore.neutral). */
   controlNeutral: number
   missing: string[]
 }
@@ -35,7 +30,6 @@ function isRating (v: unknown): boolean {
   return Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 5
 }
 
-/** Checks one judge's answers against the key; returns problems as text. */
 export function answerProblems (answers: unknown, key: PanelKey): string[] {
   if (!isRecord(answers)) return ['expected a JSON object mapping item names to answers']
   const problems: string[] = []
@@ -63,7 +57,6 @@ function share (part: number, whole: number): number {
   return whole === 0 ? NaN : part / whole
 }
 
-/** Scores a panel from each judge's answers, resolving left and right back to a and b with the key. */
 export function scorePanel (key: PanelKey, judges: JudgeAnswers[]): PanelScore {
   const byPair = new Map<string, PairScore & { ratings: { a: number[], b: number[] } }>()
   const missing: string[] = []

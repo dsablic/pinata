@@ -1,5 +1,5 @@
 import type { Mannequin } from './mannequin.ts'
-import { checkKnownKeys, isNonEmptyString, isRecord } from './validate.ts'
+import { checkKnownKeys, isHexColour, isNonEmptyString, isRecord } from './validate.ts'
 import type { Validated, ValidationError } from './validate.ts'
 
 export type SkinPart = {
@@ -7,24 +7,14 @@ export type SkinPart = {
   pivotA?: [number, number]
   pivotB?: [number, number]
   hidden?: boolean
-  /**
-   * Eight-direction skins only. `upright`: a two-joint sprite drawn standing, joint A at the top and B straight below
-   * it (the reader turns it to lie along +x). `layer`: parts on a higher layer are drawn over lower ones, whatever
-   * their depth (default 0). `from`: reuse another sprite, by part name in the same view or as `view.part`.
-   */
   upright?: boolean
   layer?: number
   from?: string
 }
 
-/**
- * The views an eight-direction skin draws, facing screen-right where they are not symmetric: front, the front
- * three-quarter view, the side, the back three-quarter view, and the back. Left-facing directions mirror them.
- */
 export const VIEWS = ['front', 'frontSide', 'side', 'backSide', 'back'] as const
 export type ViewName = typeof VIEWS[number]
 
-/** A skin: v1 draws one view (`view: 'side-right'`, `parts`); v2 draws every view in `views`. */
 export type Skin = {
   name: string
   view?: 'side-right'
@@ -39,7 +29,6 @@ export const MAX_SPRITE_SIZE = 64
 
 const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
 const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden', 'upright', 'layer', 'from'] as const
-const HEX = /^#[0-9a-fA-F]{6}$/
 
 export function validateSkin (input: unknown): Validated<Skin> {
   if (!isRecord(input)) return { errors: [{ path: '', message: 'expected a JSON object' }] }
@@ -48,7 +37,6 @@ export function validateSkin (input: unknown): Validated<Skin> {
   if (!isNonEmptyString(input.name)) errors.push({ path: 'name', message: 'expected a non-empty string' })
   const palette = validatePalette(input.palette, errors)
   if (input.views !== undefined) {
-    // v2: every view drawn, no single-view fields
     if (input.view !== undefined || input.parts !== undefined) {
       errors.push({ path: 'views', message: "an eight-direction skin has 'views' only; drop 'view' and 'parts'" })
     }
@@ -112,7 +100,7 @@ function validatePalette (palette: unknown, errors: ValidationError[]): Set<stri
       errors.push({ path: `palette.${key}`, message: 'palette keys must be a single character' })
     } else if (key === TRANSPARENT_CHAR) {
       errors.push({ path: `palette.${key}`, message: "'.' is reserved for transparent pixels; pick another character" })
-    } else if (typeof value !== 'string' || !HEX.test(value)) {
+    } else if (!isHexColour(value)) {
       errors.push({ path: `palette.${key}`, message: "expected a colour like '#a1b2c3'" })
     } else {
       known.add(key)
@@ -241,10 +229,6 @@ function checkTwoJoint (sprite: SkinPart, path: string, errors: ValidationError[
   }
 }
 
-/**
- * Replaces every sprite that has `from` with a copy of the sprite it names (its own `layer` kept), following chains of
- * references; a missing or circular reference is an error.
- */
 type PartsOf = (view: string) => Record<string, unknown>
 
 function resolveFrom (partsOf: PartsOf, view: string, errors: ValidationError[]): void {
@@ -274,10 +258,6 @@ function resolveFrom (partsOf: PartsOf, view: string, errors: ValidationError[])
   }
 }
 
-/**
- * An upright two-joint sprite (A at the top, B straight below) turned to lie along +x from A to B, its top row being
- * the left of travel: the upright sprite's right-hand column becomes the top row.
- */
 function laidDown (part: SkinPart, path: string, errors: ValidationError[]): SkinPart {
   const rows = (part.rows ?? []).map(row => [...row])
   const { pivotA, pivotB } = part

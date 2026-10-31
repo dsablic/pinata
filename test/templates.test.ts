@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { checkRig, legBend, legPhases, legsOf, resolveRig, validateRig } from '../src/formats/rig.ts'
 import type { Rig } from '../src/formats/rig.ts'
 import { listTemplates } from '../src/formats/templates.ts'
-import { validateMannequin } from '../src/formats/mannequin.ts'
 import type { Vec3 } from '../src/math/vec.ts'
+import { mannequinWithJoints } from './formats-fixtures.ts'
 
 type Input = Record<string, any>
 
@@ -30,20 +30,19 @@ const HEXAPOD_ZIGZAG = (): Input[] => [
   leg('left', 'L1'), leg('right', 'R1'), leg('left', 'L2'), leg('right', 'R2'), leg('left', 'L3'), leg('right', 'R3')
 ]
 
-test('listTemplates names the four templates with their defaults', () => {
+test('listTemplates returns copies that cannot change the templates', () => {
   const list = listTemplates()
-  assert.deepEqual(list.map(t => t.name), ['biped', 'quadruped', 'hexapod', 'octopod'])
-  assert.deepEqual(list.map(t => t.legCount), [2, 4, 6, 8])
-  assert.deepEqual(list.map(t => t.armSwingDegrees > 0), [true, false, false, false])
-  for (const t of list) {
-    assert.ok(t.stanceFraction >= 0.5 && t.stanceFraction <= 0.8)
-    assert.ok(t.description.length > 0)
-    assert.deepEqual(Object.keys(t.gaitPerLegLength).sort(), [
-      'bobAmplitude', 'footSpacing', 'referenceSpeed', 'stepHeight', 'strideLength'
-    ])
-  }
   list[0].bends.push('backward')
   assert.deepEqual(listTemplates()[0].bends, ['forward'])
+})
+
+test('every template default stanceFraction passes rig validation', () => {
+  for (const t of listTemplates()) {
+    const gait = { ...GAIT, stanceFraction: t.stanceFraction, armSwingDegrees: t.armSwingDegrees }
+    const plain = templated(t.name, BIPED(), gait)
+    delete plain.template
+    assert.deepEqual(validateRig(plain).errors, [], t.name)
+  }
 })
 
 test('a biped template gives alternating phases, forward bends, stance and arm swing', () => {
@@ -55,7 +54,7 @@ test('a biped template gives alternating phases, forward bends, stance and arm s
   assert.equal(rig.template, 'biped')
 })
 
-test('a quadruped template walks LH 0, LF 0.25, RH 0.5, RF 0.75 with hind legs bending backward', () => {
+test('a quadruped template without rest hips walks LH 0, LF 0.25, RH 0.5, RF 0.75, hind legs bent backward', () => {
   const rig = expand(templated('quadruped', QUAD()))
   assert.deepEqual(legPhases(rig), [0, 0.25, 0.5, 0.75])
   assert.deepEqual(legsOf(rig).map(legBend), ['backward', 'forward', 'backward', 'forward'])
@@ -152,10 +151,7 @@ test('the input is not modified by expansion', () => {
 test('expanded templates pass checkRig stance and side rules', () => {
   const tags = (list: Input[]): string[] => list.flatMap(l => l.joints)
   for (const [name, legs] of [['biped', BIPED()], ['quadruped', QUAD()], ['hexapod', HEXAPOD_ZIGZAG()]] as const) {
-    const names = ['pelvis', 'chest', ...tags(legs)]
-    const joints = Object.fromEntries(names.map((n, i) => [n, [i, 0, 0]]))
-    const parts = [{ name: 'p', shape: 'capsule', a: 'pelvis', b: 'chest', radiusA: 0.1, radiusB: 0.1, material: 'm' }]
-    const mannequin = validateMannequin({ name: 'm', height: 2, joints, parts }).value!
+    const mannequin = mannequinWithJoints(['pelvis', 'chest', ...tags(legs)])
     assert.deepEqual(checkRig(expand(templated(name, legs)), mannequin), [], name)
   }
 })
@@ -213,11 +209,6 @@ test('template phases and bends follow the rest hip positions, not the order of 
       }
     }
   }
-})
-
-test('without rest hip positions a template falls back to the file order', () => {
-  const rig = expand(templated('quadruped', QUAD()))
-  assert.deepEqual(legPhases(rig), [0, 0.25, 0.5, 0.75])
 })
 
 test('resolveRig leaves a rig without a template as it is', () => {

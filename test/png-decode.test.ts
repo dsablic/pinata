@@ -59,11 +59,11 @@ test('decodePng matches ImageMagick on every colour type, pixel for pixel', (t) 
       execFileSync('magick', [file, '-define', 'png:color-type=6', '-define', 'png:bit-depth=8', `PNG32:${truth}`])
       const ours = decodePng(readFileSync(file))
       const theirs = decodePng(readFileSync(truth))
-      const opaque = (img: typeof ours): number[] => {
+      const pixels = (img: typeof ours): number[] => {
         const { width, height } = img
         return Array.from({ length: width * height }, (_, k) => getPixel(img, k % width, Math.floor(k / width)))
       }
-      assert.deepEqual(opaque(ours), opaque(theirs), name)
+      assert.deepEqual(pixels(ours), pixels(theirs), name)
     })
   } finally {
     rmSync(dir, { recursive: true, force: true })

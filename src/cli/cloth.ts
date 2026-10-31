@@ -7,6 +7,7 @@ import { compile } from '../raster/gbuffer.ts'
 import * as metrics from '../sim/metrics.ts'
 import type { Recording } from '../sim/metrics.ts'
 import type { Check } from './summary.ts'
+import { firstWorstFrame, frameTime } from './frames.ts'
 
 const PIXEL_HEIGHT = 48
 const START_FRAMES = 5
@@ -23,25 +24,8 @@ function oneFrame (recording: Recording, frame: number): Recording {
   return { constraints: recording.constraints, frames: [recording.frames[frame]] }
 }
 
-function upTo (recording: Recording, frame: number): Recording {
-  return { constraints: recording.constraints, frames: recording.frames.slice(Math.max(0, frame - 1), frame + 1) }
-}
-
-function firstWorstFrame (recording: Recording, measure: (r: Recording) => number, from = 0): number {
-  let best = from
-  let bestValue = -Infinity
-  for (let i = from; i < recording.frames.length; i++) {
-    const value = measure(upTo(recording, i))
-    if (value > bestValue) {
-      best = i
-      bestValue = value
-    }
-  }
-  return best
-}
-
 function at (ctx: Context, frame: number): string {
-  return `frame ${frame} (t = ${(frame / ctx.character.scenario.fps).toFixed(2)} s)`
+  return frameTime(frame, ctx.character.scenario.fps)
 }
 
 function particleName (character: Character, index: number): string {

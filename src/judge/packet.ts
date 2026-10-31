@@ -2,13 +2,9 @@ import { createHash } from 'node:crypto'
 import { createImage, getPixel, parseHex, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import { sheet } from '../diagnostics/images.ts'
-import { checkKnownKeys, isFiniteNumber, isNonEmptyString, isRecord } from '../formats/validate.ts'
+import { checkKnownKeys, isFiniteNumber, isHexColour, isNonEmptyString, isRecord } from '../formats/validate.ts'
 import type { Validated, ValidationError } from '../formats/validate.ts'
 
-/**
- * A blind A/B panel. Each pair shows `a` (the candidate) beside `b` (the reference); a control pair shows two images
- * the judges should not be able to separate (two references of similar quality, or the same image twice).
- */
 export type PairSpec = { id: string, a: string, b: string, control?: boolean }
 export type PanelSpec = {
   name: string
@@ -18,7 +14,6 @@ export type PanelSpec = {
   scale: number
   gap: number
   background: string
-  /** 'side' (the default) puts the two images side by side; 'stacked' puts the left one on top, for wide strips. */
   layout?: 'side' | 'stacked'
   pairs: PairSpec[]
 }
@@ -51,7 +46,7 @@ export function validatePanelSpec (input: unknown): Validated<PanelSpec> {
     errors.push({ path: 'layout', message: "expected 'side' or 'stacked'" })
   }
   const { background } = input
-  if (background !== undefined && !(typeof background === 'string' && /^#[0-9a-f]{6}$/i.test(background))) {
+  if (background !== undefined && !isHexColour(background)) {
     errors.push({ path: 'background', message: "expected a colour like '#c8c8c8'" })
   }
   const ids = new Set<string>()
@@ -89,8 +84,7 @@ export function validatePanelSpec (input: unknown): Validated<PanelSpec> {
   return { value: { ...DEFAULTS, ...structuredClone(input) } as PanelSpec, errors }
 }
 
-/** The opaque bounding box of an image, or the whole image when nothing is opaque. */
-function trim (image: Image): Image {
+function trimToOpaque (image: Image): Image {
   let [left, top, right, bottom] = [image.width, image.height, -1, -1]
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {
@@ -109,13 +103,12 @@ function trim (image: Image): Image {
   return out
 }
 
-/** Two images side by side, trimmed, standing on one baseline, centred in equal cells, scaled up. */
 export function pairImage (
   left: Image,
   right: Image,
   spec: Pick<PanelSpec, 'scale' | 'gap' | 'background' | 'layout'>
 ): Image {
-  const cells = [trim(left), trim(right)].map(image => {
+  const cells = [trimToOpaque(left), trimToOpaque(right)].map(image => {
     return { image, anchor: [Math.floor(image.width / 2), image.height] as [number, number] }
   })
   const rows = spec.layout === 'stacked' ? cells.map(cell => [cell]) : [cells]
@@ -147,10 +140,6 @@ function questionsText (spec: PanelSpec, names: string[]): string {
   ].join('\n')
 }
 
-/**
- * Builds a blind panel: every pair in both orders, shuffled by the seed, under neutral names (item-01.png, ...), with
- * the questions for the judges and a key that must be kept out of their folder. `load` reads an image by its path.
- */
 export function buildPacket (spec: PanelSpec, load: (path: string) => Image): Packet {
   const shown = spec.pairs.flatMap(pair => (['left', 'right'] as const).map(aSide => ({ pair, aSide })))
   const ordered = shown

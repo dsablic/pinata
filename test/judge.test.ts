@@ -166,3 +166,18 @@ test('the CLI builds a packet from PNG files and refuses a key inside the packet
   assert.equal(scored.status, 0, scored.stderr)
   assert.match(scored.stdout, /controls left unseparated .* by 100% of judges/)
 })
+
+test('a stacked panel puts the left image on top and says so', () => {
+  const a = createImage(4, 2)
+  const b = createImage(4, 2)
+  for (let x = 0; x < 4; x++) for (let y = 0; y < 2; y++) {
+    setPixel(a, x, y, 0xff0000)
+    setPixel(b, x, y, 0x0000ff)
+  }
+  const image = pairImage(a, b, { scale: 1, gap: 1, background: '#c8c8c8', layout: 'stacked' })
+  assert.ok(image.height > image.width)
+  const pairs = [{ id: 'p', a: 'a', b: 'b' }]
+  const spec = validatePanelSpec({ name: 'n', seed: 's', question: 'q', layout: 'stacked', pairs })
+  assert.deepEqual(spec.errors, [])
+  assert.deepEqual(validatePanelSpec({ ...spec.value, layout: 'diagonal' }).errors.map(e => e.path), ['layout'])
+})

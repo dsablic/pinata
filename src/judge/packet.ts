@@ -18,13 +18,15 @@ export type PanelSpec = {
   scale: number
   gap: number
   background: string
+  /** 'side' (the default) puts the two images side by side; 'stacked' puts the left one on top, for wide strips. */
+  layout?: 'side' | 'stacked'
   pairs: PairSpec[]
 }
 export type KeyEntry = { pair: string, control: boolean, aSide: 'left' | 'right' }
 export type PanelKey = { name: string, rating?: boolean, items: Record<string, KeyEntry> }
 export type Packet = { images: Record<string, Image>, questions: string, key: PanelKey }
 
-const SPEC_FIELDS = ['name', 'seed', 'question', 'rating', 'scale', 'gap', 'background', 'pairs'] as const
+const SPEC_FIELDS = ['name', 'seed', 'question', 'rating', 'scale', 'gap', 'background', 'layout', 'pairs'] as const
 const PAIR_FIELDS = ['id', 'a', 'b', 'control'] as const
 const DEFAULTS = { scale: 8, gap: 2, background: '#c8c8c8' }
 
@@ -44,6 +46,9 @@ export function validatePanelSpec (input: unknown): Validated<PanelSpec> {
     if (v !== undefined && !(isFiniteNumber(v) && Number.isInteger(v) && v >= min && v <= 32)) {
       errors.push({ path: field, message: `expected a whole number of pixels, ${min} to 32` })
     }
+  }
+  if (input.layout !== undefined && input.layout !== 'side' && input.layout !== 'stacked') {
+    errors.push({ path: 'layout', message: "expected 'side' or 'stacked'" })
   }
   const { background } = input
   if (background !== undefined && !(typeof background === 'string' && /^#[0-9a-f]{6}$/i.test(background))) {
@@ -105,11 +110,16 @@ function trim (image: Image): Image {
 }
 
 /** Two images side by side, trimmed, standing on one baseline, centred in equal cells, scaled up. */
-export function pairImage (left: Image, right: Image, spec: Pick<PanelSpec, 'scale' | 'gap' | 'background'>): Image {
+export function pairImage (
+  left: Image,
+  right: Image,
+  spec: Pick<PanelSpec, 'scale' | 'gap' | 'background' | 'layout'>
+): Image {
   const cells = [trim(left), trim(right)].map(image => {
     return { image, anchor: [Math.floor(image.width / 2), image.height] as [number, number] }
   })
-  return sheet([cells], { scale: spec.scale, gap: spec.gap * spec.scale, background: parseHex(spec.background) })
+  const rows = spec.layout === 'stacked' ? cells.map(cell => [cell]) : [cells]
+  return sheet(rows, { scale: spec.scale, gap: spec.gap * spec.scale, background: parseHex(spec.background) })
 }
 
 function rank (seed: string, id: string): string {
@@ -123,7 +133,10 @@ function questionsText (spec: PanelSpec, names: string[]): string {
   return [
     `# ${spec.name}`,
     '',
-    `Each image shows two characters side by side. For every image: ${spec.question}`,
+    spec.layout === 'stacked'
+      ? `Each image shows two characters, one above the other: "left" means the top one and "right" the bottom one. ` +
+        `For every image: ${spec.question}`
+      : `Each image shows two characters side by side. For every image: ${spec.question}`,
     ...(spec.rating === undefined ? [] : ['', `Also: ${spec.rating}`]),
     '',
     'Judge each image on its own. Answer with one JSON object mapping each image name (without .png) to',

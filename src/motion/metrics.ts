@@ -10,9 +10,11 @@ import { appendagesOf } from './appendages.ts'
 import { kneeBendsBackward, kneeFlexionDegrees, MAX_FLEXION_DEGREES } from './ik.ts'
 import { verticalExtent } from './extent.ts'
 import { poseSequence } from './sequence.ts'
-import { bendingJoints, footRadii, legLabels, restPose } from './pose.ts'
+import { bendingJoints, legLabels, restPose, solePoints } from './pose.ts'
 import type { JointTriple } from './pose.ts'
 import type { Pose } from './pose.ts'
+
+export { solePoints } from './pose.ts'
 import type { RootState, Script } from './script.ts'
 
 type Side = 'left' | 'right'
@@ -53,13 +55,6 @@ export function recordLocomotion (
       return { time: i / fps, root: frame.root, joints, clamped, planted }
     })
   }
-}
-
-export function solePoints (joints: Pose, leg: Leg, mannequin: Mannequin): Vec3[] {
-  const radii = footRadii(leg, mannequin)
-  const ankle = joints[leg.ankle]
-  const toe = joints[leg.toe]
-  return [[ankle[0], ankle[1] - radii.ankle, ankle[2]], [toe[0], toe[1] - radii.toe, toe[2]]]
 }
 
 function soles (recording: LocomotionRecording, leg: Leg, mannequin: Mannequin): Vec3[][] {

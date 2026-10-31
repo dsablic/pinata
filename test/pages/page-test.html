@@ -51,7 +51,7 @@
     for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
       document.addEventListener(type, event => { window.__reached.push(event.type) })
     }
-    window.__pinata = await createPageWorld({ bundle: 'world.bundle.json', pixelsPerMetre: 54, scale: 2, seed: 7 })
+    window.__pinata = await createPageWorld({ bundle: 'world.bundle.json', pixelsPerMetre: 54, scale: 2, seed: 7, measure: true })
   </script>
 </body>
 </html>

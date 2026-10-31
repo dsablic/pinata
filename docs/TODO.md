@@ -27,7 +27,8 @@ first.
 
 [Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
 step and drop between them on a click-through overlay, react to the page, then the world demo is rebuilt on its own
-page. Batch A (surfaces and the overlay) next.
+page. Batches A (surfaces and the overlay) and B (moving over the page) done; B misses the mid-air half of the standing gate
+(0.4-1% of frames; see the plan). C (perception) next.
 
 ### 0b. World showcase, remaining batches
 

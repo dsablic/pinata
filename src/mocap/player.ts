@@ -44,6 +44,8 @@ export type Player = {
   push: (impulse: Vec3) => void
   wind: Vec3
   step: () => PlayerFrame
+  height: () => number
+  falling: () => boolean
 }
 
 const DEFAULT_TUNING: BodyTuning = { speedGain: 3, maxAcceleration: 3, turnGain: 4, drag: 0.03 }
@@ -62,6 +64,7 @@ const PIN_HEIGHT = 0.021
 const RELEASE_SECONDS = 0.25
 const STEP_SECONDS = 0.25
 const RELEASE_SHARE = 0.15
+const LONE_RELEASE_SHARE = 0.35
 const STEP_HEIGHT_SHARE = 0.15
 const LOOKAHEAD_SECONDS = 0.2
 const SINK_SPEED = 1.2
@@ -73,6 +76,9 @@ const TUCK_DEGREES = 148
 const REACH_INSIDE = 0.97
 const REACH_SHARE = 0.985
 const TILT_HEIGHT = 0.12
+const FALL_START_HEIGHT = 0.5
+const BELOW_SUPPORT = 0.2
+const GRAVITY = 9.81
 const MAX_GRADE = Math.tan(60 * Math.PI / 180)
 const FORWARD: Vec3 = [0, 0, 1]
 const UP: Vec3 = [0, 1, 0]
@@ -216,6 +222,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const startGround = ground(body.position[0], body.position[2])
   let base = startGround
   let settle = 0
+  let fallSpeed: number | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const heightAboveGround = (p: Vec3): number => p[1] - ground(p[0], p[2])
@@ -400,15 +407,20 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const drift = (end: Vec3 | undefined, now: Vec3): number => {
       return end === undefined ? 0 : Math.hypot(end[0] - now[0], end[2] - now[2])
     }
-    const pulled = Math.max(drift(foot.heel, free.heel), drift(foot.toe, free.toe)) > RELEASE_SHARE * reach[k]
+    const otherDown = legIndices.some(j => j !== k && isHeld(feet[j]))
+    const drifted = Math.max(drift(foot.heel, free.heel), drift(foot.toe, free.toe)) / reach[k]
+    const pulled = drifted > (otherDown ? RELEASE_SHARE : LONE_RELEASE_SHARE)
     const touching = contact && !released.stepping && !pulled
     const heelDown = touching && heightAboveGround(free.heel) <= HOLD_HEIGHT
     const toeDown = touching && heightAboveGround(free.toe) <= HOLD_HEIGHT
     const wasHeld = isHeld(foot)
+    const grounded = (before: Vec3 | undefined, now: Vec3): Vec3 => {
+      return before !== undefined && heightAboveGround(before) <= HOLD_HEIGHT ? before : now
+    }
     if (!heelDown) foot.heel = undefined
-    else if (foot.heel === undefined) foot.heel = lastSoles?.heel ?? free.heel
+    else if (foot.heel === undefined) foot.heel = grounded(lastSoles?.heel, free.heel)
     if (!toeDown) foot.toe = undefined
-    else if (foot.toe === undefined) foot.toe = lastSoles?.toe ?? free.toe
+    else if (foot.toe === undefined) foot.toe = grounded(lastSoles?.toe, free.toe)
     if (foot.heel === undefined || foot.toe === undefined) foot.frozen = undefined
     else foot.frozen ??= foot.last?.rotation ?? released.rotation
     let rotation = foot.frozen ?? released.rotation
@@ -455,6 +467,14 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     return { ankle, rotation }
   }
 
+  const pressDown = (foot: Foot, placed: Placed, k: number): Placed => {
+    const ends = soles(placed.ankle, placed.rotation, k)
+    const held = ENDS.filter(end => foot[end] !== undefined).map(end => heightAboveGround(ends[end]))
+    if (held.length === 0) return placed
+    const gap = Math.max(0, Math.min(...held))
+    return { ankle: [placed.ankle[0], placed.ankle[1] - gap, placed.ankle[2]], rotation: placed.rotation }
+  }
+
   const placeFoot = (k: number, animated: Vec3, local: Matrix, contact: boolean): Placed => {
     const foot = feet[k]
     foot.prior = foot.last
@@ -463,14 +483,14 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const world = toWorldPoint(animated)
     const near = height < TILT_HEIGHT ? 1 - height / TILT_HEIGHT : 0
     const rotation = tilted(world, turn, k, near)
-    followGround(foot, world, rotation, k)
+    if (fallSpeed === undefined) followGround(foot, world, rotation, k)
     const target: Placed = { ankle: [world[0], foot.reference + height, world[2]], rotation }
     foot.target = target
     const released = easeRelease(foot, target, k)
     const lastSoles = foot.last === undefined ? undefined : soles(foot.last.ankle, foot.last.rotation, k)
     const held = holdEnds(foot, target, released, contact, lastSoles, k)
     const clear = { ankle: standClear(foot, held, contact, k), rotation: held.rotation }
-    const placed = pinEnds(foot, lastSoles, clear, k)
+    const placed = pinEnds(foot, lastSoles, pressDown(foot, clear, k), k)
     foot.last = placed
     return placed
   }
@@ -548,6 +568,36 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     return Math.min(ceiling, Math.max(floor, settle))
   }
 
+  const supportUnderBody = (): number => ground(root.position[0], root.position[2])
+
+  const letGoOfTheGround = (): void => {
+    for (const foot of feet) {
+      foot.heel = undefined
+      foot.toe = undefined
+      foot.frozen = undefined
+      foot.release = undefined
+    }
+  }
+
+  const fall = (): void => {
+    fallSpeed = (fallSpeed ?? 0) + GRAVITY * dt
+    const support = supportUnderBody()
+    base = Math.max(support, base - fallSpeed * dt)
+    for (const foot of feet) foot.reference = base
+    if (base > support) return
+    fallSpeed = undefined
+    settle = 0
+  }
+
+  const standOnFeet = (pose: Pose, targets: Placed[]): number => {
+    const lowest = Math.max(supportUnderBody() - BELOW_SUPPORT, Math.min(...feet.map(f => f.reference)))
+    base += (lowest - base) * (1 - Math.exp(-dt / BASE_SECONDS))
+    const hips = legs.map(leg => toWorldPoint(add(pose[leg.hip], [0, base, 0])))
+    const drop = settleBody(hips, targets)
+    keepAirFeetInRange(hips, targets, drop)
+    return drop
+  }
+
   const keepAirFeetInRange = (hips: Vec3[], targets: Placed[], drop: number): void => {
     legIndices.forEach(k => {
       if (isHeld(feet[k])) return
@@ -579,10 +629,16 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   return {
     wind,
     command: next => { command = next },
+    height: () => base,
+    falling: () => fallSpeed !== undefined,
     push: impulse => { body.velocity = add(body.velocity, [impulse[0], 0, impulse[2]]) },
     step: () => {
       switched = false
       stepBody()
+      if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT) {
+        fallSpeed = 0
+        letGoOfTheGround()
+      }
       const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
       if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
       if (frameCount > 0) advance()
@@ -590,14 +646,11 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       previousFrame = lastFrame
       lastFrame = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
+      if (fallSpeed !== undefined) fall()
       const targets = legs.map((leg, k) => {
         return placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY, frame.contact[k] ?? true)
       })
-      const lowest = Math.min(...feet.map(f => f.reference))
-      base += (lowest - base) * (1 - Math.exp(-dt / BASE_SECONDS))
-      const hips = legs.map(leg => toWorldPoint(add(pose[leg.hip], [0, base, 0])))
-      const drop = settleBody(hips, targets)
-      keepAirFeetInRange(hips, targets, drop)
+      const drop = fallSpeed === undefined ? standOnFeet(pose, targets) : 0
       raise(pose, transforms, Object.keys(pose), base + drop)
       const clamped = solveLegs(pose, transforms, targets)
       frameCount++

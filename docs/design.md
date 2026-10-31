@@ -35,7 +35,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   `sticky` elements, which move with the viewport and so have no fixed place on the page.
 - The scan walks the whole body and reads every element's computed style once per scan. Scans run on load and on
   change only, never per frame.
-- Change detection: a ResizeObserver on the root element and on every marked element; a MutationObserver over the
+- Change detection: a ResizeObserver on the root element and on every marked element, each observed once from the
+  scan that found it (re-observing after every scan would rescan every frame, since every newly observed element is
+  reported straight away; that first report counts only if its size differs from the scanned box by over half a
+  pixel); a MutationObserver over the
   whole document (head stylesheets included) for added and removed nodes, text edits and changes to `data-pinata`,
   `class`, `style`, `hidden` and `open`; scrolling inside any container (capture-phase scroll listener, the page's own
   scroll excluded); window resize; fonts finishing loading. Changes that touch a marked element (or its ancestors or
@@ -53,20 +56,63 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   at all it answers a long way down (`DEPTH_WITH_NO_GROUND`, 1000 m) so a character over a gap falls rather than
   standing on nothing.
 
+### The surface graph (`graph.ts`)
+
+- Nodes are the parts of surfaces a character can stand on: a surface minus where another surface hides it (one at
+  most a step higher, or level with it and listed earlier, which is the one `surfaceBelow` would pick), cut at every
+  wall that blocks a body (a wall taller than a step above the surface and starting below head height). So adjacent
+  nodes always meet at an end, and the graph only needs to look past each node's two ends.
+- A wall element's two sides cut out everything between them, so no node lies inside a thick wall.
+- From an end that no wall closes, the node a step past it (2 cm) is found the way a falling body would find it: the
+  highest node there not higher than a step above. Within a step up or down that is a walk; lower is a drop, kept up
+  to the drop limit (6 m on the page). Rises taller than a step have no edge: characters do not climb.
+- Each edge carries `at`, the x to head for: 15 cm past the end into the next node (clamped to that node), so a
+  walker crosses the end rather than stopping on it.
+- Paths are breadth-first (fewest moves): pages have few surfaces, and fewer drops and steps read as more purposeful
+  than the shortest distance. Where two edges join the same nodes (both ends of a platform over the floor), the one
+  whose `at` is nearer the next target (the goal for the last edge) is taken.
+
+### Walkers (`walker.ts`)
+
+- A walker is one motion-captured player whose ground is `heightUnder` the page's ground at its own standing height
+  (the player's base), plus a wandering plan over the surface graph. Walls are not physical: walkers stay off them
+  because no node spans a wall.
+- Wandering: rest for 0.8-4 s, pick a reachable node weighted by width and a spot in it at least 0.35 m from its ends,
+  then follow the path edge by edge (heading for each edge's `at` at walking speed, 1.1 m/s, east or west), and slow
+  down over the last 0.5 m to the spot. The current node is the one under the root at the surface height under it;
+  off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s gives up and rests.
+- A poke turns a walker round and sends it 1.5 m the other way on its node (to its middle on a node too narrow for
+  the end margins).
+- `shiftBy` carries a walker with the element it stands on without restarting its motion: the walker keeps an offset
+  between the player's coordinates and the page's, applied to the ground the player sees and to every frame it
+  reports. `moveTo` restarts the player at a new place. `setGround` swaps the ground and graph; the goal is kept when
+  a node still holds it, and the route is planned again from there.
+- The frame it reports has the world joints, the base, whether it is falling, the surface under it, and each foot's
+  sole points with the player's planted flag, which the page records for the standing gates.
+
 ### Characters and the overlay (`page.ts`)
 
 - Characters keep a reference to the element they stand on, not to a surface index: indices shift when elements are
-  added or removed. After a rescan each character stays at the same share of its element's width. A character whose
-  element is gone, or that found no ground at all, is placed anywhere on the page's ground when there is some, and
-  until then is neither drawn nor hit.
-- Only cast members with a skin live on the page: the procedural renderer is too heavy to run per character on
-  arbitrary pages.
+  added or removed. While falling they stand on nothing. After a rescan, a character whose element moved (by more
+  than a millimetre) is carried with it, and put back inside it if the element shrank from under it; one whose element
+  is gone falls to whatever is below. A character with nothing at all below it (after a rescan or on any step) is
+  placed anywhere on the page's standing places (the surface graph's nodes, so never inside a wall). Characters wait,
+  neither drawn nor hit, until the page has some ground.
+- Only cast members with a skin and motion capture live on the page: the procedural renderer is too heavy to run per
+  character on arbitrary pages, and walking over surfaces uses the captured player.
+- Walkers step at 24 fps on a fixed clock driven by `requestAnimationFrame`, at most three steps per frame after a
+  stall; a character's sprite is rendered again only when it stepped. Every frame's main-thread time is kept for the
+  cost gate (`costs`); with `measure: true` every step's foot gaps in CSS pixels are kept for the standing gates
+  (`samples`, `null` where nothing is under a foot). The frame loop schedules its next frame even when a step throws.
+- The sprite is anchored at the surface under the character, so a foot on that surface is drawn on its top edge
+  exactly; while falling it is anchored at the body's base.
 - Starting places are drawn with a seeded random generator, weighted by surface width, at least 0.3 m from a
   surface's ends (`MARGIN_FROM_SURFACE_ENDS`).
 - Each character renders into its own sprite box, 1.6 times its height square (`SPRITE_BOX_IN_CHARACTER_HEIGHTS`),
   with its feet line at 85% of the box (`FEET_LINE_SHARE_OF_BOX`), through a camera 8 degrees above the horizon
-  (`CAMERA_ELEVATION_DEGREES`): nearly side-on, so characters read against a flat page. The sprite is rendered once per
-  facing and kept as a small canvas; scrolling only redraws.
+  (`CAMERA_ELEVATION_DEGREES`): nearly side-on, so characters read against a flat page. Each sprite is kept as a small
+  canvas until the character steps again; scrolling only redraws.
+- The overlay's own style changes (its size follows the window) are ignored by the change detection.
 - The overlay is one canvas in the top layer (a manual popover), so no transform, filter or stacking context on the
   page can move or cover it; browsers without popovers get a fixed canvas on the root element. It has
   `pointer-events: none` and `aria-hidden`, is sized in CSS pixels from the same numbers as its backing store (not
@@ -78,9 +124,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   `contextmenu`, for up to 800 ms) are stopped in the capture phase. Clicks from script or the keyboard, which carry no
   pointer, are never taken. While a modal dialog, an open popover or a fullscreen element covers the page, nothing is
   poked.
-- With `prefers-reduced-motion: reduce` a poke registers but the character does not turn.
-- `createPageWorld` returns the state tests read (`ground`, `characters`, `pokes`, `rebuilds`) and `destroy`, which
-  removes the overlay and every listener and observer.
+- With `prefers-reduced-motion: reduce` nothing steps (characters stand in their rest pose) and a poke registers
+  without turning anyone.
+- `createPageWorld` returns the state tests read (`ground`, `characters`, `samples`, `costs`, `pokes`, `rebuilds`) and
+  `destroy`, which removes the overlay and every listener and observer.
 
 ### Browser checks (`src/cli/browser-test.ts`)
 
@@ -89,6 +136,13 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - The test page lives in `test/pages/` and is copied into the built site only while the checks run, so it is never
   published.
 - Every check names what it measured and must be able to fail when the behaviour it guards breaks.
+- Plan gates measured from motion (planted feet within 1 CSS px, no mid-air frames) print as `GATE MET` or
+  `GATE MISSED` and do not fail the run; the plan records their results. Every other check fails the run.
+- The fall check removes the element under a character that has a surface below it, so a fall always happens; a fall
+  lasting over 4 s counts as a fault (a body falling into nothing). Gaps of `null` (nothing under a foot) count as off
+  the surface: values come back through the protocol as JSON, which has no infinity.
+- Layout reads are counted by wrapping `getBoundingClientRect`, `getClientRects` and `getComputedStyle` after the page
+  has settled; with nothing changing, a frame must read none.
 
 ## Motion (`src/motion/`, `src/math/`)
 
@@ -322,9 +376,15 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - Playback speed stretches between 0.8 and 1.25 to follow the body's speed. The animated root moves by the clip's
   own root motion and closes 12% of its gap to the body each frame, in position and heading.
 - Each foot's sole ends (heel and toe tip) are held where they touch the ground: the clip says when a foot is down,
-  the height (within 2.5 cm) says which ends touch. While both ends are held the foot's rotation is frozen.
+  the height (within 2.5 cm) says which ends touch. An end is held where it was last frame only if it was on the ground
+  there too; otherwise where it is now, so a foot stepping past an edge is never held over the drop. While both ends
+  are held the foot's rotation is frozen.
+- A held foot is pressed down until its lowest held end touches the ground (before the ends are kept from sliding):
+  captured contacts sit up to 2.5 cm above the floor, more than a CSS pixel on a page.
 - A held foot further than 15% of its leg's reach from its animation is pulled off and steps across, rising by 15% of
-  the reach; a released foot rejoins its animation over 0.25 s. A step clears both the ground it left and the ground it
+  the reach; a released foot rejoins its animation over 0.25 s. While no other foot is held the limit is 35%: pulling
+  the only foot down while the other swings left both in the air for a few frames every stride whenever the commanded
+  speed did not match the clip. A step clears both the ground it left and the ground it
   goes to, the first fading into the second.
 - Ends that stay within 2.1 cm of the ground from one frame to the next do not move across it, held or not; this stops
   slow sliding between hold and release.
@@ -335,7 +395,8 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   kept below it when it is placed. This lifts feet over stair edges ahead without snapping.
 - Near the ground (below 12 cm) a foot tilts to the ground under it about its heel, in proportion to how low it is;
   ground steeper than 60 degrees between heel and toe is a stair edge and does not tilt it.
-- The pelvis follows the lower foot's ground with a 0.12 s time constant.
+- The pelvis follows the lower foot's ground with a 0.12 s time constant, but not more than 0.2 m below the ground
+  under the body: a foot over a drop (the end of a shelf on a page) must not pull the body down off its surface.
 - Held feet set how high the body may stand: low enough for each to reach (98.5% of the leg), high enough that none
   folds past 140 degrees of knee flexion (legs of more than three bones: a quarter of the reach). A held foot no height
   can reach steps off; when two held feet cannot both be kept, the one limiting reach steps off.
@@ -346,6 +407,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   most 148 degrees), never into the ground. Out of reach across the ground and clear of it, it is drawn in to 97% of
   the reach; it is moved across the ground only where no end stays down, so it cannot slide.
 - The legs are solved by IK last, so the reported pose always has the character's bone lengths.
+- When the ground under the body is more than 0.5 m below its base, the body falls: every foot lets go, the base
+  drops under gravity (9.81 m/s²) with every foot's reference at the base, and it lands on the ground it meets, where
+  the feet take hold again. Smaller drops are stepped down as before. `height` (the base) and `falling` are exposed
+  for the page, whose ground depends on how high the body stands.
 
 ## The world (`src/world/`)
 

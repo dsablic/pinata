@@ -24,6 +24,13 @@ export function footRadii (leg: Leg, mannequin: Mannequin): { ankle: number, toe
   return { ankle: foot.radiusA, toe: foot.radiusB }
 }
 
+export function solePoints (joints: Pose, leg: Leg, mannequin: Mannequin): Vec3[] {
+  const radii = footRadii(leg, mannequin)
+  const ankle = joints[leg.ankle]
+  const toe = joints[leg.toe]
+  return [[ankle[0], ankle[1] - radii.ankle, ankle[2]], [toe[0], toe[1] - radii.toe, toe[2]]]
+}
+
 export type JointTriple = [string, string, string]
 
 export function bendingJoints (leg: Leg): JointTriple[] {

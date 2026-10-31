@@ -60,3 +60,25 @@ batch E of the [world showcase](2026-10-30-world-showcase.md).
 - **C. Perception:** what is near, hovered and focused, hints, the new activity targets; the liveliness gate.
   Review.
 - **D. The demo:** the world demo rebuilt on its own page; every gate again on it; release. Review.
+
+## Results
+
+Measured by `npm run test:browser` on `test/pages/page-test.html` (four skinned, captured characters, 54 px per
+metre, scale 2) and by the Node tests.
+
+- **Batch A built and reviewed.** Surfaces, page usability and reduced motion pass.
+- **Batch B built.** The surface graph, walkers that wander over it, falls and landings in the player, and a
+  per-frame loop.
+  - Surfaces, page usability: pass, as in batch A, with the characters moving.
+  - Reduced motion: pass; nothing steps, and a poke turns no one.
+  - Falls: pass. The test removes the element under a character with a surface below it; it falls onto that surface,
+    no sole goes more than 1 px through a surface, a foot is on it within 3 frames, and no fall lasts over 4 s. In
+    Node, walking off a 1.5 m ledge.
+  - Cost: pass. p95 1.4-3.3 ms per frame with 4 characters; no layout reads and no rescans over 1.5 s with nothing
+    changing.
+  - Standing, planted feet: met in the final runs (0 of about 1100 planted feet more than 1 CSS px off, worst
+    0.97 px); earlier runs had 1 foot at 1.13 px, so it holds narrowly.
+  - **Missed: standing, mid-air.** 4-10 of 960 frames (0.4-1%) have every foot more than 3 px up while not falling.
+    What is left comes from the turn, start and stop clips (`walk-turn-right` frames 46-55 most), where the stance
+    foot is pulled into a corrective step while the other foot lifts. Before batch B's player changes, planted feet
+    were off by up to 1.35 px in 3% of planted feet and 3-4% of frames were mid-air.

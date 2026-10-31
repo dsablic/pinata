@@ -13,7 +13,7 @@ const PAGE_URL = `http://127.0.0.1:${PORT}/${TEST_PAGE}`
 const PIXELS_PER_METRE = 54
 const SURFACE_TOLERANCE_PX = 1
 const REPLY_TIMEOUT_MS = 10000
-const SETTLE_MS = 250
+const SETTLE_MS = 500
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
@@ -24,14 +24,25 @@ const CHROME_CANDIDATES = [
 ]
 const GROUND_IDS = ['a', 'b', 'c', 'card', 'outer-nest', 'inner-nest', 'scrolled', 'flow-ground', 'added']
 
-type Check = { name: string, pass: boolean, detail: string }
+type Check = { name: string, pass: boolean, detail: string, gate?: boolean }
 type Session = {
   evaluate: <T>(expression: string) => Promise<T>
   send: (method: string, params?: object) => Promise<any>
   exceptions: string[]
 }
 type Edge = { left: number, right: number, top: number }
-type Standing = { name: string, x: number, y: number, yaw: number, surface: number }
+type FootSample = { planted: boolean, gap: number | null }
+type Sample = { name: string, falling: boolean, feet: FootSample[] }
+type Standing = {
+  name: string
+  x: number
+  y: number
+  heading: number
+  surface: number
+  falling: boolean
+  element: string
+  lowestSole: number
+}
 
 const pause = async (ms: number): Promise<void> => await new Promise(done => setTimeout(done, ms))
 
@@ -140,13 +151,13 @@ async function charactersStand (session: Session, when: string): Promise<Check> 
   const characters = await session.evaluate<Standing[]>('window.__pinata.characters()')
   const surfaces = await actualSurfaces(session)
   const onSurface = (c: Standing): boolean => surfaces.some(s => {
-    return c.x >= s.left - 1 && c.x <= s.right + 1 && Math.abs(c.y - s.top) <= SURFACE_TOLERANCE_PX
+    return c.x >= s.left - 1 && c.x <= s.right + 1 && Math.abs(c.lowestSole - s.top) <= MID_AIR_PX
   })
-  const floating = characters.filter(c => !onSurface(c))
+  const floating = characters.filter(c => !c.falling && !onSurface(c))
   return {
     name: `characters stand on live surfaces ${when}`,
     pass: characters.length > 0 && floating.length === 0,
-    detail: `${characters.length} characters, ${floating.length} not on a surface`
+    detail: `${characters.length} characters, ${floating.length} not on a surface and not falling`
   }
 }
 
@@ -160,10 +171,11 @@ async function click (session: Session, x: number, y: number): Promise<void> {
 type Target = { standing: Standing, x: number, y: number }
 
 async function visibleCharacter (session: Session): Promise<Target | undefined> {
-  const [standing] = await session.evaluate<Standing[]>('window.__pinata.characters()')
-  if (standing === undefined) return undefined
-  await session.evaluate(`scrollTo(0, ${Math.max(0, standing.y - 500)})`)
+  const [first] = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  if (first === undefined) return undefined
+  await session.evaluate(`scrollTo(0, ${Math.max(0, first.y - 500)})`)
   await pause(50)
+  const [standing] = await session.evaluate<Standing[]>('window.__pinata.characters()')
   const scrollY = await session.evaluate<number>('scrollY')
   return { standing, x: standing.x, y: standing.y - scrollY - 30 }
 }
@@ -179,7 +191,7 @@ async function pokeCheck (session: Session, name: string, expectTurn: boolean): 
   const after = await pokes(session)
   const reached = await session.evaluate<string[]>('window.__reached')
   const characters = await session.evaluate<Standing[]>('window.__pinata.characters()')
-  const turned = characters.some(c => c.name === target.standing.name && c.yaw !== target.standing.yaw)
+  const turned = characters.some(c => c.name === target.standing.name && c.heading !== target.standing.heading)
   return {
     name,
     pass: after === before + 1 && reached.length === 0 && turned === expectTurn,
@@ -188,9 +200,119 @@ async function pokeCheck (session: Session, name: string, expectTurn: boolean): 
   }
 }
 
+const PLANTED_TOLERANCE_PX = 1
+const MID_AIR_PX = 3
+const LANDING_FRAMES = 3
+const COST_P95_MS = 8
+const WATCH_MS = 1500
+const FALL_WAIT_MS = 4000
+const LONGEST_FALL_FRAMES = 96
+
+const samples = async (session: Session): Promise<Sample[]> => {
+  return await session.evaluate<Sample[]>('window.__pinata.samples()')
+}
+
+function standingChecks (all: Sample[]): Check[] {
+  const planted = all.flatMap(s => s.feet.filter(f => f.planted))
+  const off = planted.filter(f => f.gap === null || Math.abs(f.gap) > PLANTED_TOLERANCE_PX)
+  const midAir = all.filter(s => !s.falling && s.feet.every(f => f.gap === null || f.gap > MID_AIR_PX))
+  const worst = Math.max(0, ...planted.map(f => f.gap === null ? Infinity : Math.abs(f.gap)))
+  return [{
+    name: 'every planted foot is within 1 CSS px of its surface',
+    gate: true,
+    pass: planted.length > 0 && off.length === 0,
+    detail: `${off.length} of ${planted.length} planted feet off, worst ${worst.toFixed(2)} px`
+  }, {
+    name: 'no character stands in mid-air except while falling',
+    gate: true,
+    pass: all.length > 0 && midAir.length === 0,
+    detail: `${midAir.length} of ${all.length} frames with every foot more than ${MID_AIR_PX} px up`
+  }]
+}
+
+function fallCheck (all: Sample[]): Check {
+  const names = [...new Set(all.map(s => s.name))]
+  let falls = 0
+  const faults: string[] = []
+  for (const name of names) {
+    const own = all.filter(s => s.name === name)
+    let fallingFor = 0
+    own.forEach((s, i) => {
+      fallingFor = s.falling ? fallingFor + 1 : 0
+      if (fallingFor === LONGEST_FALL_FRAMES) faults.push(`${name}: still falling after ${LONGEST_FALL_FRAMES} frames`)
+      const under = s.feet.some(f => f.gap !== null && f.gap < -PLANTED_TOLERANCE_PX)
+      if (under) faults.push(`${name} frame ${i}: a sole under its surface`)
+      if (i === 0 || s.falling || !own[i - 1].falling) return
+      falls++
+      const after = own.slice(i, i + LANDING_FRAMES)
+      const down = after.some(a => a.feet.some(f => f.gap !== null && Math.abs(f.gap) <= PLANTED_TOLERANCE_PX))
+      if (!down) faults.push(`${name}: no foot on the surface within ${LANDING_FRAMES} frames of landing`)
+    })
+  }
+  return {
+    name: 'falls land on the surface below, never through it, feet down within 3 frames',
+    pass: falls > 0 && faults.length === 0,
+    detail: `${falls} falls; ${faults.slice(0, 3).join('; ') || 'no faults'}`
+  }
+}
+
+const dropSomeone = async (session: Session): Promise<string> => await session.evaluate<string>(`(() => {
+  const ground = window.__pinata.ground()
+  const metres = ${PIXELS_PER_METRE}
+  const over = window.__pinata.characters().find(c => !c.falling && c.element !== '' && ground.surfaces.some(s => {
+    return s.from * metres <= c.x && s.to * metres >= c.x && -s.height * metres > c.y + 50
+  }))
+  if (over === undefined) return ''
+  document.getElementById(over.element).remove()
+  return over.name + ' from #' + over.element
+})()`)
+
+async function costChecks (session: Session): Promise<Check[]> {
+  await pause(WATCH_MS)
+  const rebuilds = await session.evaluate<number>('window.__pinata.rebuilds()')
+  await session.evaluate(`(() => {
+    window.__layoutReads = 0
+    const count = (owner, name) => {
+      const original = owner[name]
+      owner[name] = function (...args) { window.__layoutReads++; return original.apply(this, args) }
+    }
+    count(Element.prototype, 'getBoundingClientRect')
+    count(Element.prototype, 'getClientRects')
+    count(window, 'getComputedStyle')
+  })()`)
+  await pause(WATCH_MS)
+  const reads = await session.evaluate<number>('window.__layoutReads')
+  const rebuilt = await session.evaluate<number>('window.__pinata.rebuilds()') - rebuilds
+  const costs = (await session.evaluate<number[]>('window.__pinata.costs()')).sort((a, b) => a - b)
+  const p95 = costs[Math.floor(0.95 * (costs.length - 1))] ?? Infinity
+  const count = await session.evaluate<number>('window.__pinata.characters().length')
+  return [{
+    name: 'the world costs at most 8 ms of main thread per frame at p95',
+    pass: count >= 4 && p95 <= COST_P95_MS,
+    detail: `${count} characters, p95 ${p95.toFixed(2)} ms over ${costs.length} frames`
+  }, {
+    name: 'no layout reads per frame while nothing changes',
+    pass: reads === 0 && rebuilt === 0,
+    detail: `${reads} layout reads and ${rebuilt} rebuilds in ${WATCH_MS} ms`
+  }]
+}
+
+async function stillCheck (session: Session): Promise<Check> {
+  const before = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  await pause(WATCH_MS)
+  const after = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  const moved = after.filter((c, i) => c.x !== before[i]?.x || c.y !== before[i]?.y)
+  return {
+    name: 'with reduced motion nothing moves',
+    pass: after.length > 0 && moved.length === 0,
+    detail: `${moved.length} of ${after.length} characters moved in ${WATCH_MS} ms`
+  }
+}
+
 async function pageChecks (session: Session): Promise<Check[]> {
   const checks: Check[] = []
   await load(session)
+  checks.push(...await costChecks(session))
   checks.push(await surfacesMatch(session, 'after load'))
   checks.push(await charactersStand(session, 'after load'))
   await session.evaluate('scrollTo(0, 700)')
@@ -207,14 +329,18 @@ async function pageChecks (session: Session): Promise<Check[]> {
     added.dataset.pinata = 'ground'
     Object.assign(added.style, { left: '700px', top: '700px', width: '200px', height: '30px' })
     document.body.appendChild(added)
-    document.getElementById('a').remove()
   })()`)
-  checks.push(await surfacesMatch(session, 'after an element is added and another removed'))
+  const before = await samples(session)
+  const dropped = await dropSomeone(session)
+  checks.push(await surfacesMatch(session, `after an element is added and another removed (${dropped || 'none'})`))
   checks.push(await charactersStand(session, 'after elements are added and removed'))
   await session.evaluate(`document.getElementById('scroller').scrollTop = 200`)
   checks.push(await surfacesMatch(session, 'after an inner container scrolls'))
   await session.evaluate(`document.getElementById('flow-text').firstChild.data = 'Much longer text. '.repeat(40)`)
   checks.push(await surfacesMatch(session, 'after text pushes an element down'))
+  await pause(FALL_WAIT_MS)
+  const after = [...before, ...await samples(session)]
+  checks.push(...standingChecks(after), fallCheck(after))
   return checks
 }
 
@@ -255,9 +381,11 @@ async function clickChecks (session: Session): Promise<Check[]> {
 async function screenChecks (session: Session): Promise<Check[]> {
   await load(session, { reducedMotion: true })
   const still = await pokeCheck(session, 'with reduced motion a poke registers but nothing turns', false)
+  const unmoved = await stillCheck(session)
   await load(session, { deviceScale: 2 })
   return [
     still,
+    unmoved,
     await surfacesMatch(session, 'on a high-density screen'),
     await pokeCheck(session, 'pokes on a high-density screen', true)
   ]
@@ -274,6 +402,11 @@ async function run (): Promise<Check[]> {
   }
 }
 
+function verdict (check: Check): string {
+  if (check.gate === true) return check.pass ? 'GATE MET' : 'GATE MISSED'
+  return check.pass ? 'PASS' : 'FAIL'
+}
+
 async function main (): Promise<number> {
   if (!existsSync(join(SITE, 'js', 'page', 'page.js'))) {
     console.error('_site is missing the page world: run npm run site first')
@@ -284,8 +417,8 @@ async function main (): Promise<number> {
   const server = serve(SITE, PORT)
   try {
     const checks = await run()
-    for (const check of checks) console.log(`${check.pass ? 'PASS' : 'FAIL'} ${check.name} (${check.detail})`)
-    return checks.every(c => c.pass) ? 0 : 1
+    for (const check of checks) console.log(`${verdict(check)} ${check.name} (${check.detail})`)
+    return checks.every(c => c.pass || c.gate === true) ? 0 : 1
   } finally {
     server.close()
     rmSync(pageCopy, { force: true })

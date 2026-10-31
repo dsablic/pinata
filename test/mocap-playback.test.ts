@@ -229,3 +229,58 @@ test('transitions: clip switches are no lumpier than ordinary frames, within 10 
   t.diagnostic(results.map(r => r.message).join('; '))
   assert.ok(results.every(r => r.pass), results.map(r => r.message).join('; '))
 })
+
+test('walking off a ledge, the body falls and lands with its feet on the floor below, never through it', () => {
+  const LEDGE_END = 3
+  const LEDGE_HEIGHT = 1.5
+  const ledge = { ground: (x: number): number => x < LEDGE_END ? LEDGE_HEIGHT : 0 }
+  const falling: boolean[] = []
+  const run = play('knight', ledge, 6, () => ({ speed: 1.2, heading: EAST }), player => {
+    falling.push(player.falling())
+  })
+  const { rig, mannequin } = character('knight')
+  const soles = run.world.frames.map(f => legsOf(rig).flatMap(leg => metrics.solePoints(f.joints, leg, mannequin)))
+  const lowestAboveGround = Math.min(...soles.flat().map(p => p[1] - ledge.ground(p[0])))
+  assert.ok(falling.includes(true), 'it fell')
+  assert.ok(lowestAboveGround >= -0.01, `a sole went ${(-lowestAboveGround).toFixed(3)} m into the ground`)
+  const landed = falling.lastIndexOf(true)
+  const footDown = soles.slice(landed, landed + 3).some(frame => Math.min(...frame.map(p => p[1])) < 0.03)
+  assert.ok(footDown, 'a foot is on the floor within 3 frames of landing')
+  assert.ok(run.frames.at(-1)!.root.position[0] > LEDGE_END + 1, 'it walks on along the floor')
+})
+
+function lowestSoles (run: Run, name: string): number[][] {
+  const { rig, mannequin } = character(name)
+  return run.relative.frames.map(f => legsOf(rig).map(leg => {
+    return Math.min(...metrics.solePoints(f.joints, leg, mannequin).map(p => p[1]))
+  }))
+}
+
+test('walking at speeds its clips do not match, a body keeps a foot near the ground', () => {
+  const flat = { ground: (): number => 0 }
+  const lifted: string[] = []
+  for (const name of HUMANOIDS) {
+    for (const speed of [0.6, 0.8, 1, 1.2]) {
+      const run = play(name, flat, 12, () => ({ speed, heading: EAST }))
+      const airborne = lowestSoles(run, name).slice(2 * FPS).filter(feet => feet.every(h => h > 0.05)).length
+      if (airborne > 0) lifted.push(`${name} at ${speed} m/s: ${airborne} frames`)
+    }
+  }
+  assert.deepEqual(lifted, [])
+})
+
+test('a planted foot rests on the ground, and is never held over a drop', () => {
+  const hovering: string[] = []
+  for (const name of HUMANOIDS) for (const edge of [3, 3.2, 3.4, 3.6, 3.8, 4]) {
+    const ledge = { ground: (x: number): number => x < edge ? 1.5 : 0 }
+    const run = play(name, ledge, 5, () => ({ speed: 1.1, heading: EAST }))
+    const soles = lowestSoles(run, name)
+    const planted = run.frames.flatMap((frame, i) => frame.planted.flatMap((held, k) => held ? [soles[i][k]] : []))
+    const high = planted.filter(h => h > 0.01)
+    const highest = Math.max(...planted)
+    if (high.length > 0.05 * planted.length || highest > 0.03) {
+      hovering.push(`${name} ${edge}: ${high.length} of ${planted.length} above 1 cm, highest ${highest.toFixed(3)} m`)
+    }
+  }
+  assert.deepEqual(hovering, [])
+})

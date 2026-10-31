@@ -71,14 +71,48 @@ function touchesMarked (node: Node, marked: ReadonlySet<Element>): boolean {
   return false
 }
 
-export function watch (onChange: () => void, marked: () => readonly Element[]): () => void {
+const SAME_SIZE_PX = 0.5
+
+function sizeChanged (entry: ResizeObserverEntry, scanned: Box | undefined): boolean {
+  const size = entry.borderBoxSize?.[0]
+  if (scanned === undefined || size === undefined) return false
+  const wider = Math.abs(size.inlineSize - scanned.width) > SAME_SIZE_PX
+  return wider || Math.abs(size.blockSize - scanned.height) > SAME_SIZE_PX
+}
+
+export function watch (
+  onChange: () => void,
+  marked: () => readonly Marked[],
+  ignore: (node: Node) => boolean = () => false
+): () => void {
   let frame: number | undefined
   let delayed: ReturnType<typeof setTimeout> | undefined
-  const resize = new ResizeObserver(() => { now() })
+  const observed = new Set<Element>()
+  const fresh = new Map<Element, Box | undefined>()
+  const resize = new ResizeObserver(entries => {
+    const changed = entries.filter(entry => {
+      if (!fresh.has(entry.target)) return true
+      const scanned = fresh.get(entry.target)
+      fresh.delete(entry.target)
+      return sizeChanged(entry, scanned)
+    })
+    if (changed.length > 0) now()
+  })
   const observeMarked = (): void => {
-    resize.disconnect()
-    resize.observe(document.documentElement)
-    for (const element of marked()) resize.observe(element)
+    const boxes = new Map<Element, Box | undefined>([[document.documentElement, undefined]])
+    for (const m of marked()) boxes.set(m.element, m.box)
+    for (const element of observed) {
+      if (boxes.has(element)) continue
+      resize.unobserve(element)
+      observed.delete(element)
+      fresh.delete(element)
+    }
+    for (const [element, box] of boxes) {
+      if (observed.has(element)) continue
+      observed.add(element)
+      fresh.set(element, box)
+      resize.observe(element)
+    }
   }
   const now = (): void => {
     if (frame !== undefined) return
@@ -95,8 +129,10 @@ export function watch (onChange: () => void, marked: () => readonly Element[]): 
     delayed = setTimeout(now, UNRELATED_CHANGE_DELAY_MS)
   }
   const mutation = new MutationObserver(records => {
-    const current = new Set(marked())
-    const relevant = records.some(record => {
+    const current = new Set(marked().map(m => m.element))
+    const own = records.filter(record => !ignore(record.target))
+    if (own.length === 0) return
+    const relevant = own.some(record => {
       if (record.type === 'childList') return true
       return record.attributeName === MARK_ATTRIBUTE || touchesMarked(record.target, current)
     })

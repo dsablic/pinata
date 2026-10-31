@@ -68,7 +68,7 @@ function placeChain (
       segment.tip = goal
       segment.target = goal
       segment.velocity = options.velocity?.(goal) ?? [0, 0, 0]
-    } else springStep(segment, from, goal, limb, options.step)
+    } else springStep(segment, from, goal, limb, options.step, options.force)
     segment.frame = multiply(between(direction, normalize(sub(segment.tip, from))), frame)
     frame = segment.frame
     from = segment.tip

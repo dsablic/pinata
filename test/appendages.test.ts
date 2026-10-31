@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { AppendageLimb, Rig } from '../src/formats/rig.ts'
-import { animateAppendages } from '../src/motion/appendages.ts'
+import { animateAppendages, createSpringChain, startChain, stepChain } from '../src/motion/appendages.ts'
+import { IDENTITY } from '../src/math/matrix.ts'
 import type { GaitFrame } from '../src/motion/gait.ts'
 import { kneeFlexionDegrees } from '../src/motion/ik.ts'
 import { length, sub } from '../src/math/vec.ts'
@@ -138,4 +139,19 @@ test('a soft tail through a half turn in one second keeps its bend changing smoo
 test('a body that starts mid-turn starts the tail moving with it', () => {
   const poses = animate(rigWith({}), frames(0.5, () => [0, 0, 0], t => 2 * t))
   assert.ok(Math.max(...poses.slice(0, 8).map(deviation)) < 0.01)
+})
+
+test('a force such as wind pushes a soft tail away from where the body holds it', () => {
+  const limb = rigWith({ stiffness: 0.3 }).limbs[0] as AppendageLimb
+  const tipAfter = (force?: (velocity: Vec3) => Vec3): Vec3 => {
+    const chain = createSpringChain(limb, rest)
+    const base = rest[TAIL[0]]
+    startChain(chain, base, IDENTITY, 0, () => [0, 0, 0])
+    const dt = 1 / (FPS * SUBSTEPS)
+    for (let i = 1; i <= FPS * SUBSTEPS; i++) stepChain(chain, base, IDENTITY, i * dt, dt, force)
+    return chain.segments[chain.segments.length - 1].tip
+  }
+  const still = tipAfter()
+  const blown = tipAfter(() => [20, 0, 0])
+  assert.ok(blown[0] - still[0] > 0.01, `the tip moved ${(blown[0] - still[0]).toFixed(3)} m with the wind`)
 })

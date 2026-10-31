@@ -177,6 +177,7 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - An appendage on a joint that turns starts moving with that joint's first-frame velocity; otherwise its tips start
   with the root's velocity.
 - A `Force` is an outside acceleration (m/s^2) on a segment's tip given its velocity, such as gravity or wind drag.
+  The live world passes one each step; offline planning passes none, so its outputs do not depend on the weather.
 
 ### Pose sequence (`sequence.ts`)
 

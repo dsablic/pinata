@@ -67,7 +67,7 @@ export function validateSkin (input: unknown): Validated<Skin> {
         return true
       })
       if (errors.length > 0) return { errors }
-      const partsOf = (view: string): Record<string, unknown> => (views[view] as { parts: Record<string, unknown> }).parts
+      const partsOf: PartsOf = view => (views[view] as { parts: Record<string, unknown> }).parts
       for (const view of drawnViews) resolveFrom(partsOf, view, errors)
       for (const view of drawnViews) {
         for (const [name, part] of Object.entries(partsOf(view))) {
@@ -245,7 +245,9 @@ function checkTwoJoint (sprite: SkinPart, path: string, errors: ValidationError[
  * Replaces every sprite that has `from` with a copy of the sprite it names (its own `layer` kept), following chains of
  * references; a missing or circular reference is an error.
  */
-function resolveFrom (partsOf: (view: string) => Record<string, unknown>, view: string, errors: ValidationError[]): void {
+type PartsOf = (view: string) => Record<string, unknown>
+
+function resolveFrom (partsOf: PartsOf, view: string, errors: ValidationError[]): void {
   const parts = partsOf(view)
   for (const [name, part] of Object.entries(parts)) {
     if (!isRecord(part) || part.from === undefined) continue
@@ -263,7 +265,8 @@ function resolveFrom (partsOf: (view: string) => Record<string, unknown>, view: 
       target = partsOf(refView)[refPart]
     }
     if (!isRecord(target)) {
-      errors.push({ path, message: `'${String(part.from)}' is not a sprite (expected 'part' or 'view.part', no loops)` })
+      const message = `'${String(part.from)}' is not a sprite (expected 'part' or 'view.part', no loops)`
+      errors.push({ path, message })
       continue
     }
     const { from, ...copied } = target

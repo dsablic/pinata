@@ -7,6 +7,9 @@
 - No comments in code: no doc comments, no inline comments. Clear names and small functions say what the code does.
 - Implementation choices and their reasons go in [`docs/design.md`](docs/design.md), under the module's heading,
   updated in place when a choice changes. Older modules still carry doc comments; move them there when touching them.
+- Code and tests are DRY: shared logic and fixtures live once and are reused.
+- Tests check behaviour that could break: no low-value tests (a constant compared against its value, a type's shape,
+  code restated as an assertion). Each test should be able to fail for a real defect.
 - Existing outputs stay byte-identical unless a change is meant to alter them.
 
 ## Documents

@@ -5,9 +5,8 @@
 (walk to a hovered button, sit on a heading, flee a click), and never get in the way of the page. Then the world demo
 is rebuilt on its own page's elements instead of the generated terrain.
 
-**Direction (user, 2026-10-30 and 2026-10-31):** batch E of the [world showcase](2026-10-30-world-showcase.md);
-"once we have the interaction with dom working, we should plan to rework the world demo to use it, instead of custom
-terrain".
+The world demo moves onto this: it is rebuilt on its own page's elements instead of the generated terrain. This is
+batch E of the [world showcase](2026-10-30-world-showcase.md).
 
 ## Design
 

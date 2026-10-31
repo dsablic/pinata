@@ -23,6 +23,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:web
       - run: npm test
+      - run: npm run site
+      - run: npm run test:browser
 
   site:
     needs: test

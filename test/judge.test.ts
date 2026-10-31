@@ -176,7 +176,7 @@ test('a stacked panel puts the left image on top and says so', () => {
   }
   const image = pairImage(a, b, { scale: 1, gap: 1, background: '#c8c8c8', layout: 'stacked' })
   assert.ok(image.height > image.width)
-  const pairs = [{ id: 'p', a: 'a', b: 'b' }]
+  const pairs = [{ id: 'p', a: 'a', b: 'b' }, { id: 'c', a: 'b', b: 'b', control: true }]
   const spec = validatePanelSpec({ name: 'n', seed: 's', question: 'q', layout: 'stacked', pairs })
   assert.deepEqual(spec.errors, [])
   assert.deepEqual(validatePanelSpec({ ...spec.value, layout: 'diagonal' }).errors.map(e => e.path), ['layout'])

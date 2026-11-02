@@ -40,7 +40,7 @@
           "KkkkkkkkKK",
           ".KKKKKKKK."
         ], "pivotA": [5, 5] },
-        "helmet": { "rows": [
+        "helmet": { "layer": 1, "rows": [
           "...wwwsss...",
           "..wwssssssS.",
           ".wwsssssssS.",
@@ -158,7 +158,7 @@
           "BkKkkkkkkK",
           ".KKKKKKKK."
         ], "pivotA": [5, 5] },
-        "helmet": { "rows": [
+        "helmet": { "layer": 1, "rows": [
           "...wwwsss...",
           "..wwssssssS.",
           ".wwsssssssS.",
@@ -266,7 +266,7 @@
           "BbKkkkkkkK",
           ".BKKKKKKK."
         ], "pivotA": [5, 5] },
-        "helmet": { "rows": [
+        "helmet": { "layer": 1, "rows": [
           "...wwwsss...",
           "..wwssssssS.",
           ".wwsssssssS.",
@@ -363,7 +363,7 @@
           ".BbBBBkkK.",
           "..BBBKKK.."
         ], "pivotA": [5, 5] },
-        "helmet": { "rows": [
+        "helmet": { "layer": 1, "rows": [
           "...wwwsss...",
           "..wwssssssS.",
           ".wwsssssssS.",
@@ -465,7 +465,7 @@
           ".bBbBBbBB.",
           "..BBBBBB.."
         ], "pivotA": [5, 5] },
-        "helmet": { "rows": [
+        "helmet": { "layer": 1, "rows": [
           "...wwwsss...",
           "..wwssssssS.",
           ".wwsssssssS.",

@@ -43,7 +43,7 @@
         "..CCCm",
         "...mm."
       ], "pivotA": [0, 2], "pivotB": [3, 2] },
-      "face": { "rows": [
+      "face": { "layer": 1, "rows": [
         ".fffff.",
         "fffffff",
         "ffefeff",
@@ -189,7 +189,7 @@
         "..rrrrrrrr..."
       ], "pivotA": [6, 6] },
       "hood": { "hidden": true },
-      "face": { "rows": [
+      "face": { "layer": 1, "rows": [
         ".fffff",
         "ffffff",
         "ffefef",
@@ -328,7 +328,7 @@
         "..crrrrrrc..."
       ], "pivotA": [6, 6] },
       "hood": { "hidden": true },
-      "face": { "rows": [
+      "face": { "layer": 1, "rows": [
         ".fff",
         "ffff",
         "ffef",

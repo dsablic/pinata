@@ -235,3 +235,26 @@ test('characters stuck on one element drop back in from above, onto open places 
   }
   assert.deepEqual(falls(s.cast.samples()).faults, [])
 })
+
+test('every character is drawn on every frame, and the dwarf never loses its helmet', () => {
+  const s = scenario(world, layout('demo-1200'))
+  const steel = [0x85, 0x92, 0xad]
+  const empty: string[] = []
+  let bareHeaded = 0
+  run(s, 60, step => {
+    for (const d of s.cast.drawables()) {
+      const { image } = d.sprite()
+      let opaque = 0
+      let helmet = 0
+      for (let k = 0; k < image.data.length; k += 4) {
+        if (image.data[k + 3] === 0) continue
+        opaque++
+        if ([0, 1, 2].every(c => Math.abs(image.data[k + c] - steel[c]) < 8)) helmet++
+      }
+      if (opaque === 0) empty.push(`${d.name} at step ${step}`)
+      if (d.name === 'dwarf' && helmet < 10) bareHeaded++
+    }
+  })
+  assert.deepEqual(empty.slice(0, 5), [])
+  assert.equal(bareHeaded, 0)
+})

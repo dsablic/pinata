@@ -104,7 +104,9 @@ export function keep<T> (list: T[], most: number): void {
 }
 
 export function anchorHeight (frame: WalkerFrame): number {
-  return frame.falling || frame.support === undefined ? frame.base : frame.support.height
+  const under = frame.support
+  if (frame.falling || under === undefined || frame.base - under.height > STEP_HEIGHT) return frame.base
+  return under.height
 }
 
 export function spriteReach (pixelsPerMetre: number): number {

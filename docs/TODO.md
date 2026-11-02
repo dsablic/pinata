@@ -32,7 +32,8 @@ draw-order rule for every part on the page. Next: batch A (the survey).
 ### 0. P7: skins to a game-art bar
 
 [P7 plan](plans/2026-10-31-p7-skins.md): built and released as v0.3.0 (eight-direction skins for the four humanoids,
-skins in the world). Left: the size gate (per-size skins), live capes on skinned characters, the human review.
+skins in the world). Left: the size gate (per-size skins), the human review. Live capes on skinned characters are
+built on the page (natural-motion batch B).
 
 ### 0a. The page as the world
 

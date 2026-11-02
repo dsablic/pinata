@@ -700,7 +700,8 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   a part counts as cloth inside the body). Parts that would push a hanging panel from the wrong side are left out
   of its collisions: the dwarf's axe, the wizard's forearms and hands. The wizard's robe sways through a back panel
   hung from the hips; a closed skirt round the legs was tried, but walking legs push through its front between the
-  particles at any practical spacing, failing the cloth gates.
+  particles at any practical spacing, failing the cloth gates. The panel's anchors sit outside the robe and it collides with the robe:
+  ignoring the robe let a panel flung over the head in a fall come down through the body and stay in front.
 
 ### solver.ts
 

@@ -22,8 +22,8 @@ check its own work.
   - **The page as the world:** characters live on an ordinary web page. Elements marked with
     `--pinata: ground` (or `data-pinata="ground"`) are their ground and `wall` their walls; they walk, step up small
     rises and drop between elements, come to what you point at or focus, say a place's `data-pinata-say` words, and
-    linger where `--pinata-attract` is set, on a click-through overlay that leaves the page usable. The demo page is
-    built this way.
+    linger where `--pinata-attract` is set, on a click-through overlay that leaves the page usable. Their capes,
+    cloaks, robes and scarves hang and swing with simulated cloth. The demo page is built this way.
   - **The hanging piñata:** a character on a rope you can poke, drag and tune. Embed it with
     `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
     `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.

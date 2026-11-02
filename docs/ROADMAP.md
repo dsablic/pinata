@@ -137,7 +137,9 @@ readability layer (exaggerated contact and passing poses, holds). Gates to fix b
 **Status:** built and released (v0.3.0): RotSprite rotation (off by default), eight-direction skins for the four
 humanoids, a readability layer, skins in the world. Passed: artist, view consistency, real-time, quality against
 references (second round). Failed: rotation preference, readability. Open: the size gate (needs per-size skins),
-live capes on skinned characters, the human review. Details in the [P7 plan](plans/2026-10-31-p7-skins.md).
+the human review. Live capes on skinned characters are built on the page: the artist's cape, cloak, robe and scarf
+sprites are drawn along their simulated cloth ([natural-motion plan](plans/2026-11-02-natural-page-motion.md)).
+Details in the [P7 plan](plans/2026-10-31-p7-skins.md).
 
 **Honest risk:** game-quality art is where the evidence is thinnest. If P7 cannot reach strong references even with
 clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics

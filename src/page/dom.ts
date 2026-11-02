@@ -1,17 +1,35 @@
 import type { Box, Mark } from './surfaces.ts'
 
-export type Marked = { element: Element, box: Box }
+export type Hints = { say?: string, attract: number }
+export type Marked = { element: Element, box: Box, hints: Hints }
 
 const MARK_PROPERTY = '--pinata'
 const MARK_ATTRIBUTE = 'data-pinata'
+const SAY_ATTRIBUTE = 'data-pinata-say'
+const ATTRACT_PROPERTY = '--pinata-attract'
+const ATTRACT_ATTRIBUTE = 'data-pinata-attract'
 const UNRELATED_CHANGE_DELAY_MS = 250
 const MOVES_WITH_VIEWPORT = new Set(['fixed', 'sticky'])
 const CLIPPING_OVERFLOW = new Set(['hidden', 'clip', 'auto', 'scroll'])
 
 export function registerMarkProperty (): void {
-  try {
-    CSS.registerProperty({ name: MARK_PROPERTY, syntax: '*', inherits: false })
-  } catch {}
+  for (const name of [MARK_PROPERTY, ATTRACT_PROPERTY]) {
+    try {
+      CSS.registerProperty({ name, syntax: '*', inherits: false })
+    } catch {}
+  }
+}
+
+export function sayOf (element: Element): string | undefined {
+  const said = element.getAttribute(SAY_ATTRIBUTE)?.trim()
+  return said === undefined || said === '' ? undefined : said
+}
+
+function hintsOf (element: Element, style: CSSStyleDeclaration): Hints {
+  const raw = element.getAttribute(ATTRACT_ATTRIBUTE) ?? style.getPropertyValue(ATTRACT_PROPERTY)
+  const attract = Number.parseFloat(raw)
+  const say = sayOf(element)
+  return { attract: Number.isFinite(attract) && attract > 0 ? attract : 0, ...(say === undefined ? {} : { say }) }
 }
 
 function markOf (element: Element, style: CSSStyleDeclaration): Mark | 'none' | undefined {
@@ -53,7 +71,8 @@ export function scan (root: Element = document.body): Marked[] {
           top: rect.top + window.scrollY,
           width: right - left,
           height: rect.height
-        }
+        },
+        hints: hintsOf(element, style)
       })
     }
     const clips = CLIPPING_OVERFLOW.has(style.overflowX) || CLIPPING_OVERFLOW.has(style.overflowY)
@@ -144,7 +163,7 @@ export function watch (
     childList: true,
     characterData: true,
     attributes: true,
-    attributeFilter: [MARK_ATTRIBUTE, 'class', 'style', 'hidden', 'open']
+    attributeFilter: [MARK_ATTRIBUTE, SAY_ATTRIBUTE, ATTRACT_ATTRIBUTE, 'class', 'style', 'hidden', 'open']
   })
   const innerScroll = (event: Event): void => {
     if (event.target !== document) now()

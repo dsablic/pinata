@@ -33,6 +33,9 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - Not ground: elements with `display: none` or not `visibility: visible`, elements whose top edge is scrolled out of a
   clipping ancestor (`overflow` other than `visible`; the visible part of the edge is kept), and `position: fixed` or
   `sticky` elements, which move with the viewport and so have no fixed place on the page.
+- Hints ride on marked elements: `data-pinata-say` (words a character says on arriving there) and how much
+  characters like to go there, from `data-pinata-attract` or the non-inherited custom property `--pinata-attract`
+  (a number; 0 when missing or not positive).
 - The scan walks the whole body and reads every element's computed style once per scan. Scans run on load and on
   change only, never per frame.
 - Change detection: a ResizeObserver on the root element and on every marked element, each observed once from the
@@ -81,6 +84,13 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   then follow the path edge by edge (heading for each edge's `at` at walking speed, 1.1 m/s, east or west), and slow
   down over the last 0.5 m to the spot. The current node is the one under the root at the surface height under it;
   off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s gives up and rests.
+- Activities: `rest`, `wander`, `visit` and `flee`; each start after the first rest is counted (`started`, for the
+  liveliness gate), and a restart (`moveTo`) puts a walker back at rest. A walk ends `reached` only when it got to its
+  spot; giving up (no path any more, a leg over 10 s, or a page change that removed its place) ends it unreached.
+  Wandering picks a node weighted by its width times one plus its surface's attraction, and the rest after arriving
+  lasts longer by half the attraction (1 + attract / 2 times), so attractive elements win both ways.
+- `visit` sends a walker to a place (a point on a surface) if a node holds it and the walker can reach that node;
+  `reaches` answers the same question without going.
 - A poke turns a walker round and sends it 1.5 m the other way on its node (to its middle on a node too narrow for
   the end margins).
 - `shiftBy` carries a walker with the element it stands on without restarting its motion: the walker keeps an offset
@@ -89,6 +99,24 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   a node still holds it, and the route is planned again from there.
 - The frame it reports has the world joints, the base, whether it is falling, the surface under it, and each foot's
   sole points with the player's planted flag, which the page records for the standing gates.
+
+### Perception (`perception.ts`) and speech (`speech.ts`)
+
+- An element is noticed when the pointer has rested on it for 300 ms (passive capture-phase `pointerover`,
+  cancelled on `pointerout`) or when it gains focus (`focusin`, so keyboard focus counts; focus returning to the same
+  element, as when the window is focused again, does not count twice). What is noticed is the nearest interactive
+  element around the target (link, button, form field, `summary`, `label`, anything with `tabindex`) or one with
+  words; resting on plain text or the page's background is not a request, and the overlay is never noticed.
+- The place for a noticed element is under its centre: the top of the ground element it is inside, if any (a button in
+  a card sends a character onto the card), otherwise the highest surface there not above the element's top (what it
+  sits on). Its box is read on the event, never per frame.
+- The page sends the nearest character (straight-line distance from where it stands to the place) that can reach it;
+  none is sent with reduced motion. Each sending is listed (`visits`) for the checks.
+- When a visit ends at its place, the character says the words of the noticed element or its nearest ancestor with
+  `data-pinata-say`; when any other walk ends at its spot, the standing element's words. Unreached walks say nothing.
+  Words show for 2.5 s in a bubble drawn on the overlay above the sprite (system font, 12 CSS px); a bubble that
+  expires redraws the overlay, so it also goes away when nothing steps. The overlay is `aria-hidden`, so words are
+  decoration, not content.
 
 ### Characters and the overlay (`page.ts`)
 
@@ -141,6 +169,12 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - The fall check removes the element under a character that has a surface below it, so a fall always happens; a fall
   lasting over 4 s counts as a fault (a body falling into nothing). Gaps of `null` (nothing under a foot) count as off
   the surface: values come back through the protocol as JSON, which has no infinity.
+- Perception and liveliness run on a second page (`test/pages/perception-test.html`): three floor elements in a row
+  (one attractive, one a step higher), a shelf with words, a button with words whose label is a child span (hovered,
+  so words come from the ancestor), and a text field inside a floor element (focused by Tab, so the place must be that
+  element's own top). A hover or focus check waits until no one is near the target, then passes only if the character
+  sent is the nearest one, reaches the target within 8 s and says the words. The hints are read back from the page
+  (`hints`).
 - Layout reads are counted by wrapping `getBoundingClientRect`, `getClientRects` and `getComputedStyle` after the page
   has settled; with nothing changing, a frame must read none.
 

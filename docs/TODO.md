@@ -26,10 +26,10 @@ skins in the world). Left: the size gate (per-size skins), live capes on skinned
 
 [Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
 step and drop between them on a click-through overlay, react to the page, then the world demo is rebuilt on its own
-page. Batches A (surfaces and the overlay) and B (moving over the page) done and reviewed; B misses the mid-air half
-of the standing gate (0.4-1% of frames, from turn, start and stop clips; see the plan). Paused here; C (perception)
-is next. Open question: whether missed motion gates should fail `npm run test:browser` (they report `GATE MISSED`
-without failing it, so CI stays green).
+page. Batches A (surfaces and the overlay), B (moving over the page) and C (perception) done and reviewed; B misses
+the mid-air half of the standing gate (0.4-1% of frames, from turn, start and stop clips; see the plan). D (the demo
+rebuilt on its own page, release) next. Open question: whether missed motion gates should fail
+`npm run test:browser` (they report `GATE MISSED` without failing it, so CI stays green).
 
 ### 0b. World showcase, remaining batches
 
@@ -42,28 +42,6 @@ works, the world demo is rebuilt on the page's elements instead of the generated
 - [ ] Several new examples sit exactly on `maxThinFraction` (0.25).
 - [ ] Appendages: a very soft appendage on a very fast spin flails (swing frames are singular near 180 degrees); no
       script does that today.
-
-### 2. Live runtime spike P8, with composable behaviours phase 1
-
-[Runtime spec](plans/2026-10-30-runtime-spike.md) and [behaviours spec](plans/2026-10-30-composable-behaviours.md):
-- [ ] Browser bundle of the engine (esbuild, no Node built-ins), compact single-file character artifact.
-- [ ] Online (frame-by-frame) motion for the hanging piñata: spherical pendulum on a rope with twist, full 3D body
-      orientation, limp legs and mane as cloth chains, `hit()` events.
-- [ ] Composition evaluator (base, limb-masked layers, additive overlays, events, blending, state machine) with
-      `hang`, `sway`, `spin`, `bounce`, `breathe`, `hit`; the five behaviours in a `behaviours.json`.
-- [ ] `<pinata-character>` element, event bridge (`loading`, `toolStart`, `error`, `success`, `idle`), poke and drag,
-      reduced motion, page stays clickable.
-- [ ] Playwright tests (add Playwright via the npm safe-install skill): p95 frame time <= 40 ms at 64 px, hit
-      reaction, behaviour switching, Node-browser determinism, event bridge, poke/drag, reduced motion, no console
-      errors, saved stills.
-- [ ] Decision: procedural renderer good enough for the runtime, or skins first.
-
-### 3. P7, in parallel with P8: skins to a game-art bar
-
-[ROADMAP.md, "P7"](ROADMAP.md): 8-direction AI-drawn skins, clean limb rotation (angle variants or RotSprite-style),
-a first readability layer (exaggerated contact and passing poses, holds), consistency at 32/48/64 px; judged against
-high-quality references with a 1-5 rating plus detection, and one human pixel artist review. Fix gates in a plan
-before building.
 
 ## Smaller items
 

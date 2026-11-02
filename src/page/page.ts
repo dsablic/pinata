@@ -8,13 +8,16 @@ import { renderSkinned } from '../style/skins.ts'
 import { getPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
-import { scan, watch } from './dom.ts'
+import { sayOf, scan, watch } from './dom.ts'
 import type { Marked } from './dom.ts'
 import { groundOf, surfaceBelow } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 import { surfaceGraph } from './graph.ts'
 import { createWalker, DROP_LIMIT, STEP_HEIGHT } from './walker.ts'
-import type { Place, Walker, WalkerFrame } from './walker.ts'
+import type { Activity, Place, Walker, WalkerFrame } from './walker.ts'
+import { perceive } from './perception.ts'
+import type { Interest } from './perception.ts'
+import { drawBubble } from './speech.ts'
 
 export type PageWorldOptions = {
   bundle: string
@@ -29,12 +32,17 @@ type Skinned = Look & { skin: NonNullable<Look['skin']> }
 type Sprite = { image: Image, camera: Camera, canvas: HTMLCanvasElement, frame: WalkerFrame }
 type Drawn = { left: number, top: number, pixel: number }
 type Standing = { element: Element, from: number, height: number }
+type Saying = { text: string, until: number }
 type Character = {
   name: string
   look: Skinned
   database: MotionDatabase
   walker?: Walker
   on?: Standing
+  visited: Set<Element>
+  activity?: Activity
+  interest?: Element
+  saying?: Saying
   view: { sector?: number }
   sprite?: Sprite
   drawn?: Drawn
@@ -50,13 +58,21 @@ export type CharacterState = {
   falling: boolean
   element: string
   lowestSole: number
+  activity: string
+  started: number
+  elements: number
+  saying: string
 }
+export type Visit = { name: string, element: string }
+export type Hint = { element: string, say?: string, attract: number }
 export type FootSample = { planted: boolean, gap: number | null }
 export type Sample = { name: string, falling: boolean, feet: FootSample[] }
 export type PageWorld = {
   ground: () => Ground
   characters: () => CharacterState[]
   samples: () => Sample[]
+  visits: () => Visit[]
+  hints: () => Hint[]
   costs: () => number[]
   pokes: () => number
   rebuilds: () => number
@@ -70,8 +86,10 @@ const SPRITE_BOX_IN_CHARACTER_HEIGHTS = 1.6
 const FEET_LINE_SHARE_OF_BOX = 0.85
 const MARGIN_FROM_SURFACE_ENDS = 0.3
 const MOVED = 1e-3
-const KEPT_SAMPLES = 4000
+const KEPT_SAMPLES = 8000
 const KEPT_COSTS = 600
+const SAYING_MS = 2500
+const KEPT_VISITS = 100
 const GESTURE_EVENTS = ['mousedown', 'pointerup', 'mouseup', 'click', 'dblclick', 'auxclick', 'contextmenu']
 const GESTURE_TIMEOUT_MS = 800
 
@@ -124,7 +142,7 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
     .flatMap((look, i) => {
       const database = cast[i].capture
       if (look.skin === undefined || database === undefined) return []
-      return [{ name: cast[i].name, look: look as Skinned, database, view: {} }]
+      return [{ name: cast[i].name, look: look as Skinned, database, view: {}, visited: new Set<Element>() }]
     })
     .slice(0, options.count)
   const heightOf = (c: Character): number => Math.max(...Object.values(c.database.options.rest).map(p => p[1]))
@@ -136,6 +154,7 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
   let rebuilds = 0
   let pokes = 0
   const samples: Sample[] = []
+  const visits: Visit[] = []
   const costs: number[] = []
 
   const placeAnywhere = (): Place | undefined => {
@@ -158,6 +177,7 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
       ? undefined
       : { element, from: surface.from, height: surface.height }
   }
+  const attraction = (surface: number): number => marked[surface]?.hints.attract ?? 0
   const replace = (walker: Walker): void => {
     const place = placeAnywhere()
     if (place !== undefined) walker.moveTo(place)
@@ -184,7 +204,7 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
         const place = placeAnywhere()
         if (place === undefined) continue
         const yaw = next() < 0.5 ? Math.PI / 2 : -Math.PI / 2
-        c.walker = createWalker({ database: c.database, fps: FPS, random: next, ground, place, yaw })
+        c.walker = createWalker({ database: c.database, fps: FPS, random: next, ground, place, yaw, attraction })
       }
       c.on = standingOn(c.walker.support())
     }
@@ -228,6 +248,8 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
       canvas.style.height = `${height}px`
     }
     draw2d.clearRect(0, 0, canvas.width, canvas.height)
+    const now = performance.now()
+    for (const c of characters) if (c.saying !== undefined && now > c.saying.until) c.saying = undefined
     draw2d.imageSmoothingEnabled = false
     const devicePixel = Math.max(1, Math.round(options.scale * ratio))
     for (const c of characters) {
@@ -243,6 +265,7 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
       const top = Math.round(footY - sprite.camera.baseline * devicePixel)
       draw2d.drawImage(sprite.canvas, left, top, sprite.image.width * devicePixel, sprite.image.height * devicePixel)
       c.drawn = { left: left / ratio + window.scrollX, top: top / ratio + window.scrollY, pixel: devicePixel / ratio }
+      if (c.saying !== undefined) drawBubble(draw2d, c.saying.text, footX, top, ratio)
     }
   }
 
@@ -260,6 +283,35 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
     keep(samples, KEPT_SAMPLES)
   }
 
+  const wordsAt = (c: Character, visited: boolean): string | undefined => {
+    const asked = c.interest?.closest('[data-pinata-say]') ?? undefined
+    if (visited && asked !== undefined) return sayOf(asked)
+    return c.on === undefined ? undefined : marked.find(m => m.element === c.on?.element)?.hints.say
+  }
+  const notice = (c: Character, frame: WalkerFrame): void => {
+    const was = c.activity
+    c.activity = frame.activity
+    if (frame.activity !== 'rest' || was === 'rest' || was === undefined) return
+    const said = frame.reached ? wordsAt(c, was === 'visit') : undefined
+    c.interest = undefined
+    if (said !== undefined) c.saying = { text: said, until: performance.now() + SAYING_MS }
+  }
+  const visitBy = (interest: Interest): void => {
+    if (reducedMotion.matches) return
+    const distance = (c: Character): number => {
+      const frame = c.walker?.frame()
+      if (frame === undefined) return Infinity
+      return Math.hypot(frame.root.position[0] - interest.place.x, anchorHeight(frame) - interest.place.height)
+    }
+    const nearest = characters.filter(c => c.walker?.reaches(interest.place) === true)
+      .sort((a, b) => distance(a) - distance(b))[0]
+    if (nearest?.walker?.visit(interest.place) !== true) return
+    nearest.interest = interest.element
+    nearest.activity = 'visit'
+    visits.push({ name: nearest.name, element: interest.element.id })
+    keep(visits, KEPT_VISITS)
+  }
+
   const stepAll = (): void => {
     for (const c of characters) {
       const walker = c.walker
@@ -267,6 +319,8 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
       const frame = walker.step()
       if (frame.support === undefined) replace(walker)
       c.on = frame.falling ? undefined : standingOn(frame.support) ?? c.on
+      if (c.on !== undefined) c.visited.add(c.on.element)
+      notice(c, frame)
       if (options.measure === true) record(c, frame)
     }
   }
@@ -287,7 +341,8 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
           stepped = true
         }
       } else owed = 0
-      if (stepped || scrolled) redraw()
+      const expired = characters.some(c => c.saying !== undefined && performance.now() > c.saying.until)
+      if (stepped || scrolled || expired) redraw()
       scrolled = false
     } finally {
       costs.push(performance.now() - begin)
@@ -329,6 +384,9 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
     rescan()
     scrolled = true
   }, () => marked, node => node === canvas)
+  const stopPerceiving = perceive({
+    ground: () => ground, pixelsPerMetre, onInterest: visitBy, ignore: element => element === canvas, surfaceOf
+  })
   const onScroll = (): void => { scrolled = true }
   window.addEventListener('scroll', onScroll, { passive: true })
   redraw()
@@ -348,16 +406,23 @@ export async function createPageWorld (options: PageWorldOptions): Promise<PageW
         heading: frame.heading,
         falling: frame.falling,
         element: c.on?.element.id ?? '',
-        lowestSole: -Math.min(...frame.feet.flatMap(f => f.soles.map(p => p[1]))) * pixelsPerMetre
+        lowestSole: -Math.min(...frame.feet.flatMap(f => f.soles.map(p => p[1]))) * pixelsPerMetre,
+        activity: frame.activity,
+        started: frame.started,
+        elements: c.visited.size,
+        saying: c.saying?.text ?? ''
       }]
     }),
     samples: () => samples.splice(0),
+    visits: () => [...visits],
+    hints: () => marked.map(m => ({ element: m.element.id, ...m.hints })),
     costs: () => [...costs],
     pokes: () => pokes,
     rebuilds: () => rebuilds,
     destroy: () => {
       cancelAnimationFrame(animation)
       stopWatching()
+      stopPerceiving()
       document.removeEventListener('pointerdown', onPointerDown, true)
       for (const type of GESTURE_EVENTS) document.removeEventListener(type, swallow, true)
       window.removeEventListener('scroll', onScroll)

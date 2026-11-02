@@ -100,3 +100,47 @@ test('moved with its surface, a walker stands on the surface where it now is', (
   const frames = run(w, 1)
   assert.ok(frames.every(f => !f.falling && f.support?.height === 0.4))
 })
+
+test('asked to visit a place it can reach, a walker goes there; one it cannot reach, it refuses', () => {
+  const page = ground([[0, 12, 0], [5, 7, 2]])
+  const w = walker(page, 2, 0, 6)
+  run(w, 1)
+  assert.equal(w.reaches({ x: 6, height: 2 }), false)
+  assert.equal(w.visit({ x: 6, height: 2 }), false)
+  assert.equal(w.visit({ x: 10, height: 0 }), true)
+  const frames = run(w, 12)
+  const ended = frames.findIndex(f => f.activity !== 'visit')
+  assert.ok(ended > 0, 'the visit ended')
+  const end = frames[ended]
+  assert.ok(end.activity === 'rest' && end.reached, `the visit ended in ${end.activity}`)
+  assert.ok(Math.abs(end.root.position[0] - 10) < 0.15, `it stopped at ${end.root.position[0].toFixed(2)} m`)
+})
+
+test('walkers spend at least twice as long per metre on attractive elements', () => {
+  const page = ground([[0, 4, 0], [4, 8, 0], [8, 12, 0]])
+  let attracted = 0
+  let plain = 0
+  for (let seed = 1; seed <= 10; seed++) {
+    const w = createWalker({
+      database, fps: FPS, random: random(seed), ground: page, place: { x: 2 + seed, height: 0 }, yaw: EAST,
+      attraction: surface => surface === 1 ? 3 : 0
+    })
+    for (const f of run(w, 60)) {
+      if (f.support?.id === 1) attracted++
+      else plain++
+    }
+  }
+  const ratio = (attracted / 4) / (plain / 8)
+  assert.ok(ratio >= 2, `${ratio.toFixed(2)} times as long per metre`)
+})
+
+test('a visit whose place goes from the page ends without arriving', () => {
+  const w = walker(ground([[0, 12, 0]]), 2, 0, 6)
+  run(w, 1)
+  assert.equal(w.visit({ x: 10, height: 0 }), true)
+  run(w, 1)
+  w.setGround(ground([[0, 6, 0]]))
+  const after = w.step()
+  assert.equal(after.activity, 'rest')
+  assert.equal(after.reached, false)
+})

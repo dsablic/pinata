@@ -7,9 +7,11 @@ import { ROOT } from './paths.ts'
 
 const SITE = join(ROOT, '_site')
 const TEST_PAGE = 'page-test.html'
+const PERCEPTION_PAGE = 'perception-test.html'
+const TEST_PAGES = [TEST_PAGE, PERCEPTION_PAGE]
 const PORT = 8791
 const DEBUG_PORT = 9341
-const PAGE_URL = `http://127.0.0.1:${PORT}/${TEST_PAGE}`
+const pageUrl = (page: string): string => `http://127.0.0.1:${PORT}/${page}`
 const PIXELS_PER_METRE = 54
 const SURFACE_TOLERANCE_PX = 1
 const REPLY_TIMEOUT_MS = 10000
@@ -35,6 +37,10 @@ type FootSample = { planted: boolean, gap: number | null }
 type Sample = { name: string, falling: boolean, feet: FootSample[] }
 type Standing = {
   name: string
+  activity: string
+  started: number
+  elements: number
+  saying: string
   x: number
   y: number
   heading: number
@@ -101,7 +107,7 @@ async function openChrome (): Promise<{ session: Session, close: () => Promise<v
   return { session: { evaluate, send, exceptions }, close }
 }
 
-type Screen = { reducedMotion?: boolean, deviceScale?: number }
+type Screen = { reducedMotion?: boolean, deviceScale?: number, page?: string }
 
 async function load (session: Session, screen: Screen = {}): Promise<void> {
   const motion = screen.reducedMotion === true ? 'reduce' : 'no-preference'
@@ -109,12 +115,13 @@ async function load (session: Session, screen: Screen = {}): Promise<void> {
   await session.send('Emulation.setDeviceMetricsOverride', {
     width: 1200, height: 900, deviceScaleFactor: screen.deviceScale ?? 1, mobile: false
   })
-  await session.send('Page.navigate', { url: PAGE_URL })
+  const url = pageUrl(screen.page ?? TEST_PAGE)
+  await session.send('Page.navigate', { url })
   for (let tries = 0; tries < 100; tries++) {
     await pause(100)
     if (await session.evaluate<boolean>('window.__pinata !== undefined')) return
   }
-  throw new Error(`${PAGE_URL} did not start a page world`)
+  throw new Error(`${url} did not start a page world`)
 }
 
 const expectedSurfaces = async (session: Session): Promise<Edge[]> => await session.evaluate<Edge[]>(`(() => {
@@ -391,10 +398,128 @@ async function screenChecks (session: Session): Promise<Check[]> {
   ]
 }
 
+const ARRIVAL_MS = 8000
+const LIVELY_MS = 60000
+const POLL_MS = 200
+const NEAR_PX = PIXELS_PER_METRE
+const SAYING_WAIT_MS = 3000
+const CLEAR_WAIT_MS = 10000
+
+type Centre = { x: number, y: number, pageX: number }
+
+const centreOf = async (session: Session, id: string): Promise<Centre> => await session.evaluate<Centre>(`(() => {
+  const rect = document.getElementById('${id}').getBoundingClientRect()
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, pageX: rect.left + rect.width / 2 + scrollX }
+})()`)
+
+type Visit = { name: string, id: string, floor: string, say: string, trigger: () => Promise<void> }
+type Sent = { name: string, element: string }
+
+async function arrival (session: Session, visit: Visit): Promise<Check> {
+  const centre = await centreOf(session, visit.id)
+  const floorTop = await session.evaluate<number>(
+    `document.getElementById('${visit.floor}').getBoundingClientRect().top + scrollY`)
+  const characters = async (): Promise<Standing[]> => {
+    return await session.evaluate<Standing[]>('window.__pinata.characters()')
+  }
+  const isNear = (c: Standing): boolean => {
+    return !c.falling && c.element === visit.floor && Math.abs(c.x - centre.pageX) <= NEAR_PX
+  }
+  const clearBy = Date.now() + CLEAR_WAIT_MS
+  while ((await characters()).some(isNear) && Date.now() < clearBy) await pause(POLL_MS)
+  const before = await characters()
+  const sentBefore = (await session.evaluate<Sent[]>('window.__pinata.visits()')).length
+  await visit.trigger()
+  const start = Date.now()
+  const distance = (c: Standing): number => Math.hypot(c.x - centre.pageX, c.y - floorTop)
+  const nearest = before.filter(c => !c.falling).sort((a, b) => distance(a) - distance(b))[0]
+  let sent: Sent | undefined
+  let arrivedMs: number | undefined
+  let said = false
+  while (Date.now() - start < ARRIVAL_MS + SAYING_WAIT_MS && !said) {
+    await pause(POLL_MS)
+    sent ??= (await session.evaluate<Sent[]>('window.__pinata.visits()'))[sentBefore]
+    const own = (await characters()).find(c => c.name === sent?.name)
+    if (own === undefined) continue
+    if (arrivedMs === undefined && isNear(own) && Date.now() - start <= ARRIVAL_MS) arrivedMs = Date.now() - start
+    said = arrivedMs !== undefined && own.saying === visit.say
+  }
+  const where = `#${visit.floor} within ${NEAR_PX} px of #${visit.id}`
+  const already = before.filter(isNear).map(c => c.name)
+  const chosen = sent !== undefined && sent.name === nearest?.name
+  return {
+    name: visit.name,
+    pass: chosen && arrivedMs !== undefined && said && already.length === 0,
+    detail: sent === undefined
+      ? 'no character was sent'
+      : `${sent.name} sent (nearest: ${nearest?.name ?? 'none'}), ` +
+        (arrivedMs === undefined
+          ? `did not reach ${where} in ${ARRIVAL_MS} ms`
+          : `reached ${where} in ${arrivedMs} ms`) +
+        `; said "${visit.say}": ${String(said)}` + (already.length > 0 ? `; already there: ${already.join(', ')}` : '')
+  }
+}
+
+const tabTo = async (session: Session, id: string): Promise<void> => {
+  for (let tabs = 0; tabs < 4; tabs++) {
+    if (await session.evaluate<boolean>(`document.activeElement?.id === '${id}'`)) return
+    for (const type of ['keyDown', 'keyUp']) {
+      await session.send('Input.dispatchKeyEvent', { type, key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 })
+    }
+  }
+}
+
+async function perceptionChecks (session: Session): Promise<Check[]> {
+  await load(session, { page: PERCEPTION_PAGE })
+  await pause(1500)
+  const hints = await session.evaluate<Array<{ element: string, say?: string, attract: number }>>(
+    'window.__pinata.hints()')
+  const hint = (id: string): { say?: string, attract: number } | undefined => hints.find(h => h.element === id)
+  const hinted = hint('floor-2')?.attract === 3 && hint('floor-1')?.attract === 0 && hint('shelf')?.say === 'Nice view'
+  const hintCheck: Check = {
+    name: 'hints are read from attributes and the non-inherited --pinata-attract',
+    pass: hinted,
+    detail: JSON.stringify(hints)
+  }
+  const button = await centreOf(session, 'button-label')
+  const hovered = await arrival(session, {
+    name: 'hovering inside a button brings the nearest character to it, which says the button\'s words',
+    id: 'button',
+    floor: 'floor-3',
+    say: 'Click me!',
+    trigger: async () => {
+      await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: button.x, y: button.y })
+    }
+  })
+  await session.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 5, y: 5 })
+  const focused = await arrival(session, {
+    name: 'focusing a field inside a ground element brings the nearest character onto it, which says its words',
+    id: 'field',
+    floor: 'floor-1',
+    say: 'Typing?',
+    trigger: async () => { await tabTo(session, 'field') }
+  })
+  await load(session, { page: PERCEPTION_PAGE })
+  await samples(session)
+  await pause(LIVELY_MS)
+  const all = await session.evaluate<Standing[]>('window.__pinata.characters()')
+  const steps = (await samples(session)).length / Math.max(1, all.length) / (LIVELY_MS / 1000)
+  const dull = all.filter(c => c.started < 4 || c.elements < 2)
+  return [hintCheck, hovered, focused, {
+    name: 'over 60 s every character starts at least 4 activities and stands on at least 2 elements',
+    pass: all.length > 0 && dull.length === 0,
+    detail: `${steps.toFixed(1)} steps/s; ` +
+      all.map(c => `${c.name}: ${c.started} activities, ${c.elements} elements`).join('; ')
+  }]
+}
+
 async function run (): Promise<Check[]> {
   const { session, close } = await openChrome()
   try {
-    const checks = [...await pageChecks(session), ...await clickChecks(session), ...await screenChecks(session)]
+    const checks = [
+      ...await pageChecks(session), ...await clickChecks(session), ...await screenChecks(session),
+      ...await perceptionChecks(session)
+    ]
     const exceptions = session.exceptions.join('; ')
     return [...checks, { name: 'the page throws nothing', pass: exceptions === '', detail: exceptions || 'none' }]
   } finally {
@@ -412,8 +537,8 @@ async function main (): Promise<number> {
     console.error('_site is missing the page world: run npm run site first')
     return 2
   }
-  const pageCopy = join(SITE, TEST_PAGE)
-  copyFileSync(join(ROOT, 'test', 'pages', TEST_PAGE), pageCopy)
+  const copies = TEST_PAGES.map(page => join(SITE, page))
+  TEST_PAGES.forEach((page, i) => { copyFileSync(join(ROOT, 'test', 'pages', page), copies[i]) })
   const server = serve(SITE, PORT)
   try {
     const checks = await run()
@@ -421,7 +546,7 @@ async function main (): Promise<number> {
     return checks.every(c => c.pass || c.gate === true) ? 0 : 1
   } finally {
     server.close()
-    rmSync(pageCopy, { force: true })
+    for (const copy of copies) rmSync(copy, { force: true })
   }
 }
 

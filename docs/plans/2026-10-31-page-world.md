@@ -47,6 +47,8 @@ batch E of the [world showcase](2026-10-30-world-showcase.md).
 | The page stays usable | clicks on any page element's centre reach it unless a character is under the pointer; scrolling, text selection and keyboard focus are unaffected; the overlay causes no layout shift (CLS 0) | in Chrome |
 | Cost | with 4 characters, the world's main-thread time per frame at most 8 ms at p95, and no layout reads per frame (rects only on change events) | pages must stay responsive |
 | Liveliness | over 60 s each character starts at least 4 activities and stands on at least 2 different elements | uses the page |
+| Perception | hovering an element, or focusing one from the keyboard, brings the nearest character that can reach it onto the surface under it, within 1 m of the element's centre, in at most 8 s; one arriving at an element with `data-pinata-say` shows that text beside it | batch C |
+| Attraction | over 10 seeds of 60 s in Node, characters spend at least twice as much time per metre on elements with `--pinata-attract: 3` as on unmarked-attraction ones | batch C |
 | Reduced motion | with `prefers-reduced-motion: reduce`, nothing moves | |
 | The demo | the world demo page is rebuilt on its own elements, passes every gate above, and replaces the generated-terrain page | user direction |
 
@@ -57,8 +59,8 @@ batch E of the [world showcase](2026-10-30-world-showcase.md).
   and reduced-motion gates. Review.
 - **B. Moving over the page:** the surface graph, paths, per-character ground, stepping up and dropping (falling and
   landing for captured characters, turning at edges for planned ones); the standing, falls and cost gates. Review.
-- **C. Perception:** what is near, hovered and focused, hints, the new activity targets; the liveliness gate.
-  Review.
+- **C. Perception:** hovered and focused elements, hints (words, attraction), visits to a noticed element, named
+  activities; the perception, attraction and liveliness gates. Review.
 - **D. The demo:** the world demo rebuilt on its own page; every gate again on it; release. Review.
 
 ## Results
@@ -82,3 +84,12 @@ metre, scale 2) and by the Node tests.
     What is left comes from the turn, start and stop clips (`walk-turn-right` frames 46-55 most), where the stance
     foot is pulled into a corrective step while the other foot lifts. Before batch B's player changes, planted feet
     were off by up to 1.35 px in 3% of planted feet and 3-4% of frames were mid-air.
+- **Batch C built and reviewed.** Hints, hover and focus perception, visits by the nearest character that can reach
+  the place, words in bubbles, attraction in goal choice and rest length, named activities. In place of activity
+  targets like `{ to: 'hovered' }`, the page sends a walker on a visit; nearness beyond hover and focus is left out.
+  - Perception: pass. Hovering a button's label sends the nearest character, which reaches the button's floor in
+    1.8 s and says the button's words; Tab to a field inside a floor element sends the nearest, which reaches it in
+    4.9 s and says the field's words.
+  - Attraction: pass. Over 10 seeds of 60 s, 3.14 times as long per metre on the element with attraction 3 (1.10 with
+    none).
+  - Liveliness: pass. Over 60 s, 13-16 activities and 2-3 elements per character.

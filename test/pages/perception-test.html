@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piñata perception test</title>
+<style>
+  body { margin: 0; height: 1200px; background: #f4ecd8; font: 15px/1.5 system-ui, sans-serif; position: relative; }
+  .floor { position: absolute; top: 700px; height: 40px; background: #e2d4b8; border-top: 1px solid #b9a682; }
+  #floor-1 { left: 20px; width: 380px; }
+  #floor-2 { left: 400px; width: 400px; --pinata-attract: 3; }
+  #floor-3 { left: 800px; width: 380px; top: 692px; }
+  #shelf { position: absolute; left: 300px; top: 560px; width: 260px; height: 20px; background: #d9c7a3; }
+  #button { position: absolute; left: 960px; top: 652px; height: 40px; padding: 0 16px; }
+  #field { position: absolute; left: 100px; top: 6px; width: 160px; height: 28px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+  <div id="floor-1" class="floor" data-pinata="ground">
+    <input id="field" type="text" aria-label="A field to focus" data-pinata-say="Typing?">
+  </div>
+  <div id="floor-2" class="floor" data-pinata="ground"></div>
+  <div id="floor-3" class="floor" data-pinata="ground"></div>
+  <div id="shelf" data-pinata="ground" data-pinata-say="Nice view"></div>
+  <button id="button" type="button" data-pinata-say="Click me!"><span id="button-label">Click me</span></button>
+  <script type="module">
+    import { createPageWorld } from './js/page/page.js'
+    window.__pinata = await createPageWorld({
+      bundle: 'world.bundle.json', pixelsPerMetre: 54, scale: 2, seed: 11, measure: true
+    })
+  </script>
+</body>
+</html>

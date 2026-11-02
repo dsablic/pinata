@@ -13,6 +13,7 @@ import { heightUnder, surfaceBelow } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 
 export type Place = { x: number, height: number }
+export type Activity = 'rest' | 'wander' | 'visit' | 'flee'
 export type Foot = { planted: boolean, soles: Array<[number, number]> }
 export type WalkerFrame = {
   joints: Pose
@@ -23,6 +24,9 @@ export type WalkerFrame = {
   feet: Foot[]
   heading: number
   moving: boolean
+  activity: Activity
+  started: number
+  reached: boolean
 }
 export type Walker = {
   step: () => WalkerFrame
@@ -31,6 +35,8 @@ export type Walker = {
   shiftBy: (dx: number, dy: number) => void
   moveTo: (place: Place) => void
   poke: () => void
+  visit: (place: Place) => boolean
+  reaches: (place: Place) => boolean
   support: () => Surface | undefined
 }
 export type WalkerOptions = {
@@ -40,6 +46,7 @@ export type WalkerOptions = {
   ground: Ground
   place: Place
   yaw: number
+  attraction?: (surface: number) => number
 }
 
 export const STEP_HEIGHT = 0.2
@@ -52,6 +59,7 @@ const END_MARGIN = 0.35
 const REST_SECONDS: [number, number] = [0.8, 4]
 const LEG_TIMEOUT_SECONDS = 10
 const POKE_RUN = 1.5
+const LINGER_PER_ATTRACTION = 0.5
 const ON_NODE = 1e-3
 
 type Goal = { node: number, x: number, height: number }
@@ -83,6 +91,15 @@ export function createWalker (options: WalkerOptions): Walker {
   let restUntil = 0
   let legStart = 0
   let time = 0
+  let activity: Activity = 'rest'
+  let reached = false
+  let started = 0
+  const attraction = options.attraction ?? (() => 0)
+
+  const begin = (next: Activity): void => {
+    activity = next
+    started++
+  }
 
   const worldStanding = (): number => standing + offset[1]
   const groundAt = (x: number, z: number): number => {
@@ -105,7 +122,8 @@ export function createWalker (options: WalkerOptions): Walker {
     const falling = player?.falling() ?? false
     const under = supportAt(root.position[0])
     const support = under === undefined ? {} : { support: under }
-    return { joints, root, base: worldStanding(), falling, ...support, feet, heading, moving }
+    const doing = { heading, moving, activity, started, reached }
+    return { joints, root, base: worldStanding(), falling, ...support, feet, ...doing }
   }
 
   const start = (place: Place, yaw: number): void => {
@@ -119,6 +137,8 @@ export function createWalker (options: WalkerOptions): Walker {
     route = []
     goal = undefined
     restUntil = time
+    activity = 'rest'
+    reached = false
   }
   start(options.place, options.yaw)
 
@@ -128,28 +148,45 @@ export function createWalker (options: WalkerOptions): Walker {
     return nodeAt(graph, current.root.position[0], under.height, ON_NODE)
   }
 
-  const aimAt = (node: Node, x: number): void => {
+  const aimAt = (node: Node, x: number, next: Activity): void => {
     route = []
     goal = { node: node.id, x, height: node.height }
     legStart = time
+    begin(next)
+  }
+
+  const inside = (node: Node, x: number): number => {
+    if (node.to - node.from <= 2 * END_MARGIN) return (node.from + node.to) / 2
+    return Math.min(node.to - END_MARGIN, Math.max(node.from + END_MARGIN, x))
   }
 
   const chooseGoal = (from: Node): void => {
     const roomy = reachable(graph, from.id).map(id => graph.nodes[id]).filter(n => n.to - n.from > 2 * END_MARGIN)
-    const total = roomy.reduce((sum, n) => sum + n.to - n.from, 0)
+    const weight = (n: Node): number => (n.to - n.from) * (1 + attraction(n.surface))
+    const total = roomy.reduce((sum, n) => sum + weight(n), 0)
     let pick = random() * total
-    const node = roomy.find(n => (pick -= n.to - n.from) <= 0) ?? roomy.at(-1)
+    const node = roomy.find(n => (pick -= weight(n)) <= 0) ?? roomy.at(-1)
     if (node === undefined) return
-    aimAt(node, node.from + END_MARGIN + random() * (node.to - node.from - 2 * END_MARGIN))
+    aimAt(node, node.from + END_MARGIN + random() * (node.to - node.from - 2 * END_MARGIN), 'wander')
   }
 
-  const arrive = (): void => {
+  const arrive = (there: boolean): void => {
+    reached = there
     goal = undefined
     route = []
-    restUntil = time + REST_SECONDS[0] + random() * (REST_SECONDS[1] - REST_SECONDS[0])
+    const linger = 1 + attraction(current.support?.id ?? -1) * LINGER_PER_ATTRACTION
+    restUntil = time + linger * (REST_SECONDS[0] + random() * (REST_SECONDS[1] - REST_SECONDS[0]))
+    begin('rest')
   }
 
-  const followRoute = (node: Node): { speed: number, target: number } | undefined => {
+  const target = (place: Place): Node | undefined => {
+    const from = here()
+    const node = nodeAt(graph, place.x, place.height, ON_NODE)
+    if (from === undefined || node === undefined) return undefined
+    return from.id === node.id || path(graph, from.id, node.id) !== undefined ? node : undefined
+  }
+
+  const followRoute = (node: Node): { speed: number, target: number } | 'arrived' | undefined => {
     if (goal === undefined) return undefined
     if (route.length > 0 && node.id === route[0].to) {
       route.shift()
@@ -165,7 +202,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const x = current.root.position[0]
     if (route.length > 0) return { speed: WALK_SPEED, target: route[0].at }
     const distance = Math.abs(goal.x - x)
-    if (distance < ARRIVED) return undefined
+    if (distance < ARRIVED) return 'arrived'
     return { speed: Math.max(SLOWEST_SPEED, Math.min(WALK_SPEED, WALK_SPEED * distance / SLOW_WITHIN)), target: goal.x }
   }
 
@@ -175,8 +212,8 @@ export function createWalker (options: WalkerOptions): Walker {
     if (goal === undefined && time >= restUntil) chooseGoal(node)
     if (goal === undefined) return { speed: 0, heading }
     const move = followRoute(node)
-    if (move === undefined) {
-      arrive()
+    if (move === undefined || move === 'arrived') {
+      arrive(move === 'arrived')
       return { speed: 0, heading }
     }
     heading = headingTo(current.root.position[0], move.target)
@@ -199,7 +236,8 @@ export function createWalker (options: WalkerOptions): Walker {
       graph = surfaceGraph(ground, reach)
       route = []
       const kept = goal === undefined ? undefined : nodeAt(graph, goal.x, goal.height, ON_NODE)
-      goal = kept === undefined || goal === undefined ? undefined : { ...goal, node: kept.id }
+      if (goal !== undefined && kept === undefined) arrive(false)
+      else if (goal !== undefined && kept !== undefined) goal = { ...goal, node: kept.id }
       current = { ...current, ...supportOf(supportAt(current.root.position[0])) }
     },
     shiftBy: (dx, dy) => {
@@ -213,11 +251,15 @@ export function createWalker (options: WalkerOptions): Walker {
       heading = heading === EAST ? WEST : EAST
       if (node === undefined) return
       const away = current.root.position[0] + (heading === EAST ? POKE_RUN : -POKE_RUN)
-      const roomy = node.to - node.from > 2 * END_MARGIN
-      const middle = (node.from + node.to) / 2
-      const x = roomy ? Math.min(node.to - END_MARGIN, Math.max(node.from + END_MARGIN, away)) : middle
-      aimAt(node, x)
+      aimAt(node, inside(node, away), 'flee')
     },
+    visit: place => {
+      const node = target(place)
+      if (node === undefined) return false
+      aimAt(node, inside(node, place.x), 'visit')
+      return true
+    },
+    reaches: place => target(place) !== undefined,
     support: () => supportAt(current.root.position[0])
   }
 }

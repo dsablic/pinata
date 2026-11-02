@@ -17,6 +17,12 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
+### 0. Natural motion on the page, game-like visuals
+
+[Plan](plans/2026-11-02-natural-page-motion.md): secondary motion (chains, cloth, a robe hem) in the page world, cloth
+drawn in skins, natural falls and landings, jumps up the page, structural draw order; judged against the old terrain
+demo and strong references. Batch A (secondary motion on the page) first.
+
 ### 0. P7: skins to a game-art bar
 
 [P7 plan](plans/2026-10-31-p7-skins.md): built and released as v0.3.0 (eight-direction skins for the four humanoids,

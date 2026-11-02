@@ -93,3 +93,23 @@ metre, scale 2) and by the Node tests.
   - Attraction: pass. Over 10 seeds of 60 s, 3.14 times as long per metre on the element with attraction 3 (1.10 with
     none).
   - Liveliness: pass. Over 60 s, 13-16 activities and 2-3 elements per character.
+- **Batch D built.** The site's front page is now the page world on its own cards and tiles; the generated-terrain
+  page is gone (the world engine and its config stay for the tests). Characters that have stood on one element for
+  30 s drop back in from above. Fixes found on the demo: drops need landing room, a body keeps its speed across the
+  page while it falls, a fall waits until no sole is over ground near the body, and a placed foot looks ground up from
+  its own height (a trailing foot used to sink through a ledge's corner as the body stepped off).
+  - Review fixes: a point sees ground only 2 cm above itself, so feet no longer climb rises; a falling body keeps its
+    traction again (without it, drops overshot their landings); a drop-in starts where nothing is between it and its
+    place; the demo's cards alternate sides across rows at phone widths, so every card leads down to the floor; the
+    suites are selectable and an unknown one is an error.
+  - In Chrome on the demo: cost (p95 3.8 ms), no layout reads, surfaces, standing on live surfaces, clicks, pokes,
+    hover and focus sending visits with their words, and reduced motion: pass. On the demo's recorded layouts in Node
+    (see the [harness plan](2026-11-02-page-harness.md)): the nearest character arriving within 8 s and saying the
+    words, falls with no sole through a surface, liveliness, drop-ins and connectivity at 1200 and 390 px: pass.
+  - **Missed: standing** (`npm run gates`). In Node over 60 s per layout, planted feet: 10-38 of about 7000 more than
+    1 CSS px off, the worst 1.12-1.13 px; mid-air: 21-49 of 5759 frames (0.4-0.9%). In Chrome over 20 s per page:
+    5-14 of about 2000 planted feet off, the worst 1.10-1.12 px; mid-air: 8-33 of 1920 frames (0.4-1.7%). The same
+    turn, start and stop clips as before.
+  - The demo gate (rebuilt on its own elements, every gate above, replacing the generated-terrain page) is met except
+    for the standing gate, missed narrowly here as on the test page.
+

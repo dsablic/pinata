@@ -32,15 +32,4 @@ export function surfaceBelow (ground: Ground, x: number, standingHeight: number,
   return best
 }
 
-export function heightUnder (
-  ground: Ground,
-  standingHeight: () => number,
-  stepHeight: number
-): (x: number, z: number) => number {
-  return x => {
-    const surface = surfaceBelow(ground, x, standingHeight(), stepHeight)
-    return surface?.height ?? standingHeight() - DEPTH_WITH_NO_GROUND
-  }
-}
-
-const DEPTH_WITH_NO_GROUND = 1000
+export const DEPTH_WITH_NO_GROUND = 1000

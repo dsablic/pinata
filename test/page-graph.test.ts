@@ -95,3 +95,10 @@ test('of two ways off a platform, a path takes the one on the side of the goal',
   assert.ok(path(graph, platform, floor, 9)![0].at > 6)
   assert.ok(path(graph, platform, floor, 1)![0].at < 4)
 })
+
+test('a drop needs room to land: a lower surface ending just past the edge is not dropped onto', () => {
+  const short = surfaceGraph(ground([[0, 10.5, 0], [4, 10, 1]]), REACH)
+  const roomy = surfaceGraph(ground([[0, 11, 0], [4, 10, 1]]), REACH)
+  const eastward = (graph: Graph): number => graph.edges.filter(e => e.from === on(graph, 5, 1) && e.at > 10).length
+  assert.deepEqual([eastward(short), eastward(roomy)], [0, 1])
+})

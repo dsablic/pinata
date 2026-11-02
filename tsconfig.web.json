@@ -20,7 +20,7 @@
   "files": [
     "src/runtime/browser.ts",
     "src/runtime/showcase.ts",
-    "src/world/page.ts",
+    "src/page/demo.ts",
     "src/page/page.ts"
   ]
 }

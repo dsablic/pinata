@@ -4,60 +4,103 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Piñata world</title>
-<meta name="description" content="Little pixel-art characters living on procedural terrain in your browser, animated live by the Piñata motion engine.">
+<meta name="description" content="Pixel-art characters living on this web page: they walk on its cards, drop between them, come when you point at something, and are animated live by the Piñata motion engine.">
 <style>
-  :root { --bg: #f4ecd8; --ink: #2b2233; --muted: #6f6478; --panel: #fffaf0; --line: #d9ccb4; --accent: #c2477a; }
+  :root { --bg: #f4ecd8; --ink: #2b2233; --muted: #574d61; --panel: #fffaf0; --line: #d9ccb4; --accent: #c2477a; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
-  header, main, footer { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
-  header { padding-top: 20px; }
-  h1 { margin: 0; font-size: 22px; }
-  header p { margin: 4px 0 12px; color: var(--muted); max-width: 75ch; }
-  .stage { border: 2px solid var(--line); border-radius: 10px; overflow: auto; background: var(--panel); }
-  canvas { display: block; image-rendering: pixelated; cursor: pointer; max-width: none; }
-  .bar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin: 12px 0; font-size: 13px; }
-  .bar label { display: flex; gap: 6px; align-items: center; }
-  .bar input[type="range"] { accent-color: var(--accent); }
-  .bar input[type="number"] { width: 6em; font: inherit; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; }
-  button { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
-  button:hover { border-color: var(--accent); }
+  header, main, footer { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+  header { padding-top: 28px; }
+  h1 { margin: 0; font-size: 26px; }
+  header p { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+  .row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 110px 120px 0; }
+  .row.offset { grid-template-columns: 1fr 1.4fr 1fr; margin: 110px 60px 0; }
+  .card { --pinata: ground; background: var(--panel); border: 2px solid var(--line); padding: 14px 16px 16px;
+    min-height: 150px; }
+  .card:nth-child(2) { margin-top: 8px; }
+  .card:nth-child(3) { margin-top: 16px; }
+  .card h2 { margin: 0 0 6px; font-size: 16px; }
+  .card p { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+  code { font: 12px ui-monospace, monospace; background: #f1e6cf; padding: 1px 4px; border-radius: 4px; }
+  pre { margin: 0; font: 12px/1.45 ui-monospace, monospace; background: #f1e6cf; padding: 8px 10px;
+    border-radius: 6px; overflow: auto; }
+  button, select, input { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  button { cursor: pointer; }
+  button:hover, button:focus-visible { border-color: var(--accent); }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .readout { font: 12px ui-monospace, monospace; color: var(--muted); }
-  ul#doing { columns: 4 160px; font: 12px ui-monospace, monospace; color: var(--muted); padding-left: 18px; }
-  footer { padding-bottom: 32px; color: var(--muted); font-size: 13px; }
-  a { color: var(--accent); }
+  .floor { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 110px; }
+  .tile { --pinata: ground; background: #e9dcc0; border-top: 3px solid var(--line); padding: 12px 14px 40px;
+    font-size: 13px; color: var(--muted); }
+  .tile.sunny { --pinata-attract: 2; background: #f3e1b4; }
+  footer { padding: 24px 16px 40px; color: var(--muted); font-size: 13px; }
+  a { color: #9e2f5e; }
+  @media (max-width: 720px) {
+    .row, .row.offset { grid-template-columns: 1fr; margin: 90px 0 0; }
+    .card:nth-child(n) { margin-top: 0; }
+    .card.left { margin-right: 22%; }
+    .card.right { margin-left: 22%; }
+  }
 </style>
 </head>
 <body>
 <header>
   <h1>Piñata world</h1>
-  <p>A cast of characters living on procedurally generated terrain: they wander, look around, visit each other for
-  a chat, dash about, and rest; capes and tails stream in the wind. Click one to startle it. The knight, rogue, dwarf and wizard move by
-  motion capture, matched live to what they want to do and kept on the ground; every footstep, ramp and stair, every
-  frame, is planned and rendered live in your browser by the <a href="https://github.com/dsablic/pinata">Piñata</a> motion
-  engine; the world is <a href="world.json">one declarative config</a>.</p>
+  <p>The knight, rogue, dwarf and wizard live on this page. The cards and tiles are their ground: they walk along
+  them, step up small rises and drop from one to the one below, by motion capture matched live and kept on the
+  surface, every frame planned and drawn in your browser by the
+  <a id="engine-link" href="https://github.com/dsablic/pinata">Piñata</a> motion engine.</p>
 </header>
 <main>
-  <div class="stage"><canvas id="world" width="560" height="170"></canvas></div>
-  <div class="bar">
-    <label>Seed <input id="seed" type="number" value="3" min="1" max="99999"></label>
-    <button id="new">New world</button>
-    <label>Characters <input id="count" type="range" min="1" max="8" step="1" value="8"> <output id="countOut">8</output></label>
-    <label><input id="skins" type="checkbox" checked> Skins</label>
-    <label>Render samples <input id="samples" type="range" min="1" max="3" step="1" value="1"> <output id="samplesOut">1</output></label>
-    <span class="readout" id="readout">loading…</span>
-  </div>
-  <div class="bar">
-    <label>Scene <select id="scene"></select></label>
-    <label>Wind <input id="wind" type="range" min="-8" max="8" step="0.1" value="1.2"> <output id="windOut">1.2</output> m/s</label>
-    <label>Gusts <input id="gust" type="range" min="0" max="1" step="0.05" value="0.4"> <output id="gustOut">0.4</output></label>
-    <label>Gravity <input id="gravity" type="range" min="1" max="25" step="0.1" value="9.8"> <output id="gravityOut">9.8</output></label>
-    <label>Hills <input id="hills" type="range" min="0" max="2" step="0.1" value="1"> <output id="hillsOut">1</output> m</label>
-  </div>
-  <ul id="doing"></ul>
+  <section class="row" aria-label="What they do">
+    <article id="card-ground" class="card left" data-pinata-say="Walk on me!">
+      <h2>Any element is ground</h2>
+      <p>Mark an element and its top edge becomes a surface; mark it a wall and its sides block the way.</p>
+      <pre>.card { --pinata: ground; }</pre>
+    </article>
+    <article id="card-point" class="card right">
+      <h2>Point at something</h2>
+      <p>Rest the pointer on a button, or move keyboard focus to it, and the nearest character that can reach it
+      walks over.</p>
+      <button id="hello" type="button" data-pinata-say="Hello!">Say hello</button>
+    </article>
+    <article id="card-words" class="card left" data-pinata-say="Nice spot">
+      <h2>Words and favourite places</h2>
+      <p><code>data-pinata-say</code> gives a place words; <code>--pinata-attract</code> makes characters linger.
+      The sunny tile below is a favourite.</p>
+    </article>
+  </section>
+  <section class="row offset" aria-label="Try it">
+    <article id="card-poke" class="card right">
+      <h2>Poke</h2>
+      <p>Click a character to turn it round. Clicks anywhere else reach the page as usual.</p>
+    </article>
+    <article id="card-cast" class="card left">
+      <h2>The cast</h2>
+      <div class="controls">
+        <label id="count-label">Characters <select id="count"><option>1</option><option>2</option><option>3</option>
+          <option selected>4</option></select></label>
+        <label id="seed-label">Seed <input id="seed" type="number" value="3" min="1" max="99999" style="width: 6em"></label>
+        <button id="restart" type="button" data-pinata-say="Again!">Start again</button>
+        <label id="timing-label"><input id="timing" type="checkbox"> Show timing</label>
+      </div>
+      <p class="readout" id="readout"></p>
+    </article>
+    <article id="card-calm" class="card right" data-pinata-say="Gently">
+      <h2>Calm when asked</h2>
+      <p>With reduced motion set in your system, they stand still. Clicks always go through to the page.</p>
+    </article>
+  </section>
+  <section class="floor" aria-label="The floor">
+    <div id="tile-1" class="tile">Characters that have been in one place a long while drop back in from above.
+      <a id="source-link" href="https://github.com/dsablic/pinata" data-pinata-say="Read me">The source</a>.</div>
+    <div id="tile-2" class="tile sunny" data-pinata-say="Warm here">The sunny tile.</div>
+    <div id="tile-3" class="tile">They cannot climb: rises taller than a small step are only dropped down.</div>
+    <div id="tile-4" class="tile">Also: <a id="pinata-link" href="pinata.html" data-pinata-say="Swing by!">the hanging piñata</a>, rope physics you can poke and drag.</div>
+  </section>
 </main>
-<footer>
-  Also: <a href="pinata.html">the hanging piñata</a>, a single character with rope physics you can poke, drag and tune.
-</footer>
-<script type="module" src="js/world/page.js"></script>
+<footer>Piñata is open source: <a id="footer-link" href="https://github.com/dsablic/pinata">github.com/dsablic/pinata</a>.</footer>
+<script type="module" src="js/page/demo.js"></script>
 </body>
 </html>

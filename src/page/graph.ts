@@ -7,6 +7,7 @@ export type Graph = { nodes: Node[], edges: Edge[] }
 
 const BEYOND_END = 0.02
 const INTO_NEXT = 0.15
+const LANDING_ROOM = 0.8
 const SAME_PLACE = 1e-6
 
 type Span = [number, number]
@@ -76,7 +77,8 @@ function edgesFrom (ground: Ground, nodes: Node[], node: Node, reach: Reach): Ed
     if (next === undefined || next.id === node.id) continue
     const fall = node.height - next.height
     const kind = fall <= reach.step ? 'walk' : 'drop'
-    if (kind === 'drop' && fall > reach.drop) continue
+    const room = direction > 0 ? next.to - end : end - next.from
+    if (kind === 'drop' && (fall > reach.drop || room < LANDING_ROOM)) continue
     const at = Math.min(next.to, Math.max(next.from, end + direction * INTO_NEXT))
     edges.push({ from: node.id, to: next.id, kind, at })
   }

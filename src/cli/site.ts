@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { writeOutput } from '../diagnostics/report.ts'
 import { ROOT } from './paths.ts'
+import { worldBundle } from './world-bundle.ts'
 
 const OUT = resolve(process.argv[2] ?? join(ROOT, '_site'))
 
@@ -12,29 +13,6 @@ function commit (): string {
   } catch {
     return 'unknown'
   }
-}
-
-function worldBundle (examples: string): unknown {
-  const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
-  const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
-  const cast = config.cast.map(name => {
-    const dir = join(examples, name)
-    return {
-      name,
-      mannequin: read(join(dir, 'mannequin.json')),
-      style: read(join(dir, 'style.json')),
-      rig: read(join(dir, 'rig.json')),
-      materials: read(join(dir, 'materials.json')),
-      motion: read(join(dir, 'motion.json')),
-      ...(existsSync(join(dir, 'skin.json')) ? { skin: read(join(dir, 'skin.json')) } : {})
-    }
-  })
-  const clipDir = join(ROOT, 'motion', 'clips')
-  const clips = readdirSync(clipDir).filter(f => f.endsWith('.json')).sort().map(f => read(join(clipDir, f)))
-  const members = Object.fromEntries(config.cast
-    .filter(name => existsSync(join(examples, name, 'retarget.json')))
-    .map(name => [name, read(join(examples, name, 'retarget.json'))]))
-  return { config, cast, capture: { clips, base: read(join(ROOT, 'motion', 'humanoid.json')), members } }
 }
 
 function main (): number {

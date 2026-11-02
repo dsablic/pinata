@@ -1,14 +1,16 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildDatabase } from '../src/mocap/database.ts'
-import { createWalker } from '../src/page/walker.ts'
+import { createWalker, STEP_HEIGHT } from '../src/page/walker.ts'
 import type { Walker, WalkerFrame } from '../src/page/walker.ts'
+import { surfaceBelow } from '../src/page/surfaces.ts'
 import type { Ground } from '../src/page/surfaces.ts'
 import { random } from '../src/world/terrain.ts'
 import { HUMANOIDS, loadClips, retargetOptions } from './mocap-fixtures.ts'
 
 const FPS = 24
 const EAST = Math.PI / 2
+const ONE_PIXEL = 1 / 54
 const database = buildDatabase(loadClips(), retargetOptions('knight'))
 
 function walker (ground: Ground, x: number, height: number, seed = 1): Walker {
@@ -143,4 +145,75 @@ test('a visit whose place goes from the page ends without arriving', () => {
   const after = w.step()
   assert.equal(after.activity, 'rest')
   assert.equal(after.reached, false)
+})
+
+test('dropped in from above, a walker falls onto the surface and walks on from there', () => {
+  const w = walker(ground([[0, 12, 0]]), 3, 0, 7)
+  run(w, 1)
+  w.dropIn({ x: 8, height: 0 }, 3)
+  const frames = run(w, 4)
+  assert.equal(frames[0].activity, 'drop')
+  assert.ok(frames.some(f => f.falling), 'it fell')
+  const landed = frames.findIndex((f, i) => i > 0 && frames[i - 1].falling && !f.falling)
+  assert.ok(landed > 0 && frames.slice(landed).every(f => !f.falling && f.support?.height === 0))
+  assert.ok(Math.abs(frames[landed].root.position[0] - 8) < 0.5)
+})
+
+test('walking under a shelf far overhead, a walker stays on its own floor', () => {
+  const page = ground([[0, 20, -10], [4, 16, -5]])
+  const frames = run(walker(page, 2, -10, 8), 30)
+  const highest = Math.max(...frames.map(f => f.base))
+  assert.ok(highest < -9.9 && frames.every(f => !f.falling), `rose to ${highest.toFixed(2)} m`)
+})
+
+test('dropping off ledges, no sole goes through the ledge or the floor below it', () => {
+  const page = ground([[3, 8, -5], [8, 13, -5.15], [2, 14, -10]])
+  const through: string[] = []
+  for (const seed of [1, 2, 3, 4]) {
+    for (const f of run(walker(page, 5 + seed, -5, seed), 40)) {
+      for (const [x, y] of f.feet.flatMap(foot => foot.soles)) {
+        const under = surfaceBelow(page, x, y + STEP_HEIGHT, 0)
+        const depth = under === undefined ? 0 : under.height - y
+        if (depth > ONE_PIXEL) through.push(`seed ${seed}: ${depth.toFixed(3)} m`)
+      }
+    }
+  }
+  assert.deepEqual(through, [])
+})
+
+test('walking into a rise taller than a step, a walker never climbs onto it', () => {
+  const climbed: string[] = []
+  for (const rise of [0.25, 0.3, 0.45]) {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const w = createWalker({
+        database, fps: FPS, random: random(seed), ground: ground([[0, 30, 0], [12, 30, rise]]),
+        place: { x: 8, height: 0 }, yaw: EAST
+      })
+      w.visit({ x: 11.6, height: 0 })
+      const frames = run(w, 12)
+      const reaching = (f: WalkerFrame): boolean => f.feet.some(foot => {
+        return foot.planted && Math.min(...foot.soles.map(p => p[1])) > f.base + 2 * STEP_HEIGHT
+      })
+      if (frames.some(f => f.base > STEP_HEIGHT || reaching(f))) {
+        climbed.push(`rise ${rise}, seed ${seed}: base ${Math.max(...frames.map(f => f.base)).toFixed(2)}`)
+      }
+    }
+  }
+  assert.deepEqual(climbed, [])
+})
+
+test('dropping off a ledge onto a surface with room to land, every character lands on it', () => {
+  const missed: string[] = []
+  for (const name of HUMANOIDS) {
+    const own = buildDatabase(loadClips(), retargetOptions(name))
+    for (const [height, room] of [[5.5, 1.1], [3.5, 0.85]]) {
+      const page = ground([[2, 6, height], [0, 6 + room, 0]])
+      const place = { x: 4, height }
+      const w = createWalker({ database: own, fps: FPS, random: random(1), ground: page, place, yaw: EAST })
+      w.visit({ x: 6 + room / 2, height: 0 })
+      const frames = run(w, 8)
+      if (frames.some(f => f.support === undefined)) missed.push(`${name}: ${height} m drop, ${room} m room`)
+    }
+  }
+  assert.deepEqual(missed, [])
 })

@@ -9,11 +9,11 @@ import type { Vec3 } from '../math/vec.ts'
 import { toWorld } from '../sim/body.ts'
 import { nodeAt, path, reachable, surfaceGraph } from './graph.ts'
 import type { Edge, Graph, Node, Reach } from './graph.ts'
-import { heightUnder, surfaceBelow } from './surfaces.ts'
+import { DEPTH_WITH_NO_GROUND, surfaceBelow } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 
 export type Place = { x: number, height: number }
-export type Activity = 'rest' | 'wander' | 'visit' | 'flee'
+export type Activity = 'rest' | 'wander' | 'visit' | 'flee' | 'drop'
 export type Foot = { planted: boolean, soles: Array<[number, number]> }
 export type WalkerFrame = {
   joints: Pose
@@ -34,6 +34,7 @@ export type Walker = {
   setGround: (ground: Ground) => void
   shiftBy: (dx: number, dy: number) => void
   moveTo: (place: Place) => void
+  dropIn: (place: Place, above: number) => void
   poke: () => void
   visit: (place: Place) => boolean
   reaches: (place: Place) => boolean
@@ -61,6 +62,7 @@ const LEG_TIMEOUT_SECONDS = 10
 const POKE_RUN = 1.5
 const LINGER_PER_ATTRACTION = 0.5
 const ON_NODE = 1e-3
+const SOLE_REACH = 0.02
 
 type Goal = { node: number, x: number, height: number }
 const EAST = Math.PI / 2
@@ -102,8 +104,11 @@ export function createWalker (options: WalkerOptions): Walker {
   }
 
   const worldStanding = (): number => standing + offset[1]
-  const groundAt = (x: number, z: number): number => {
-    return heightUnder(ground, worldStanding, STEP_HEIGHT)(x + offset[0], z) - offset[1]
+  const groundAt = (x: number, z: number, from?: number): number => {
+    const reach = worldStanding() + STEP_HEIGHT
+    const limit = from === undefined ? reach : Math.max(reach, from + offset[1] + SOLE_REACH)
+    const surface = surfaceBelow(ground, x + offset[0], limit, 0)
+    return (surface?.height ?? worldStanding() - DEPTH_WITH_NO_GROUND) - offset[1]
   }
   const supportAt = (x: number): Surface | undefined => surfaceBelow(ground, x, worldStanding(), STEP_HEIGHT)
 
@@ -126,14 +131,15 @@ export function createWalker (options: WalkerOptions): Walker {
     return { joints, root, base: worldStanding(), falling, ...support, feet, ...doing }
   }
 
-  const start = (place: Place, yaw: number): void => {
+  const start = (place: Place, yaw: number, above = 0): void => {
     offset = [0, 0]
-    standing = place.height
-    player = createPlayer({ database, fps, ground: groundAt }, { position: [place.x, 0, 0], yaw })
+    standing = place.height + above
+    const at = { position: [place.x, 0, 0] as Vec3, yaw, ...(above > 0 ? { height: standing } : {}) }
+    player = createPlayer({ database, fps, ground: groundAt }, at)
     const root: RootState = { position: [place.x, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
     const lifted: Pose = {}
-    for (const [name, p] of Object.entries(rest)) lifted[name] = [p[0], p[1] + place.height, p[2]]
-    current = frameOf(root, lifted, legs.map(() => true), false)
+    for (const [name, p] of Object.entries(rest)) lifted[name] = [p[0], p[1] + standing, p[2]]
+    current = frameOf(root, lifted, legs.map(() => above === 0), false)
     route = []
     goal = undefined
     restUntil = time
@@ -141,6 +147,8 @@ export function createWalker (options: WalkerOptions): Walker {
     reached = false
   }
   start(options.place, options.yaw)
+
+
 
   const here = (): Node | undefined => {
     const under = current.support
@@ -246,6 +254,11 @@ export function createWalker (options: WalkerOptions): Walker {
       current = shifted(current, dx, dy)
     },
     moveTo: place => { start(place, current.root.yaw) },
+    dropIn: (place, above) => {
+      start(place, current.root.yaw, above)
+      activity = 'drop'
+      current = { ...current, falling: true, activity }
+    },
     poke: () => {
       const node = here()
       heading = heading === EAST ? WEST : EAST

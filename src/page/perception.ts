@@ -2,18 +2,18 @@ import { surfaceBelow } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 import type { Place } from './walker.ts'
 
-export type Interest = { element: Element, place: Place }
+export type Noticed = { element: Element, place: Place }
 export type PerceptionOptions = {
   ground: () => Ground
   pixelsPerMetre: number
-  onInterest: (interest: Interest) => void
+  onInterest: (noticed: Noticed) => void
   ignore: (element: Element) => boolean
   surfaceOf: (element: Element) => Surface | undefined
 }
 
 const HOVER_MS = 300
 const ABOVE_TOP = 0.01
-const INTERACTIVE = 'a[href], button, input, select, textarea, summary, label, [tabindex], [data-pinata-say]'
+export const INTERACTIVE = 'a[href], button, input, select, textarea, summary, label, [tabindex], [data-pinata-say]'
 
 function standingFor (element: Element, options: PerceptionOptions): Surface | undefined {
   for (let at: Element | null = element; at !== null; at = at.parentElement) {
@@ -23,15 +23,24 @@ function standingFor (element: Element, options: PerceptionOptions): Surface | u
   return undefined
 }
 
-export function placeUnder (element: Element, options: PerceptionOptions): Place | undefined {
-  const rect = element.getBoundingClientRect()
-  const x = (rect.left + rect.width / 2 + window.scrollX) / options.pixelsPerMetre
-  const top = -(rect.top + window.scrollY) / options.pixelsPerMetre
-  const own = standingFor(element, options)
-  const surface = own !== undefined && x >= own.from && x <= own.to
-    ? own
-    : surfaceBelow(options.ground(), x, top + ABOVE_TOP, 0)
+export type Rect = { left: number, top: number, width: number }
+
+export function placeFor (
+  rect: Rect,
+  own: Surface | undefined,
+  ground: Ground,
+  pixelsPerMetre: number
+): Place | undefined {
+  const x = (rect.left + rect.width / 2) / pixelsPerMetre
+  const top = -rect.top / pixelsPerMetre
+  const surface = own !== undefined && x >= own.from && x <= own.to ? own : surfaceBelow(ground, x, top + ABOVE_TOP, 0)
   return surface === undefined ? undefined : { x, height: surface.height }
+}
+
+function placeUnder (element: Element, options: PerceptionOptions): Place | undefined {
+  const rect = element.getBoundingClientRect()
+  const box = { left: rect.left + window.scrollX, top: rect.top + window.scrollY, width: rect.width }
+  return placeFor(box, standingFor(element, options), options.ground(), options.pixelsPerMetre)
 }
 
 export function interestOf (element: Element, ignore: (element: Element) => boolean): Element | undefined {

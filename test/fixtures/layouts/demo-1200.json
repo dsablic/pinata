@@ -1,0 +1,308 @@
+{
+  "name": "demo-1200",
+  "width": 1200,
+  "height": 900,
+  "page": "index.html?measure",
+  "pixelsPerMetre": 54,
+  "scale": 2,
+  "seed": 3,
+  "platform": "darwin",
+  "marks": [
+    {
+      "id": "card-ground",
+      "box": {
+        "id": 0,
+        "mark": "ground",
+        "left": 186,
+        "top": 273,
+        "width": 276,
+        "height": 197.5
+      },
+      "hints": {
+        "attract": 0,
+        "say": "Walk on me!"
+      }
+    },
+    {
+      "id": "card-point",
+      "box": {
+        "id": 1,
+        "mark": "ground",
+        "left": 462,
+        "top": 281,
+        "width": 276,
+        "height": 189.5
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "card-words",
+      "box": {
+        "id": 2,
+        "mark": "ground",
+        "left": 738,
+        "top": 289,
+        "width": 276,
+        "height": 181.5
+      },
+      "hints": {
+        "attract": 0,
+        "say": "Nice spot"
+      }
+    },
+    {
+      "id": "card-poke",
+      "box": {
+        "id": 3,
+        "mark": "ground",
+        "left": 126,
+        "top": 580.5,
+        "width": 278.8125,
+        "height": 166
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "card-cast",
+      "box": {
+        "id": 4,
+        "mark": "ground",
+        "left": 404.8125,
+        "top": 588.5,
+        "width": 390.359375,
+        "height": 158
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "card-calm",
+      "box": {
+        "id": 5,
+        "mark": "ground",
+        "left": 795.171875,
+        "top": 596.5,
+        "width": 278.8125,
+        "height": 150
+      },
+      "hints": {
+        "attract": 0,
+        "say": "Gently"
+      }
+    },
+    {
+      "id": "tile-1",
+      "box": {
+        "id": 6,
+        "mark": "ground",
+        "left": 66,
+        "top": 856.5,
+        "width": 267,
+        "height": 113.5
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "tile-2",
+      "box": {
+        "id": 7,
+        "mark": "ground",
+        "left": 333,
+        "top": 856.5,
+        "width": 267,
+        "height": 113.5
+      },
+      "hints": {
+        "attract": 2,
+        "say": "Warm here"
+      }
+    },
+    {
+      "id": "tile-3",
+      "box": {
+        "id": 8,
+        "mark": "ground",
+        "left": 600,
+        "top": 856.5,
+        "width": 267,
+        "height": 113.5
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "tile-4",
+      "box": {
+        "id": 9,
+        "mark": "ground",
+        "left": 867,
+        "top": 856.5,
+        "width": 267,
+        "height": 113.5
+      },
+      "hints": {
+        "attract": 0
+      }
+    }
+  ],
+  "targets": [
+    {
+      "id": "engine-link",
+      "rect": {
+        "left": 66,
+        "top": 142.5,
+        "width": 42.59375
+      }
+    },
+    {
+      "id": "card-ground",
+      "rect": {
+        "left": 186,
+        "top": 273,
+        "width": 276
+      },
+      "say": "Walk on me!",
+      "ground": "card-ground"
+    },
+    {
+      "id": "hello",
+      "rect": {
+        "left": 480,
+        "top": 421,
+        "width": 76.578125
+      },
+      "say": "Hello!",
+      "ground": "card-point"
+    },
+    {
+      "id": "card-words",
+      "rect": {
+        "left": 738,
+        "top": 289,
+        "width": 276
+      },
+      "say": "Nice spot",
+      "ground": "card-words"
+    },
+    {
+      "id": "count-label",
+      "rect": {
+        "left": 422.8125,
+        "top": 635.25,
+        "width": 126.34375
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "count",
+      "rect": {
+        "left": 502.15625,
+        "top": 635.25,
+        "width": 47
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "seed-label",
+      "rect": {
+        "left": 557.15625,
+        "top": 634.5,
+        "width": 116.96875
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "seed",
+      "rect": {
+        "left": 596.125,
+        "top": 634.5,
+        "width": 78
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "restart",
+      "rect": {
+        "left": 682.125,
+        "top": 634.5,
+        "width": 87.875
+      },
+      "say": "Again!",
+      "ground": "card-cast"
+    },
+    {
+      "id": "timing-label",
+      "rect": {
+        "left": 422.8125,
+        "top": 674,
+        "width": 108.015625
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "timing",
+      "rect": {
+        "left": 426.8125,
+        "top": 678,
+        "width": 13
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "card-calm",
+      "rect": {
+        "left": 795.171875,
+        "top": 596.5,
+        "width": 278.8125
+      },
+      "say": "Gently",
+      "ground": "card-calm"
+    },
+    {
+      "id": "source-link",
+      "rect": {
+        "left": 80,
+        "top": 911.5,
+        "width": 67.75
+      },
+      "say": "Read me",
+      "ground": "tile-1"
+    },
+    {
+      "id": "tile-2",
+      "rect": {
+        "left": 333,
+        "top": 856.5,
+        "width": 267
+      },
+      "say": "Warm here",
+      "ground": "tile-2"
+    },
+    {
+      "id": "pinata-link",
+      "rect": {
+        "left": 914.59375,
+        "top": 872.5,
+        "width": 112.59375
+      },
+      "say": "Swing by!",
+      "ground": "tile-4"
+    },
+    {
+      "id": "footer-link",
+      "rect": {
+        "left": 203.046875,
+        "top": 995,
+        "width": 156.375
+      }
+    }
+  ]
+}

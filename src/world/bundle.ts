@@ -94,10 +94,14 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
   return { value: { config: config.value, cast, looks }, errors }
 }
 
-export async function fetchWorldBundle (url: string): Promise<ReadWorld> {
-  const read = readWorldBundle(await (await fetch(url)).json())
+export function worldOf (input: unknown): ReadWorld {
+  const read = readWorldBundle(input)
   if (read.value === undefined) throw new Error(read.errors.map(e => `${e.path}: ${e.message}`).join('; '))
   return read.value
+}
+
+export async function fetchWorldBundle (url: string): Promise<ReadWorld> {
+  return worldOf(await (await fetch(url)).json())
 }
 
 function readCloth (

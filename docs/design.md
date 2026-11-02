@@ -55,9 +55,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   left and right sides, from its bottom to its top.
 - `surfaceBelow` picks the highest surface spanning x that is not higher than the character's own height plus a step:
   a character under a shelf does not stand on the shelf.
-- `heightUnder` turns that into the per-character ground function the motion code expects. Where there is no surface
-  at all it answers a long way down (`DEPTH_WITH_NO_GROUND`, 1000 m) so a character over a gap falls rather than
-  standing on nothing.
+- A walker's ground function (in `walker.ts`) answers with that surface; where there is no surface at all it answers a
+  long way down (`DEPTH_WITH_NO_GROUND`, 1000 m) so a character over a gap falls rather than standing on nothing.
+  Asked from a point's own height, it sees surfaces up to 2 cm above the point (`SOLE_REACH`) as well as up to a step
+  above the body: a foot on a ledge keeps the ledge, but a swinging foot does not see a rise it cannot climb.
 
 ### The surface graph (`graph.ts`)
 
@@ -68,7 +69,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - A wall element's two sides cut out everything between them, so no node lies inside a thick wall.
 - From an end that no wall closes, the node a step past it (2 cm) is found the way a falling body would find it: the
   highest node there not higher than a step above. Within a step up or down that is a walk; lower is a drop, kept up
-  to the drop limit (6 m on the page). Rises taller than a step have no edge: characters do not climb.
+  to the drop limit (6 m on the page) and only where the surface below runs on at least 0.8 m past the edge
+  (`LANDING_ROOM`): a body walking off an edge is still moving when it falls, and would otherwise land past a short
+  surface.
+  Rises taller than a step have no edge: characters do not climb.
 - Each edge carries `at`, the x to head for: 15 cm past the end into the next node (clamped to that node), so a
   walker crosses the end rather than stopping on it.
 - Paths are breadth-first (fewest moves): pages have few surfaces, and fewer drops and steps read as more purposeful
@@ -77,8 +81,8 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 
 ### Walkers (`walker.ts`)
 
-- A walker is one motion-captured player whose ground is `heightUnder` the page's ground at its own standing height
-  (the player's base), plus a wandering plan over the surface graph. Walls are not physical: walkers stay off them
+- A walker is one motion-captured player whose ground is the page's ground seen from its own standing height (the
+  player's base), plus a wandering plan over the surface graph. Walls are not physical: walkers stay off them
   because no node spans a wall.
 - Wandering: rest for 0.8-4 s, pick a reachable node weighted by width and a spot in it at least 0.35 m from its ends,
   then follow the path edge by edge (heading for each edge's `at` at walking speed, 1.1 m/s, east or west), and slow
@@ -89,6 +93,9 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   spot; giving up (no path any more, a leg over 10 s, or a page change that removed its place) ends it unreached.
   Wandering picks a node weighted by its width times one plus its surface's attraction, and the rest after arriving
   lasts longer by half the attraction (1 + attract / 2 times), so attractive elements win both ways.
+- While falling a walker makes no plans and commands no speed; walking off an edge it keeps walking until the fall
+  starts.
+- `dropIn` restarts a walker above a place (activity `drop`), already falling, so it falls onto it.
 - `visit` sends a walker to a place (a point on a surface) if a node holds it and the walker can reach that node;
   `reaches` answers the same question without going.
 - A poke turns a walker round and sends it 1.5 m the other way on its node (to its middle on a node too narrow for
@@ -111,72 +118,108 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   a card sends a character onto the card), otherwise the highest surface there not above the element's top (what it
   sits on). Its box is read on the event, never per frame.
 - The page sends the nearest character (straight-line distance from where it stands to the place) that can reach it;
-  none is sent with reduced motion. Each sending is listed (`visits`) for the checks.
+  none is sent with reduced motion. Each sending is listed (`visits`, with the words it carries) for the checks.
 - When a visit ends at its place, the character says the words of the noticed element or its nearest ancestor with
   `data-pinata-say`; when any other walk ends at its spot, the standing element's words. Unreached walks say nothing.
   Words show for 2.5 s in a bubble drawn on the overlay above the sprite (system font, 12 CSS px); a bubble that
   expires redraws the overlay, so it also goes away when nothing steps. The overlay is `aria-hidden`, so words are
   decoration, not content.
 
-### Characters and the overlay (`page.ts`)
+### The cast (`cast.ts`)
 
-- Characters keep a reference to the element they stand on, not to a surface index: indices shift when elements are
-  added or removed. While falling they stand on nothing. After a rescan, a character whose element moved (by more
-  than a millimetre) is carried with it, and put back inside it if the element shrank from under it; one whose element
-  is gone falls to whatever is below. A character with nothing at all below it (after a rescan or on any step) is
-  placed anywhere on the page's standing places (the surface graph's nodes, so never inside a wall). Characters wait,
+- The page world's behaviour lives in a core with no DOM: characters, their walkers, the layout (marked boxes with
+  hints, each under an opaque key: the element in the browser, an id in Node), rescans, stepping, visits and words,
+  drop-ins, samples, sprite images. The browser shell (`page.ts`) scans, observes, listens and draws; Node tests drive
+  the same core on recorded layouts.
+- Characters keep the key of the element they stand on, not a surface index: indices shift when elements are added
+  or removed. While falling they stand on nothing. After a rescan, a character whose element moved (by more than a
+  millimetre) is carried with it, and put back inside it if the element shrank from under it; one whose element is
+  gone falls to whatever is below. A character with nothing at all below it (after a rescan or on any step) is placed
+  anywhere on the page's standing places (the surface graph's nodes, so never inside a wall). Characters wait,
   neither drawn nor hit, until the page has some ground.
 - Only cast members with a skin and motion capture live on the page: the procedural renderer is too heavy to run per
   character on arbitrary pages, and walking over surfaces uses the captured player.
-- Walkers step at 24 fps on a fixed clock driven by `requestAnimationFrame`, at most three steps per frame after a
-  stall; a character's sprite is rendered again only when it stepped. Every frame's main-thread time is kept for the
-  cost gate (`costs`); with `measure: true` every step's foot gaps in CSS pixels are kept for the standing gates
-  (`samples`, `null` where nothing is under a foot). The frame loop schedules its next frame even when a step throws.
-- The sprite is anchored at the surface under the character, so a foot on that surface is drawn on its top edge
-  exactly; while falling it is anchored at the body's base.
+- Time is passed in (`advance(seconds, viewport, moving)`), at most three steps' worth per call after a stall.
+  Walkers step at 24 fps on one clock, each character a share of a step later than the one before, so with four
+  characters on screen their steps and sprite renders fall on different frames; the shares survive stalls. Without
+  motion only time passes, so words still expire.
+- Characters cannot climb, so a page drains them downwards. A character that has been on the same element for 30 s
+  (longer by the element's attraction) drops in, at its next rest, from above onto another standing place with
+  nothing above it up to where it starts: 2.5 m above the place, or 1 m above the top of the viewport when that start
+  would be in view, so it falls in from off screen. A drop-in is not an activity start, and the element it lands on
+  counts as visited only once the character walks on it. Words for a visit that ends in the same step are said
+  before a drop-in can take the character away.
+- With `measure: true` every step's foot gaps in CSS pixels are kept (`samples`, `null` where nothing is under a foot).
+- A sprite is anchored at the surface under the character, so a foot on that surface is drawn on its top edge
+  exactly; while falling it is anchored at the body's base. Each character renders into its own sprite box, 1.6 times
+  its height square (`SPRITE_BOX_IN_CHARACTER_HEIGHTS`), with its feet line at 85% of the box
+  (`FEET_LINE_SHARE_OF_BOX`), through a camera 8 degrees above the horizon (`CAMERA_ELEVATION_DEGREES`): nearly
+  side-on, so characters read against a flat page. A sprite is rendered only when it is drawn and its frame changed.
 - Starting places are drawn with a seeded random generator, weighted by surface width, at least 0.3 m from a
   surface's ends (`MARGIN_FROM_SURFACE_ENDS`).
-- Each character renders into its own sprite box, 1.6 times its height square (`SPRITE_BOX_IN_CHARACTER_HEIGHTS`),
-  with its feet line at 85% of the box (`FEET_LINE_SHARE_OF_BOX`), through a camera 8 degrees above the horizon
-  (`CAMERA_ELEVATION_DEGREES`): nearly side-on, so characters read against a flat page. Each sprite is kept as a small
-  canvas until the character steps again; scrolling only redraws.
+
+### The overlay (`page.ts`)
+
+- The shell turns the scan into the cast's layout, passes noticed elements on as visits (with the words of the
+  element or its nearest ancestor with `data-pinata-say`), advances the cast every animation frame (not at all under
+  reduced motion), and draws its sprites. Every frame's main-thread time is kept for the cost check (`costs`); the
+  frame loop schedules its next frame even when a step throws.
 - The overlay's own style changes (its size follows the window) are ignored by the change detection.
 - The overlay is one canvas in the top layer (a manual popover), so no transform, filter or stacking context on the
   page can move or cover it; browsers without popovers get a fixed canvas on the root element. It has
   `pointer-events: none` and `aria-hidden`, is sized in CSS pixels from the same numbers as its backing store (not
   `100vh`, which differs from the visible height on mobile), and its backing store is scaled by the device pixel ratio.
   Sprite pixels are drawn at a whole number of device pixels (the scale times the ratio, rounded) so they stay square
-  on high-density screens. Characters outside the viewport are neither rendered nor drawn.
+  on high-density screens. Characters outside the viewport are neither rendered nor drawn; each drawn sprite is kept
+  as a small canvas until its image changes.
 - Pokes are decided on a trusted primary `pointerdown`. When it lands on an opaque pixel of a drawn character, that
   event and the rest of the gesture (`mousedown`, `pointerup`, `mouseup`, `click`, `dblclick`, `auxclick`,
   `contextmenu`, for up to 800 ms) are stopped in the capture phase. Clicks from script or the keyboard, which carry no
   pointer, are never taken. While a modal dialog, an open popover or a fullscreen element covers the page, nothing is
   poked.
-- With `prefers-reduced-motion: reduce` nothing steps (characters stand in their rest pose) and a poke registers
-  without turning anyone.
-- `createPageWorld` returns the state tests read (`ground`, `characters`, `samples`, `costs`, `pokes`, `rebuilds`) and
-  `destroy`, which removes the overlay and every listener and observer.
+- With `prefers-reduced-motion: reduce` nothing steps (characters stand in their rest pose), no one is sent on
+  visits, and a poke registers without turning anyone.
+- `createPageWorld` returns the state checks read (`ground`, `layout`, `characters`, `samples`, `visits`, `costs`,
+  `pokes`, `rebuilds`) and `destroy`, which removes the overlay and every listener and observer.
 
-### Browser checks (`src/cli/browser-test.ts`)
+### The demo page (`site/index.html`, `demo.ts`)
 
-- The checks drive the locally installed Chrome over the DevTools protocol with Node's own WebSocket: no test
-  framework or browser package is needed, and CI uses the runner's Chrome.
-- The test page lives in `test/pages/` and is copied into the built site only while the checks run, so it is never
-  published.
-- Every check names what it measured and must be able to fail when the behaviour it guards breaks.
-- Plan gates measured from motion (planted feet within 1 CSS px, no mid-air frames) print as `GATE MET` or
-  `GATE MISSED` and do not fail the run; the plan records their results. Every other check fails the run.
-- The fall check removes the element under a character that has a surface below it, so a fall always happens; a fall
-  lasting over 4 s counts as a fault (a body falling into nothing). Gaps of `null` (nothing under a foot) count as off
-  the surface: values come back through the protocol as JSON, which has no infinity.
-- Perception and liveliness run on a second page (`test/pages/perception-test.html`): three floor elements in a row
-  (one attractive, one a step higher), a shelf with words, a button with words whose label is a child span (hovered,
-  so words come from the ancestor), and a text field inside a floor element (focused by Tab, so the place must be that
-  element's own top). A hover or focus check waits until no one is near the target, then passes only if the character
-  sent is the nearest one, reaches the target within 8 s and says the words. The hints are read back from the page
-  (`hints`).
+- The site's front page is built on the page world: rows of cards (each card ground, neighbouring cards a step apart
+  so a row is one walk), each row inset from the one below so its ends drop onto it with room to land, and a floor of
+  tiles, one of them attractive. Words sit on cards, a button and a link; hovering or focusing them calls a character.
+- Controls restart the world with another count or seed. Timing is shown only on request: text changing inside a
+  ground card is a page change, which would rescan the page every second.
+- `?measure` turns on samples; the world is exposed as `window.__pinata`.
+
+### Checking the page world
+
+Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
+
+- **Layout fixtures** (`test/fixtures/layouts/`, `fixture.ts`): the marked boxes, hints and interactive targets (with
+  their words and the ground element they are inside) of the test page, the perception page and the demo at 1200 and
+  390 px, as Chrome laid them out. `npm run layouts` records them again; marked elements need ids.
+- **Scenarios in Node** (`src/diagnostics/page-scenarios.ts`, `test/page-scenarios.test.ts`): the cast runs on a
+  fixture at exactly 24 steps per second with the fixture's seed, so results are the same on every run (a test).
+  Events are made to happen: an element is taken away under a character, a target is noticed, a layout moves, a
+  character is left on an island. Who can reach a place is worked out from the graph by the test, not taken from the
+  cast. A minute on a layout takes about a second.
+- **Measured gates** (`npm run gates`): the standing gate on every layout, printed as met or missed, in Node over
+  60 s, or in Chrome over 20 s per page with `-- --browser`; tests assert only what must always hold (the scenarios
+  bound mid-air frames at 1.5% as a guard against regressions).
+- **The browser suite** (`npm run test:browser`, about 30 s) checks what needs a browser: the scan against an oracle
+  that reads elements directly, after load, scrolling, resizing, adding, removing, inner scrolling and text reflow;
+  characters standing on live surfaces (lowest sole within 8 px: mid-stride feet are a few pixels up, and the precise
+  foot gates are `npm run gates`'); clicks reaching the page; pokes (and nothing reaching the page), with modal
+  dialogs, reduced motion and high-density screens; layout shift; layout reads and rescans while nothing changes;
+  frame cost; hover and keyboard focus sending a visit; and that every layout fixture still matches its page. Suites
+  (`page`, `screen`, `perception`, `demo`, `fixtures`) run together or one alone (`node src/cli/browser-test.ts
+  <suite>`); an unknown suite name is an error.
+- The checks drive the locally installed Chrome over the DevTools protocol with Node's own WebSocket (`chrome.ts`): no
+  test framework or browser package is needed, and CI uses the runner's Chrome. Test pages live in `test/pages/` and
+  are copied into the built site only while the checks run.
 - Layout reads are counted by wrapping `getBoundingClientRect`, `getClientRects` and `getComputedStyle` after the page
   has settled; with nothing changing, a frame must read none.
+- Gaps of `null` (nothing under a foot) count as off the surface.
 
 ## Motion (`src/motion/`, `src/math/`)
 
@@ -441,10 +484,19 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   most 148 degrees), never into the ground. Out of reach across the ground and clear of it, it is drawn in to 97% of
   the reach; it is moved across the ground only where no end stays down, so it cannot slide.
 - The legs are solved by IK last, so the reported pose always has the character's bone lengths.
-- When the ground under the body is more than 0.5 m below its base, the body falls: every foot lets go, the base
-  drops under gravity (9.81 m/s²) with every foot's reference at the base, and it lands on the ground it meets, where
-  the feet take hold again. Smaller drops are stepped down as before. `height` (the base) and `falling` are exposed
-  for the page, whose ground depends on how high the body stands.
+- When the ground under the body is more than 0.5 m below its base, and under every sole end too, the body falls:
+  every foot lets go, the base drops under gravity (9.81 m/s²) with every foot's reference at the base, and it lands
+  on the ground it meets, where the feet take hold again. Waiting for the soles keeps a trailing foot still on a ledge
+  from being dragged through its corner. The legs keep their grip on the air: commands still change the body's
+  speed while it falls (without that, a body leaving an edge at walking speed overshot the surfaces below the page's
+  drops). Smaller drops are stepped down as before. `height` (the base) and `falling` are exposed for
+  the page, whose ground depends on how high the body stands, and a player can start at a given height (`height` in
+  its start), above the ground, to fall in.
+- The ground function may take the height a point is seen from (`ground(x, z, from)`). Two lookups use it: whether
+  the soles are over the drop before a fall starts, and a swinging foot's reference, which also takes the ground under
+  where its soles are now, seen from there; so a trailing foot still over a ledge keeps the ledge after the body has
+  dropped below it. Every other lookup is from the body. Ground that ignores the third argument (terrain) behaves as
+  before.
 
 ## The world (`src/world/`)
 
@@ -467,7 +519,8 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 
 ### `config.ts`
 
-- The world config holds everything that is tuning rather than mechanism; `site/world.json` is the showcase.
+- The world config holds everything that is tuning rather than mechanism; `site/world.json` names the cast the site
+  bundles for the page world (its terrain and weather settings are used by the tests).
 - Stair rise is a fraction of the shortest leg in the cast and stair tread a multiple of the longest foot, so every
   character can climb every flight and fit a foot on a tread.
 - `dress` says how to draw a member's simulated cloth (material and radius of the cape and each chain) and which fixed
@@ -504,13 +557,6 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - Each character is rendered live in its own box that follows its root, keeping its own temporal hysteresis, and the
   boxes are drawn back to front. Characters with a skin draw with it unless skins are switched off; the skin draws its
   own cape.
-
-### `page.ts`
-
-- A click pokes the character with a joint nearest the click, not its root: the root sits at height 0, below the feet
-  on a hill.
-- The environment sliders write into the running world, which cloth reads every frame, so the weather changes live
-  without rebuilding the world.
 
 ### `yaw.ts`
 

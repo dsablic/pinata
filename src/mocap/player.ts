@@ -26,7 +26,7 @@ export type BodyTuning = {
 export type PlayerOptions = {
   database: MotionDatabase
   fps: number
-  ground: (x: number, z: number) => number
+  ground: (x: number, z: number, from?: number) => number
   tuning?: Partial<BodyTuning>
 }
 export type PlayerFrame = {
@@ -188,7 +188,7 @@ function legFolded (leg: Leg, rest: Pose, reach: number, degrees: number): numbe
   return Math.sqrt(a * a + b * b - 2 * a * b * Math.cos(inner))
 }
 
-export function createPlayer (options: PlayerOptions, start: { position: Vec3, yaw: number }): Player {
+export function createPlayer (options: PlayerOptions, start: { position: Vec3, yaw: number, height?: number }): Player {
   const { database, fps, ground } = options
   const { entries, candidates, scales, hierarchy } = database
   const { rig, rest, mannequin } = database.options
@@ -219,13 +219,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   let lastFrame: BodyFrame | undefined
   let previousFrame: BodyFrame | undefined
   let switched = false
-  const startGround = ground(body.position[0], body.position[2])
+  const startGround = start.height ?? ground(body.position[0], body.position[2])
   let base = startGround
   let settle = 0
   let fallSpeed: number | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
-  const heightAboveGround = (p: Vec3): number => p[1] - ground(p[0], p[2])
+  const groundUnder = (p: Vec3): number => ground(p[0], p[2], p[1])
+  const groundAcross = (p: Vec3): number => ground(p[0], p[2])
+  const heightAboveGround = (p: Vec3): number => p[1] - groundAcross(p)
   const groundRoot = (): Vec3 => [root.position[0], 0, root.position[2]]
   const toWorldPoint = (local: Vec3): Vec3 => add(groundRoot(), turnToWorld(local, root.yaw))
   const wantedVelocity = (): Vec3 => {
@@ -341,8 +343,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   }
 
   const liftAboveGround = (ends: Soles, clearance: number): number => {
-    return Math.max(0, clearance + ground(ends.heel[0], ends.heel[2]) - ends.heel[1],
-      clearance + ground(ends.toe[0], ends.toe[2]) - ends.toe[1])
+    const needed = (p: Vec3): number => clearance + groundAcross(p) - p[1]
+    return Math.max(0, needed(ends.heel), needed(ends.toe))
   }
 
   const tilted = (ankle: Vec3, rotation: Matrix, k: number, weight: number): Matrix => {
@@ -350,7 +352,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const { heel, toe } = soles(ankle, rotation, k)
     const run = Math.hypot(toe[0] - heel[0], toe[2] - heel[2])
     if (run < 1e-6) return rotation
-    const rise = ground(toe[0], toe[2]) - ground(heel[0], heel[2])
+    const rise = groundAcross(toe) - groundAcross(heel)
     if (Math.abs(rise) > MAX_GRADE * run) return rotation
     const along = normalize([toe[0] - heel[0], 0, toe[2] - heel[2]])
     const axis = cross(along, UP)
@@ -371,10 +373,12 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const ahead = add(world, scale([velocity[0], 0, velocity[2]], LOOKAHEAD_SECONDS))
     const ends = soles(world, rotation, k)
     const aheadEnds = soles(ahead, rotation, k)
-    const highest = Math.max(...[ends.heel, ends.toe, aheadEnds.heel, aheadEnds.toe].map(p => ground(p[0], p[2])))
+    const placed = foot.last === undefined ? [] : Object.values(soles(foot.last.ankle, foot.last.rotation, k))
+    const highest = Math.max(
+      ...[ends.heel, ends.toe, aheadEnds.heel, aheadEnds.toe].map(groundAcross), ...placed.map(groundUnder))
     if (isHeld(foot)) {
       const end = foot.heel ?? foot.toe as Vec3
-      foot.reference = ground(end[0], end[2])
+      foot.reference = groundAcross(end)
     } else {
       const rising = Math.min(highest, foot.reference + RISE_SPEED * dt)
       const sinking = Math.max(highest, foot.reference - SINK_SPEED * dt)
@@ -570,6 +574,13 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
 
   const supportUnderBody = (): number => ground(root.position[0], root.position[2])
 
+  const feetOverTheDrop = (): boolean => legIndices.every(k => {
+    const last = feet[k].last
+    if (last === undefined) return true
+    const ends = soles(last.ankle, last.rotation, k)
+    return ENDS.every(end => base - groundUnder(ends[end]) > FALL_START_HEIGHT)
+  })
+
   const letGoOfTheGround = (): void => {
     for (const foot of feet) {
       foot.heel = undefined
@@ -635,7 +646,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     step: () => {
       switched = false
       stepBody()
-      if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT) {
+      if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT && feetOverTheDrop()) {
         fallSpeed = 0
         letGoOfTheGround()
       }

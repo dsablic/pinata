@@ -57,7 +57,8 @@ for previews, collision geometry and checks.
 [Plan](plans/2026-10-31-page-world.md): characters live on an ordinary web page. Marked elements are ground and walls;
 characters walk, step up and drop between them over a click-through overlay, then react to the page (hovered,
 focused and nearby elements), and the world demo is rebuilt on its own page's elements instead of generated terrain.
-Surfaces and the overlay (A) and moving over the page (B) are built; perception (C) and the demo (D) remain.
+All four batches are built: surfaces and the overlay, moving over the page, perception, and the demo page; the
+standing gate is missed narrowly (see the plan).
 
 ## Next: live runtime spike (P8)
 

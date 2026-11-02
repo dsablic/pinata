@@ -1,0 +1,148 @@
+{
+  "name": "page-test",
+  "page": "page-test.html",
+  "width": 1200,
+  "height": 900,
+  "pixelsPerMetre": 54,
+  "scale": 2,
+  "seed": 7,
+  "platform": "darwin",
+  "marks": [
+    {
+      "id": "a",
+      "box": {
+        "id": 0,
+        "mark": "ground",
+        "left": 80,
+        "top": 300,
+        "width": 420,
+        "height": 60
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "b",
+      "box": {
+        "id": 1,
+        "mark": "ground",
+        "left": 560,
+        "top": 420,
+        "width": 300,
+        "height": 40
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "c",
+      "box": {
+        "id": 2,
+        "mark": "ground",
+        "left": 120,
+        "top": 900,
+        "width": 600,
+        "height": 50
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "wall",
+      "box": {
+        "id": 3,
+        "mark": "wall",
+        "left": 520,
+        "top": 200,
+        "width": 2,
+        "height": 200
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "card",
+      "box": {
+        "id": 4,
+        "mark": "ground",
+        "left": 300,
+        "top": 1400,
+        "width": 360,
+        "height": 160
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "outer-nest",
+      "box": {
+        "id": 5,
+        "mark": "ground",
+        "left": 760,
+        "top": 1100,
+        "width": 300,
+        "height": 160
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "inner-nest",
+      "box": {
+        "id": 6,
+        "mark": "ground",
+        "left": 781,
+        "top": 1181,
+        "width": 200,
+        "height": 40
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "scrolled",
+      "box": {
+        "id": 7,
+        "mark": "ground",
+        "left": 101,
+        "top": 1821,
+        "width": 300,
+        "height": 30
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "flow-ground",
+      "box": {
+        "id": 8,
+        "mark": "ground",
+        "left": 600,
+        "top": 1752.5,
+        "width": 400,
+        "height": 30
+      },
+      "hints": {
+        "attract": 0
+      }
+    }
+  ],
+  "targets": [
+    {
+      "id": "button",
+      "rect": {
+        "left": 140,
+        "top": 600,
+        "width": 87.109375
+      }
+    }
+  ]
+}

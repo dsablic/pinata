@@ -25,17 +25,18 @@ skins in the world). Left: the size gate (per-size skins), live capes on skinned
 ### 0a. The page as the world
 
 [Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
-step and drop between them on a click-through overlay, react to the page, then the world demo is rebuilt on its own
-page. Batches A (surfaces and the overlay), B (moving over the page) and C (perception) done and reviewed; B misses
-the mid-air half of the standing gate (0.4-1% of frames, from turn, start and stop clips; see the plan). D (the demo
-rebuilt on its own page, release) next. Open question: whether missed motion gates should fail
-`npm run test:browser` (they report `GATE MISSED` without failing it, so CI stays green).
+step and drop between them on a click-through overlay, react to the page, and the front page is built on it. All
+four batches built and reviewed. The standing gate is missed narrowly on every layout
+(`npm run gates`: 0.4-0.9% of frames mid-air, from turn, start and stop clips, and about 0.3% of planted feet over
+1 px). Next for it: the corrective-step overlap in the turn clips, and jumping, so characters can climb. The page
+world is checked in Node on recorded layouts ([harness plan](plans/2026-11-02-page-harness.md)); after changing a
+test page or the demo, run `npm run layouts`.
 
 ### 0b. World showcase, remaining batches
 
 [World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
 into P7 batch D), physics engine spike (D), page-as-world (E, now the page-world plan above). Once page-as-world
-works, the world demo is rebuilt on the page's elements instead of the generated terrain.
+works, the world demo is rebuilt on the page's elements instead of the generated terrain (done: the front page).
 
 ### 1. Leftovers from general limbs
 

@@ -41,8 +41,10 @@
     "judge": "node src/cli/judge.ts",
     "mocap": "node src/cli/mocap.ts",
     "skin": "node src/cli/skin.ts",
-    "build:web": "tsc -p tsconfig.web.json",
+    "build:web": "node -e \"require('node:fs').rmSync('dist/web', { recursive: true, force: true })\" && tsc -p tsconfig.web.json",
     "site": "npm run build:web && node src/cli/site.ts",
+    "layouts": "node src/cli/layouts.ts",
+    "gates": "node src/cli/gates.ts",
     "runtime": "npm run site && node src/cli/serve.ts _site",
     "artifact": "node src/cli/artifact.ts"
   },

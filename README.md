@@ -19,8 +19,11 @@ check its own work.
   cloth (capes, scarves, chains) with wind and gravity; a joint hierarchy for attached parts.
 - **Rendering:** a procedural pixel-art renderer that stays stable in motion, with interchangeable styles.
 - **Live runtime:** characters animate frame by frame in the browser and in a terminal pane.
-  - **The world:** a cast of characters living on procedurally generated terrain, wandering, visiting each other,
-    resting and reacting to pokes and weather. The whole world is [one declarative config](site/world.json).
+  - **The page as the world:** characters live on an ordinary web page. Elements marked with
+    `--pinata: ground` (or `data-pinata="ground"`) are their ground and `wall` their walls; they walk, step up small
+    rises and drop between elements, come to what you point at or focus, say a place's `data-pinata-say` words, and
+    linger where `--pinata-attract` is set, on a click-through overlay that leaves the page usable. The demo page is
+    built this way.
   - **The hanging piñata:** a character on a rope you can poke, drag and tune. Embed it with
     `<pinata-character src="unicorn.json"></pinata-character>` and send it events with
     `window.dispatchEvent(new CustomEvent('pinata', { detail: 'toolStart' }))`.
@@ -32,12 +35,9 @@ check its own work.
 
 ## In progress
 
-- **Natural motion from motion capture** ([plan](docs/plans/2026-10-30-motion-data.md)): humanoids driven by
-  retargeted CMU motion capture through motion matching, with their feet locked to the terrain and a physical body
-  leading. Clips and retargeting are done; playback is under way.
 - **Physical bodies** ([plan](docs/plans/2026-10-30-physical-walking.md)) for creatures without motion-capture data.
-- Then weather and particles, character skins, a physics engine, and pages whose elements become terrain. The
-  [roadmap](docs/ROADMAP.md) and [TODO](docs/TODO.md) have the order.
+- Then weather and particles and a physics engine. The [roadmap](docs/ROADMAP.md) and [TODO](docs/TODO.md) have the
+  order.
 
 ## Running it
 

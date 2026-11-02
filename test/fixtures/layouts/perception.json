@@ -1,0 +1,100 @@
+{
+  "name": "perception",
+  "page": "perception-test.html",
+  "width": 1200,
+  "height": 900,
+  "pixelsPerMetre": 54,
+  "scale": 2,
+  "seed": 11,
+  "platform": "darwin",
+  "marks": [
+    {
+      "id": "floor-1",
+      "box": {
+        "id": 0,
+        "mark": "ground",
+        "left": 20,
+        "top": 700,
+        "width": 380,
+        "height": 41
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "floor-2",
+      "box": {
+        "id": 1,
+        "mark": "ground",
+        "left": 400,
+        "top": 700,
+        "width": 400,
+        "height": 41
+      },
+      "hints": {
+        "attract": 3
+      }
+    },
+    {
+      "id": "floor-3",
+      "box": {
+        "id": 2,
+        "mark": "ground",
+        "left": 800,
+        "top": 692,
+        "width": 380,
+        "height": 41
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "shelf",
+      "box": {
+        "id": 3,
+        "mark": "ground",
+        "left": 300,
+        "top": 560,
+        "width": 260,
+        "height": 20
+      },
+      "hints": {
+        "attract": 0,
+        "say": "Nice view"
+      }
+    }
+  ],
+  "targets": [
+    {
+      "id": "field",
+      "rect": {
+        "left": 120,
+        "top": 707,
+        "width": 160
+      },
+      "say": "Typing?",
+      "ground": "floor-1"
+    },
+    {
+      "id": "shelf",
+      "rect": {
+        "left": 300,
+        "top": 560,
+        "width": 260
+      },
+      "say": "Nice view",
+      "ground": "shelf"
+    },
+    {
+      "id": "button",
+      "rect": {
+        "left": 960,
+        "top": 652,
+        "width": 87.109375
+      },
+      "say": "Click me!"
+    }
+  ]
+}

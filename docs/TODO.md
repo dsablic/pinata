@@ -21,7 +21,7 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 [Plan](plans/2026-11-02-natural-page-motion.md): secondary motion (chains, cloth, a robe hem) in the page world, cloth
 drawn in skins, natural falls and landings, jumps up the page, structural draw order; judged against the old terrain
-demo and strong references. Batch A (secondary motion on the page) first.
+demo and strong references. Batch A (secondary motion on the page) done; B (cloth in skins) next.
 
 ### 0. P7: skins to a game-art bar
 

@@ -3,6 +3,7 @@ import type { Look } from '../world/render.ts'
 import { random } from '../world/terrain.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
 import type { Pose } from '../motion/pose.ts'
+import type { RootState } from '../motion/script.ts'
 import { makeCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { renderSkinned } from '../style/skins.ts'
@@ -14,6 +15,10 @@ import { groundOf, surfaceBelow } from './surfaces.ts'
 import type { Box, Ground, Surface } from './surfaces.ts'
 import { createWalker, DROP_LIMIT, STEP_HEIGHT } from './walker.ts'
 import type { Activity, Place, Walker, WalkerFrame } from './walker.ts'
+import { createSecondary } from '../motion/secondary.ts'
+import type { Secondary, SecondaryEnvironment } from '../motion/secondary.ts'
+import type { WorldConfig } from '../world/config.ts'
+import type { System } from '../sim/cloth.ts'
 
 export type Mark<K> = { key: K, box: Box, hints: Hints }
 export type Viewport = { top: number, height: number }
@@ -21,6 +26,8 @@ export type Interest<K> = { key: K, place: Place, say?: string }
 export type CastOptions = {
   cast: CastMember[]
   looks: Look[]
+  environment: SecondaryEnvironment
+  springSubsteps: number
   pixelsPerMetre: number
   scale: number
   seed: number
@@ -29,6 +36,7 @@ export type CastOptions = {
 }
 export type Sprite = { image: Image, camera: Camera }
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
+export type Moving = { name: string, frame: WalkerFrame, cloth: Float64Array | undefined, system: System | undefined }
 export type CharacterState<K> = {
   name: string
   x: number
@@ -58,6 +66,7 @@ export type Cast<K> = {
   ground: () => Ground
   layout: () => Array<Mark<K>>
   drawables: () => Drawable[]
+  moving: () => Moving[]
   characters: () => Array<CharacterState<K>>
   samples: () => Sample[]
   visits: () => Array<Visit<K>>
@@ -71,6 +80,8 @@ type Character<K> = {
   look: Skinned
   database: MotionDatabase
   walker?: Walker
+  secondary: Secondary
+  cloth?: Float64Array
   on?: Standing<K>
   visited: Set<K>
   sameSince: number
@@ -98,6 +109,26 @@ const STALE_SECONDS = 30
 const LEAST_DROP_IN = 2.5
 const ABOVE_VIEWPORT = 1
 const DROP_IN_TRIES = 8
+const PAGE_CLOTH = { collisionPasses: 2, settlePasses: 8, settleOnStart: true }
+
+export function pageEnvironment (config: WorldConfig, wind = 0): Pick<CastOptions, 'environment' | 'springSubsteps'> {
+  const { environment, motion } = config
+  return {
+    environment: {
+      ...environment,
+      wind: { ...environment.wind, speed: wind, gust: wind === 0 ? 0 : environment.wind.gust }
+    },
+    springSubsteps: motion.springSubsteps
+  }
+}
+
+function raisedRoot (frame: WalkerFrame): [RootState, Pose] {
+  const lift = frame.base - frame.root.position[1]
+  const [x, y, z] = frame.root.position
+  const body: Pose = {}
+  for (const [name, p] of Object.entries(frame.body)) body[name] = [p[0], p[1] - lift, p[2]]
+  return [{ ...frame.root, position: [x, y + lift, z] }, body]
+}
 
 export function keep<T> (list: T[], most: number): void {
   if (list.length > most) list.splice(0, list.length - most)
@@ -125,7 +156,10 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       const database = cast[i].capture
       if (look.skin === undefined || database === undefined) return []
       const fresh = { view: {}, visited: new Set<K>(), sameSince: 0, placedAgain: 0, steps: 0, ticks: 0 }
-      return [{ name: cast[i].name, look: look as Skinned, database, ...fresh }]
+      const secondary = createSecondary(cast[i], {
+        ...PAGE_CLOTH, fps: FPS, springSubsteps: options.springSubsteps, environment: () => options.environment
+      })
+      return [{ name: cast[i].name, look: look as Skinned, database, secondary, ...fresh }]
     })
     .slice(0, options.count)
   const heightOf = (c: Character<K>): number => Math.max(...Object.values(c.database.options.rest).map(p => p[1]))
@@ -160,22 +194,35 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       ? undefined
       : { key: mark.key, from: surface.from, height: surface.height }
   }
-  const replace = (walker: Walker): void => {
-    const place = placeAnywhere()
-    if (place !== undefined) walker.moveTo(place)
+  const restart = (c: Character<K>): void => {
+    c.secondary.reset()
+    c.cloth = undefined
   }
-  const carry = (walker: Walker, on: Standing<K>, now: Surface): void => {
+  const moveTo = (c: Character<K>, walker: Walker, place: Place): void => {
+    walker.moveTo(place)
+    restart(c)
+  }
+  const replace = (c: Character<K>, walker: Walker): void => {
+    const place = placeAnywhere()
+    if (place !== undefined) moveTo(c, walker, place)
+  }
+  const carry = (c: Character<K>, walker: Walker, on: Standing<K>, now: Surface): void => {
     const dx = now.from - on.from
     const dy = now.height - on.height
-    if (Math.abs(dx) > MOVED || Math.abs(dy) > MOVED) walker.shiftBy(dx, dy)
+    if (Math.abs(dx) > MOVED || Math.abs(dy) > MOVED) {
+      walker.shiftBy(dx, dy)
+      c.secondary.shift([dx, dy, 0])
+      c.cloth = c.cloth?.map((v, i) => i % 3 === 0 ? v + dx : i % 3 === 1 ? v + dy : v)
+    }
     const x = walker.frame().root.position[0]
-    if (x < now.from || x > now.to) walker.moveTo({ x: Math.min(now.to, Math.max(now.from, x)), height: now.height })
+    const inside = Math.min(now.to, Math.max(now.from, x))
+    if (x < now.from || x > now.to) moveTo(c, walker, { x: inside, height: now.height })
   }
   const follow = (c: Character<K>, walker: Walker): void => {
     const now = c.on === undefined ? undefined : surfaceOf(c.on.key)
-    if (now !== undefined && c.on !== undefined) carry(walker, c.on, now)
+    if (now !== undefined && c.on !== undefined) carry(c, walker, c.on, now)
     walker.setGround(ground)
-    if (walker.support() === undefined) replace(walker)
+    if (walker.support() === undefined) replace(c, walker)
   }
   const nextYaw = (): number => next() < 0.5 ? Math.PI / 2 : -Math.PI / 2
   const setLayout = (latest: Array<Mark<K>>): void => {
@@ -268,6 +315,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       const start = startOf(place, viewport)
       if (!clearAbove(place, start)) continue
       walker.dropIn(place, start - place.height)
+      restart(c)
       c.interest = undefined
       return
     }
@@ -276,8 +324,10 @@ export function createCast<K> (options: CastOptions): Cast<K> {
   const stepOne = (c: Character<K>, walker: Walker, viewport: Viewport): void => {
     c.steps++
     const frame = walker.step()
+    const [raised, lowered] = raisedRoot(frame)
+    c.cloth = c.secondary.step(c.steps, raised, frame.joints, lowered, frame.transforms)
     if (frame.support === undefined) {
-      replace(walker)
+      replace(c, walker)
       c.placedAgain++
     }
     const before = c.on?.key
@@ -338,6 +388,10 @@ export function createCast<K> (options: CastOptions): Cast<K> {
         ...(c.saying === undefined ? {} : { saying: c.saying.text })
       }
       return [drawable]
+    }),
+    moving: () => characters.flatMap(c => {
+      const frame = c.walker?.frame()
+      return frame === undefined ? [] : [{ name: c.name, frame, cloth: c.cloth, system: c.secondary.system }]
     }),
     characters: () => characters.flatMap(c => {
       const frame = c.walker?.frame()

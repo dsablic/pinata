@@ -1,11 +1,11 @@
 import type { Mannequin } from '../formats/mannequin.ts'
 import type { Scenario, SimMaterial } from '../formats/sim.ts'
 import { legsOf } from '../formats/rig.ts'
-import type { AppendageLimb, Rig } from '../formats/rig.ts'
+import type { Rig } from '../formats/rig.ts'
 import { add, dot, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import { bodyFrame, createSpringChain, startChain, stepChain } from '../motion/appendages.ts'
-import type { SpringChain } from '../motion/appendages.ts'
+import { createSecondary } from '../motion/secondary.ts'
+import type { Secondary } from '../motion/secondary.ts'
 import { planGait } from '../motion/gait.ts'
 import type { GaitFrame } from '../motion/gait.ts'
 import { poseAt } from '../motion/locomotion.ts'
@@ -16,9 +16,7 @@ import { parentsOf, transformTo } from '../motion/skeleton.ts'
 import { apply, axisAngle, multiply } from '../math/matrix.ts'
 import type { Matrix } from '../math/matrix.ts'
 import { toWorld } from '../sim/body.ts'
-import { buildClothSystem } from '../sim/cloth.ts'
-import type { System } from '../sim/cloth.ts'
-import { step as stepCloth, windAt } from '../sim/solver.ts'
+import { windAt } from '../sim/solver.ts'
 import { pickActivity } from './config.ts'
 import type { Step, WorldConfig } from './config.ts'
 import { generateTerrain, random } from './terrain.ts'
@@ -82,8 +80,7 @@ type Actor = {
   friend: number
   say?: { glyph: string, until: number }
   poked?: number
-  chains: Array<{ chain: SpringChain, parent: string, started: boolean, base: Vec3, yaw: number }>
-  cloth?: { system: System, scenario: Scenario, previous?: RootState }
+  secondary: Secondary
   lean: { forward: number, side: number, forwardRate: number, sideRate: number, speed: number, phase: number }
   upper: string[]
   head: { angle: number, rate: number, leanRate: number, lift: number, liftRate: number }
@@ -150,16 +147,6 @@ export function createWorld (options: WorldOptions): World {
     const lane = (i - (cast.length - 1) / 2) * config.lanes.spacing
     const x = span[0] + (span[1] - span[0]) * (i + 0.5) / cast.length
     const parents = parentsOf(member.rig)
-    const chains = member.rig.limbs.filter((l): l is AppendageLimb => l.kind === 'appendage').map(limb => ({
-      chain: createSpringChain(limb, restPose(member.mannequin)),
-      parent: parents[limb.joints[0]] ?? member.rig.pelvis,
-      started: false,
-      base: [0, 0, 0] as Vec3,
-      yaw: 0
-    }))
-    const cloth = member.cloth === undefined ? undefined : {
-      system: buildClothSystem({ mannequin: member.mannequin, ...member.cloth }), scenario: member.cloth.scenario
-    }
     const legJoints = new Set(legsOf(member.rig).flatMap(leg => leg.joints))
     const upper = Object.keys(parents).filter(joint => !legJoints.has(joint) && joint !== member.rig.pelvis)
     return {
@@ -172,7 +159,6 @@ export function createWorld (options: WorldOptions): World {
       squashed: -Infinity,
       wasPlanted: [],
       headJoints: headOf(member, upper, config.life.head.above),
-      ...(cloth === undefined ? {} : { cloth }),
       root: {
         position: [x, 0, lane], yaw: next() < 0.5 ? Math.PI / 2 : -Math.PI / 2, velocity: [0, 0, 0], angularVelocity: 0
       },
@@ -181,7 +167,9 @@ export function createWorld (options: WorldOptions): World {
       steps: [],
       activity: 'arrive',
       friend: (i + 1) % cast.length,
-      chains,
+      secondary: createSecondary(member, {
+        fps, springSubsteps: motion.springSubsteps, environment: () => environment
+      }),
       moves: [],
       moveStart: 0,
       moveFrom: x
@@ -296,36 +284,6 @@ export function createWorld (options: WorldOptions): World {
   }
 
   type Turns = ReturnType<typeof poseAt>['transforms']
-  const springs = (actor: Actor, body: RootState, joints: Pose, transforms: Turns): void => {
-    const substeps = motion.springSubsteps
-    const dt = 1 / (fps * substeps)
-    for (const entry of actor.chains) {
-      const root = entry.chain.limb.joints[0]
-      const base = joints[root]
-      const rotation = transforms[entry.parent]?.rotation
-      if (!entry.started) {
-        startChain(entry.chain, base, bodyFrame(body.yaw, rotation), frameIndex / fps, () => [0, 0, 0])
-        entry.started = true
-      } else {
-        for (let s = 1; s <= substeps; s++) {
-          const u = s / substeps
-          const at = add(entry.base, scale(sub(base, entry.base), u))
-          const yaw = entry.yaw + turnBetween(entry.yaw, body.yaw) * u
-          const t = (frameIndex - 1 + u) / fps
-          const wind = windAt(environment.wind, t)
-          const { gravity, windDrag } = environment.springs
-          const force = (velocity: Vec3): Vec3 => {
-            return add([0, -environment.gravity * gravity, 0], scale(sub(wind, velocity), windDrag))
-          }
-          stepChain(entry.chain, at, bodyFrame(yaw, rotation), t, dt, force)
-        }
-      }
-      entry.base = base
-      entry.yaw = body.yaw
-      entry.chain.segments.forEach((segment, i) => { joints[entry.chain.limb.joints[i + 1]] = segment.tip })
-    }
-  }
-
   const environment = structuredClone(config.environment)
 
   const forwardSpeed = (root: RootState): number => {
@@ -406,48 +364,6 @@ export function createWorld (options: WorldOptions): World {
     }
   }
 
-  const weather = (actor: Actor, root: RootState, pose: Pose, transforms: Turns): Float64Array | undefined => {
-    const cloth = actor.cloth
-    if (cloth === undefined) return undefined
-    const { particles } = cloth.system
-    if (cloth.previous === undefined) {
-      for (let i = 0; i < particles.count; i++) {
-        const at: Vec3 = [particles.position[3 * i], particles.position[3 * i + 1], particles.position[3 * i + 2]]
-        const p = toWorld(at, root)
-        particles.position.set(p, 3 * i)
-        particles.previous.set(p, 3 * i)
-      }
-    } else {
-      const from = cloth.previous
-      const substeps = environment.clothSubsteps
-      const env = {
-        gravity: [0, -environment.gravity, 0] as Vec3,
-        wind: environment.wind,
-        particleRadius: cloth.scenario.particleRadius
-      }
-      const track = (t: number): RootState => {
-        const u = Math.min(1, Math.max(0, t * fps - (frameIndex - 1)))
-        return {
-          position: add(from.position, scale(sub(root.position, from.position), u)),
-          yaw: from.yaw + turnBetween(from.yaw, root.yaw) * u,
-          velocity: root.velocity,
-          angularVelocity: root.angularVelocity
-        }
-      }
-      for (let s = 1; s <= substeps; s++) {
-        stepCloth(cloth.system, {
-          env, body: actor.member.mannequin, exclude: cloth.scenario.bodyExcludeParts, track,
-          pose: () => pose,
-          transforms: () => transforms,
-          t: (frameIndex - 1 + s / substeps) / fps,
-          dt: 1 / (fps * substeps)
-        })
-      }
-    }
-    cloth.previous = root
-    return particles.position.slice(0, 3 * particles.count)
-  }
-
   const actorFrame = (
     actor: Actor,
     root: RootState,
@@ -459,8 +375,7 @@ export function createWorld (options: WorldOptions): World {
     const body: Pose = { ...actor.rest, ...pose }
     const joints: Pose = {}
     for (const [name, local] of Object.entries(body)) joints[name] = toWorld(local, root)
-    springs(actor, root, joints, transforms)
-    const cloth = weather(actor, root, body, transforms)
+    const cloth = actor.secondary.step(frameIndex, root, joints, body, transforms)
     const say = actor.say !== undefined && actor.say.until > time ? actor.say.glyph : undefined
     return {
       name: actor.member.name,

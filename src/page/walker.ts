@@ -6,6 +6,7 @@ import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import type { Vec3 } from '../math/vec.ts'
+import type { Transforms } from '../motion/skeleton.ts'
 import { toWorld } from '../sim/body.ts'
 import { nodeAt, path, reachable, surfaceGraph } from './graph.ts'
 import type { Edge, Graph, Node, Reach } from './graph.ts'
@@ -17,6 +18,8 @@ export type Activity = 'rest' | 'wander' | 'visit' | 'flee' | 'drop'
 export type Foot = { planted: boolean, soles: Array<[number, number]> }
 export type WalkerFrame = {
   joints: Pose
+  body: Pose
+  transforms: Transforms
   root: RootState
   base: number
   falling: boolean
@@ -112,14 +115,19 @@ export function createWalker (options: WalkerOptions): Walker {
   }
   const supportAt = (x: number): Surface | undefined => surfaceBelow(ground, x, worldStanding(), STEP_HEIGHT)
 
-  const frameOf = (local: RootState, pose: Pose, planted: boolean[], moving: boolean): WalkerFrame => {
+  const frameOf = (
+    local: RootState,
+    pose: Pose,
+    transforms: Transforms,
+    planted: boolean[],
+    moving: boolean
+  ): WalkerFrame => {
     const [dx, dy] = offset
-    const root: RootState = { ...local, position: [local.position[0] + dx, local.position[1], local.position[2]] }
+    const position: Vec3 = [local.position[0] + dx, local.position[1] + dy, local.position[2]]
+    const root: RootState = { ...local, position }
+    const body: Pose = { ...rest, ...pose }
     const joints: Pose = {}
-    for (const [name, p] of Object.entries({ ...rest, ...pose })) {
-      const world = toWorld(p, local)
-      joints[name] = [world[0] + dx, world[1] + dy, world[2]]
-    }
+    for (const [name, p] of Object.entries(body)) joints[name] = toWorld(p, root)
     const feet = legs.map((leg, k): Foot => {
       const soles = solePoints(joints, leg, mannequin).map((p): [number, number] => [p[0], p[1]])
       return { planted: planted[k] ?? false, soles }
@@ -128,7 +136,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const under = supportAt(root.position[0])
     const support = under === undefined ? {} : { support: under }
     const doing = { heading, moving, activity, started, reached }
-    return { joints, root, base: worldStanding(), falling, ...support, feet, ...doing }
+    return { joints, body, transforms, root, base: worldStanding(), falling, ...support, feet, ...doing }
   }
 
   const start = (place: Place, yaw: number, above = 0): void => {
@@ -139,7 +147,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const root: RootState = { position: [place.x, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
     const lifted: Pose = {}
     for (const [name, p] of Object.entries(rest)) lifted[name] = [p[0], p[1] + standing, p[2]]
-    current = frameOf(root, lifted, legs.map(() => above === 0), false)
+    current = frameOf(root, lifted, {}, legs.map(() => above === 0), false)
     route = []
     goal = undefined
     restUntil = time
@@ -235,7 +243,7 @@ export function createWalker (options: WalkerOptions): Walker {
       const frame: PlayerFrame = player.step()
       standing = player.height()
       time += 1 / fps
-      current = frameOf(frame.root, frame.pose, frame.planted, command.speed > 0)
+      current = frameOf(frame.root, frame.pose, frame.transforms, frame.planted, command.speed > 0)
       return current
     },
     frame: () => current,
@@ -284,7 +292,7 @@ function supportOf (under: Surface | undefined): { support: Surface | undefined 
 function shifted (frame: WalkerFrame, dx: number, dy: number): WalkerFrame {
   const move = (p: Vec3): Vec3 => [p[0] + dx, p[1] + dy, p[2]]
   const joints = Object.fromEntries(Object.entries(frame.joints).map(([name, p]) => [name, move(p)]))
-  const position: Vec3 = [frame.root.position[0] + dx, frame.root.position[1], frame.root.position[2]]
+  const position: Vec3 = [frame.root.position[0] + dx, frame.root.position[1] + dy, frame.root.position[2]]
   const feet = frame.feet.map(foot => ({
     ...foot, soles: foot.soles.map(([x, y]): [number, number] => [x + dx, y + dy])
   }))

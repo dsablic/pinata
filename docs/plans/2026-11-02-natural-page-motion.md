@@ -17,7 +17,7 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 - **Cloth in skins:** a skin draws cloth (capes, robes, the hem of a robe) from the simulated particles in its own
   palette: the cloth sheet filled with the skin's colours by shade (light from above, folds darker), outlined like the
   sprites, and drawn in the depth order of its anchors. Chains (plume, scarf) are drawn the same way along their
-  links. The wizard gets a robe hem: a cloth skirt hung from the hips. A skin may name the colours its cloth uses.
+  links. The wizard gets a robe hem: a cloth back panel hung from the hips. A skin may name the colours its cloth uses.
 - **Falls and landings:** an airborne phase (arms out, legs reaching down, from springs and the airborne clip frames),
   and a landing reaction: the body dips at impact by an amount and for a time that grow with the landing speed, the
   knees take it with the feet held, then recovers; big drops add a recovery step.
@@ -56,3 +56,22 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 - **D. Jumps:** CMU takes, jump edges and arcs; the jumps gate; drop-ins as a fallback. Review.
 - **E. Structure and the bar:** structural draw order with hysteresis, one anchor; the no-popping gate; the
   natural-motion and game-like panels; release. Review.
+
+## Results
+
+- **Batch A built and reviewed.** The shared secondary-motion module (`src/motion/secondary.ts`), run by the page
+  cast for every character; the wizard's robe as a cloth back panel hung from the hips (a closed skirt failed the
+  cloth gates: legs push through its front); the body's height handed to cloth through the root, so falls no longer
+  push cloth through the body; extra collision passes on the page; cape and plume anchors moved just outside the
+  body. The head's nod stays in the terrain world's procedural characters: captured heads move with the capture.
+  - Cloth moves: on the two demo layouts over 90 s each (at least 60 s of walking per character in all), the hems
+    move 7-27 cm RMS relative to the pelvis and hang further back walking than standing (knight 16-22 cm, dwarf
+    2-6, wizard 16-39). **Pass.**
+  - Chains move: plume and scarf tips lag their anchors 8-15 cm RMS while walking. **Pass.**
+  - Wind: in a 3 m/s wind the knight's cape hangs 13-15 cm downwind of the pelvis (facing upwind and downwind
+    weighted equally). **Pass.**
+  - Cloth stays outside the body: no particle, pinned or free, more than 0.5 cm inside, calm or windy. **Pass.**
+  - Cost: p95 5.9-6.9 ms on the demo and 4.4-5.5 ms on the test page in Chrome, with cloth and chains on. **Pass**,
+    with less room than before (3.8 ms).
+  - Existing outputs: the knight's, dwarf's and wizard's cloth reports change (anchors, collisions, the wizard's new
+    panel); everything else is byte-identical. The terrain world's wizard now simulates its panel.

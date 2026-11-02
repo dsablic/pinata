@@ -1,12 +1,18 @@
 import type { ReadWorld } from '../world/bundle.ts'
-import { createCast, FPS } from '../page/cast.ts'
-import type { Cast, CharacterState, Mark, Sample, Viewport } from '../page/cast.ts'
+import { createCast, FPS, pageEnvironment } from '../page/cast.ts'
+import type { Cast, CharacterState, Mark, Moving, Sample, Viewport } from '../page/cast.ts'
 import type { LayoutFixture, Target } from '../page/fixture.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
 import { placeFor } from '../page/perception.ts'
 import type { Ground } from '../page/surfaces.ts'
 import { DROP_LIMIT, STEP_HEIGHT } from '../page/walker.ts'
 import type { Place } from '../page/walker.ts'
+import { add, dot, sub } from '../math/vec.ts'
+import type { Vec3 } from '../math/vec.ts'
+import { partsCollider, posedParts, toLocal } from '../sim/body.ts'
+import { capeHemIndices } from '../sim/cloth.ts'
+import type { CastMember } from '../world/world.ts'
+import type { Scenario as ClothScenario } from '../formats/sim.ts'
 
 export type Scenario = { fixture: LayoutFixture, cast: Cast<string>, viewport: Viewport }
 export type Standing = { planted: number, off: number, worst: number, midAir: number, frames: number }
@@ -25,9 +31,11 @@ export function marksOf (fixture: LayoutFixture, without: string[] = []): Array<
   }))
 }
 
-export function scenario (world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed): Scenario {
+export function scenario (world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0): Scenario {
   const { pixelsPerMetre, scale } = fixture
-  const cast = createCast<string>({ cast: world.cast, looks: world.looks, pixelsPerMetre, scale, seed, measure: true })
+  const air = pageEnvironment(world.config, wind)
+  const { cast: members, looks } = world
+  const cast = createCast<string>({ cast: members, looks, pixelsPerMetre, scale, seed, measure: true, ...air })
   cast.setLayout(marksOf(fixture))
   return { fixture, cast, viewport: { top: 0, height: fixture.height } }
 }
@@ -82,4 +90,103 @@ export function falls (samples: Sample[]): Falls {
     })
   }
   return { falls: count, faults }
+}
+
+export type ClothMotion = {
+  walkingSeconds: number
+  hemRms: number
+  hemTrail: number
+  hemDownwind: number
+  tipRms: number
+  inside: number
+}
+
+const WALKING_SPEED = 0.3
+const STILL_SPEED = 0.05
+const SETTLE_SECONDS = 1
+
+function mean (points: Vec3[]): Vec3 {
+  return points.reduce((a, p) => add(a, p), [0, 0, 0] as Vec3).map(v => v / Math.max(1, points.length)) as Vec3
+}
+
+function average (values: number[]): number {
+  return values.reduce((a, b) => a + b, 0) / Math.max(1, values.length)
+}
+
+function rms (points: Vec3[]): number {
+  const centre = mean(points)
+  return Math.sqrt(points.reduce((sum, p) => sum + dot(sub(p, centre), sub(p, centre)), 0) / Math.max(1, points.length))
+}
+
+type Watch = {
+  member: CastMember
+  scenario: ClothScenario
+  hem: number[]
+  anchor: string | undefined
+  walkingHem: Vec3[]
+  stillHem: Vec3[]
+  tips: Vec3[]
+  facingEast: number[]
+  facingWest: number[]
+  sinceStart: number
+  deepest: number
+}
+
+function watchOf (member: CastMember): Watch | undefined {
+  const scenario = member.cloth?.scenario
+  if (scenario === undefined) return undefined
+  const hem = scenario.cape === undefined ? [] : capeHemIndices(scenario.cape)
+  const anchor = scenario.chains.at(-1)?.anchor
+  const lists = { walkingHem: [], stillHem: [], tips: [], facingEast: [], facingWest: [] }
+  return { member, scenario, hem, anchor, ...lists, sinceStart: 0, deepest: 0 }
+}
+
+function observe (w: Watch, moving: Moving): void {
+  const { frame, cloth } = moving
+  if (cloth === undefined) return
+  const at = (i: number): Vec3 => [cloth[3 * i], cloth[3 * i + 1], cloth[3 * i + 2]]
+  w.sinceStart = frame.falling ? 0 : w.sinceStart + 1 / FPS
+  const collider = partsCollider(posedParts(w.member.mannequin, w.scenario.bodyExcludeParts, frame.body), frame.root)
+  for (let i = 0; i < cloth.length / 3; i++) w.deepest = Math.max(w.deepest, -collider.distance(at(i)))
+  if (w.sinceStart <= SETTLE_SECONDS) return
+  const pelvis = frame.joints[w.member.rig.pelvis]
+  const local = (p: Vec3): Vec3 => toLocal(add(sub(p, pelvis), frame.root.position), frame.root)
+  const { yaw, velocity } = frame.root
+  const forward = Math.sin(yaw) * velocity[0] + Math.cos(yaw) * velocity[2]
+  const walking = forward > WALKING_SPEED
+  const still = Math.abs(forward) < STILL_SPEED
+  if (w.hem.length > 0) {
+    const middle = mean(w.hem.map(at))
+    if (walking) w.walkingHem.push(local(middle))
+    if (still) {
+      w.stillHem.push(local(middle))
+      ;(Math.sin(yaw) > 0 ? w.facingEast : w.facingWest).push(middle[0] - pelvis[0])
+    }
+  }
+  if (w.anchor !== undefined && walking) {
+    w.tips.push(sub(local(at(cloth.length / 3 - 1)), local(frame.joints[w.anchor])))
+  }
+}
+
+export function clothMotion (s: Scenario, world: ReadWorld, seconds: number): Record<string, ClothMotion> {
+  const watches = new Map<string, Watch>()
+  run(s, seconds, () => {
+    for (const moving of s.cast.moving()) {
+      if (!watches.has(moving.name)) {
+        const member = world.cast.find(m => m.name === moving.name)
+        const w = member === undefined ? undefined : watchOf(member)
+        if (w !== undefined) watches.set(moving.name, w)
+      }
+      const w = watches.get(moving.name)
+      if (w !== undefined) observe(w, moving)
+    }
+  })
+  return Object.fromEntries([...watches].map(([name, w]) => [name, {
+    walkingSeconds: Math.max(w.walkingHem.length, w.tips.length) / FPS,
+    hemRms: rms(w.walkingHem),
+    hemTrail: mean(w.stillHem)[2] - mean(w.walkingHem)[2],
+    hemDownwind: (average(w.facingEast) + average(w.facingWest)) / 2,
+    tipRms: rms(w.tips),
+    inside: w.deepest
+  }]))
 }

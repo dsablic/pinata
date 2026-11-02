@@ -1,7 +1,7 @@
 import { fetchWorldBundle } from '../world/bundle.ts'
 import { getPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
-import { createCast, keep, spriteReach } from './cast.ts'
+import { createCast, keep, pageEnvironment, spriteReach } from './cast.ts'
 import type { CharacterState, Mark, Sample } from './cast.ts'
 import { sayOf, scan, watch } from './dom.ts'
 import type { Hints } from './dom.ts'
@@ -17,6 +17,7 @@ export type PageWorldOptions = {
   seed: number
   count?: number
   measure?: boolean
+  wind?: number
 }
 export type PageCharacter = Omit<CharacterState<Element>, 'on'> & { element: string }
 export type Visit = { name: string, element: string, say?: string }
@@ -83,9 +84,9 @@ function toCanvas (image: Image, reuse?: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 export async function createPageWorld (options: PageWorldOptions): Promise<PageWorld> {
-  const { cast, looks } = await fetchWorldBundle(options.bundle)
+  const { cast, looks, config } = await fetchWorldBundle(options.bundle)
   const { pixelsPerMetre } = options
-  const world = createCast<Element>({ ...options, cast, looks })
+  const world = createCast<Element>({ ...options, cast, looks, ...pageEnvironment(config, options.wind) })
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)')
   const canvas = overlayCanvas()
   const context = canvas.getContext('2d')

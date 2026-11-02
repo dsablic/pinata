@@ -149,6 +149,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   would be in view, so it falls in from off screen. A drop-in is not an activity start, and the element it lands on
   counts as visited only once the character walks on it. Words for a visit that ends in the same step are said
   before a drop-in can take the character away.
+- Every character runs secondary motion (chains and cloth, see `secondary.ts`) each step, in the bundle's gravity and
+  a wind of the page's choosing (`wind`, none by default). The body's height is handed to the cloth as the root's
+  height, with the pose lowered to match: the cloth substeps follow the root, so a falling body moves smoothly
+  through them instead of jumping a whole frame's fall at once (which pushed cloth through it).
 - With `measure: true` every step's foot gaps in CSS pixels are kept (`samples`, `null` where nothing is under a foot).
 - A sprite is anchored at the surface under the character, so a foot on that surface is drawn on its top edge
   exactly; while falling it is anchored at the body's base. Each character renders into its own sprite box, 1.6 times
@@ -309,6 +313,19 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   with the root's velocity.
 - A `Force` is an outside acceleration (m/s^2) on a segment's tip given its velocity, such as gravity or wind drag.
   The live world passes one each step; offline planning passes none, so its outputs do not depend on the weather.
+
+### Secondary motion (`secondary.ts`)
+
+- One module runs a character's secondary motion for both worlds: spring chains for the rig's appendages and the
+  cloth (cape and cloth chains) of its scenario, from the character's body each frame, in the world's gravity
+  and wind. The terrain world and the page cast both use it.
+- `reset` puts cloth and chains back to rest, for a character moved, re-placed or dropped in; `shift` carries them
+  with a page element that moved.
+- Options the page sets and the terrain world leaves off, so the terrain world's outputs stay as they were: two
+  collision passes per substep, eight more passes at the end of each frame (`settle`), and a full step on the frame
+  cloth starts (otherwise it is only placed, and can start inside a body posed away from rest). Between them, no
+  cloth particle sinks more than 0.5 cm into the body on the page's recorded layouts, where one pass let free cloth
+  sink 3 cm.
 
 ### Pose sequence (`sequence.ts`)
 
@@ -654,6 +671,11 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 
 - Every cape pin references `anchorLeft`: offsets are body-local, so one joint is enough because `checkCapeAnchors`
   requires both anchors to move rigidly together.
+- Cape anchors and chain anchors sit just outside the body parts their cloth collides with (a pinned particle inside
+  a part counts as cloth inside the body). Parts that would push a hanging panel from the wrong side are left out
+  of its collisions: the dwarf's axe, the wizard's forearms and hands. The wizard's robe sways through a back panel
+  hung from the hips; a closed skirt round the legs was tried, but walking legs push through its front between the
+  particles at any practical spacing, failing the cloth gates.
 
 ### solver.ts
 
@@ -663,6 +685,9 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   object for every `t` within a frame so the collider is compiled once per frame. With `transforms`, a pin's offset
   also turns with its joint's rotation.
 - Each constraint is solved once per substep, so its XPBD multiplier starts at zero and never needs storing.
+- `collisionPasses` repeats the collision pass in a substep; `settle` runs collision passes alone with the end of the
+  frame's body. A particle between two parts (between the legs) can be pushed out of one into the other; more passes
+  let it find room.
 
 ### metrics.ts
 

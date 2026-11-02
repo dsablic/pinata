@@ -20,6 +20,7 @@ export type StepOptions = {
   transforms?: (t: number) => Transforms
   t: number
   dt: number
+  collisionPasses?: number
 }
 
 export function windAt (wind: Wind | undefined, t: number): Vec3 {
@@ -71,7 +72,7 @@ export function step (system: System, options: StepOptions): void {
     position[o + 2] += (bz + (vz - bz) * keep) * dt
   }
   solveConstraints(system, dt)
-  collide(system, options, root, pose)
+  for (let pass = 0; pass < (options.collisionPasses ?? 1); pass++) collide(system, options, root, pose)
 }
 
 function solveConstraints (system: System, dt: number): void {
@@ -98,6 +99,12 @@ function solveConstraints (system: System, dt: number): void {
     position[b + 1] -= wb * factor * dy
     position[b + 2] -= wb * factor * dz
   }
+}
+
+export function settle (system: System, options: StepOptions, passes: number): void {
+  const root = options.track(options.t)
+  const pose = options.pose?.(options.t)
+  for (let pass = 0; pass < passes; pass++) collide(system, options, root, pose)
 }
 
 function collide (system: System, options: StepOptions, root: RootState, pose: Pose | undefined): void {

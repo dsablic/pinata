@@ -1,11 +1,10 @@
 import type { Mannequin } from '../formats/mannequin.ts'
-import type { Scenario, SimMaterial } from '../formats/sim.ts'
 import { legsOf } from '../formats/rig.ts'
 import type { Rig } from '../formats/rig.ts'
 import { add, dot, scale, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { createSecondary } from '../motion/secondary.ts'
-import type { Secondary } from '../motion/secondary.ts'
+import type { Clothing, Secondary } from '../motion/secondary.ts'
 import { planGait } from '../motion/gait.ts'
 import type { GaitFrame } from '../motion/gait.ts'
 import { poseAt } from '../motion/locomotion.ts'
@@ -32,7 +31,7 @@ export type CastMember = {
   name: string
   mannequin: Mannequin
   rig: Rig
-  cloth?: { scenario: Scenario, materials: SimMaterial[] }
+  cloth?: Clothing
   capture?: MotionDatabase
 }
 export type ActorFrame = {

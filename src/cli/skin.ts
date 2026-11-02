@@ -169,7 +169,8 @@ function preview (character: Character, dir: string, skinFile: string, out: stri
   const walks = directions.map(yaw => capturedWalk(character, dir, yaw, 8))
   const camera = cameraFor(character, [...still, ...spin, ...walks.flat().map(w => w.pose)])
   const draw = (pose: Pose, yaw: number, state: { sector?: number }, angles: Map<string, number>): Image => {
-    return renderSkinned({ mannequin: character.mannequin, pose, skin, camera, rotation, angles, yaw, view: state })
+    const kept = rotation === 'clean' ? { angles } : {}
+    return renderSkinned({ mannequin: character.mannequin, pose, skin, camera, rotation, ...kept, yaw, view: state })
   }
   const big = { scale: SCALE, gap: SCALE, background: BACKGROUND }
   const stills = still.map((pose, i) => draw(pose, directions[i], {}, new Map()))

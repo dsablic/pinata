@@ -1,6 +1,6 @@
 import { createImage, getPixel, parseHex, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
-import type { Mannequin } from '../formats/mannequin.ts'
+import type { Mannequin, Part } from '../formats/mannequin.ts'
 import type { Skin, SkinPart } from '../formats/skin.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { project } from '../raster/camera.ts'
@@ -18,6 +18,9 @@ export type SkinnedOptions = {
   camera: Camera
   rotation?: 'nearest' | 'clean'
   angles?: Map<string, number>
+  lengths?: Map<string, number>
+  anchors?: Map<string, [number, number]>
+  curves?: Record<string, Vec3[]>
   yaw?: number
   view?: { sector?: number }
 }
@@ -34,6 +37,7 @@ type Placement = {
   anchor: [number, number]
   angle: number
   depth: number
+  curve?: { points: Array<[number, number]>, span: number }
 }
 
 export const ANGLE_STEP = Math.PI / 8
@@ -42,8 +46,8 @@ const HYSTERESIS = 0.25
 const SNAP = 1e-9
 const NEIGHBOURS: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 
-export function snapAngle (radians: number): number {
-  return Math.round(radians / ANGLE_STEP) * ANGLE_STEP
+export function snapAngle (radians: number, previous?: number): number {
+  return steadyStep(radians, ANGLE_STEP, previous)
 }
 
 function exactTrig (angle: number): { cos: number, sin: number } {
@@ -85,13 +89,16 @@ function placements (o: SkinnedOptions): Placement[] {
     const a: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.a))
     const b: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.b))
     const single = part.a === part.b
-    const { sprite, unmirrored } = spriteFor(o, part.name, single, choice, Math.hypot(b.x - a.x, b.y - a.y))
+    const length = steadyLength(arcLength(o, part, a, b), o.lengths?.get(part.name))
+    if (!single) o.lengths?.set(part.name, length)
+    const { sprite, unmirrored } = spriteFor(o, part.name, single, choice, length)
     if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
       continue
     }
     const raw = Math.atan2(b.y - a.y, b.x - a.x)
-    const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, o.angles?.get(part.name)) : snapAngle(raw)
-    if (!single && o.rotation === 'clean') o.angles?.set(part.name, angle)
+    const kept = o.angles?.get(part.name)
+    const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, kept) : snapAngle(raw, kept)
+    if (!single) o.angles?.set(part.name, angle)
     found.push({
       name: part.name,
       joints: [part.a, part.b],
@@ -101,9 +108,10 @@ function placements (o: SkinnedOptions): Placement[] {
         : { unmirrored: { rows: unmirrored.rows, pivot: unmirrored.pivotA } }),
       rows: sprite.rows,
       pivot: sprite.pivotA,
-      anchor: [Math.floor(a.x), Math.floor(a.y)],
+      anchor: steadyAnchor(a, o.anchors, part.a),
       angle,
-      depth: (a.depth + b.depth) / 2
+      depth: (a.depth + b.depth) / 2,
+      ...curveFor(o, part.b, single, sprite)
     })
   }
   if (choice !== undefined) {
@@ -138,10 +146,50 @@ export function darkerShades (colours: Map<string, number>): Map<number, number>
 }
 
 export function cleanStep (radians: number, previous?: number): number {
-  const nearest = Math.round(radians / CLEAN_STEP) * CLEAN_STEP
+  return steadyStep(radians, CLEAN_STEP, previous)
+}
+
+function arcLength (o: SkinnedOptions, part: Part, a: Screen, b: Screen): number {
+  const curve = o.curves?.[part.b]
+  if (curve === undefined || part.a === part.b) return Math.hypot(b.x - a.x, b.y - a.y)
+  const points = curve.map(at => project(o.camera, at))
+  return points.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - points[i].x, p.y - points[i].y), 0)
+}
+
+function curveFor (o: SkinnedOptions, joint: string, single: boolean, sprite: SkinPart): Pick<Placement, 'curve'> {
+  const curve = o.curves?.[joint]
+  if (single || curve === undefined || sprite.pivotA === undefined || sprite.pivotB === undefined) return {}
+  const points = curve.map((at, k) => {
+    const screen = project(o.camera, at)
+    return steadyAnchor(screen, o.anchors, `${joint}#${k}`)
+  })
+  return { curve: { points, span: sprite.pivotB[0] - sprite.pivotA[0] } }
+}
+
+function steadyAnchor (at: Screen, kept: Map<string, [number, number]> | undefined, joint: string): [number, number] {
+  const previous = kept?.get(joint)
+  const cell = (v: number, was: number | undefined): number => {
+    const near = was !== undefined && v > was - ANCHOR_HYSTERESIS_PX && v < was + 1 + ANCHOR_HYSTERESIS_PX
+    return near ? was : Math.floor(v)
+  }
+  const anchor: [number, number] = [cell(at.x, previous?.[0]), cell(at.y, previous?.[1])]
+  kept?.set(joint, anchor)
+  return anchor
+}
+
+const ANCHOR_HYSTERESIS_PX = 0.25
+
+function steadyLength (pixels: number, previous?: number): number {
+  return previous !== undefined && Math.abs(pixels - previous) < LENGTH_HYSTERESIS_PX ? previous : pixels
+}
+
+const LENGTH_HYSTERESIS_PX = 1
+
+function steadyStep (radians: number, step: number, previous?: number): number {
+  const nearest = Math.round(radians / step) * step
   if (previous === undefined) return nearest
   const off = Math.atan2(Math.sin(radians - previous), Math.cos(radians - previous))
-  return Math.abs(off) <= CLEAN_STEP * (0.5 + HYSTERESIS) ? previous : nearest
+  return Math.abs(off) <= step * (0.5 + HYSTERESIS) ? previous : nearest
 }
 
 const ROTATIONS = new Map<string, Rotated>()
@@ -203,6 +251,58 @@ function paint (img: Image, p: Placement, colours: Map<string, number>, ink?: In
   }
 }
 
+function paintCurve (
+  img: Image, p: Placement, points: Array<[number, number]>, span: number, colours: Map<string, number>, ink?: Ink
+): void {
+  const lines = p.rows.map(row => [...row])
+  const w = lines[0].length
+  const h = lines.length
+  const segments = points.slice(1).map((end, i) => {
+    const start = points[i]
+    const length = Math.hypot(end[0] - start[0], end[1] - start[1])
+    return { start, length, u: length === 0 ? [1, 0] : [(end[0] - start[0]) / length, (end[1] - start[1]) / length] }
+  }).filter(segment => segment.length > 0)
+  if (segments.length === 0) return
+  const total = segments.reduce((sum, segment) => sum + segment.length, 0)
+  const reach = Math.ceil(Math.hypot(w, h))
+  const xs = points.map(point => point[0])
+  const ys = points.map(point => point[1])
+  for (let y = Math.min(...ys) - reach; y <= Math.max(...ys) + reach; y++) {
+    for (let x = Math.min(...xs) - reach; x <= Math.max(...xs) + reach; x++) {
+      let best = Infinity
+      let along = 0
+      let across = 0
+      let before = 0
+      segments.forEach((segment, i) => {
+        const dx = x - segment.start[0]
+        const dy = y - segment.start[1]
+        const raw = dx * segment.u[0] + dy * segment.u[1]
+        const lowest = i === 0 ? -Infinity : 0
+        const highest = i === segments.length - 1 ? Infinity : segment.length
+        const t = Math.max(lowest, Math.min(highest, raw))
+        const off = -dx * segment.u[1] + dy * segment.u[0]
+        const gap = Math.hypot(raw - t, off)
+        if (gap < best) {
+          best = gap
+          along = before + t
+          across = off
+        }
+        before += segment.length
+      })
+      const column = along < 0
+        ? p.pivot[0] + along
+        : along > total ? p.pivot[0] + span + along - total : p.pivot[0] + along * span / total
+      const sx = Math.floor(column + 0.5)
+      const sy = Math.floor(p.pivot[1] + 0.5 + across)
+      if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue
+      const colour = colours.get(lines[sy][sx])
+      if (colour === undefined) continue
+      if (ink === undefined) setPixel(img, x, y, colour)
+      else put(img, x, y, colour, p, ink)
+    }
+  }
+}
+
 function innerLines (img: Image, placed: Placement[], ink: Ink): void {
   const { owner, shade } = ink
   const joins = (p: Placement, q: Placement): boolean => p.joints.some(j => q.joints.includes(j))
@@ -253,7 +353,8 @@ export function renderSkinned (options: SkinnedOptions): Image {
     : { owner: new Int16Array(img.width * img.height).fill(-1), index: 0, shade: darkerShades(colours) }
   placed.forEach((p, index) => {
     if (ink !== undefined) ink.index = index
-    if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours, ink)
+    if (p.curve !== undefined) paintCurve(img, p, p.curve.points, p.curve.span, colours, ink)
+    else if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours, ink)
     else paint(img, p, colours, ink)
   })
   if (ink !== undefined) innerLines(img, placed, ink)

@@ -238,8 +238,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const want = wantedVelocity()
     const relative = sub(wind, body.velocity)
     let drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
-    const most = WIND_SHARE * tuning.maxAcceleration
-    if (length(drag) > most) drag = scale(drag, most / length(drag))
+    const most = command.speed > 0 ? WIND_SHARE * tuning.maxAcceleration : 0
+    if (length(drag) > most) drag = most === 0 ? [0, 0, 0] : scale(drag, most / length(drag))
     const gain = command.speed > 0 ? tuning.speedGain : STAND_GAIN * tuning.speedGain
     let push = scale(sub(want, body.velocity), gain)
     if (length(push) > tuning.maxAcceleration) push = scale(push, tuning.maxAcceleration / length(push))

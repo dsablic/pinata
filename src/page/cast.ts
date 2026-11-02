@@ -1,3 +1,4 @@
+import type { Vec3 } from '../math/vec.ts'
 import type { CastMember } from '../world/world.ts'
 import type { Look } from '../world/render.ts'
 import { random } from '../world/terrain.ts'
@@ -36,7 +37,13 @@ export type CastOptions = {
 }
 export type Sprite = { image: Image, camera: Camera }
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
-export type Moving = { name: string, frame: WalkerFrame, cloth: Float64Array | undefined, system: System | undefined }
+export type Moving = {
+  name: string
+  frame: WalkerFrame
+  cloth: Float64Array | undefined
+  system: System | undefined
+  curves: Record<string, Vec3[]>
+}
 export type CharacterState<K> = {
   name: string
   x: number
@@ -92,6 +99,9 @@ type Character<K> = {
   interest?: string
   saying?: Saying
   view: { sector?: number }
+  angles: Map<string, number>
+  lengths: Map<string, number>
+  anchors: Map<string, [number, number]>
   sprite?: Sprite & { frame: WalkerFrame }
 }
 
@@ -109,7 +119,9 @@ const STALE_SECONDS = 30
 const LEAST_DROP_IN = 2.5
 const ABOVE_VIEWPORT = 1
 const DROP_IN_TRIES = 8
-const PAGE_CLOTH = { collisionPasses: 2, settlePasses: 8, settleOnStart: true }
+const PAGE_CLOTH = {
+  collisionPasses: 2, settlePasses: 8, settleOnStart: true, fabric: { drag: 6, damping: 0.2, bend: 300 }
+}
 
 export function pageEnvironment (config: WorldConfig, wind = 0): Pick<CastOptions, 'environment' | 'springSubsteps'> {
   const { environment, motion } = config
@@ -155,7 +167,17 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     .flatMap((look, i) => {
       const database = cast[i].capture
       if (look.skin === undefined || database === undefined) return []
-      const fresh = { view: {}, visited: new Set<K>(), sameSince: 0, placedAgain: 0, steps: 0, ticks: 0 }
+      const fresh = {
+        view: {},
+        angles: new Map<string, number>(),
+        lengths: new Map<string, number>(),
+        anchors: new Map<string, [number, number]>(),
+        visited: new Set<K>(),
+        sameSince: 0,
+        placedAgain: 0,
+        steps: 0,
+        ticks: 0
+      }
       const secondary = createSecondary(cast[i], {
         ...PAGE_CLOTH, fps: FPS, springSubsteps: options.springSubsteps, environment: () => options.environment
       })
@@ -249,8 +271,11 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     const y = anchorHeight(frame)
     const pose: Pose = {}
     for (const [name, p] of Object.entries(frame.joints)) pose[name] = [p[0] - x, p[1] - y, p[2] - z]
+    const curves = Object.fromEntries(Object.entries(c.secondary.curves())
+      .map(([joint, points]) => [joint, points.map((p): Vec3 => [p[0] - x, p[1] - y, p[2] - z])]))
     const image = renderSkinned({
-      mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view
+      mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view,
+      angles: c.angles, lengths: c.lengths, anchors: c.anchors, curves
     })
     c.sprite = { image, camera: box, frame }
     return c.sprite
@@ -391,7 +416,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     }),
     moving: () => characters.flatMap(c => {
       const frame = c.walker?.frame()
-      return frame === undefined ? [] : [{ name: c.name, frame, cloth: c.cloth, system: c.secondary.system }]
+      if (frame === undefined) return []
+      return [{ name: c.name, frame, cloth: c.cloth, system: c.secondary.system, curves: c.secondary.curves() }]
     }),
     characters: () => characters.flatMap(c => {
       const frame = c.walker?.frame()

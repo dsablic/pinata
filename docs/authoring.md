@@ -392,8 +392,18 @@ The file is required even if the character has no cloth; one material is enough.
 | `exclude` | array of part names | no, default `[]` | Parts the cloth ignores when colliding. Names must be parts of the mannequin, no duplicates. |
 | `cape` | object | no | A cloth sheet hung from two joints. |
 | `chains` | array | no, default `[]` | Hanging chains (plumes, tails, antennae, scarves). |
+| `bind` | array of joint names | no | Joints that follow the cloth, so the parts drawn on them swing with it: see below. |
 | `wind` | object | no | Constant wind with gusts. |
 | `durationSeconds` | number above 0, at most 600 | no | Length of the simulation. Default: script length plus 3 s. |
+
+### bind
+
+A list of joints, each moved every frame by the cape or chains so that a sprite drawn on it hangs and bends as the
+cloth does: a cape's hem joints, a cloak's or robe's bottom joint, a scarf's end. The part ending at the joint is drawn
+along a curve that runs from the part's first joint down the cloth to the joint, at the part's drawn length. Bind a
+joint whose part lies along the cloth; a joint drawn on an ornament that does not hang (a crest over a helmet) stays
+unbound. Names must be joints of the mannequin, not the cloth's own anchors, with no duplicates, and the motion must
+have a cape or chains.
 
 ### script
 

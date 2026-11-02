@@ -319,6 +319,23 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - One module runs a character's secondary motion for both worlds: spring chains for the rig's appendages and the
   cloth (cape and cloth chains) of its scenario, from the character's body each frame, in the world's gravity
   and wind. The terrain world and the page cast both use it.
+- A character's motion may bind joints to its cloth (`bind`), so the artist's cape, cloak, robe and scarf sprites
+  swing and bend with the simulation. Each bound joint gets a curve: from the joint its drawn part starts at (the full
+  mannequin's part ending at the joint, even one the world's dress hides), then down the cloth from its pin to the
+  free particle nearest the joint, along structural links only (a link spanning two collinear links is a bend link,
+  the diagonal of a right angle a shear link), each point the mean of a particle and its structural neighbours. At
+  rest every point is moved onto the drawn bone, and the last onto the joint; points at or above the part's start are
+  left out, so the curve does not double back. Each frame the curve keeps those offsets (turned with the body),
+  turns at most 75 degrees from the drawn bone at its start and 40 at each point, and is scaled to the bone's drawn
+  length, so a flung or bunched cloth does not stretch, fold or flip its sprite. The bound joint is the curve's end,
+  and skins draw the part along the curve.
+- The resting hang is the cloth after 3 s still in the rest pose, run with the world's own cloth step (its substeps,
+  gravity and collision passes, no wind), since chains and capes are built straight and droop; `reset` starts the
+  cloth from that hang.
+- The page softens its cloth materials (`fabric`: air drag ×6, damping toward the body's motion ×0.2, bend
+  compliance ×300): with the materials as measured, damping carried the cloth along with the body and stiff bending
+  kept it flat, so capes and robes read as armour at page size. The terrain world and the reports keep the materials.
+- The knight's plume is not bound: its sprite is a crest over the helmet.
 - `reset` puts cloth and chains back to rest, for a character moved, re-placed or dropped in; `shift` carries them
   with a page element that moved.
 - Options the page sets and the terrain world leaves off, so the terrain world's outputs stay as they were: two
@@ -461,8 +478,9 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - A light physical body (velocity and heading with gains, air drag from the wind, shoves) follows the commands, and
   the animation follows the body: motion matching picks the clip frame whose path ahead, velocity and feet best fit
   what the body is about to do.
-- The legs can always out-push the wind (drag is capped at 80% of their acceleration), and a body told to stand holds
-  its place three times harder.
+- The legs can always out-push the wind (drag is capped at 80% of their acceleration). A body told to stand has its
+  feet planted: the wind leans it but does not slide it, and it settles three times harder. A standing body that gave
+  way to the drag slid downwind for as long as it stood, out of the world on a long stand in a strong wind.
 - Matching runs every 5 frames and whenever a clip runs out. A jump to within 3 frames of the playing frame is not
   taken, and the playing frame's cost is lowered by 0.15, so playback does not jump for nothing.
 - Switches use dead blending: the old motion carries on from its last frame at its own velocity, slowing to a stop over
@@ -622,9 +640,16 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 ### skins.ts
 
 - Limb rotation: `nearest` (the default) snaps to 22.5 degrees and samples the nearest pixel; `clean` snaps to 11.25
-  degrees and rotates with RotSprite. With `clean`, each part's last step is kept between frames (`angles`) and a bone
-  must turn a quarter step past the middle of two steps (`HYSTERESIS`) before it moves on, so a bone near the middle
-  does not flicker.
+  degrees and rotates with RotSprite. When the caller keeps each part's last step between frames (`angles`), a bone
+  must turn a quarter step past the middle of two steps (`HYSTERESIS`) before it moves on, in either mode, so a bone
+  near the middle does not flicker. The skin command keeps angles only with `clean`, so its sheets stay as they were.
+- Callers that draw frame after frame may also keep each part's fitted length (`lengths`: kept until the bone's screen
+  length moves a whole pixel) and each joint's anchor pixel (`anchors`: kept until the joint is a quarter pixel outside
+  it), so a joint or bone near a pixel boundary does not dither between two pixels. Anchors are kept per joint, so
+  parts that share a joint stay together. The page world keeps all three per character.
+- A part given a curve (`curves`, keyed by its second joint) is drawn along it instead of rotated: each pixel near the
+  curve takes the sprite's column at its distance along the curve and the row at its distance across, and the sprite
+  is fitted to the curve's length.
 - Eight-direction skins take the character's yaw and keep the chosen view's sector between frames, so the view
   changes with hysteresis. A part shows the chosen view's sprite, or its counterpart's mirrored in a left-facing
   direction, fitted to the bone's on-screen length; one-view skins show their own sprite.

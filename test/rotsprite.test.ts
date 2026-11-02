@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { cleanRotation, jaggies, rotateNearest, scale2x, toGrid } from '../src/style/rotsprite.ts'
-import { CLEAN_STEP, cleanStep } from '../src/style/skins.ts'
+import { ANGLE_STEP, CLEAN_STEP, cleanStep, snapAngle } from '../src/style/skins.ts'
 
 const skin = JSON.parse(readFileSync('pocs/skins-spike/artist-skin.json', 'utf8')) as {
   parts: Record<string, { rows?: string[], pivotA?: [number, number], pivotB?: [number, number] }>
@@ -52,10 +52,13 @@ test('rotation quality gate: clean rotation has at most half the jaggies of near
   assert.ok(clean <= 0.5 * nearest, `clean ${clean}, nearest ${nearest}`)
 })
 
-test('the clean angle keeps its step until the bone is well past the middle', () => {
-  assert.equal(cleanStep(0.04), 0)
-  assert.equal(cleanStep(0.55 * CLEAN_STEP, 0), 0)
-  assert.equal(cleanStep(0.8 * CLEAN_STEP, 0), CLEAN_STEP)
-  assert.equal(cleanStep(-0.7 * CLEAN_STEP, 0), 0)
-  assert.equal(cleanStep(-0.8 * CLEAN_STEP, 0), -CLEAN_STEP)
+test('a kept angle holds its step until the bone is well past the middle, in either rotation', () => {
+  for (const [snap, step] of [[cleanStep, CLEAN_STEP], [snapAngle, ANGLE_STEP]] as const) {
+    assert.equal(snap(0.04), 0)
+    assert.equal(snap(0.55 * step), step)
+    assert.equal(snap(0.55 * step, 0), 0)
+    assert.equal(snap(0.8 * step, 0), step)
+    assert.equal(snap(-0.7 * step, 0), 0)
+    assert.equal(snap(-0.8 * step, 0), -step)
+  }
 })

@@ -125,7 +125,7 @@ function readCloth (
     ...checkRenderMaterials(scenario.value, styleMaterials)
   ]
   errors.push(...cross.map(e => at('motion', e)))
-  return cross.length > 0 ? undefined : { scenario: scenario.value, materials: materials.value }
+  return cross.length > 0 ? undefined : { scenario: scenario.value, materials: materials.value, drawn: mannequin.parts }
 }
 
 function dressed (scenario: Scenario, dress: Dress): Scenario {

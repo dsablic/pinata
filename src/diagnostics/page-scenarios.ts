@@ -99,9 +99,11 @@ export type ClothMotion = {
   hemDownwind: number
   tipRms: number
   inside: number
+  hemAhead: number
 }
 
 const WALKING_SPEED = 0.3
+const HEM_AHEAD = 0.1
 const STILL_SPEED = 0.05
 const SETTLE_SECONDS = 1
 
@@ -130,6 +132,8 @@ type Watch = {
   facingWest: number[]
   sinceStart: number
   deepest: number
+  hemFrames: number
+  hemAhead: number
 }
 
 function watchOf (member: CastMember): Watch | undefined {
@@ -138,7 +142,7 @@ function watchOf (member: CastMember): Watch | undefined {
   const hem = scenario.cape === undefined ? [] : capeHemIndices(scenario.cape)
   const anchor = scenario.chains.at(-1)?.anchor
   const lists = { walkingHem: [], stillHem: [], tips: [], facingEast: [], facingWest: [] }
-  return { member, scenario, hem, anchor, ...lists, sinceStart: 0, deepest: 0 }
+  return { member, scenario, hem, anchor, ...lists, sinceStart: 0, deepest: 0, hemFrames: 0, hemAhead: 0 }
 }
 
 function observe (w: Watch, moving: Moving): void {
@@ -157,6 +161,8 @@ function observe (w: Watch, moving: Moving): void {
   const still = Math.abs(forward) < STILL_SPEED
   if (w.hem.length > 0) {
     const middle = mean(w.hem.map(at))
+    w.hemFrames++
+    if (local(middle)[2] > HEM_AHEAD) w.hemAhead++
     if (walking) w.walkingHem.push(local(middle))
     if (still) {
       w.stillHem.push(local(middle))
@@ -187,6 +193,14 @@ export function clothMotion (s: Scenario, world: ReadWorld, seconds: number): Re
     hemTrail: mean(w.stillHem)[2] - mean(w.walkingHem)[2],
     hemDownwind: (average(w.facingEast) + average(w.facingWest)) / 2,
     tipRms: rms(w.tips),
-    inside: w.deepest
+    inside: w.deepest,
+    hemAhead: w.hemAhead / Math.max(1, w.hemFrames)
   }]))
+}
+
+export function withoutBindings (member: CastMember): CastMember {
+  const cloth = member.cloth
+  if (cloth === undefined) return member
+  const { bind, ...rigid } = cloth.scenario
+  return bind === undefined ? member : { ...member, cloth: { ...cloth, scenario: rigid } }
 }

@@ -14,10 +14,10 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 - **Secondary motion, shared:** the spring chains, cloth and the head's nod that `world.ts` runs are moved into one
   module both worlds use, and the page cast runs them for every character, with the page's wind (none by default)
   and gravity. Every appendage part moves unless the character marks it rigid.
-- **Cloth in skins:** a skin draws cloth (capes, robes, the hem of a robe) from the simulated particles in its own
-  palette: the cloth sheet filled with the skin's colours by shade (light from above, folds darker), outlined like the
-  sprites, and drawn in the depth order of its anchors. Chains (plume, scarf) are drawn the same way along their
-  links. The wizard gets a robe hem: a cloth back panel hung from the hips. A skin may name the colours its cloth uses.
+- **Cloth in skins:** the joints a skin draws its cape, cloak, robe and scarf sprites on are bound to the simulated
+  cloth, so the artist's sprites swing with it, as game sprites on bones do; no cloth is
+  drawn from scratch, and the pixel art stays the artist's. The wizard gets a robe hem: a cloth back panel hung from
+  the hips, its hem joint bound to it.
 - **Falls and landings:** an airborne phase (arms out, legs reaching down, from springs and the airborne clip frames),
   and a landing reaction: the body dips at impact by an amount and for a time that grow with the landing speed, the
   knees take it with the feet held, then recovers; big drops add a recovery step.
@@ -50,8 +50,8 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 
 - **A. Secondary motion on the page:** the shared module, chains and cloth in the page cast, the wizard's hem, the
   cloth, chain, wind and inside-the-body gates; cost in Chrome. Review.
-- **B. Cloth in skins:** rendering cloth sheets and chains in the skin's palette; the skins-show-cloth gate; the
-  natural-motion panel against the current page. Review.
+- **B. Cloth in skins:** joints bound to the cloth, carrying the skin's sprites; the skins-show-cloth gate. The
+  natural-motion panel runs in batch E, with the fall-and-land strips it names. Review.
 - **C. Falls and landings:** the airborne phase and the landing reaction; the landing and recovery gates. Review.
 - **D. Jumps:** CMU takes, jump edges and arcs; the jumps gate; drop-ins as a fallback. Review.
 - **E. Structure and the bar:** structural draw order with hysteresis, one anchor; the no-popping gate; the
@@ -75,3 +75,16 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
     with less room than before (3.8 ms).
   - Existing outputs: the knight's, dwarf's and wizard's cloth reports change (anchors, collisions, the wizard's new
     panel); everything else is byte-identical. The terrain world's wizard now simulates its panel.
+- **Batch B built and reviewed.** Joint bindings to cloth (`bind` in a character's motion): each bound joint gets a
+  curve down its cloth from its part's first joint, held to the part's drawn length and to limited swing and bend;
+  skins draw bound parts along their curves; softer cloth materials on the page; hysteresis on angles, fitted lengths
+  and joint anchors, kept per character on the page. Fixed on the way: the wizard's back panel could end up in front of
+  the body after a fall (its anchors now sit outside the robe, and it collides with it), and a standing character slid
+  downwind in a strong wind (standing feet now hold).
+  - Skins show cloth: over six 12 s windows (demo-1200 and demo-390, seeds 1-3) every bound part swings at least 10
+    degrees more than rigid and keeps its length along its curve. The flicker part of the gate is open: the renderer is
+    being reworked (see [unified part rendering](2026-11-02-unified-part-rendering.md)), and the gate is measured on
+    that.
+  - The natural-motion panel is run in batch E with fall-and-land strips, as its gate names them.
+  - Existing outputs: the terrain world's captured actors change (bound joints, the wizard's panel, standing in
+    wind), and the wizard's cloth report (its panel's anchors); the other reports and check outputs are byte-identical.

@@ -154,6 +154,21 @@ test('checkScenario reports unknown joints, parts and materials with the known n
   assert.match(errors[2].message, /unknown material 'satin'; known materials: silk/)
 })
 
+test('checkScenario rejects binding unknown joints, cloth anchors, and joints with no cloth to follow', () => {
+  const s = validateScenario(scenario()).value as Scenario
+  const materials = [material('silk'), material('wool')] as SimMaterial[]
+  const body = mannequin()
+  const hemmed = { ...body, joints: { ...body.joints, hem: [0, 0.2, 0] as [number, number, number] } }
+  const bound = (bind: string[], change: Partial<Scenario> = {}): string[] => {
+    return checkScenario({ ...s, ...change, bind }, hemmed, materials).map(e => `${e.path}: ${e.message}`)
+  }
+  assert.deepEqual(bound(['hem']), [])
+  assert.match(bound(['hip'])[0], /bind.hip: unknown joint/)
+  assert.match(bound([s.cape!.anchorLeft])[0], /cloth anchor cannot follow/)
+  assert.match(bound(['hem'], { cape: undefined, chains: [] })[0], /no cloth to follow/)
+  assert.deepEqual(validateScenario({ ...scenario(), bind: ['top', 'top'] }).errors.map(e => e.path), ['bind'])
+})
+
 test('scenarioDuration uses durationSeconds or the script plus a 3 second tail', () => {
   const s = validateScenario(scenario()).value as Scenario
   assert.equal(scenarioDuration(s), 7)

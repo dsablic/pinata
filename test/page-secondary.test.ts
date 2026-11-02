@@ -9,7 +9,7 @@ import { ROOT } from '../src/cli/paths.ts'
 
 const world = readWorld(worldBundle())
 const SECONDS = 90
-const RUNS: Array<[string, number]> = [['demo-1200', 1], ['demo-390', 2]]
+const RUNS: Array<[string, number]> = [['demo-1200', 1], ['demo-1200', 3], ['demo-390', 2]]
 const HEMMED = ['knight', 'dwarf', 'wizard']
 const CHAINED = ['knight', 'rogue']
 const WIND = 3
@@ -55,6 +55,15 @@ test('no cloth particle, pinned or free, sinks more than a centimetre into the b
   for (const { where, motion } of [...calm, ...windy]) {
     for (const [name, m] of Object.entries(motion)) {
       assert.ok(m.inside <= 0.01, `${where} ${name}: ${m.inside} m inside`)
+    }
+  }
+})
+
+test('capes, cloaks and the robe stay behind the body: the hem is ahead of the pelvis in at most 1% of frames', () => {
+  for (const { where, motion } of [...calm, ...windy]) {
+    for (const name of HEMMED) {
+      const ahead = motion[name].hemAhead
+      assert.ok(ahead <= 0.01, `${where} ${name}: in front ${(100 * ahead).toFixed(1)}%`)
     }
   }
 })

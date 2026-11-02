@@ -1,4 +1,5 @@
 {
+  "bind": ["cloakBot"],
   "exclude": ["cloakBack", "handle", "blade"],
   "script": { "accelSeconds": 0.4, "segments": [
     { "action": "move", "speed": 0.7, "duration": 3 },

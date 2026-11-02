@@ -46,6 +46,7 @@ export type Scenario = {
   script: Script
   cape?: Cape
   chains: Chain[]
+  bind?: string[]
   wind?: Wind
   gravity: Vec3
   fps: number
@@ -56,7 +57,7 @@ export type Scenario = {
 
 const MATERIAL_FIELDS = ['name', 'particleMass', 'stretchCompliance', 'bendCompliance', 'damping', 'drag'] as const
 const SCENARIO_FIELDS = [
-  'name', 'body', 'bodyExcludeParts', 'script', 'cape', 'chains', 'wind', 'gravity', 'fps', 'substeps',
+  'name', 'body', 'bodyExcludeParts', 'script', 'cape', 'chains', 'bind', 'wind', 'gravity', 'fps', 'substeps',
   'particleRadius', 'durationSeconds'
 ] as const
 const SCRIPT_FIELDS = ['segments', 'accelSeconds'] as const
@@ -146,6 +147,7 @@ export function validateScenario (input: unknown): Validated<Scenario> {
     input.chains.forEach((chain, i) => { validateChain(chain, `chains[${i}]`, errors) })
   }
   if (input.wind !== undefined) validateWind(input.wind, errors)
+  if (input.bind !== undefined) validateBind(input.bind, errors)
   expect(isVec3(input.gravity), 'gravity', 'expected [x, y, z] in m/s^2, for example [0, -9.81, 0]', errors)
   expect(isPositiveAtMost(input.fps, 120), 'fps', 'expected a number of output frames per second up to 120', errors)
   expect(isIntegerBetween(input.substeps, 1, 100), 'substeps', 'expected an integer from 1 to 100', errors)
@@ -209,6 +211,14 @@ function validateSegment (segment: unknown, path: string, errors: ValidationErro
 
 function validateMaterialName (record: Record<string, unknown>, path: string, errors: ValidationError[]): void {
   expect(isNonEmptyString(record.material), `${path}.material`, 'expected a material name', errors)
+}
+
+function validateBind (bind: unknown, errors: ValidationError[]): void {
+  const joints = Array.isArray(bind) ? bind : []
+  const named = joints.every(joint => isNonEmptyString(joint))
+  if (!Array.isArray(bind) || !named || new Set(joints).size !== joints.length) {
+    errors.push({ path: 'bind', message: 'expected a list of different joint names' })
+  }
 }
 
 function validateCape (cape: unknown, errors: ValidationError[]): void {
@@ -286,6 +296,15 @@ export function checkScenario (
     check(scenario.cape.anchorRight, jointNames, 'joint', 'cape.anchorRight')
     check(scenario.cape.material, materialNames, 'material', 'cape.material')
     checkCapeWidth(scenario.cape, mannequin, errors)
+  }
+  const { cape, chains } = scenario
+  const anchors = new Set([cape?.anchorLeft, cape?.anchorRight, ...chains.map(c => c.anchor)])
+  for (const joint of scenario.bind ?? []) {
+    check(joint, jointNames, 'joint', `bind.${joint}`)
+    if (anchors.has(joint)) errors.push({ path: `bind.${joint}`, message: 'a cloth anchor cannot follow its cloth' })
+  }
+  if ((scenario.bind ?? []).length > 0 && scenario.cape === undefined && scenario.chains.length === 0) {
+    errors.push({ path: 'bind', message: 'there is no cloth to follow' })
   }
   scenario.chains.forEach((chain, i) => {
     check(chain.anchor, jointNames, 'joint', `chains[${i}].anchor`)

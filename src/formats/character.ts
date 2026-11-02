@@ -40,7 +40,8 @@ const DEFAULT_FILES: CharacterFiles = {
 const FILE_KEYS = Object.keys(DEFAULT_FILES) as Array<keyof CharacterFiles>
 const MANIFEST_FIELDS = ['name', 'description', ...FILE_KEYS]
 const MOTION_FIELDS = [
-  'exclude', 'script', 'cape', 'chains', 'wind', 'gravity', 'fps', 'substeps', 'particleRadius', 'durationSeconds'
+  'exclude', 'script', 'cape', 'chains', 'bind', 'wind', 'gravity', 'fps', 'substeps', 'particleRadius',
+  'durationSeconds'
 ]
 
 type Errors = ValidationError[]

@@ -1,5 +1,6 @@
 import { createImage, parseHex, setPixel } from '../image.ts'
 import type { Image } from '../image.ts'
+import { TRANSPARENT_CHAR } from '../formats/skin.ts'
 import type { Pixel, Walk, WalkFrame } from '../formats/skin.ts'
 
 export type Box = { width: number, height: number, baseline: number }
@@ -67,7 +68,7 @@ const PIXELS = new WeakMap<WalkFrame, Pixel[]>()
 export function pixelsOf (frame: WalkFrame): Pixel[] {
   const found = PIXELS.get(frame)
   if (found !== undefined) return found
-  const pixels = frame.rows.flatMap((row, y) => [...row].flatMap((cell, x): Pixel[] => cell === '.' ? [] : [[x, y]]))
+  const pixels = frame.rows.flatMap((row, y) => [...row].flatMap((cell, x): Pixel[] => cell === TRANSPARENT_CHAR ? [] : [[x, y]]))
   PIXELS.set(frame, pixels)
   return pixels
 }

@@ -33,8 +33,8 @@ export const MAX_COLOURS = 16
 export const MAX_SPRITE_SIZE = 64
 
 const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
-export type WalkView = 'frontSide' | 'side' | 'backSide'
-export const WALK_VIEWS: ViewName[] = ['frontSide', 'side', 'backSide']
+export const WALK_VIEWS = ['frontSide', 'side', 'backSide'] as const
+export type WalkView = typeof WALK_VIEWS[number]
 export const FEWEST_WALK_FRAMES = 4
 const WALK_FIELDS = ['frames'] as const
 const WALK_FRAME_FIELDS = ['rows', 'soles', 'planted'] as const
@@ -149,7 +149,7 @@ function validatePart (part: unknown, path: string, palette: Set<string>, errors
 function validateWalk (
   walk: unknown, path: string, view: ViewName, palette: Set<string>, errors: ValidationError[]
 ): void {
-  if (!WALK_VIEWS.includes(view)) {
+  if (!(WALK_VIEWS as readonly string[]).includes(view)) {
     const message = `a ${view} view has no sideways stride; walk frames go on ${WALK_VIEWS.join(', ')}`
     errors.push({ path, message })
     return

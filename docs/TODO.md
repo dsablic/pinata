@@ -23,6 +23,10 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 travelled so planted feet stay put, the cut-outs kept for everything else. The knight's side walk first, judged alone
 against clothed references before the other skins are drawn. It follows
 [drawn, not pasted](plans/2026-11-03-drawn-not-pasted.md), whose beat-and-pose stage made the game-like ratings fall.
+Batch A is built (the skin's `walk`, phase from distance, planted-sole placement, the gates on a test walk; the landing
+squat fix is not: it raised the dwarf's pops); its numbers are in the plan. Next: batch B, the knight's drawn side walk, then the knight-alone round. The
+switching gate misses on the test walk (leaves at a stop), so the drawn frames need a pose near the cut-out's slowing
+step, or the leave rule needs the art's help.
 
 ### 0. Natural motion on the page, game-like visuals
 

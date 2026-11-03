@@ -52,3 +52,36 @@ before more art is drawn.
 - **C. The rest:** the knight's other views, then the rogue, dwarf and wizard; the all-four round; release. Review.
 
 ## Results
+
+### Batch A: frames in the format and the renderer
+
+Built: the skin's `walk` per side-like view, phase from distance, placement by the planted sole, the landing dip, the
+gates. The test walk is eight of the knight's own cut-out poses from one steady cycle
+(`test/fixtures/walk-frames/knight-side.json`, 39 x 54 px, drawn stride 33 px, the knight's walk at the page's 27
+sprite pixels per metre: its cycle is 1.2 m). It is a stand-in for drawn art and does not ship.
+
+- Existing outputs: a skin without frames draws byte-identically; the hash of every drawn sprite over 20 s on all five
+  layouts is the same before and after (page-test, perception, jumps, demo-1200, demo-390), and `npm run
+  rendering-panel` writes the same files after the frames work and after the landing change.
+- Planted feet (60 s per layout, knight on the test walk): worst 0.00 px in x and y on all five layouts, over 388, 508,
+  773, 484 and 224 frame pairs in 39, 42, 71, 48 and 29 stances. By construction the planted sole cannot move, so this
+  gate checks the bookkeeping, not the art.
+- Frames showing on walking steps: 60%, 78%, 77%, 72% and 44% (page-test, perception, jumps, demo-1200, demo-390).
+- Switching on the test walk: 12 of 16, 5 of 8, 12 of 14, 13 of 16 and 15 of 16 switches within 25%: 57 of 70 in all,
+  81%, below the 95% gate. Every miss is a leave at a stop: the cut-out standing still resembles no frame of a walk,
+  and the cut-out's walk is not a repeating cycle, so the closest frame to its pose is typically 20 to 30% away even
+  in the best step. With 13 frames from the same cycle the same gate reads 59 of 67; with 26 (one per step) 76 of 86.
+  Entering is always within the threshold of its own step. Drawn frames will not resemble the mocap poses better than
+  these do, so this gate is likely to be the hard one for the knight's art.
+- Cost, browser suite p95 (page-test page, demo page, four characters): 2.00 and 4.90 ms with the test walk on the
+  knight (site built with `npm run site -- _site --walk-frames=test/fixtures/walk-frames/knight-side.json`), 1.80 and
+  2.50 ms without; the gate is 8 ms.
+- Landing gates (`npm run gates -- --landings`): every number identical with and without the landing change below.
+- The landing squat: a quicker rise out of the dip for a character walking on (a clock 4x as fast after 0.2 s took 4
+  cm at 8 ticks to 0, leaving `rendering-panel` byte-identical and the landing and jump gates met) was built and left
+  out: the survey's dwarf pops went from 1 to 3 at every setting tried (clock 1.5, 2 and 4, start 0.2 and 0.3 s),
+  the rest unchanged. What stays: `LANDING_RECOVERY_SECONDS` (1 s), used by the walk frames (not shown until 1 s after
+  the last air) and by the game panel's stride window, which now starts only after a landing has recovered. The
+  squat itself is not fixed.
+- Survey (`npm run glitches`, real skins without frames, with the landing change left out): fragments 0, stretch 0
+  for all four; pops knight 1, rogue 0, dwarf 1, wizard 0, as before.

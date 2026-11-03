@@ -66,7 +66,10 @@ export function createWalkFrames (options: WalkFramesOptions): WalkFrames | unde
   for (const [view, drawn] of Object.entries(skin.views ?? {}) as Array<[ViewName, { walk?: Walk }]>) {
     if (drawn.walk !== undefined) gaits.set(view, gaitOf(drawn.walk, spritePerMetre, fps))
   }
-  if (gaits.size === 0) return undefined
+  const fits = [...gaits.values()].every(({ walk }) => walk.frames.every(frame => {
+    return frame.rows.length <= box.baseline && [...frame.rows[0]].length <= box.width
+  }))
+  if (gaits.size === 0 || !fits) return undefined
   const centre = Math.floor(box.width / 2)
   let playing: Playing | undefined
   let current: Shown | undefined

@@ -46,14 +46,14 @@ export type CastOptions = {
   footprints?: boolean
   painter?: 'strip' | 'rotate'
 }
-export type DrawnWalk = { sole: [number, number], planted: number, index: number }
+export type DrawnFrame = { sole: [number, number], planted: number, index: number }
 export type Sprite = {
   image: Image
   camera: Camera
   owner?: Int16Array
   parts?: DrawnPart[]
   sector?: number
-  walk?: DrawnWalk
+  walk?: DrawnFrame
 }
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
 export type Moving = {
@@ -261,10 +261,11 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     const dx = now.from - on.from
     const dy = now.height - on.height
     if (Math.abs(dx) > MOVED || Math.abs(dy) > MOVED) {
+      const was = walker.frame().root.position[0]
       walker.shiftBy(dx, dy)
       c.secondary.shift([dx, dy, 0])
       c.cloth = c.cloth?.map((v, i) => i % 3 === 0 ? v + dx : i % 3 === 1 ? v + dy : v)
-      c.frames?.carry(Math.round(dx * spritePerMetre))
+      c.frames?.carry(Math.round((was + dx) * spritePerMetre) - Math.round(was * spritePerMetre))
     }
     const x = walker.frame().root.position[0]
     const inside = Math.min(now.to, Math.max(now.from, x))

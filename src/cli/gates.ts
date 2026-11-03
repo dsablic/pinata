@@ -169,7 +169,7 @@ function walkFrameGates (world: ReadWorld): void {
       `${MOST_SOLE_MOVE_PX} px in x and y between frames of one stance on ${spec.name} over ${NODE_SECONDS} s ` +
       `(worst ${w.worstX.toFixed(2)} px in x, ${w.worstY.toFixed(2)} px in y over ${w.compared} frame pairs in ` +
       `${w.stances} stances)`)
-    const smooth = w.smooth >= FEWEST_SMOOTH_SWITCHES * w.switches
+    const smooth = w.switches > 0 && w.smooth >= FEWEST_SMOOTH_SWITCHES * w.switches
     console.log(`${smooth ? 'GATE MET' : 'GATE MISSED'} switching in or out of ${WALK_CHARACTER}'s walk frames ` +
       `changes the drawn silhouette by at most ${100 * MOST_SWITCH_CHANGE}% in at least ` +
       `${100 * FEWEST_SMOOTH_SWITCHES}% of switches on ${spec.name} (${w.smooth} of ${w.switches} switches)`)

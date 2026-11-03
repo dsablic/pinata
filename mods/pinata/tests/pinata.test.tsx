@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
-import { expect, test } from 'claude-code/testing'
+import { expect, mock, test } from 'claude-code/testing'
 
-import { guessMode, layoutFor } from '../hooks/logic.ts'
+import { checkoutsFor, guessMode, layoutFor } from '../hooks/logic.ts'
 
 const PANE = {
   plugin: 'pinata',
@@ -18,20 +18,39 @@ const PANE = {
 } as const
 
 type Env = Record<string, string | undefined>
+type Files = Record<string, string>
+type Spawned = (readonly string[])[]
 
-function engine (on: On, env: Env, writes: string[]): void {
+const PROJECT = '/work'
+const CHECKOUT: Files = { [`${PROJECT}/package.json`]: '{ "name": "pinata" }', [`${PROJECT}/src/cli/live.ts`]: '' }
+
+function engine (on: On, env: Env, writes: string[], files: Files = CHECKOUT, spawned: Spawned = []) {
+  const clock = mock.clock(on)
   on('command.register', () => ({ value: { command: 'pinata' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
-  on('ui.panes', () => ({ value: [] }))
+  const shown = { id: 'pinata', title: 'Piñata', isShown: true, isFocused: false, isPlaced: true }
+  on('ui.panes', () => ({ value: [shown] }))
+  on('ui.blit', () => ({ value: {} }))
   on('env.get', (_, e) => ({ value: env[e.name] }))
+  on('session.root', () => ({ value: PROJECT }))
+  on('fs.read', (_, e) => {
+    const text = files[e.path]
+    if (text === undefined) throw new Error(`no file at ${e.path}`)
+    return { value: text }
+  })
+  on('fs.exists', (_, e) => ({ value: e.path in files }))
   on('fs.write', (_, e) => {
     writes.push(e.text)
     return { value: undefined }
   })
+  on('process.spawn', async function * (_, e) {
+    spawned.push(e.argv)
+    await clock.sleep(60000)
+  })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('prompt.submit', (_, e) => ({ text: e.text }))
-  on('clock.every', () => ({ value: undefined }))
   on('tool.call', () => ({ result: {} }))
+  return clock
 }
 
 test('iTerm2 3.5+ gets a terminal Image with alt text', async ($, on) => {
@@ -79,4 +98,33 @@ test('layouts fit the pane and the terminal guess follows the docs', () => {
   expect(guessMode({ term: 'ghostty' })).toBe('image')
   expect(guessMode({ kitty: '1' })).toBe('image')
   expect(guessMode({ term: 'WezTerm' })).toBe('raster')
+})
+
+test('the live renderer runs once from the Piñata checkout', async ($, on) => {
+  const spawned: Spawned = []
+  const clock = engine(on, { TERM_PROGRAM: 'Apple_Terminal', TMPDIR: '/tmp' }, [], CHECKOUT, spawned)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  for (let i = 0; i < 4; i++) await clock.advance(500)
+  expect(spawned.map(argv => argv[1])).toEqual([`${PROJECT}/src/cli/live.ts`])
+  await ui.unmount()
+})
+
+test('a project that is not Piñata stops the pane and says so', async ($, on) => {
+  const other = { [`${PROJECT}/package.json`]: '{ "name": "deploy" }', [`${PROJECT}/src/cli/live.ts`]: '' }
+  const spawned: Spawned = []
+  const clock = engine(on, { TERM_PROGRAM: 'Apple_Terminal', TMPDIR: '/tmp' }, [], other, spawned)
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+  await clock.advance(1000)
+  expect(spawned).toEqual([])
+  expect((await ui.find({ type: 'Text', text: /stopped/ }))?.text).toMatch(/no Piñata checkout was found/)
+  await ui.unmount()
+})
+
+test('the renderer is looked for in the mod\'s repo, the marketplace checkout, then the session\'s project', () => {
+  expect(checkoutsFor('/src/pinata/mods/pinata/', '/work/')).toEqual(['/src/pinata', '/work'])
+  expect(checkoutsFor('/home/me/.claude/plugins/cache/pinata/pinata/0.1.0', '/work'))
+    .toEqual(['/home/me/.claude/plugins/marketplaces/pinata', '/work'])
+  expect(checkoutsFor('/opt/plugins/pinata', '/work')).toEqual(['/work'])
 })

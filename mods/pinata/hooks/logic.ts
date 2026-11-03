@@ -66,3 +66,18 @@ export function guessMode (env: TerminalEnv): Mode {
 export function isAltDeny (deny: string, fix?: string): boolean {
   return fix === 'tmux-passthrough' || /\balt\b/i.test(deny)
 }
+
+const IN_REPO = '/mods/pinata'
+const CACHED = /^(.*)\/cache\/([^/]+)\/[^/]+\/[^/]+$/
+
+function trimSlashes (path: string): string {
+  return path.replace(/\/+$/, '')
+}
+
+export function checkoutsFor (pluginRoot: string, sessionRoot: string): string[] {
+  const root = trimSlashes(pluginRoot)
+  const own = root.endsWith(IN_REPO) ? [root.slice(0, -IN_REPO.length)] : []
+  const cached = CACHED.exec(root)
+  const marketplace = cached === null ? [] : [`${cached[1]}/marketplaces/${cached[2]}`]
+  return [...own, ...marketplace, trimSlashes(sessionRoot)]
+}

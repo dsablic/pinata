@@ -913,8 +913,15 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - Terminal images are used where the terminal draws them (kitty, Ghostty, iTerm2 3.5+), half-block cells elsewhere.
   A blit refused because the Image would draw its alt text (no image protocol, or tmux holding images back) falls
   back to cells.
-- The repository is found two folders up when the mod is loaded from the repo's `mods/pinata`, at a fixed checkout path
-  otherwise.
+- The live renderer is run from the first Piñata checkout: a folder whose `package.json` is named `pinata` and that
+  holds `src/cli/live.ts`, so another project's `live.ts` is never run. The candidates are the repository two folders
+  up when the mod is loaded from the repo's `mods/pinata`; the marketplace checkout when it runs from the plugin cache,
+  which holds only the mod (`<plugins>/cache/<marketplace>/<plugin>/<version>` beside
+  `<plugins>/marketplaces/<marketplace>`); the session's project last. The checkout follows the marketplace and can be
+  ahead of the cached mod.
+- The checkout is looked up at session start and on each retry, not in the pane's timer, so lookups never overlap and
+  a child is never started from a stale folder. With none, the pane stops and says so; while it is stopped, `/pinata`
+  and `/pinata open` retry instead of closing the pane.
 
 ## Formats (`src/formats/`)
 

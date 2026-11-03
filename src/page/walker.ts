@@ -3,6 +3,7 @@ import { createPlayer } from '../mocap/player.ts'
 import type { Player, PlayerFrame } from '../mocap/player.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
 import { jumpOf } from '../mocap/jump.ts'
+import type { JumpKind } from '../mocap/jump.ts'
 import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
@@ -52,7 +53,7 @@ export type WalkerOptions = {
   ground: Ground
   place: Place
   yaw: number
-  jumps?: boolean
+  jumps?: JumpKind
   attraction?: (surface: number) => number
 }
 
@@ -87,8 +88,9 @@ export function createWalker (options: WalkerOptions): Walker {
   const { database, fps, random } = options
   const { rig, rest, mannequin } = database.options
   const legs = legsOf(rig)
-  const jump = options.jumps === true ? { jump: jumpOf(rig, rest) } : {}
-  const reach: Reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: tallest(rest), ...jump }
+  const jump = options.jumps === undefined ? undefined : jumpOf(rig, rest, options.jumps)
+  const jumping = jump === undefined ? {} : { jump }
+  const reach: Reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: tallest(rest), ...jumping }
   let ground = options.ground
   let graph: Graph = surfaceGraph(ground, reach)
   let standing = options.place.height
@@ -150,7 +152,7 @@ export function createWalker (options: WalkerOptions): Walker {
     offset = [0, 0]
     standing = place.height + above
     const at = { position: [place.x, 0, 0] as Vec3, yaw, ...(above > 0 ? { height: standing } : {}) }
-    player = createPlayer({ database, fps, ground: groundAt }, at)
+    player = createPlayer({ database, fps, ground: groundAt, ...jumping }, at)
     const root: RootState = { position: [place.x, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
     const lifted: Pose = {}
     for (const [name, p] of Object.entries(rest)) lifted[name] = [p[0], p[1] + standing, p[2]]

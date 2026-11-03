@@ -222,7 +222,7 @@ test('a walker with jumping on gets onto a ledge above a step, and one without c
   const page = ground([[0, 12, 0], [4, 6, 0.4]])
   const place = { x: 1, height: 0 }
   const make = (jumps: boolean): Walker => createWalker({
-    database, fps: FPS, random: random(1), ground: page, place, yaw: EAST, ...(jumps ? { jumps } : {})
+    database, fps: FPS, random: random(1), ground: page, place, yaw: EAST, ...(jumps ? { jumps: 'leg' as const } : {})
   })
   assert.equal(make(false).reaches({ x: 5, height: 0.4 }), false)
   const w = make(true)
@@ -245,7 +245,7 @@ function crouching (w: Walker): WalkerFrame {
 function ledgeWalker (): Walker {
   const page = ground([[0, 12, 0], [4, 6, 0.4]])
   const w = createWalker({
-    database, fps: FPS, random: random(1), ground: page, place: { x: 1, height: 0 }, yaw: EAST, jumps: true
+    database, fps: FPS, random: random(1), ground: page, place: { x: 1, height: 0 }, yaw: EAST, jumps: 'leg'
   })
   w.visit({ x: 5, height: 0.4 })
   return w

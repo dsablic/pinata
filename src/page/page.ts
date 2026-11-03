@@ -1,4 +1,5 @@
 import { fetchWorldBundle } from '../world/bundle.ts'
+import type { JumpKind } from '../mocap/jump.ts'
 import { getPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import { createCast, keep, pageEnvironment, spriteReach } from './cast.ts'
@@ -18,6 +19,7 @@ export type PageWorldOptions = {
   count?: number
   measure?: boolean
   wind?: number
+  jumps?: JumpKind
 }
 export type PageCharacter = Omit<CharacterState<Element>, 'on'> & { element: string }
 export type Visit = { name: string, element: string, say?: string }

@@ -4,6 +4,7 @@ import { FPS } from '../page/cast.ts'
 import type { LayoutFixture } from '../page/fixture.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
 import type { Graph } from '../page/graph.ts'
+import type { Sample } from '../page/cast.ts'
 import { groundOf, surfaceBelow } from '../page/surfaces.ts'
 import type { Ground, Surface } from '../page/surfaces.ts'
 import { createWalker, DROP_LIMIT, STEP_HEIGHT } from '../page/walker.ts'
@@ -46,7 +47,20 @@ export function countJumps (frames: Jumping[]): JumpCount {
     if (frame.jumpTo !== undefined && before === undefined) planned++
     if (frame.jumpTo === undefined && before !== undefined && frame.surface === before) landed++
   })
-  return { planned, landed }
+  const unfinished = frames.length > 0 && frames[frames.length - 1].jumpTo !== undefined
+  return { planned: unfinished ? planned - 1 : planned, landed }
+}
+
+export type CastJumps = { name: string, jumps: JumpCount }
+
+export function countCastJumps (samples: Sample[]): CastJumps[] {
+  const names = [...new Set(samples.map(m => m.name))]
+  return names.map(name => ({ name, jumps: countJumps(samples.filter(m => m.name === name)) }))
+}
+
+export function deepestInJump (samples: Sample[]): number {
+  const gaps = samples.filter(s => s.jumpTo !== undefined).flatMap(s => s.feet.map(f => f.gap ?? 0))
+  return Math.max(0, -Math.min(0, ...gaps))
 }
 
 export function tripArrived (frames: TripFrame[], aim: number): boolean {
@@ -149,7 +163,7 @@ function runLayout (layout: JumpLayout, database: MotionDatabase): Tally {
       path(jumping, a.id, b.id) !== undefined
   }
   const walker = createWalker({
-    database, fps: FPS, random: random(SEED), ground: layout.ground, place: layout.floors[0], yaw: EAST, jumps: true
+    database, fps: FPS, random: random(SEED), ground: layout.ground, place: layout.floors[0], yaw: EAST, jumps: 'leg'
   })
   const frames: WalkerFrame[] = []
   const result = tally()

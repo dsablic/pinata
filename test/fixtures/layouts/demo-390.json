@@ -239,9 +239,27 @@
       "ground": "card-cast"
     },
     {
-      "id": "timing-label",
+      "id": "super-jumps-label",
       "rect": {
         "left": 34,
+        "top": 1201.890625,
+        "width": 109.890625
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "super-jumps",
+      "rect": {
+        "left": 38,
+        "top": 1205.890625,
+        "width": 13
+      },
+      "ground": "card-cast"
+    },
+    {
+      "id": "timing-label",
+      "rect": {
+        "left": 151.890625,
         "top": 1201.890625,
         "width": 108.015625
       },
@@ -250,7 +268,7 @@
     {
       "id": "timing",
       "rect": {
-        "left": 38,
+        "left": 155.890625,
         "top": 1205.890625,
         "width": 13
       },

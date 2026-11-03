@@ -82,7 +82,10 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   reach the top), and at least 10 cm back from the gap; the edge's `land` is 25 cm inside the target (its middle on
   a narrow one), where a body's feet still stand on it. An edge is dropped when the take-off is not on the node,
   when the speed the arc needs is over 3.5 m/s, when a wall stands where the arc is below its top and within a body
-  of its foot, or when another surface lies above the target's top within the apex's head room. Several jump edges
+  of its foot, or when another surface lies above the target's top within the apex's head room, or when a surface
+  whose top is between the two ends lies under the arc's span (a jump never rises through a card: the soles would be
+  under its top, and the feet are lifted onto it in two frames). The head room and the run-up use the jump's
+  clearance (`clearance`, default 10 cm; 1 m for super jumps). Several jump edges
   between the same nodes (from either side) are chosen between like parallel drops, by nearness to the goal, and a
   path given the walker's x takes, for each jump, the take-off nearest to where the walker is (the far side's take-off
   walked a character through the whole page first). A jump edge is its own type (`JumpEdge`, with `land`). The cast's
@@ -116,6 +119,14 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   ankle chain: knight 0.70 m, wizard 0.79, rogue 0.44, dwarf 0.34), which is as high as a character can put its hip
   without folding; a share of 0.6 left the rogue and dwarf below a step, so they could jump nowhere. Only the page's
   cast turns it on; walkers made without it, and drop-ins, behave as before.
+- `jumps` is a kind, `'leg'` or `'super'` (`jumpOf(rig, rest, kind)` in `mocap/jump.ts`), and the walker hands the
+  resulting `{ height, reach, clearance }` to its graph and to its player, so both agree on what a jump can reach. A
+  super jump reaches 6 m up and 2 m across, with an apex 1 m above the target's top instead of 10 cm: the demo and
+  page layouts have rises of 3 to 5 m stacked directly over each other, and with a 10 cm apex a 5 m rise needs about
+  2 m of run-up, more than the 1 to 2 m of floor beside a card; a 1 m apex needs about 0.7 m. The 6 m leap lands from
+  an apex 1 m up, at 4.4 m/s, where the landing dip already scales. The crouch, take-off, arc shape and refusal are
+  the leg jump's. `PageWorldOptions.jumps` (default `'leg'`) reaches the cast and every walker; the kind changes no
+  random draw, so the default world is byte-identical.
 - A jump leg walks to the take-off at walking speed, slowing over the last 0.5 m as for a goal, and when within 6 cm
   asks the player to jump to the edge's landing (x and the target node's height, in the player's coordinates). A
   refusal ends the walk unreached, like any leg that cannot go on. A poke in the crouch cancels the jump (the player
@@ -220,7 +231,8 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - The site's front page is built on the page world: rows of cards (each card ground, neighbouring cards a step apart
   so a row is one walk), each row inset from the one below so its ends drop onto it with room to land, and a floor of
   tiles, one of them attractive. Words sit on cards, a button and a link; hovering or focusing them calls a character.
-- Controls restart the world with another count or seed. Timing is shown only on request: text changing inside a
+- Controls restart the world with another count or seed, or with super jumps (a checkbox; the default is jumps of a
+  leg length, which only reach low ledges). Timing is shown only on request: text changing inside a
   ground card is a page change, which would rescan the page every second.
 - `?measure` turns on samples; the world is exposed as `window.__pinata`.
 
@@ -269,7 +281,12 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   sole is over, within 20 cm above it, and held to the page's 1 px planted tolerance. The gate is met per character
   with at least 40 trips, 95% hits, no climbs and no sole under. The recorded layouts are also run for 60 s with the
   cast and their jumps counted from the samples (`jumpTo` and `surface`); they print only. Page-test, perception and
-  both demos have rises of 1.5 to 5 m, beyond a jump, so no jumps happen there.
+  both demos have rises of 1.5 to 5 m, beyond a leg-length jump, so no jumps happen there.
+- **Super jumps** (`npm run gates -- --super-jumps`, also in the full run): each recorded demo and page layout (not the
+  jump page) runs 60 s with `jumps: 'super'`. Met when at least 4 jumps are planned, at least 95% land on the surface
+  they aim for, and no sole is more than 1 px under a surface in a jump (`deepestInJump`, from the samples' foot
+  gaps). A jump still in flight when the run ends is neither planned nor missed; counted as planned it made a clean
+  7 of 8.
 - **The browser suite** (`npm run test:browser`, about 30 s) checks what needs a browser: the scan against an oracle
   that reads elements directly, after load, scrolling, resizing, adding, removing, inner scrolling and text reflow;
   characters standing on live surfaces (lowest sole within 8 px: mid-stride feet are a few pixels up, and the precise
@@ -649,10 +666,11 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
   placement follows, so the landing starts from where the feet are drawn.
 - Jumps (`jump(target)`, with `jumping()`): the target is a landing x and a surface height. The arc is
-  `arcOver(rise, run)` in `jump.ts`: the apex is 10 cm of base height above the target's top (a body's base is its
+  `arcOver(rise, run, clearance)` in `jump.ts`: the apex is `clearance` (10 cm; `options.jump.clearance` overrides it)
+  of base height above the target's top (a body's base is its
   feet's rest level), the launch speed `sqrt(2 g (rise + 10 cm))`, the flight time the way up plus the way down from
   the apex to the top, and the horizontal speed the run over that time. A jump is refused (`false`, nothing
-  changes) when the rise is over one leg length, when the horizontal speed is over 3.5 m/s, when the ground has no
+  changes) when the rise is over one leg length (or `options.jump.height`), when the horizontal speed is over 3.5 m/s, when the ground has no
   surface at the target's height under the landing x, or when the arc, sampled each step, has the base more than 5 cm
   under the target's top while over that surface (the body would go through its edge). It is also refused while
   jumping or falling.

@@ -6,7 +6,7 @@ import type { Sample } from '../page/cast.ts'
 import { LAYOUTS, readLayout } from '../page/fixture.ts'
 import { DROP_HEIGHTS, landings, PLANTED_TOLERANCE, REACTION_SECONDS } from '../diagnostics/landings.ts'
 import type { Landings } from '../diagnostics/landings.ts'
-import { countJumps, FEWEST_TRIPS, jumps, SMALLEST_SHARE_LANDED } from '../diagnostics/jumps.ts'
+import { countCastJumps, deepestInJump, FEWEST_TRIPS, jumps, SMALLEST_SHARE_LANDED } from '../diagnostics/jumps.ts'
 import type { JumpRun, Tally } from '../diagnostics/jumps.ts'
 import { flickerFraction } from '../diagnostics/stability.ts'
 import type { Image } from '../image.ts'
@@ -18,6 +18,7 @@ import { ROOT } from './paths.ts'
 import { worldBundle } from './world-bundle.ts'
 
 const NODE_SECONDS = 60
+const FEWEST_SUPER_JUMPS = 4
 const FLICKER_LAYOUTS = ['demo-1200', 'demo-390']
 const FLICKER_SEEDS = [1, 2, 3]
 const FLICKER_WARMUP_SECONDS = 4
@@ -119,16 +120,37 @@ function jumpGates (runs: JumpRun[]): void {
   }
 }
 
+function castJumps (samples: Sample[]): { each: string, planned: number, landed: number } {
+  const counts = countCastJumps(samples)
+  return {
+    each: counts.map(c => `${c.name} ${c.jumps.landed} of ${c.jumps.planned}`).join(', '),
+    planned: counts.reduce((sum, c) => sum + c.jumps.planned, 0),
+    landed: counts.reduce((sum, c) => sum + c.jumps.landed, 0)
+  }
+}
+
+function superJumpGates (world: ReadWorld): void {
+  for (const spec of LAYOUTS.filter(l => l.name !== 'jumps')) {
+    const s = scenario(world, readLayout(ROOT, spec.name), undefined, 0, false, 'strip', 'super')
+    run(s, NODE_SECONDS)
+    const samples = s.cast.samples()
+    const { each, planned, landed } = castJumps(samples)
+    const deepest = deepestInJump(samples)
+    const met = planned >= FEWEST_SUPER_JUMPS && landed >= SMALLEST_SHARE_LANDED * planned &&
+      deepest <= PLANTED_TOLERANCE_PX
+    console.log(`${met ? 'GATE MET' : 'GATE MISSED'} super jumps on ${spec.name} over ${NODE_SECONDS} s: at least ` +
+      `${FEWEST_SUPER_JUMPS} planned jumps, at least ${100 * SMALLEST_SHARE_LANDED}% landed on the surface they ` +
+      `aim for, and no sole more than ${PLANTED_TOLERANCE_PX} CSS px under a surface in a jump (${landed} of ` +
+      `${planned} landed: ${each}; deepest sole ${deepest.toFixed(2)} px)`)
+  }
+}
+
 function recordedJumps (world: ReadWorld): void {
   for (const spec of LAYOUTS) {
     const s = scenario(world, readLayout(ROOT, spec.name))
     run(s, NODE_SECONDS)
     const samples = s.cast.samples()
-    const names = [...new Set(samples.map(m => m.name))]
-    const counts = names.map(name => countJumps(samples.filter(m => m.name === name)))
-    const each = names.map((name, i) => `${name} ${counts[i].landed} of ${counts[i].planned}`).join(', ')
-    const planned = counts.reduce((sum, c) => sum + c.planned, 0)
-    const landed = counts.reduce((sum, c) => sum + c.landed, 0)
+    const { each, planned, landed } = castJumps(samples)
     console.log(`jumps on ${spec.name} over ${NODE_SECONDS} s: ${landed} of ${planned} planned jumps landed on ` +
       `their surface (${each})`)
   }
@@ -153,6 +175,10 @@ async function main (): Promise<number> {
     recordedJumps(world)
     return 0
   }
+  if (process.argv.includes('--super-jumps')) {
+    superJumpGates(world)
+    return 0
+  }
   clothFlicker(world)
   for (const spec of LAYOUTS) {
     const s = scenario(world, readLayout(ROOT, spec.name))
@@ -162,6 +188,7 @@ async function main (): Promise<number> {
   landingGates(landings(world))
   jumpGates(jumps(world, [readLayout(ROOT, 'jumps')]))
   recordedJumps(world)
+  superJumpGates(world)
   return 0
 }
 

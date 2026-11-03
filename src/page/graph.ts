@@ -1,8 +1,8 @@
 import { arcOver, heightAt, JUMP_CLEARANCE, LAND_IN, MOST_JUMP_SPEED, runUp } from '../mocap/jump.ts'
-import type { Arc } from '../mocap/jump.ts'
+import type { Arc, JumpReach } from '../mocap/jump.ts'
 import type { Ground, Surface, Wall } from './surfaces.ts'
 
-export type Jump = { height: number, reach: number }
+export type Jump = JumpReach
 export type Reach = { step: number, drop: number, body: number, jump?: Jump }
 export type Node = { id: number, surface: number, from: number, to: number, height: number }
 export type StepEdge = { from: number, to: number, kind: 'walk' | 'drop', at: number }
@@ -91,16 +91,20 @@ function edgesFrom (ground: Ground, nodes: Node[], node: Node, reach: Reach): Ed
   return edges
 }
 
-function unobstructed (ground: Ground, from: Node, to: Node, span: [number, number], arc: Arc, body: number): boolean {
+function unobstructed (
+  ground: Ground, from: Node, to: Node, span: [number, number], arc: Arc, body: number, clearance: number
+): boolean {
   const [low, high] = span[0] < span[1] ? span : [span[1], span[0]]
   const feetAt = (x: number): number => from.height + heightAt(arc, (x - span[0]) / arc.speed)
   const hits = (w: Wall): boolean => w.top > feetAt(w.x) && w.bottom < feetAt(w.x) + body
   const walled = ground.walls.some(w => w.x >= low && w.x <= high && hits(w))
-  const roofed = ground.surfaces.some(s => {
+  const blocked = ground.surfaces.some(s => {
     const own = s.id === from.surface || s.id === to.surface
-    return !own && s.to >= low && s.from <= high && s.height > to.height && s.height < to.height + JUMP_CLEARANCE + body
+    const above = s.height > to.height && s.height < to.height + clearance + body
+    const between = s.height > from.height && s.height < to.height
+    return !own && s.to >= low && s.from <= high && (above || between)
   })
-  return !walled && !roofed
+  return !walled && !blocked
 }
 
 function jumpEdge (ground: Ground, node: Node, target: Node, direction: -1 | 1, body: number, jump: Jump): JumpEdge[] {
@@ -108,12 +112,12 @@ function jumpEdge (ground: Ground, node: Node, target: Node, direction: -1 | 1, 
   const near = direction > 0 ? target.from : target.to
   const gap = Math.max(0, direction * (near - (direction > 0 ? node.to : node.from)))
   if (gap > jump.reach) return []
-  const takeOff = near - direction * Math.max(runUp(rise), gap + TAKE_OFF_INSET)
+  const takeOff = near - direction * Math.max(runUp(rise, jump.clearance), gap + TAKE_OFF_INSET)
   if (takeOff < node.from || takeOff > node.to) return []
   const land = near + direction * Math.min(LAND_IN, (target.to - target.from) / 2)
-  const arc = arcOver(rise, land - takeOff)
+  const arc = arcOver(rise, land - takeOff, jump.clearance)
   if (Math.abs(arc.speed) > MOST_JUMP_SPEED) return []
-  if (!unobstructed(ground, node, target, [takeOff, land], arc, body)) return []
+  if (!unobstructed(ground, node, target, [takeOff, land], arc, body, jump.clearance ?? JUMP_CLEARANCE)) return []
   return [{ from: node.id, to: target.id, kind: 'jump', at: takeOff, land }]
 }
 

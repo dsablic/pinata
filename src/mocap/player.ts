@@ -11,6 +11,7 @@ import type { RootState } from '../motion/script.ts'
 import { transformTo } from '../motion/skeleton.ts'
 import type { Transforms } from '../motion/skeleton.ts'
 import { turnBetween, turnToLocal, turnToWorld } from '../world/yaw.ts'
+import type { JumpReach } from './jump.ts'
 import { arcOver, heightAt, jumpHeightOf, legLengthOf, MOST_JUMP_SPEED } from './jump.ts'
 import type { Arc } from './jump.ts'
 import { ankleVelocity, featureOf, featureWeights, HORIZONS } from './database.ts'
@@ -33,6 +34,7 @@ export type PlayerOptions = {
   fps: number
   ground: (x: number, z: number, from?: number) => number
   tuning?: Partial<BodyTuning>
+  jump?: JumpReach
 }
 export type PlayerFrame = {
   root: RootState
@@ -215,6 +217,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const rate = database.options.style?.rate ?? 1
   const dt = 1 / fps
   const legs = legsOf(rig)
+  const mostRise = options.jump?.height ?? jumpHeightOf(legLengthOf(rig, rest))
   const legIndices = legs.map((_, k) => k)
   const weights = featureWeights(legs.length)
   const reach = legs.map(leg => chainLength(leg.chain, rest))
@@ -661,8 +664,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
 
   const arcTo = (target: JumpTarget): Arc | undefined => {
     const rise = target.height - base
-    if (rise > jumpHeightOf(legLengthOf(rig, rest)) + SURFACE_TOLERANCE) return undefined
-    const arc = arcOver(rise, target.x - body.position[0])
+    if (rise > mostRise + SURFACE_TOLERANCE) return undefined
+    const arc = arcOver(rise, target.x - body.position[0], options.jump?.clearance)
     return Math.abs(arc.speed) <= MOST_JUMP_SPEED && landsOn(target, arc) ? arc : undefined
   }
 

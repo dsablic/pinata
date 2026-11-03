@@ -16,6 +16,7 @@ const count = byId<HTMLSelectElement>('count')
 const seed = byId<HTMLInputElement>('seed')
 const readout = byId<HTMLElement>('readout')
 const timing = byId<HTMLInputElement>('timing')
+const superJumps = byId<HTMLInputElement>('super-jumps')
 let world: PageWorld | undefined
 let starting: Promise<void> | undefined
 
@@ -29,6 +30,7 @@ async function start (): Promise<void> {
     scale: SCALE,
     seed: Number(seed.value) || 1,
     count: Number(count.value),
+    jumps: superJumps.checked ? 'super' : 'leg',
     measure: new URLSearchParams(location.search).has('measure')
   })
   Object.assign(globalThis, { __pinata: world })
@@ -52,5 +54,6 @@ byId<HTMLButtonElement>('restart').addEventListener('click', restart)
 timing.addEventListener('change', () => { readout.textContent = timing.checked ? 'measuring…' : '' })
 count.addEventListener('change', restart)
 seed.addEventListener('change', restart)
+superJumps.addEventListener('change', restart)
 restart()
 setInterval(report, READOUT_MS)

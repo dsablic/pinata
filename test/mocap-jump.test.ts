@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildDatabase } from '../src/mocap/database.ts'
-import { arcOver, LAND_IN, runUp } from '../src/mocap/jump.ts'
+import type { JumpReach } from '../src/mocap/jump.ts'
+import { arcOver, jumpOf, LAND_IN, runUp } from '../src/mocap/jump.ts'
 import { createPlayer } from '../src/mocap/player.ts'
 import type { Player, PlayerFrame } from '../src/mocap/player.ts'
 import { loadClips, retargetOptions } from './mocap-fixtures.ts'
@@ -117,4 +118,16 @@ test('a jump cancelled in the crouch leaves the player standing where it was', (
   player.cancelJump()
   for (let i = 0; i < FPS; i++) player.step()
   assert.deepEqual([player.jumping(), player.falling(), player.height()], [false, false, 0])
+})
+
+test('a character with a super jump height gets up a 4 m rise and one without is refused', () => {
+  const rise = 4
+  const attempt = (jump?: JumpReach): boolean => {
+    const ground = (x: number): number => x >= EDGE ? rise : 0
+    const options = { database, fps: FPS, ground, ...(jump === undefined ? {} : { jump }) }
+    const player = createPlayer(options, { position: [EDGE - runUp(rise), 0, 0], yaw: EAST })
+    for (let i = 0; i < FPS; i++) player.step()
+    return player.jump({ x: EDGE + LAND_IN, height: rise })
+  }
+  assert.deepEqual([attempt(), attempt(jumpOf(database.options.rig, database.options.rest, 'super'))], [false, true])
 })

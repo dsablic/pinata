@@ -134,3 +134,16 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
   - On the cast, the jump page gives about one jump a minute: wandering picks nodes by width, so the long floor wins.
   - Standing gates unchanged (34, 18, 40 and 61 frames in mid air on the four older layouts); landings still pass;
     knight pops 17 and dwarf pops 1 in the glitch survey, fragments 0, as before.
+- **Batch D, super jumps built** (`jumps: 'super'`: 6 m up, 2 m across; `npm run gates -- --super-jumps`). With the
+  option on, over 60 s: page-test 5 of 5 planned jumps landed, demo-1200 7 of 7, demo-390 14 of 14 and perception 2
+  of 2, with the deepest sole 0.00 px everywhere. **Met** on page-test, demo-1200 and demo-390; **missed** on
+  perception, which has only 2 planned jumps against the gate's 4 (every jump lands; the page has one 2.6 m ledge,
+  4.8 m wide of 26 m of ground, and wandering picks nodes by width). With the option off, `npm run gates -- --jumps`
+  prints the same lines as before, and `npm test` passes.
+  - Two things the first run showed. With the leg-jump arc (apex 10 cm over the top) a 5 m rise needs about 2 m of
+    run-up, more than the floor beside a card, so demo-390 had no jump edge and perception and demo-1200 few; super
+    jumps leap 1 m above the top, which needs about 0.7 m. And a jump that rose through another card put the soles up
+    to 10.7 px under its top (the feet were lifted onto it in two frames), so the graph drops a jump whose span has a
+    surface with its top between the two ends.
+  - A jump still in flight when a run ends was counted as planned but not landed (7 of 8 on demo-1200); it is now
+    neither. The leg-jump lines are unchanged by it.

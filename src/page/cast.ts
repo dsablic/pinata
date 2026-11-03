@@ -3,6 +3,7 @@ import type { CastMember } from '../world/world.ts'
 import type { Look } from '../world/render.ts'
 import { random } from '../world/terrain.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
+import type { JumpKind } from '../mocap/jump.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { makeCamera } from '../raster/camera.ts'
@@ -35,6 +36,7 @@ export type CastOptions = {
   seed: number
   count?: number
   measure?: boolean
+  jumps?: JumpKind
   footprints?: boolean
   painter?: 'strip' | 'rotate'
 }
@@ -266,7 +268,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
         if (place === undefined) continue
         const yaw = nextYaw()
         const { database } = c
-        c.walker = createWalker({ database, fps: FPS, random: next, ground, place, yaw, attraction, jumps: true })
+        const jumps = options.jumps ?? 'leg'
+        c.walker = createWalker({ database, fps: FPS, random: next, ground, place, yaw, attraction, jumps })
       }
       c.on = standingOn(c.walker.support())
     }

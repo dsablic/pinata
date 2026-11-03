@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { nodeAt, path, reachable, surfaceGraph } from '../src/page/graph.ts'
-import type { Graph, JumpEdge } from '../src/page/graph.ts'
+import type { Graph, JumpEdge, Reach } from '../src/page/graph.ts'
 import type { Ground, Surface, Wall } from '../src/page/surfaces.ts'
 
 const REACH = { step: 0.2, drop: 3, body: 1.8 }
@@ -137,4 +137,27 @@ test('a shelf or a wall in the way of the arc stops the jump', () => {
   const roofed = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.4], [3, 7, 1.2]]), JUMPING)
   const walled = surfaceGraph(ground([[0, 3.8, 0], [4, 6, 0.4]], [[3.9, 0, 3]]), JUMPING)
   assert.deepEqual([open, roofed, walled].map(jumpsOnto), [2, 0, 0])
+})
+
+test('a super jump reaches a 4 m rise across 2 m that a leg jump cannot, and a walk-only graph has none', () => {
+  const page = ground([[0, 10, 0], [4, 6, 4]])
+  const super_ = { ...REACH, jump: { height: 6, reach: 2 } }
+  const jumps = (reach: typeof REACH): number => surfaceGraph(page, reach).edges.filter(e => e.kind === 'jump').length
+  assert.deepEqual([jumps(REACH), jumps(JUMPING), jumps(super_)], [0, 0, 2])
+  const apart = ground([[0, 3, 0], [5, 8, 4]])
+  assert.deepEqual([surfaceGraph(apart, JUMPING), surfaceGraph(apart, super_)].map(g => g.edges.length), [0, 1])
+})
+
+test('a jump never rises through a surface between its ends, and a higher leap takes off nearer the ledge', () => {
+  const high = { ...REACH, jump: { height: 6, reach: 2, clearance: 1 } }
+  const low = { ...REACH, jump: { height: 6, reach: 2 } }
+  const open = ground([[0, 6, 0], [5, 9, 4]])
+  const through = ground([[0, 6, 0], [5, 9, 4], [4, 5.5, 2]])
+  const onto = (page: Ground, reach: Reach): JumpEdge[] => {
+    const graph = surfaceGraph(page, reach)
+    const ledge = on(graph, 7, 4)
+    return graph.edges.filter((e): e is JumpEdge => e.kind === 'jump' && e.to === ledge && e.from === on(graph, 1, 0))
+  }
+  assert.deepEqual([onto(open, high).length, onto(through, high).length], [1, 0])
+  assert.ok(onto(open, high)[0].at > onto(open, low)[0].at)
 })

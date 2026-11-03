@@ -2,19 +2,17 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Mode } from '../types'
-import { layoutFor, labelFor, blankCells, guessMode, isAltDeny, sameLayout } from './logic.ts'
+import {
+  layoutFor, labelFor, blankCells, guessMode, isAltDeny, sameLayout, checkoutsFor, trimSlashes
+} from './logic.ts'
 import type { Layout } from './logic.ts'
 
 const PANE = 'pinata'
 const TITLE = 'Piñata'
 const KEY = 'frame'
-const FALLBACK_REPO = '/Users/denis/pinata'
-const IN_REPO = '/mods/pinata'
-
-function repoOf ($: EngineInterface): string {
-  const root = $.plugin.root.replace(/\/+$/, '')
-  return root.endsWith(IN_REPO) ? root.slice(0, -IN_REPO.length) : FALLBACK_REPO
-}
+const LIVE = '/src/cli/live.ts'
+const PACKAGE = '/package.json'
+const NO_CHECKOUT = 'no Piñata checkout was found'
 const FPS = 15
 const QUIET_MS = 5000
 const MANAGE_MS = 500
@@ -27,6 +25,7 @@ const label = atom({ plugin: 'pinata', key: 'label' } as const, 'idle', { shape:
 type Child = { layout: Layout, stop: () => void }
 
 let want: Layout | undefined
+let repo: string | undefined
 let child: Child | undefined
 let eventsPath: string | undefined
 let seq = 0
@@ -51,11 +50,16 @@ function stopChild (): void {
   running?.stop()
 }
 
+async function setLabel ($: EngineInterface, word: string): Promise<void> {
+  shownWord = word
+  await update($, label, () => word)
+}
+
 function giveUp ($: EngineInterface, reason: string): void {
   stopped = reason
   stopChild()
   log($, `stopped (${reason})`)
-  void update($, label, () => 'stopped').catch(() => {})
+  setLabel($, 'stopped').catch(() => {})
 }
 
 function send ($: EngineInterface, name: string): void {
@@ -84,10 +88,7 @@ function settleLater ($: EngineInterface): void {
 async function show ($: EngineInterface, handle: Child, line: string): Promise<void> {
   const frame = JSON.parse(line) as { behaviour?: string, png?: string, cells?: string }
   const word = labelFor(frame.behaviour ?? '')
-  if (word !== shownWord) {
-    shownWord = word
-    await update($, label, () => word)
-  }
+  if (word !== shownWord) await setLabel($, word)
   if (child !== handle) return
   lastFrame = { layout: handle.layout, png: frame.png, cells: frame.cells }
   const blitted = handle.layout.format === 'png' && frame.png !== undefined
@@ -103,11 +104,37 @@ async function show ($: EngineInterface, handle: Child, line: string): Promise<v
   }
 }
 
-function startChild ($: EngineInterface, layout: Layout, events: string): void {
-  const repo = repoOf($)
-  const argv = ['node', `${repo}/src/cli/live.ts`, '--events', events, '--start', current, '--format', layout.format,
+async function isCheckout ($: EngineInterface, dir: string): Promise<boolean> {
+  try {
+    const manifest = JSON.parse(await $.fs.read(dir + PACKAGE)) as { name?: unknown }
+    return manifest.name === 'pinata' && await $.fs.exists(dir + LIVE)
+  } catch {
+    return false
+  }
+}
+
+async function findRepo ($: EngineInterface): Promise<string | undefined> {
+  for (const dir of checkoutsFor($.plugin.root)) {
+    if (await isCheckout($, dir)) return dir
+  }
+  return undefined
+}
+
+async function locate ($: EngineInterface): Promise<void> {
+  const found = await findRepo($)
+  if (found === undefined) {
+    giveUp($, NO_CHECKOUT)
+    return
+  }
+  repo = found
+  stopped = undefined
+  failures = 0
+}
+
+function startChild ($: EngineInterface, dir: string, layout: Layout, events: string): void {
+  const argv = ['node', dir + LIVE, '--events', events, '--start', current, '--format', layout.format,
     '--px', String(layout.px), '--fps', String(FPS), '--samples', '2']
-  const stream = $.process.spawn({ argv, cwd: repo })
+  const stream = $.process.spawn({ argv, cwd: dir })
   const handle: Child = { layout, stop: () => { void stream.return({ code: null, signal: null }).catch(() => {}) } }
   child = handle
   void (async () => {
@@ -145,16 +172,23 @@ async function manage ($: EngineInterface): Promise<void> {
   const panes = await $.ui.panes()
   const pane = panes.find(p => p.id === PANE)
   const layout = want
-  if (pane === undefined || !pane.isShown || !pane.isPlaced || layout === undefined || eventsPath === undefined) {
+  const from = repo
+  if (stopped !== undefined || from === undefined || pane === undefined || !pane.isShown || !pane.isPlaced ||
+    layout === undefined || eventsPath === undefined) {
     stopChild()
     return
   }
   if (child !== undefined && sameLayout(child.layout, layout)) return
   stopChild()
-  startChild($, layout, eventsPath)
+  startChild($, from, layout, eventsPath)
 }
 
 async function open ($: EngineInterface): Promise<string> {
+  if (stopped !== undefined) {
+    await locate($)
+    if (stopped !== undefined) return `Piñata stopped: ${stopped}.`
+    $.ui.invalidate('ui.render')
+  }
   const opened = await $.ui.open({ id: PANE, title: TITLE })
   return opened.isPlaced ? 'Piñata pane opened.' : `Piñata pane waits: ${opened.reason}`
 }
@@ -168,12 +202,13 @@ export const register: Register = on => {
         description: 'Toggle the piñata pane; /pinata hit whacks it; /pinata pixels or blocks picks how it is drawn'
       })
       const tmp = (await $.env.get('TMPDIR')) ?? '/tmp/'
-      eventsPath = `${tmp.endsWith('/') ? tmp : tmp + '/'}pinata-${Date.now()}.events`
+      eventsPath = `${trimSlashes(tmp)}/pinata-${Date.now()}.events`
       const term = await $.env.get('TERM_PROGRAM')
       const termVersion = await $.env.get('TERM_PROGRAM_VERSION')
       const kitty = await $.env.get('KITTY_WINDOW_ID')
       const termName = await $.env.get('TERM')
       await update($, mode, () => guessMode({ term, termVersion, kitty, termName }))
+      void locate($)
       manager?.cancel()
       manager = $.clock.every(MANAGE_MS, () => {
         manage($).catch(err => log($, 'manage failed', err))
@@ -209,10 +244,6 @@ export const register: Register = on => {
       if (pane?.isShown === true) {
         await $.ui.close({ id: PANE })
         return { text: 'Piñata pane closed.' }
-      }
-      if (stopped !== undefined) {
-        stopped = undefined
-        failures = 0
       }
       return { text: await open($) }
     } catch (err) {
@@ -266,7 +297,7 @@ export const register: Register = on => {
       return <Text>Piñata: {word} (the animation shows in the terminal)</Text>
     }
     const { Box, Text, Image, Raster } = $.ui.resolve(e)
-    if (stopped !== undefined) return <Text dimColor>Piñata stopped: {stopped}. Run /pinata to try again.</Text>
+    if (stopped !== undefined) return <Text dimColor>Piñata stopped: {stopped}. Run /pinata open to try again.</Text>
     const layout = layoutFor(await read($, mode), e.props.bodyColumns, e.props.scroll.bodyRows)
     want = layout
     const kept = lastFrame !== undefined && sameLayout(lastFrame.layout, layout) ? lastFrame : undefined

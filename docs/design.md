@@ -914,14 +914,14 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   A blit refused because the Image would draw its alt text (no image protocol, or tmux holding images back) falls
   back to cells.
 - The live renderer is run from the first Piñata checkout: a folder whose `package.json` is named `pinata` and that
-  holds `src/cli/live.ts`, so another project's `live.ts` is never run. The candidates are the repository two folders
-  up when the mod is loaded from the repo's `mods/pinata`; the marketplace checkout when it runs from the plugin cache,
-  which holds only the mod (`<plugins>/cache/<marketplace>/<plugin>/<version>` beside
-  `<plugins>/marketplaces/<marketplace>`); the session's project last. The checkout follows the marketplace and can be
-  ahead of the cached mod.
-- The checkout is looked up at session start and on each retry, not in the pane's timer, so lookups never overlap and
-  a child is never started from a stale folder. With none, the pane stops and says so; while it is stopped, `/pinata`
-  and `/pinata open` retry instead of closing the pane.
+  holds `src/cli/live.ts`. The candidates are the repository two folders up when the mod is loaded from the repo's
+  `mods/pinata` (also how a folder marketplace is read), then the marketplace checkout when it runs from the plugin
+  cache, which holds only the mod (`<plugins>/cache/<marketplace>/<plugin>/<version>` beside
+  `<plugins>/marketplaces/<marketplace>`). The session's project is never a candidate: any cloned repo could name
+  itself `pinata` and have its code run. The checkout follows the marketplace and can be ahead of the cached mod.
+- The checkout is looked up at session start, without holding it up, and on each retry, not in the pane's timer, so
+  lookups never overlap. Until one is found no child starts. With none, the pane stops and says so; `/pinata open`
+  (or `/pinata` on a closed pane) retries and redraws the pane, and `/pinata` on a shown pane still closes it.
 
 ## Formats (`src/formats/`)
 

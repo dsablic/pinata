@@ -68,16 +68,15 @@ export function isAltDeny (deny: string, fix?: string): boolean {
 }
 
 const IN_REPO = '/mods/pinata'
-const CACHED = /^(.*)\/cache\/([^/]+)\/[^/]+\/[^/]+$/
+const CACHED = /^(.*\/plugins)\/cache\/([^/]+)\/[^/]+\/[^/]+$/
 
-function trimSlashes (path: string): string {
+export function trimSlashes (path: string): string {
   return path.replace(/\/+$/, '')
 }
 
-export function checkoutsFor (pluginRoot: string, sessionRoot: string): string[] {
+export function checkoutsFor (pluginRoot: string): string[] {
   const root = trimSlashes(pluginRoot)
   const own = root.endsWith(IN_REPO) ? [root.slice(0, -IN_REPO.length)] : []
   const cached = CACHED.exec(root)
-  const marketplace = cached === null ? [] : [`${cached[1]}/marketplaces/${cached[2]}`]
-  return [...own, ...marketplace, trimSlashes(sessionRoot)]
+  return cached === null ? own : [...own, `${cached[1]}/marketplaces/${cached[2]}`]
 }

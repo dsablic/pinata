@@ -21,8 +21,10 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 [Plan](plans/2026-11-02-natural-page-motion.md): secondary motion (chains, cloth, a robe hem) in the page world, cloth
 drawn in skins, natural falls and landings, jumps up the page, structural draw order; judged against the old terrain
-demo and strong references. Batches A (secondary motion), B (cloth in skins) and C (landings that dip and absorb,
-legs reaching down in falls) done. Next: batch D (jumps).
+demo and strong references. Batches A (secondary motion), B (cloth in skins), C (landings that dip and absorb, legs
+reaching down in falls) and D's jump mechanics (jump edges up to a leg length, ballistic arcs, gated on a recorded
+jump page) done. The demo and page layouts' rises are 1.5-5 m, beyond a human jump, so nobody jumps there: climbing
+the real page needs a decision on jump height. Next: CMU take-off and landing takes for jumps, then batch E.
 
 ### 0. Unified part rendering on the page
 

@@ -73,6 +73,21 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   (`LANDING_ROOM`): a body walking off an edge is still moving when it falls, and would otherwise land past a short
   surface.
   Rises taller than a step have no edge: characters do not climb.
+- Jump edges exist only when the caller gives a jump height and reach (`reach.jump`); without them nothing changes.
+  From a node to another whose top is more than a step and at most the jump height above, in either direction, with
+  a gap between the nearest ends of at most the reach (1 m on the page; a node that runs under the target has no
+  gap). The edge's `at` is the take-off, in the take-off node: far enough back that the body is already above the
+  target's top when it crosses the target's near end, with 30 cm to spare because the leading foot is that far ahead of
+  the root (at 5 cm the foot went 20 cm into the ledge's face; `runUp` in `mocap/jump.ts`, from the arc's time to
+  reach the top), and at least 10 cm back from the gap; the edge's `land` is 25 cm inside the target (its middle on
+  a narrow one), where a body's feet still stand on it. An edge is dropped when the take-off is not on the node,
+  when the speed the arc needs is over 3.5 m/s, when a wall stands where the arc is below its top and within a body
+  of its foot, or when another surface lies above the target's top within the apex's head room. Several jump edges
+  between the same nodes (from either side) are chosen between like parallel drops, by nearness to the goal, and a
+  path given the walker's x takes, for each jump, the take-off nearest to where the walker is (the far side's take-off
+  walked a character through the whole page first). A jump edge is its own type (`JumpEdge`, with `land`). The cast's
+  `placeAnywhere` (drop-ins) uses nodes only, so jump edges do not enter it; `canReach` in the diagnostics takes the
+  character's jump when the cast has jumps on.
 - Each edge carries `at`, the x to head for: 15 cm past the end into the next node (clamped to that node), so a
   walker crosses the end rather than stopping on it.
 - Paths are breadth-first (fewest moves): pages have few surfaces, and fewer drops and steps read as more purposeful
@@ -87,7 +102,8 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - Wandering: rest for 0.8-4 s, pick a reachable node weighted by width and a spot in it at least 0.35 m from its ends,
   then follow the path edge by edge (heading for each edge's `at` at walking speed, 1.1 m/s, east or west), and slow
   down over the last 0.5 m to the spot. The current node is the one under the root at the surface height under it;
-  off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s gives up and rests.
+  off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s plus the time to walk its
+  distance at walking speed gives up and rests.
 - Activities: `rest`, `wander`, `visit` and `flee`; each start after the first rest is counted (`started`, for the
   liveliness gate), and a restart (`moveTo`) puts a walker back at rest. A walk ends `reached` only when it got to its
   spot; giving up (no path any more, a leg over 10 s, or a page change that removed its place) ends it unreached.
@@ -96,6 +112,19 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - While falling a walker makes no plans and commands no speed; walking off an edge it keeps walking until the fall
   starts.
 - `dropIn` restarts a walker above a place (activity `drop`), already falling, so it falls onto it.
+- With `jumps` on, the walker's graph has jump edges for a jump height of one leg length (the shorter leg's hip-knee-
+  ankle chain: knight 0.70 m, wizard 0.79, rogue 0.44, dwarf 0.34), which is as high as a character can put its hip
+  without folding; a share of 0.6 left the rogue and dwarf below a step, so they could jump nowhere. Only the page's
+  cast turns it on; walkers made without it, and drop-ins, behave as before.
+- A jump leg walks to the take-off at walking speed, slowing over the last 0.5 m as for a goal, and when within 6 cm
+  asks the player to jump to the edge's landing (x and the target node's height, in the player's coordinates). A
+  refusal ends the walk unreached, like any leg that cannot go on. A poke in the crouch cancels the jump (the player
+  stays down on the floor, the dip dying away); after take-off it is carried through and the walker replans on
+  landing. A page change in the crouch changes what the launch checks against, so a jump whose target is gone is
+  cancelled at the launch and the walker, whose place is gone, rests. `reached` is cleared when a walk starts. While
+  the player is jumping the walker commands no speed; the frame's `jumpTo` is the surface id aimed at from the
+  command until the landing, which is what the jumps gate counts.
+  Landing anywhere else is off course and replans like any other.
 - `visit` sends a walker to a place (a point on a surface) if a node holds it and the walker can reach that node;
   `reaches` answers the same question without going.
 - A poke turns a walker round and sends it 1.5 m the other way on its node (to its middle on a node too narrow for
@@ -224,6 +253,23 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   the pelvis and the unplanted feet the rule passed a character crouched for good or holding a foot half a metre up. The gates are printed
   with the others and with `--landings` alone; tests check the knee angle and the recovery rule on hand-made frames,
   not the gates.
+- **Jumps** (`src/diagnostics/jumps.ts`, `npm run gates -- --jumps`): every skinned character runs on the recorded
+  jump page (`test/pages/jump-test.html`, layout `jumps`: a 22 m floor, a wall, and eight shelves at 18, 20, 23, 25,
+  37, 39, 42 and 45 px, 0.33 to 0.83 m, so each character has rises up to and just above its jump height, with
+  1.3 m shelves and gaps between them) and on six synthetic grounds (a floor 14 m long, with solid ledges, walls
+  down to the floor): stairs of three steps with rises 0.2, 0.3, 0.4 and 0.5 m and 0.6 m gaps, single ledges, and
+  rises of 1.4 m with a shelf 1.4 m above a ledge. 300 s each, the walker alone, seed 1. It visits each top in turn,
+  returning to the floor after each, starting each trip once resting on the ground (the walker's own wandering
+  jumps in between). A trip counts as a planned jump when the top needs one (no route without jump edges, one with)
+  and is accepted or refused; it is a hit only if the walker ends resting on the aimed surface with every jump of
+  the trip having landed on its aim. A refusal, a time-out (30 s), a short landing or a landing elsewhere is a miss;
+  counting the trips that reached their take-off only was flattering. A climb is a standing frame (base within 1 cm
+  of the surface under it) whose surface is more than the jump height (and 2 cm) above the previous standing one,
+  however it got there. The deepest sole is measured on the jump's frames (crouch to landing) against the surface a
+  sole is over, within 20 cm above it, and held to the page's 1 px planted tolerance. The gate is met per character
+  with at least 40 trips, 95% hits, no climbs and no sole under. The recorded layouts are also run for 60 s with the
+  cast and their jumps counted from the samples (`jumpTo` and `surface`); they print only. Page-test, perception and
+  both demos have rises of 1.5 to 5 m, beyond a jump, so no jumps happen there.
 - **The browser suite** (`npm run test:browser`, about 30 s) checks what needs a browser: the scan against an oracle
   that reads elements directly, after load, scrolling, resizing, adding, removing, inner scrolling and text reflow;
   characters standing on live surfaces (lowest sole within 8 px: mid-stride feet are a few pixels up, and the precise
@@ -602,6 +648,27 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - While falling no foot takes contact from the clip: a foot held on the frame a fall starts stayed planted in mid air.
   The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
   placement follows, so the landing starts from where the feet are drawn.
+- Jumps (`jump(target)`, with `jumping()`): the target is a landing x and a surface height. The arc is
+  `arcOver(rise, run)` in `jump.ts`: the apex is 10 cm of base height above the target's top (a body's base is its
+  feet's rest level), the launch speed `sqrt(2 g (rise + 10 cm))`, the flight time the way up plus the way down from
+  the apex to the top, and the horizontal speed the run over that time. A jump is refused (`false`, nothing
+  changes) when the rise is over one leg length, when the horizontal speed is over 3.5 m/s, when the ground has no
+  surface at the target's height under the landing x, or when the arc, sampled each step, has the base more than 5 cm
+  under the target's top while over that surface (the body would go through its edge). It is also refused while
+  jumping or falling.
+- A jump first crouches: the landing dip, with the launch speed standing for the landing speed (so a higher jump
+  crouches deeper), peaking at 0.18 s, where the body launches; it stops dead at the crouch's start so the arc is
+  computed from where it crouches. The flight sets the base from the exact parabola (stepping gravity added up
+  fell 6 cm short of the apex and landed 12 cm early), the body moves at the arc's constant horizontal speed, and the
+  root follows the body so the landing's ground is the arc's. No foot is held in the air, and the feet follow the
+  clip going up and reach down, as for falls, only after the apex (`fallSpeed` is negative going up). The landing is
+  the ordinary one (dip from the downward speed), with the body's horizontal speed removed at touchdown.
+- The pelvis keeps the settled drop the grounded legs had at launch, and eases it out over 0.2 s (smoothstep): the
+  flight alone drops it, which moved the knight's pelvis 0.22 m in one frame at launch. No frame moves the pelvis by
+  more than the launch speed over a frame (3.3 m/s, 14 cm at 24 fps), which a test holds. In flight the feet see the
+  target's top (the ground from the target's height), so a sole over the target is lifted onto it instead of going
+  into its face or edge, and feet reaching down for the landing are lifted above the ground under them.
+  Take-off is 30 cm back of the near end because the leading foot is that far ahead of the root.
 
 ## The world (`src/world/`)
 

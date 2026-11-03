@@ -6,6 +6,8 @@ import type { Sample } from '../page/cast.ts'
 import { LAYOUTS, readLayout } from '../page/fixture.ts'
 import { DROP_HEIGHTS, landings, PLANTED_TOLERANCE, REACTION_SECONDS } from '../diagnostics/landings.ts'
 import type { Landings } from '../diagnostics/landings.ts'
+import { countJumps, FEWEST_TRIPS, jumps, SMALLEST_SHARE_LANDED } from '../diagnostics/jumps.ts'
+import type { JumpRun, Tally } from '../diagnostics/jumps.ts'
 import { flickerFraction } from '../diagnostics/stability.ts'
 import type { Image } from '../image.ts'
 import type { ReadWorld } from '../world/bundle.ts'
@@ -94,6 +96,44 @@ function landingGates (all: Landings[]): void {
   }
 }
 
+function jumpGates (runs: JumpRun[]): void {
+  const shown = (t: Tally): string => {
+    return `${t.arrived} of ${t.trips} trips, ${t.jumps.landed} of ${t.jumps.planned} jumps, ${t.climbs} climbs`
+  }
+  for (const run of runs) {
+    const { synthetic: a, recorded: b } = run
+    const trips = a.trips + b.trips
+    const arrived = a.arrived + b.arrived
+    const climbs = a.climbs + b.climbs
+    const deepest = Math.max(a.deepest, b.deepest)
+    const met = trips >= FEWEST_TRIPS && arrived >= SMALLEST_SHARE_LANDED * trips && climbs === 0 &&
+      deepest <= PLANTED_TOLERANCE
+    const verdict = met ? 'GATE MET' : 'GATE MISSED'
+    console.log(`${verdict} ${run.name}: at least ${100 * SMALLEST_SHARE_LANDED}% of planned jumps land on the ` +
+      `surface they aim for (a planned jump is a visit to a top that needs one; refusals, time-outs and short ` +
+      `landings are misses), nobody climbs a rise above the jump height of ` +
+      `${run.jumpHeight.toFixed(2)} m, and no sole goes more than ` +
+      `${(100 * PLANTED_TOLERANCE).toFixed(1)} cm under a surface in a jump (${arrived} of ${trips} trips, at least ` +
+      `${FEWEST_TRIPS}; ${climbs} climbs; deepest sole ${(100 * deepest).toFixed(1)} cm; recorded jump page: ` +
+      `${shown(b)}; synthetic grounds: ${shown(a)})`)
+  }
+}
+
+function recordedJumps (world: ReadWorld): void {
+  for (const spec of LAYOUTS) {
+    const s = scenario(world, readLayout(ROOT, spec.name))
+    run(s, NODE_SECONDS)
+    const samples = s.cast.samples()
+    const names = [...new Set(samples.map(m => m.name))]
+    const counts = names.map(name => countJumps(samples.filter(m => m.name === name)))
+    const each = names.map((name, i) => `${name} ${counts[i].landed} of ${counts[i].planned}`).join(', ')
+    const planned = counts.reduce((sum, c) => sum + c.planned, 0)
+    const landed = counts.reduce((sum, c) => sum + c.landed, 0)
+    console.log(`jumps on ${spec.name} over ${NODE_SECONDS} s: ${landed} of ${planned} planned jumps landed on ` +
+      `their surface (${each})`)
+  }
+}
+
 async function main (): Promise<number> {
   if (process.argv.includes('--browser')) {
     await withSite(async session => {
@@ -108,6 +148,11 @@ async function main (): Promise<number> {
     landingGates(landings(world))
     return 0
   }
+  if (process.argv.includes('--jumps')) {
+    jumpGates(jumps(world, [readLayout(ROOT, 'jumps')]))
+    recordedJumps(world)
+    return 0
+  }
   clothFlicker(world)
   for (const spec of LAYOUTS) {
     const s = scenario(world, readLayout(ROOT, spec.name))
@@ -115,6 +160,8 @@ async function main (): Promise<number> {
     report(standing(s.cast.samples()), `on ${spec.name} over ${NODE_SECONDS} s`)
   }
   landingGates(landings(world))
+  jumpGates(jumps(world, [readLayout(ROOT, 'jumps')]))
+  recordedJumps(world)
   return 0
 }
 

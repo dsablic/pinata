@@ -2,7 +2,9 @@ import type { ReadWorld } from '../world/bundle.ts'
 import { createCast, FPS, pageEnvironment } from '../page/cast.ts'
 import type { Cast, CastOptions, CharacterState, Mark, Moving, Sample, Viewport } from '../page/cast.ts'
 import type { LayoutFixture, Target } from '../page/fixture.ts'
+import { jumpOf } from '../mocap/jump.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
+import type { Jump } from '../page/graph.ts'
 import { placeFor } from '../page/perception.ts'
 import type { Ground } from '../page/surfaces.ts'
 import { DROP_LIMIT, STEP_HEIGHT } from '../page/walker.ts'
@@ -58,9 +60,19 @@ export function placeOfTarget (s: Scenario, target: Target): Place | undefined {
   return placeFor(target.rect, own, s.cast.ground(), s.fixture.pixelsPerMetre)
 }
 
-export function canReach (ground: Ground, c: CharacterState<string>, place: Place, pixelsPerMetre: number): boolean {
+export function jumpOfCast (world: ReadWorld, name: string): Jump {
+  const member = world.cast.find(m => m.name === name)
+  const database = member?.capture
+  if (database === undefined) throw new Error(`${name} has no motion database`)
+  return jumpOf(database.options.rig, database.options.rest)
+}
+
+export function canReach (
+  ground: Ground, c: CharacterState<string>, place: Place, pixelsPerMetre: number, jump?: Jump
+): boolean {
   if (c.falling) return false
-  const graph = surfaceGraph(ground, { step: STEP_HEIGHT, drop: DROP_LIMIT, body: TALLEST_BODY })
+  const reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: TALLEST_BODY, ...(jump === undefined ? {} : { jump }) }
+  const graph = surfaceGraph(ground, reach)
   const from = nodeAt(graph, c.x / pixelsPerMetre, -c.y / pixelsPerMetre, ON_NODE)
   const to = nodeAt(graph, place.x, place.height, ON_NODE)
   if (from === undefined || to === undefined) return false

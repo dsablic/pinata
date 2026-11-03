@@ -64,7 +64,7 @@ export type CharacterState<K> = {
   placedAgain: number
 }
 export type FootSample = { planted: boolean, gap: number | null }
-export type Sample = { name: string, falling: boolean, feet: FootSample[] }
+export type Sample = { name: string, falling: boolean, surface: number, jumpTo: number | undefined, feet: FootSample[] }
 export type Visit<K> = { name: string, key: K, say?: string }
 export type Advance = { stepped: boolean, changed: boolean }
 export type Cast<K> = {
@@ -261,7 +261,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
         const place = placeAnywhere()
         if (place === undefined) continue
         const yaw = nextYaw()
-        c.walker = createWalker({ database: c.database, fps: FPS, random: next, ground, place, yaw, attraction })
+        const { database } = c
+        c.walker = createWalker({ database, fps: FPS, random: next, ground, place, yaw, attraction, jumps: true })
       }
       c.on = standingOn(c.walker.support())
     }
@@ -300,7 +301,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       const known = gaps.filter((gap): gap is number => gap !== null)
       return { planted: foot.planted, gap: known.length === 0 ? null : Math.min(...known) }
     })
-    samples.push({ name: c.name, falling: frame.falling, feet })
+    samples.push({ name: c.name, falling: frame.falling, surface: frame.support?.id ?? -1, jumpTo: frame.jumpTo, feet })
     keep(samples, KEPT_SAMPLES)
   }
 

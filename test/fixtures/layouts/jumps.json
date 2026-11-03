@@ -1,0 +1,153 @@
+{
+  "name": "jumps",
+  "page": "jump-test.html",
+  "width": 1200,
+  "height": 900,
+  "pixelsPerMetre": 54,
+  "scale": 2,
+  "seed": 13,
+  "platform": "darwin",
+  "marks": [
+    {
+      "id": "floor",
+      "box": {
+        "id": 0,
+        "mark": "ground",
+        "left": 0,
+        "top": 800,
+        "width": 1200,
+        "height": 100
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "wall",
+      "box": {
+        "id": 1,
+        "mark": "wall",
+        "left": 1150,
+        "top": 650,
+        "width": 8,
+        "height": 150
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s0",
+      "box": {
+        "id": 2,
+        "mark": "ground",
+        "left": 40,
+        "top": 782,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s1",
+      "box": {
+        "id": 3,
+        "mark": "ground",
+        "left": 180,
+        "top": 780,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s2",
+      "box": {
+        "id": 4,
+        "mark": "ground",
+        "left": 320,
+        "top": 777,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s3",
+      "box": {
+        "id": 5,
+        "mark": "ground",
+        "left": 460,
+        "top": 775,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s4",
+      "box": {
+        "id": 6,
+        "mark": "ground",
+        "left": 600,
+        "top": 763,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s5",
+      "box": {
+        "id": 7,
+        "mark": "ground",
+        "left": 740,
+        "top": 761,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s6",
+      "box": {
+        "id": 8,
+        "mark": "ground",
+        "left": 880,
+        "top": 758,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    },
+    {
+      "id": "s7",
+      "box": {
+        "id": 9,
+        "mark": "ground",
+        "left": 1020,
+        "top": 755,
+        "width": 70,
+        "height": 8
+      },
+      "hints": {
+        "attract": 0
+      }
+    }
+  ],
+  "targets": []
+}

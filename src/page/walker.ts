@@ -2,6 +2,7 @@ import { legsOf } from '../formats/rig.ts'
 import { createPlayer } from '../mocap/player.ts'
 import type { Player, PlayerFrame } from '../mocap/player.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
+import { jumpOf } from '../mocap/jump.ts'
 import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
@@ -9,7 +10,7 @@ import type { Vec3 } from '../math/vec.ts'
 import type { Transforms } from '../motion/skeleton.ts'
 import { toWorld } from '../sim/body.ts'
 import { nodeAt, path, reachable, surfaceGraph } from './graph.ts'
-import type { Edge, Graph, Node, Reach } from './graph.ts'
+import type { Edge, Graph, JumpEdge, Node, Reach } from './graph.ts'
 import { DEPTH_WITH_NO_GROUND, surfaceBelow } from './surfaces.ts'
 import type { Ground, Surface } from './surfaces.ts'
 
@@ -30,6 +31,7 @@ export type WalkerFrame = {
   activity: Activity
   started: number
   reached: boolean
+  jumpTo: number | undefined
 }
 export type Walker = {
   step: () => WalkerFrame
@@ -50,6 +52,7 @@ export type WalkerOptions = {
   ground: Ground
   place: Place
   yaw: number
+  jumps?: boolean
   attraction?: (surface: number) => number
 }
 
@@ -67,6 +70,7 @@ const LINGER_PER_ATTRACTION = 0.5
 const ON_NODE = 1e-3
 const SOLE_REACH = 0.02
 
+type Move = { speed: number, target: number }
 type Goal = { node: number, x: number, height: number }
 const EAST = Math.PI / 2
 const WEST = -Math.PI / 2
@@ -83,7 +87,8 @@ export function createWalker (options: WalkerOptions): Walker {
   const { database, fps, random } = options
   const { rig, rest, mannequin } = database.options
   const legs = legsOf(rig)
-  const reach: Reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: tallest(rest) }
+  const jump = options.jumps === true ? { jump: jumpOf(rig, rest) } : {}
+  const reach: Reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: tallest(rest), ...jump }
   let ground = options.ground
   let graph: Graph = surfaceGraph(ground, reach)
   let standing = options.place.height
@@ -95,10 +100,12 @@ export function createWalker (options: WalkerOptions): Walker {
   let goal: Goal | undefined
   let restUntil = 0
   let legStart = 0
+  let legMetres = 0
   let time = 0
   let activity: Activity = 'rest'
   let reached = false
   let started = 0
+  let jumpTo: number | undefined
   const attraction = options.attraction ?? (() => 0)
 
   const begin = (next: Activity): void => {
@@ -135,7 +142,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const falling = player?.falling() ?? false
     const under = supportAt(root.position[0])
     const support = under === undefined ? {} : { support: under }
-    const doing = { heading, moving, activity, started, reached }
+    const doing = { heading, moving, activity, started, reached, jumpTo }
     return { joints, body, transforms, root, base: worldStanding(), falling, ...support, feet, ...doing }
   }
 
@@ -153,6 +160,7 @@ export function createWalker (options: WalkerOptions): Walker {
     restUntil = time
     activity = 'rest'
     reached = false
+    jumpTo = undefined
   }
   start(options.place, options.yaw)
 
@@ -164,10 +172,16 @@ export function createWalker (options: WalkerOptions): Walker {
     return nodeAt(graph, current.root.position[0], under.height, ON_NODE)
   }
 
+  const startLeg = (to: number): void => {
+    legStart = time
+    legMetres = Math.abs(to - current.root.position[0])
+  }
+
   const aimAt = (node: Node, x: number, next: Activity): void => {
     route = []
     goal = { node: node.id, x, height: node.height }
-    legStart = time
+    startLeg(x)
+    reached = false
     begin(next)
   }
 
@@ -202,36 +216,53 @@ export function createWalker (options: WalkerOptions): Walker {
     return from.id === node.id || path(graph, from.id, node.id) !== undefined ? node : undefined
   }
 
-  const followRoute = (node: Node): { speed: number, target: number } | 'arrived' | undefined => {
+  const approach = (to: number): Move => {
+    const distance = Math.abs(to - current.root.position[0])
+    const speed = Math.max(SLOWEST_SPEED, Math.min(WALK_SPEED, WALK_SPEED * distance / SLOW_WITHIN))
+    return { speed, target: to }
+  }
+
+  const followRoute = (node: Node): Move | 'arrived' | { jump: JumpEdge } | undefined => {
     if (goal === undefined) return undefined
     if (route.length > 0 && node.id === route[0].to) {
       route.shift()
-      legStart = time
+      startLeg(route.at(0)?.at ?? goal.x)
     }
     const onCourse = route.length > 0 ? node.id === route[0].from : node.id === goal.node
     if (!onCourse) {
-      const replanned = path(graph, node.id, goal.node, goal.x)
+      const replanned = path(graph, node.id, goal.node, goal.x, current.root.position[0])
       if (replanned === undefined) return undefined
       route = replanned
     }
-    if (time - legStart > LEG_TIMEOUT_SECONDS) return undefined
-    const x = current.root.position[0]
-    if (route.length > 0) return { speed: WALK_SPEED, target: route[0].at }
-    const distance = Math.abs(goal.x - x)
-    if (distance < ARRIVED) return 'arrived'
-    return { speed: Math.max(SLOWEST_SPEED, Math.min(WALK_SPEED, WALK_SPEED * distance / SLOW_WITHIN)), target: goal.x }
+    if (time - legStart > LEG_TIMEOUT_SECONDS + legMetres / WALK_SPEED) return undefined
+    const edge = route.at(0)
+    if (edge !== undefined && edge.kind !== 'jump') return { speed: WALK_SPEED, target: edge.at }
+    const to = edge?.at ?? goal.x
+    if (Math.abs(to - current.root.position[0]) >= ARRIVED) return approach(to)
+    return edge === undefined ? 'arrived' : { jump: edge }
+  }
+
+  const takeOff = (edge: JumpEdge): boolean => {
+    const target = graph.nodes[edge.to]
+    const place = { x: edge.land - offset[0], height: target.height - offset[1] }
+    if (!player.jump(place)) return false
+    jumpTo = target.surface
+    heading = headingTo(current.root.position[0], edge.land)
+    return true
   }
 
   const decide = (): { speed: number, heading: number } => {
+    if (player.jumping()) return { speed: 0, heading }
     const node = here()
     if (node === undefined) return { speed: current.falling ? 0 : WALK_SPEED, heading }
     if (goal === undefined && time >= restUntil) chooseGoal(node)
     if (goal === undefined) return { speed: 0, heading }
     const move = followRoute(node)
-    if (move === undefined || move === 'arrived') {
+    if (move === undefined || move === 'arrived' || ('jump' in move && !takeOff(move.jump))) {
       arrive(move === 'arrived')
       return { speed: 0, heading }
     }
+    if ('jump' in move) return { speed: 0, heading }
     heading = headingTo(current.root.position[0], move.target)
     return { speed: move.speed, heading }
   }
@@ -242,6 +273,7 @@ export function createWalker (options: WalkerOptions): Walker {
       player.command(command)
       const frame: PlayerFrame = player.step()
       standing = player.height()
+      if (!player.jumping()) jumpTo = undefined
       time += 1 / fps
       current = frameOf(frame.root, frame.pose, frame.transforms, frame.planted, command.speed > 0)
       return current
@@ -270,6 +302,7 @@ export function createWalker (options: WalkerOptions): Walker {
     poke: () => {
       const node = here()
       heading = heading === EAST ? WEST : EAST
+      player.cancelJump()
       if (node === undefined) return
       const away = current.root.position[0] + (heading === EAST ? POKE_RUN : -POKE_RUN)
       aimAt(node, inside(node, away), 'flee')

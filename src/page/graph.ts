@@ -1,13 +1,19 @@
+import { arcOver, heightAt, JUMP_CLEARANCE, LAND_IN, MOST_JUMP_SPEED, runUp } from '../mocap/jump.ts'
+import type { Arc } from '../mocap/jump.ts'
 import type { Ground, Surface, Wall } from './surfaces.ts'
 
-export type Reach = { step: number, drop: number, body: number }
+export type Jump = { height: number, reach: number }
+export type Reach = { step: number, drop: number, body: number, jump?: Jump }
 export type Node = { id: number, surface: number, from: number, to: number, height: number }
-export type Edge = { from: number, to: number, kind: 'walk' | 'drop', at: number }
+export type StepEdge = { from: number, to: number, kind: 'walk' | 'drop', at: number }
+export type JumpEdge = { from: number, to: number, kind: 'jump', at: number, land: number }
+export type Edge = StepEdge | JumpEdge
 export type Graph = { nodes: Node[], edges: Edge[] }
 
 const BEYOND_END = 0.02
 const INTO_NEXT = 0.15
 const LANDING_ROOM = 0.8
+const TAKE_OFF_INSET = 0.1
 const SAME_PLACE = 1e-6
 
 type Span = [number, number]
@@ -85,6 +91,42 @@ function edgesFrom (ground: Ground, nodes: Node[], node: Node, reach: Reach): Ed
   return edges
 }
 
+function unobstructed (ground: Ground, from: Node, to: Node, span: [number, number], arc: Arc, body: number): boolean {
+  const [low, high] = span[0] < span[1] ? span : [span[1], span[0]]
+  const feetAt = (x: number): number => from.height + heightAt(arc, (x - span[0]) / arc.speed)
+  const hits = (w: Wall): boolean => w.top > feetAt(w.x) && w.bottom < feetAt(w.x) + body
+  const walled = ground.walls.some(w => w.x >= low && w.x <= high && hits(w))
+  const roofed = ground.surfaces.some(s => {
+    const own = s.id === from.surface || s.id === to.surface
+    return !own && s.to >= low && s.from <= high && s.height > to.height && s.height < to.height + JUMP_CLEARANCE + body
+  })
+  return !walled && !roofed
+}
+
+function jumpEdge (ground: Ground, node: Node, target: Node, direction: -1 | 1, body: number, jump: Jump): JumpEdge[] {
+  const rise = target.height - node.height
+  const near = direction > 0 ? target.from : target.to
+  const gap = Math.max(0, direction * (near - (direction > 0 ? node.to : node.from)))
+  if (gap > jump.reach) return []
+  const takeOff = near - direction * Math.max(runUp(rise), gap + TAKE_OFF_INSET)
+  if (takeOff < node.from || takeOff > node.to) return []
+  const land = near + direction * Math.min(LAND_IN, (target.to - target.from) / 2)
+  const arc = arcOver(rise, land - takeOff)
+  if (Math.abs(arc.speed) > MOST_JUMP_SPEED) return []
+  if (!unobstructed(ground, node, target, [takeOff, land], arc, body)) return []
+  return [{ from: node.id, to: target.id, kind: 'jump', at: takeOff, land }]
+}
+
+function jumpsFrom (ground: Ground, nodes: Node[], node: Node, reach: Reach): JumpEdge[] {
+  const jump = reach.jump
+  if (jump === undefined) return []
+  return nodes.flatMap(target => {
+    const rise = target.height - node.height
+    if (rise <= reach.step || rise > jump.height) return []
+    return [-1 as const, 1 as const].flatMap(direction => jumpEdge(ground, node, target, direction, reach.body, jump))
+  })
+}
+
 export function surfaceGraph (ground: Ground, reach: Reach): Graph {
   const nodes: Node[] = []
   ground.surfaces.forEach((surface, index) => {
@@ -92,11 +134,13 @@ export function surfaceGraph (ground: Ground, reach: Reach): Graph {
       nodes.push({ id: nodes.length, surface: surface.id, from, to, height: surface.height })
     }
   })
-  const edges = nodes.flatMap(node => edgesFrom(ground, nodes, node, reach))
+  const edges: Edge[] = nodes.flatMap(node => [
+    ...edgesFrom(ground, nodes, node, reach), ...jumpsFrom(ground, nodes, node, reach)
+  ])
   return { nodes, edges }
 }
 
-export function path (graph: Graph, from: number, to: number, towards?: number): Edge[] | undefined {
+export function path (graph: Graph, from: number, to: number, towards?: number, start?: number): Edge[] | undefined {
   const via = new Map<number, Edge | undefined>([[from, undefined]])
   const queue = [from]
   while (queue.length > 0) {
@@ -118,7 +162,20 @@ export function path (graph: Graph, from: number, to: number, towards?: number):
     if (aim !== undefined) route[i] = parallel.reduce((a, b) => Math.abs(b.at - aim) < Math.abs(a.at - aim) ? b : a)
     target = route[i].at
   }
+  if (start !== undefined) nearestTakeOffs(graph, route, start)
   return route
+}
+
+function nearestTakeOffs (graph: Graph, route: Edge[], start: number): void {
+  let from = start
+  route.forEach((edge, i) => {
+    if (edge.kind === 'jump') {
+      const jumps = graph.edges.filter(e => e.kind === 'jump' && e.from === edge.from && e.to === edge.to)
+      route[i] = jumps.reduce((a, b) => Math.abs(b.at - from) < Math.abs(a.at - from) ? b : a)
+    }
+    const placed = route[i]
+    from = placed.kind === 'jump' ? placed.land : placed.at
+  })
 }
 
 export function reachable (graph: Graph, from: number): number[] {

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { nodeAt, path, reachable, surfaceGraph } from '../src/page/graph.ts'
-import type { Graph } from '../src/page/graph.ts'
+import type { Graph, JumpEdge } from '../src/page/graph.ts'
 import type { Ground, Surface, Wall } from '../src/page/surfaces.ts'
 
 const REACH = { step: 0.2, drop: 3, body: 1.8 }
@@ -101,4 +101,40 @@ test('a drop needs room to land: a lower surface ending just past the edge is no
   const roomy = surfaceGraph(ground([[0, 11, 0], [4, 10, 1]]), REACH)
   const eastward = (graph: Graph): number => graph.edges.filter(e => e.from === on(graph, 5, 1) && e.at > 10).length
   assert.deepEqual([eastward(short), eastward(roomy)], [0, 1])
+})
+
+const JUMPING = { ...REACH, jump: { height: 0.6, reach: 1 } }
+
+test('a ledge over a step and within the jump height is jumped onto from both sides, taking off short of it', () => {
+  const graph = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.4]]), JUMPING)
+  const [floor, ledge] = [on(graph, 1, 0), on(graph, 5, 0.4)]
+  const jumps = graph.edges.filter(e => e.from === floor && e.to === ledge)
+  assert.deepEqual(jumps.map(e => e.kind), ['jump', 'jump'])
+  const west = jumps.find(e => e.at < 4) as JumpEdge
+  const east = jumps.find(e => e.at > 6) as JumpEdge
+  assert.ok(west.at < 4 && west.land > 4 && west.land < 6, 'taking off west of the ledge, landing on it')
+  assert.ok(east.at > 6 && east.land < 6 && east.land > 4, 'taking off east of the ledge, landing on it')
+  assert.ok(path(graph, floor, ledge) !== undefined)
+  assert.equal(path(surfaceGraph(ground([[0, 10, 0], [4, 6, 0.4]]), REACH), floor, ledge), undefined)
+})
+
+test('no jump onto a surface above the jump height, or one a step or less above', () => {
+  const high = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.8]]), JUMPING)
+  const low = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.15]]), JUMPING)
+  assert.deepEqual([high, low].map(g => g.edges.filter(e => e.kind === 'jump').length), [0, 0])
+})
+
+test('a jump crosses a gap up to the reach and no further', () => {
+  const near = surfaceGraph(ground([[0, 3, 0], [3.8, 6, 0.4]]), JUMPING)
+  const far = surfaceGraph(ground([[0, 3, 0], [4.5, 7, 0.4]]), JUMPING)
+  const across = (graph: Graph): number => graph.edges.filter(e => e.kind === 'jump' && e.at < 3).length
+  assert.deepEqual([across(near), across(far)], [1, 0])
+})
+
+test('a shelf or a wall in the way of the arc stops the jump', () => {
+  const jumpsOnto = (graph: Graph): number => graph.edges.filter(e => e.kind === 'jump').length
+  const open = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.4], [3, 7, 4]]), JUMPING)
+  const roofed = surfaceGraph(ground([[0, 10, 0], [4, 6, 0.4], [3, 7, 1.2]]), JUMPING)
+  const walled = surfaceGraph(ground([[0, 3.8, 0], [4, 6, 0.4]], [[3.9, 0, 3]]), JUMPING)
+  assert.deepEqual([open, roofed, walled].map(jumpsOnto), [2, 0, 0])
 })

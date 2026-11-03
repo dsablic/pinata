@@ -11,11 +11,16 @@ import type { RootState } from '../motion/script.ts'
 import { transformTo } from '../motion/skeleton.ts'
 import type { Transforms } from '../motion/skeleton.ts'
 import { turnBetween, turnToLocal, turnToWorld } from '../world/yaw.ts'
+import { arcOver, heightAt, jumpHeightOf, legLengthOf, MOST_JUMP_SPEED } from './jump.ts'
+import type { Arc } from './jump.ts'
 import { ankleVelocity, featureOf, featureWeights, HORIZONS } from './database.ts'
 import type { MotionDatabase } from './database.ts'
 import { assemble, raise } from './retarget.ts'
 import type { BodyFrame } from './retarget.ts'
 
+export type JumpTarget = { x: number, height: number }
+type Flight = { arc: Arc, from: number, elapsed: number, drop: number }
+type Jump = { target: JumpTarget, crouched: number, flight?: Flight }
 export type Command = { speed: number, heading: number }
 export type BodyTuning = {
   speedGain: number
@@ -46,6 +51,9 @@ export type Player = {
   step: () => PlayerFrame
   height: () => number
   falling: () => boolean
+  jump: (target: JumpTarget) => boolean
+  jumping: () => boolean
+  cancelJump: () => void
 }
 
 const DEFAULT_TUNING: BodyTuning = { speedGain: 3, maxAcceleration: 3, turnGain: 4, drag: 0.03 }
@@ -84,6 +92,10 @@ const DIP_LEG_SHARE = 0.24
 const DIP_RISE_SECONDS = 0.07
 const DIP_RISE_PER_SPEED = 0.008
 const DIP_LASTS = 6
+const CROUCH_SECONDS = 0.18
+const LAUNCH_EASE_SECONDS = 0.2
+const SURFACE_TOLERANCE = 0.02
+const INSIDE_TOLERANCE = 0.05
 const REACH_DOWN_SHARE = 0.93
 const REACH_DOWN_SECONDS = 0.15
 const MAX_GRADE = Math.tan(60 * Math.PI / 180)
@@ -232,10 +244,14 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   let landing: { depth: number, rise: number, elapsed: number } | undefined
   let airborne = 0
   let fallSpeed: number | undefined
+  let standingDrop = 0
+  let jump: Jump | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const groundUnder = (p: Vec3): number => ground(p[0], p[2], p[1])
-  const groundAcross = (p: Vec3): number => ground(p[0], p[2])
+  const groundAcross = (p: Vec3): number => {
+    return jump?.flight === undefined ? ground(p[0], p[2]) : ground(p[0], p[2], jump.target.height)
+  }
   const heightAboveGround = (p: Vec3): number => p[1] - groundAcross(p)
   const groundRoot = (): Vec3 => [root.position[0], 0, root.position[2]]
   const toWorldPoint = (local: Vec3): Vec3 => add(groundRoot(), turnToWorld(local, root.yaw))
@@ -243,7 +259,13 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     return [Math.sin(command.heading) * command.speed, 0, Math.cos(command.heading) * command.speed]
   }
 
+  const inFlight = (): boolean => jump?.flight !== undefined
+
   const stepBody = (): void => {
+    if (inFlight()) {
+      body.position = add(body.position, scale(body.velocity, dt))
+      return
+    }
     const want = wantedVelocity()
     const relative = sub(wind, body.velocity)
     let drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
@@ -603,21 +625,80 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
 
   const fall = (): void => {
     fallSpeed = (fallSpeed ?? 0) + GRAVITY * dt
+    let next = base - fallSpeed * dt
+    if (jump?.flight !== undefined) {
+      jump.flight.elapsed += dt
+      next = jump.flight.from + heightAt(jump.flight.arc, jump.flight.elapsed)
+    }
+    if (fallSpeed < 0) {
+      base = next
+      for (const foot of feet) foot.reference = base
+      return
+    }
     const support = supportUnderBody()
-    base = Math.max(support, base - fallSpeed * dt)
+    base = Math.max(support, next)
     for (const foot of feet) foot.reference = base
     if (base > support) return
     landing = landingFrom(fallSpeed)
     fallSpeed = undefined
     settle = 0
+    if (jump === undefined) return
+    jump = undefined
+    body.velocity = [0, 0, 0]
+  }
+
+  const landsOn = (target: JumpTarget, arc: Arc): boolean => {
+    const onTop = (x: number): boolean => {
+      return Math.abs(ground(x, body.position[2], target.height) - target.height) <= SURFACE_TOLERANCE
+    }
+    const inside = (seconds: number): boolean => {
+      const x = body.position[0] + arc.speed * seconds
+      return base + heightAt(arc, seconds) < target.height - INSIDE_TOLERANCE && onTop(x)
+    }
+    const times = Array.from({ length: Math.floor(arc.seconds / dt) }, (_, i) => i * dt)
+    return onTop(target.x) && !times.some(inside)
+  }
+
+  const arcTo = (target: JumpTarget): Arc | undefined => {
+    const rise = target.height - base
+    if (rise > jumpHeightOf(legLengthOf(rig, rest)) + SURFACE_TOLERANCE) return undefined
+    const arc = arcOver(rise, target.x - body.position[0])
+    return Math.abs(arc.speed) <= MOST_JUMP_SPEED && landsOn(target, arc) ? arc : undefined
+  }
+
+  const launch = (started: Jump): void => {
+    const arc = arcTo(started.target)
+    if (arc === undefined) {
+      jump = undefined
+      return
+    }
+    started.flight = { arc, from: base, elapsed: 0, drop: standingDrop }
+    landing = undefined
+    fallSpeed = -arc.launch
+    body.velocity = [arc.speed, 0, 0]
+    letGoOfTheGround()
+  }
+
+  const launchDrop = (): number => {
+    if (jump?.flight === undefined) return 0
+    const u = clamp(jump.flight.elapsed / LAUNCH_EASE_SECONDS, 0, 1)
+    return jump.flight.drop * (1 - u * u * (3 - 2 * u))
+  }
+
+  const crouch = (): void => {
+    if (jump === undefined || fallSpeed !== undefined) return
+    jump.crouched += dt
+    if (jump.crouched >= CROUCH_SECONDS) launch(jump)
   }
 
   const reachingDown = (placed: Placed, hip: Vec3, k: number): Placed => {
     const under: Vec3 = [hip[0], hip[1] - REACH_DOWN_SHARE * reach[k], hip[2]]
     const w = 1 - Math.exp(-airborne / REACH_DOWN_SECONDS)
     const ankle = placed.ankle.map((v, i) => v + (under[i] - v) * w) as Vec3
-    feet[k].last = { ankle, rotation: placed.rotation }
-    return { ...placed, ankle }
+    const lift = jump === undefined ? 0 : liftAboveGround(soles(ankle, placed.rotation, k), 0)
+    const lifted: Vec3 = [ankle[0], ankle[1] + lift, ankle[2]]
+    feet[k].last = { ankle: lifted, rotation: placed.rotation }
+    return { ...placed, ankle: lifted }
   }
 
   const landingFrom = (speed: number): { depth: number, rise: number, elapsed: number } => ({
@@ -679,10 +760,23 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     command: next => { command = next },
     height: () => base,
     falling: () => fallSpeed !== undefined,
+    jumping: () => jump !== undefined,
+    cancelJump: () => {
+      if (jump?.flight === undefined) jump = undefined
+    },
+    jump: target => {
+      const arc = jump === undefined && fallSpeed === undefined ? arcTo(target) : undefined
+      if (arc === undefined) return false
+      jump = { target, crouched: 0 }
+      body.velocity = [0, 0, 0]
+      landing = { ...landingFrom(arc.launch), rise: CROUCH_SECONDS }
+      return true
+    },
     push: impulse => { body.velocity = add(body.velocity, [impulse[0], 0, impulse[2]]) },
     step: () => {
       switched = false
       stepBody()
+      crouch()
       if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT && feetOverTheDrop()) {
         fallSpeed = 0
         landing = undefined
@@ -691,19 +785,23 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
       if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
       if (frameCount > 0) advance()
+      if (inFlight()) root.position = [body.position[0], root.position[1], body.position[2]]
       const frame = playing()
       previousFrame = lastFrame
       lastFrame = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
       if (fallSpeed !== undefined) fall()
-      airborne = fallSpeed === undefined ? 0 : airborne + dt
+      airborne = fallSpeed === undefined || fallSpeed < 0 ? 0 : airborne + dt
+      const rising = fallSpeed !== undefined && fallSpeed < 0
       const targets = legs.map((leg, k) => {
         const contact = fallSpeed === undefined && (frame.contact[k] ?? true)
         const placed = placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY, contact)
         if (fallSpeed === undefined) return placed
+        if (rising) return placed
         return reachingDown(placed, toWorldPoint(add(pose[leg.hip], [0, base, 0])), k)
       })
-      const drop = fallSpeed === undefined ? standOnFeet(pose, targets) : 0
+      const drop = fallSpeed === undefined ? standOnFeet(pose, targets) : launchDrop()
+      if (fallSpeed === undefined) standingDrop = drop
       if (landing !== undefined && fallSpeed === undefined) landing.elapsed += dt
       raise(pose, transforms, Object.keys(pose), base + drop)
       const clamped = solveLegs(pose, transforms, targets)

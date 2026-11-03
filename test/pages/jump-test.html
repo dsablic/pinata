@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piñata jump test</title>
+<style>
+  body { margin: 0; height: 900px; background: #f4ecd8; position: relative; overflow: hidden; }
+  .box { position: absolute; background: #e2d4b8; border: 1px solid #b9a682; box-sizing: border-box; }
+  #floor { left: 0; top: 800px; width: 1200px; height: 100px; }
+  #wall { left: 1150px; top: 650px; width: 8px; height: 150px; }
+  #s0 { left: 40px; top: 782px; width: 70px; height: 8px; }
+  #s1 { left: 180px; top: 780px; width: 70px; height: 8px; }
+  #s2 { left: 320px; top: 777px; width: 70px; height: 8px; }
+  #s3 { left: 460px; top: 775px; width: 70px; height: 8px; }
+  #s4 { left: 600px; top: 763px; width: 70px; height: 8px; }
+  #s5 { left: 740px; top: 761px; width: 70px; height: 8px; }
+  #s6 { left: 880px; top: 758px; width: 70px; height: 8px; }
+  #s7 { left: 1020px; top: 755px; width: 70px; height: 8px; }
+</style>
+</head>
+<body>
+  <div id="floor" class="box" data-pinata="ground"></div>
+  <div id="wall" class="box" data-pinata="wall"></div>
+  <div id="s0" class="box" data-pinata="ground"></div>
+  <div id="s1" class="box" data-pinata="ground"></div>
+  <div id="s2" class="box" data-pinata="ground"></div>
+  <div id="s3" class="box" data-pinata="ground"></div>
+  <div id="s4" class="box" data-pinata="ground"></div>
+  <div id="s5" class="box" data-pinata="ground"></div>
+  <div id="s6" class="box" data-pinata="ground"></div>
+  <div id="s7" class="box" data-pinata="ground"></div>
+  <script type="module">
+    import { createPageWorld } from './js/page/page.js'
+    window.__pinata = await createPageWorld({ bundle: 'world.bundle.json', pixelsPerMetre: 54, scale: 2, seed: 13, measure: true })
+  </script>
+</body>
+</html>

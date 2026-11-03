@@ -27,6 +27,7 @@ export const LAYOUTS: LayoutSpec[] = [
   {
     name: 'perception', page: 'perception-test.html', width: 1200, height: 900, pixelsPerMetre: 54, scale: 2, seed: 11
   },
+  { name: 'jumps', page: 'jump-test.html', width: 1200, height: 900, pixelsPerMetre: 54, scale: 2, seed: 13 },
   { name: 'demo-1200', width: 1200, height: 900, ...DEMO },
   { name: 'demo-390', width: 390, height: 844, ...DEMO }
 ]

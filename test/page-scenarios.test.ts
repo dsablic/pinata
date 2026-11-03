@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { worldBundle } from '../src/cli/world-bundle.ts'
 import {
-  canReach, falls, marksOf, placeOfTarget, readWorld, run, scenario, standing
+  canReach, falls, jumpOfCast, marksOf, placeOfTarget, readWorld, run, scenario, standing
 } from '../src/diagnostics/page-scenarios.ts'
 import type { Scenario } from '../src/diagnostics/page-scenarios.ts'
 import { FPS } from '../src/page/cast.ts'
@@ -56,9 +56,26 @@ test('on the perception page and the demo at both widths, every standing place l
   }
 })
 
-test('on a recorded layout with a rise taller than a step added, nobody climbs onto it', () => {
+test('on a recorded layout with a low rise added, the cast climbs onto it by jumping', () => {
   const fixture = layout('perception')
   const rise = { id: 'rise', box: { id: 9, mark: 'ground' as const, left: 520, top: 684, width: 120, height: 16 } }
+  const s = scenario(world, { ...fixture, marks: [...fixture.marks, { ...rise, hints: { attract: 3 } }] })
+  const climbed = new Set<string>()
+  const left = new Set<string>()
+  run(s, 60, () => {
+    for (const c of s.cast.characters()) {
+      if (c.on !== 'rise') left.add(c.name)
+      else if (left.has(c.name)) climbed.add(c.name)
+    }
+  })
+  const jumped = s.cast.samples().filter(m => m.jumpTo !== undefined)
+  assert.ok(climbed.size > 0, 'someone got onto the rise')
+  assert.ok(jumped.length > 0 && jumped.every(m => m.jumpTo === fixture.marks.length), 'by a jump onto it')
+})
+
+test('on a recorded layout with a rise above every jump height added, nobody climbs onto it', () => {
+  const fixture = layout('perception')
+  const rise = { id: 'rise', box: { id: 9, mark: 'ground' as const, left: 520, top: 640, width: 120, height: 60 } }
   const s = scenario(world, { ...fixture, marks: [...fixture.marks, { ...rise, hints: { attract: 3 } }] })
   const climbed = new Set<string>()
   const left = new Set<string>()
@@ -142,7 +159,8 @@ test('a noticed target sends the nearest character that can reach it, which arri
     }
     const before = s.cast.characters()
     assert.ok(!before.some(c => near(s, c, place)), `${name} #${id}: nobody is near before it is noticed`)
-    const able = before.filter(c => canReach(s.cast.ground(), c, place, s.fixture.pixelsPerMetre))
+    const ppm = s.fixture.pixelsPerMetre
+    const able = before.filter(c => canReach(s.cast.ground(), c, place, ppm, jumpOfCast(world, c.name)))
     const accepted = s.cast.interest({ key: id, place, ...(target.say === undefined ? {} : { say: target.say }) })
     assert.equal(accepted, able.length > 0, `${name} #${id}: sent only when someone can reach it`)
     if (!accepted) {

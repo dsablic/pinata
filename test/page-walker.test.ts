@@ -217,3 +217,55 @@ test('dropping off a ledge onto a surface with room to land, every character lan
   }
   assert.deepEqual(missed, [])
 })
+
+test('a walker with jumping on gets onto a ledge above a step, and one without cannot', () => {
+  const page = ground([[0, 12, 0], [4, 6, 0.4]])
+  const place = { x: 1, height: 0 }
+  const make = (jumps: boolean): Walker => createWalker({
+    database, fps: FPS, random: random(1), ground: page, place, yaw: EAST, ...(jumps ? { jumps } : {})
+  })
+  assert.equal(make(false).reaches({ x: 5, height: 0.4 }), false)
+  const w = make(true)
+  assert.equal(w.visit({ x: 5, height: 0.4 }), true)
+  const frames = run(w, 15)
+  const aims = new Set(frames.flatMap(f => f.jumpTo === undefined ? [] : [f.jumpTo]))
+  assert.deepEqual([...aims], [1])
+  const arrived = frames.find(f => f.reached)
+  assert.equal(arrived?.support?.id, 1)
+  assert.ok(frames.some(f => f.falling), 'it was airborne')
+})
+
+function crouching (w: Walker): WalkerFrame {
+  let frame = w.step()
+  for (let i = 0; i < 10 * FPS && !(frame.jumpTo !== undefined && !frame.falling); i++) frame = w.step()
+  assert.ok(frame.jumpTo !== undefined && !frame.falling, 'crouching for a jump')
+  return frame
+}
+
+function ledgeWalker (): Walker {
+  const page = ground([[0, 12, 0], [4, 6, 0.4]])
+  const w = createWalker({
+    database, fps: FPS, random: random(1), ground: page, place: { x: 1, height: 0 }, yaw: EAST, jumps: true
+  })
+  w.visit({ x: 5, height: 0.4 })
+  return w
+}
+
+test('poked while crouching to jump, a walker gives the jump up and stays on the floor, turned away', () => {
+  const w = ledgeWalker()
+  const crouched = crouching(w)
+  w.poke()
+  const after = run(w, 2)
+  assert.ok(after.every(f => !f.falling && f.jumpTo === undefined), 'it never left the floor')
+  assert.notEqual(after.at(-1)!.heading, crouched.heading)
+})
+
+test('when the page changes in the crouch and the place is gone, the walker never launches and rests', () => {
+  const w = ledgeWalker()
+  crouching(w)
+  w.setGround(ground([[0, 12, 0], [4, 6, 0.9]]))
+  const after = run(w, 8)
+  assert.ok(after.every(f => !f.falling), 'it never launched')
+  assert.ok(after.every(f => f.support !== undefined), 'it never ends up over nothing')
+  assert.equal(after.at(-1)!.activity, 'rest')
+})

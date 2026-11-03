@@ -44,7 +44,8 @@ export async function recordLayout (session: Session, spec: LayoutSpec): Promise
 
 async function main (): Promise<number> {
   await withSite(async session => {
-    for (const spec of LAYOUTS) {
+    const only = process.argv.slice(2)
+    for (const spec of LAYOUTS.filter(l => only.length === 0 || only.includes(l.name))) {
       const fixture = await recordLayout(session, spec)
       writeOutput(layoutPath(ROOT, spec.name), `${JSON.stringify(fixture, null, 2)}\n`)
       console.log(`${spec.name}: ${fixture.marks.length} marked elements, ${fixture.targets.length} targets`)

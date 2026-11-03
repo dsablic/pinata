@@ -28,6 +28,22 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
   head) draws above its parent by rule; order between independent parts switches with hysteresis; sprites are
   anchored to the body everywhere.
 
+### How batch D builds it
+
+- Jump mechanics first, gated before any new capture. The surface graph (`graph.ts`) gains jump edges, only where a
+  caller gives a jump height and reach: from a node up to another whose top is more than a step and at most one leg
+  length above (knight 0.70 m, wizard 0.79, rogue 0.44, dwarf 0.34), across a gap of at most 1 m, with the take-off
+  far enough back to be above the top at its edge, and the body's head room and walls clear. The walker plans over
+  them (preferring the take-off nearest to where it is), walks to the take-off, and commands the player to jump to
+  the target's x and height; the player crouches (the landing dip, peaking at 0.18 s), launches on a ballistic arc
+  that lands on the target, lifts its soles over the target's top, reaches its legs down after the apex and lands
+  with the dip. A jump that would miss is refused and the walk is given up.
+- The page cast turns jumps on. The recorded demo and page layouts have rises of 1.5 to 5 m, beyond a human jump, so
+  no jumps happen there; the jumps gate runs on a recorded jump page (`test/pages/jump-test.html`, layout `jumps`)
+  with rises up to and just above each character's jump height, and on synthetic grounds as a supplement.
+- Then CMU takes for take-off and landing join the database, picked only while jumping (by vertical speed), so walking
+  never matches them.
+
 ## Gates (fixed before implementation)
 
 | Gate | Threshold | Notes |
@@ -103,3 +119,14 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
     the cloth flicker windows moved with the falls, the dwarf's worst to 2.76% (2.56% before) and the wizard's to
     1.81%, both still missed. The terrain world's captured actors change wherever they fall (the plan allows it);
     planted feet slide no more after walk-off landings than before.
+- **Batch D, jump mechanics built (CMU takes not yet).** Jump edges, the walker's jump legs and the player's jump
+  (crouch, arc, refusal, landing); `npm run gates -- --jumps` (`src/diagnostics/jumps.ts`).
+  - Jumps: a planned jump is a visit to a top that needs one; refusals, time-outs and short landings are misses. On
+    the jump page plus six synthetic grounds, every character is at least 95% (all arrive; 90, 69, 53 and 93 trips
+    for the knight, rogue, dwarf and wizard), nobody climbs a rise above their jump height, and no sole goes under a
+    surface during a jump. **Pass.** An earlier count that only took trips reaching their take-off was flattering; the
+    far-side take-off walked characters through the page and long floors timed out, both fixed (nearest take-off, a
+    leg's time-out grows with its distance).
+  - On the cast, the jump page gives about one jump a minute: wandering picks nodes by width, so the long floor wins.
+  - Standing gates unchanged (34, 18, 40 and 61 frames in mid air on the four older layouts); landings still pass;
+    knight pops 17 and dwarf pops 1 in the glitch survey, fragments 0, as before.

@@ -198,14 +198,14 @@
           "..gggggggggggggF."
         ], "pivotA": [1, 8], "pivotB": [15, 8] },
         "mantle": { "rows": [
-          ".F.FF.F.FF.FF.FF.F.FF.F.",
-          "FfFFfFFfFFfFFfFFfFFfFFfF",
-          "ffFfffFffffffffffFfffFff",
-          "gffffffffffffffffffffffg",
-          ".gggffffffffffffffffggg.",
-          "..gggggffffffffffggggg..",
-          "....gggggggggggggggg...."
-        ], "pivotA": [2, 3], "pivotB": [21, 3] },
+          ".F.FF.F.FF.FF.F",
+          "FfFFfFFfFFfFFfF",
+          "ffFfffFfffffFff",
+          "gfffffffffffffg",
+          ".gggfffffffggg.",
+          "..gggfffffggg..",
+          "....ggggggg...."
+        ], "pivotA": [2, 3], "pivotB": [12, 3] },
         "thighL": { "rows": [".SSSSSSSSS..", "SSssssssssSS", "sssssssssssS", "sssssssssssS", "ssssssssssss", ".ssssssssss."], "pivotA": [2, 3], "pivotB": [9, 3] },
         "thighR": { "rows": [".SSSSSSSSS..", "SSssssssssSS", "sssssssssssS", "sssssssssssS", "ssssssssssss", ".ssssssssss."], "pivotA": [2, 3], "pivotB": [9, 3] },
         "shinL": { "rows": [".SSSFFFFFF.", "SsssFFFFFFF", "ssssFFFFFFF", "ssssfffffFF", "ssssfffffff", ".sssffffff."], "pivotA": [2, 3], "pivotB": [8, 3] },
@@ -393,14 +393,14 @@
           "..gggggggggggggF."
         ], "pivotA": [1, 8], "pivotB": [15, 8] },
         "mantle": { "rows": [
-          "....gggggggggggggggg....",
-          "..gggggffffffffffggggg..",
-          ".gggffffffffffffffffggg.",
-          "gffffffffffffffffffffffg",
-          "ffFfffFffffffffffFfffFff",
-          "FfFFfFFfFFfFFfFFfFFfFFfF",
-          ".F.FF.F.FF.FF.FF.F.FF.F."
-        ], "pivotA": [2, 3], "pivotB": [21, 3] },
+          "....ggggggg....",
+          "..gggfffffggg..",
+          ".gggfffffffggg.",
+          "gfffffffffffffg",
+          "ffFfffFfffffFff",
+          "FfFFfFFfFFfFFfF",
+          ".F.FF.F.FF.FF.F"
+        ], "pivotA": [2, 3], "pivotB": [12, 3] },
         "thighL": { "rows": [".SSSSSSSSS..", "SSssssssssSS", "sssssssssssS", "sssssssssssS", "ssssssssssss", ".ssssssssss."], "pivotA": [2, 3], "pivotB": [9, 3] },
         "thighR": { "rows": [".SSSSSSSSS..", "SSssssssssSS", "sssssssssssS", "sssssssssssS", "ssssssssssss", ".ssssssssss."], "pivotA": [2, 3], "pivotB": [9, 3] },
         "shinL": { "rows": [".SSSFFFFFF.", "SsssFFFFFFF", "ssssFFFFFFF", "ssssfffffFF", "ssssfffffff", ".sssffffff."], "pivotA": [2, 3], "pivotB": [8, 3] },

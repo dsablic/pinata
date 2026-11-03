@@ -197,12 +197,12 @@
         "fFFFFf"
       ], "pivotA": [2, 2] },
       "scarfWrap": { "rows": [
-        ".rrrrrrrrrr.",
-        "rrRRRrRRRRrr",
-        "rRRRRrRRRsRR",
-        "RRRsRRRsssss",
-        ".RRssRRssss."
-      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+        ".rrrrrrrr.",
+        "rrRRrRRRrr",
+        "rRRRrRRRsR",
+        "RRRsRRssss",
+        ".RRssRsss."
+      ], "pivotA": [2, 2], "pivotB": [7, 2] },
       "scarfTail": { "rows": [
         ".rrr....",
         "rRRRRrr.",
@@ -477,12 +477,12 @@
       "hood": { "hidden": true },
       "face": { "hidden": true },
       "scarfWrap": { "rows": [
-        ".sssRRsssRR.",
-        "ssRrRRRrRRRr",
-        "RRRrRRRrRRRr",
-        "rRRrRRRrRRrr",
-        ".rrrrrrrrrr."
-      ], "pivotA": [2, 2], "pivotB": [9, 2] },
+        ".ssRRssRR.",
+        "ssRrRRRrRr",
+        "RRRrRRRrRr",
+        "rRRrRRRrrr",
+        ".rrrrrrrr."
+      ], "pivotA": [2, 2], "pivotB": [7, 2] },
       "scarfTail": { "rows": [
         ".rrr....",
         "rRRRRrr.",

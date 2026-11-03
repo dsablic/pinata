@@ -32,8 +32,9 @@ the real page needs a decision on jump height. Next: CMU take-off and landing ta
 painter, steady draw order and joints snapped once for every part on the page. All three batches are built: no torn
 parts or blank frames, far fewer pops, cheaper frames. Still missed: the knight's and dwarf's pops, the rogue's worst
 flicker window, the dwarf's and wizard's cloth flicker, and the judge gate (the judges could not tell the renderers
-apart in three rounds, leaning slightly to the old one). Left: the skins' front-view feet, which don't match their
-bones from the page camera (the knight's pops).
+apart in three rounds, leaning slightly to the old one). Batch D redrew the skin sprites that did not fit their bones
+from the page camera: the knight's pops fell from 17 to 1; one knight foot sprite still misses the fit check, since a
+mirrored view draws it on the other foot's bone and a skin cannot hold a sprite for the mirrored view.
 
 ### 0. P7: skins to a game-art bar
 
@@ -56,6 +57,13 @@ test page or the demo, run `npm run layouts`.
 [World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
 into P7 batch D), physics engine spike (D), page-as-world (E, now the page-world plan above). Once page-as-world
 works, the world demo is rebuilt on the page's elements instead of the generated terrain (done: the front page).
+
+### 0c. Per-character motion settings
+
+A few settings per character applied to every retargeted take, as an auto-rigging tool's clip sliders do: arm space
+(the arms held out so bulky characters' arms clear their torso, as the knight's and dwarf's do not), stride scale and
+playback speed. One setting per character in the retarget step, not a fix per take; judged by the glitch survey and a
+blind panel. A browsable page of every take retargeted onto every skin helps pick takes (the jump takes first).
 
 ### 1. Leftovers from general limbs
 

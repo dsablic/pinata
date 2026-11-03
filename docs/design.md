@@ -844,6 +844,11 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - Rest is the check's pose: walking changes bone lengths, so a flag is a sprite that is wrong at rest and a pass is
   not a guarantee. It is a separate subcommand, not part of `preview` or `check`, so their outputs stay as they are
   (`check` reads no skin).
+- Flagged sprites are fixed in the art, not in the painter: the sprite is redrawn so its pivot span suits the bone
+  from the page camera (a foreshortened sword, plume or foot drawn short, a three-quarter mantle or scarf narrower
+  than the front one), with its end pieces kept at their size unless they are foreshortened with it (the back view's
+  sword grip). A mirrored sector draws the counterpart's sprite, so one sprite serves two bones; where their ranges
+  need different spans, no span fits both.
 
 ### stylize.ts
 

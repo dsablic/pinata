@@ -25,12 +25,12 @@
           "...mmmmmddd..."
         ], "pivotA": [7, 7] },
         "plume": { "rows": [
-          ".RRRRRRR.",
-          "RRrrrrrRR",
-          "rrrrrrrrr",
-          "qqqqqqqq.",
-          ".qqqqqq.."
-        ], "pivotA": [1, 2], "pivotB": [7, 2] },
+          ".RRR.",
+          "RrrrR",
+          "rrrrr",
+          "qqqq.",
+          ".qq.."
+        ], "pivotA": [1, 2], "pivotB": [3, 2] },
         "torso": { "rows": [
           "Llmshhhhhhhh",
           "Llmmsssssshh",
@@ -117,19 +117,19 @@
           ".sss..ssssss.."
         ], "pivotA": [2, 3], "pivotB": [11, 3] },
         "footL": { "rows": [
-          "LLLL",
-          "llLL",
-          "lllL",
-          "tllL",
-          "ttlL"
-        ], "pivotA": [1, 2], "pivotB": [2, 2] },
+          "LLLLL",
+          "lllLL",
+          "llllL",
+          "tlllL",
+          "tttlL"
+        ], "pivotA": [1, 2], "pivotB": [3, 2] },
         "footR": { "rows": [
-          "LLLL",
-          "llLL",
-          "lllL",
-          "tllL",
-          "ttlL"
-        ], "pivotA": [1, 2], "pivotB": [2, 2] },
+          "LLLLL",
+          "lllLL",
+          "llllL",
+          "tlllL",
+          "tttlL"
+        ], "pivotA": [1, 2], "pivotB": [3, 2] },
         "pauldronL": { "rows": [
           "..hhs..",
           ".hhssm.",
@@ -216,12 +216,12 @@
           "...mmmmmddd..."
         ], "pivotA": [7, 7] },
         "plume": { "rows": [
-          "..........RRcc",
-          "RRrrrrrrrrrRRc",
-          "rqqqrrrrrrR...",
-          ".qqqqrr.......",
-          "..qqr........."
-        ], "pivotA": [2, 1], "pivotB": [11, 1] },
+          "........RRcc",
+          "RRrrrrrrrRRc",
+          "rqqqrrrrR...",
+          ".qqqrr......",
+          "..qq........"
+        ], "pivotA": [2, 1], "pivotB": [9, 1] },
         "torso": { "rows": [
           "Llmshhhhhhhh",
           "Llmmhhhhhhhh",
@@ -678,19 +678,19 @@
           ".mmm..mmmmmm.."
         ], "pivotA": [2, 3], "pivotB": [11, 3] },
         "footR": { "rows": [
-          ".tllllll.",
-          "ttlllllll",
-          "tllllllLL",
-          "llllllLLL",
-          "LLLLLLLL."
-        ], "pivotA": [2, 2], "pivotB": [6, 2] },
+          ".tlllll.",
+          "ttllllll",
+          "tlllllLL",
+          "lllllLLL",
+          "LLLLLLL."
+        ], "pivotA": [2, 2], "pivotB": [5, 2] },
         "footL": { "rows": [
-          ".lLLLLLL.",
-          "llLLLLLLL",
-          "lLLLLLLkk",
-          "LLLLLLkkk",
-          "kkkkkkkk."
-        ], "pivotA": [2, 2], "pivotB": [6, 2] },
+          ".lLLLLL.",
+          "llLLLLLL",
+          "lLLLLLkk",
+          "LLLLLkkk",
+          "kkkkkkk."
+        ], "pivotA": [2, 2], "pivotB": [5, 2] },
         "pauldronR": { "rows": [
           "..hhs..",
           ".hhssm.",
@@ -750,12 +750,12 @@
           ".kkk."
         ], "pivotA": [2, 2] },
         "sword": { "rows": [
-          "......gG..............",
-          "G.....gGwwwwwwwwwwww..",
-          "gLLLLLgGhhhhhhhhhhhhhh",
-          "G.....gGmmmmmmmmmmmm..",
-          "......gG.............."
-        ], "pivotA": [3, 2], "pivotB": [20, 2] }
+          "......gG...........",
+          "G.....gGwwwwwwwww..",
+          "gLLLLLgGhhhhhhhhhhh",
+          "G.....gGmmmmmmmmm..",
+          "......gG..........."
+        ], "pivotA": [3, 2], "pivotB": [17, 2] }
       }
     },
     "back": {
@@ -941,12 +941,12 @@
           ".LLL."
         ], "pivotA": [2, 2] },
         "sword": { "rows": [
-          "......gG..............",
-          "G.....gGwwwwwwwwwwww..",
-          "gLLLLLgGhhhhhhhhhhhhhh",
-          "G.....gGmmmmmmmmmmmm..",
-          "......gG.............."
-        ], "pivotA": [3, 2], "pivotB": [20, 2] }
+          "....gG......",
+          "G...gGwwww..",
+          "gLLLgGhhhhhh",
+          "G...gGmmmm..",
+          "....gG......"
+        ], "pivotA": [2, 2], "pivotB": [10, 2] }
       }
     }
   }

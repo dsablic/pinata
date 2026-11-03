@@ -191,3 +191,23 @@ round, both orders. The gate needs the new renderer preferred in at least 65% of
   from the current one, though they leaned slightly to the current one. The judge gate stays missed. The
   natural-motion plan resumes at its batch C.
 
+### D. Skins fitted to their bones
+
+The sprites `npm run skin -- fit` flagged were redrawn at the length their bone projects from the page camera: the
+knight's plume (front, three-quarter front), front feet, back three-quarter feet and sword (back, back three-quarter),
+the rogue's scarf wrap and the dwarf's mantle in the three-quarter views. The back view's sword also has a shorter
+grip, three columns with the hand in the middle, so the foreshortened sword keeps its proportions.
+
+- Fit: no flags for the rogue, dwarf and wizard; one for the knight, its back three-quarter foot sprites (both span
+  3), each of which also draws the other foot in the mirrored sector. The two bones project 1.3-3.7 px and 0.97-3.3 px; span 3 misses
+  the second by 0.03 px and span 2 misses the first, so no span fits both. **Missed**, narrowly; fixing it needs a
+  skin to hold a sprite for the mirrored sector.
+- Survey: fragments and stretch 0% for every character; pops 1 (knight, against 17), 0, 1 (dwarf, against 2), 0.
+  **Missed** for the knight (none required) by one pop, a sword hidden at a view change; the dwarf's, an arm at a
+  view change, is no worse than batch C's, as its gate asks. Worst flicker windows 50.30%, 47.19%, 34.65%, 30.41%; no
+  blank frames. The knight's is worse than batch C's 47.14%: flicker is not gated here, but it is a regression, not
+  yet traced to a part.
+- Redrawn sprites, blind panel of each redrawn skin's eight-direction sheet against the current one, three judges,
+  both orders: every answer can't tell, ratings level (knight 4.0, rogue 3.3, dwarf 4.0); the control unseparated by
+  every judge. **Pass.**
+

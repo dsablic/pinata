@@ -134,6 +134,19 @@ function corners (quad: Quad, low: number, high: number): Vec[] {
 
 export type Lay = { length?: number, heading?: [number, number] }
 
+function laidPoints (points: Array<[number, number]>, heading?: [number, number]): Vec[] {
+  const laid = distinct(points)
+  if (laid.length === 1 && heading !== undefined && Math.hypot(...heading) > EPSILON) {
+    laid.push(advance(laid[0], direction([0, 0], heading), 1))
+  }
+  return laid
+}
+
+export function endOf (points: Array<[number, number]>, length: number, heading?: [number, number]): [number, number] {
+  const path = laidTo(laidPoints(points, heading), length)
+  return path[path.length - 1]
+}
+
 export function paintStrip (
   sprite: StripSprite,
   points: Array<[number, number]>,
@@ -146,10 +159,7 @@ export function paintStrip (
   const low = -pivotY - 0.5
   const high = height - 0.5 - pivotY
   const floorLength = Math.round(FLOOR_SHARE * (sprite.pivotB[0] - sprite.pivotA[0]))
-  const laid = distinct(points)
-  if (laid.length === 1 && heading !== undefined && Math.hypot(...heading) > EPSILON) {
-    laid.push(advance(laid[0], direction([0, 0], heading), 1))
-  }
+  const laid = laidPoints(points, heading)
   const ceiling = Math.max(floorLength, CEILING_SHARE * (sprite.pivotB[0] - sprite.pivotA[0]))
   const target = Math.min(ceiling, Math.max(floorLength, length ?? arcLength(laid)))
   const path = laidTo(laid, target)

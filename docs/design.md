@@ -251,6 +251,19 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   - Pop notes list the views from the frame before to the frame back, so a view change is told from a renderer pop.
   - Turns on the spot are a yaw change over 90 degrees within 1.5 s at a mean speed under 0.3 m/s (turns while
     walking average about 0.7); drops are the starts of falls.
+- **The rendering panel** (`npm run rendering-panel`, `rendering-panel.ts`): blind pairs of the page's strip painter
+  against the rotating painter it replaced (`CastOptions.painter: 'rotate'`, which keeps the per-character angle,
+  length and anchor maps the cast kept before and draws exactly what it drew), on the same motion. For each skinned
+  character, the first survey run after 4 s holding a walk (`WALK_FRAMES` frames above 0.3 m/s on a surface), a turn
+  on the spot (the survey's count, from its start to 4 frames after) or a fall (3 frames before take-off to 4 after
+  landing) is the window, sampled evenly to `MOST_FRAMES`; no window is picked by hand, and a character or kind with
+  none stops the build. A fall counts only when the character walked off a surface (12 steady frames on it, no
+  drop-in activity): drop-ins from above are not the case the page's falls are judged on. Both scenarios are built
+  with the same seed and stress and run every frame, since the painters keep state between frames, and their
+  walkers' roots are asserted equal at every step. Controls pair the rotating painter's strip of a window with its
+  strip one frame later. The panel's seed names the round; a new round takes a new seed.
+  - A sampled strip shows a frame every few, so glitches that last one to three frames (pops, tears, blank frames)
+    seldom reach the judges: the panel judges the look of ordinary motion, the survey the rare frames.
 
 ## Motion (`src/motion/`, `src/math/`)
 
@@ -701,10 +714,17 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 ### strip.ts and order.ts (the page's painter)
 
 - The page draws every two-joint part with one painter, `paintStrip`: the sprite laid along a polyline of pixel
-  points, a rigid part's two joints or a cloth-bound part's curve. Every joint and curve point of a character is
-  projected and snapped to a pixel once per frame (with the anchors' quarter-pixel hysteresis), and parts read only
-  those points, so a child part starts exactly where its parent ends and no part has an angle or length of its own to
-  dither. The skin command keeps the rotating painters, so its sheets stay as they are.
+  points, a rigid part's stepped bone or a cloth-bound part's curve. Every joint and curve point of a character is
+  projected and snapped to a pixel once per frame (with the anchors' quarter-pixel hysteresis), and every part
+  starts at its snapped first joint, so parts sharing a joint start at the same pixel. The skin command keeps the
+  rotating painters, so its sheets stay as they are; the cast's `painter: 'rotate'` draws the page with them, for
+  comparison.
+- A rigid part's strip starts at its snapped first joint and turns in 22.5-degree steps, with the rotating painter's
+  hysteresis, rather than running to its snapped second joint: laid at any angle, a thin part a few degrees off
+  vertical (a hat cone) came out ragged under nearest sampling, and the judges preferred the stepped one. Its end can
+  so land up to about 2 px from the next part's joint on a 10 px bone; the survey counts frames where an end is 2 px
+  or more off a joint another two-joint part starts or ends at (free ends, a sword tip or a hat tip, are not
+  counted), reported only when the caller asks for footprints, so the page does not pay for it.
 - The middle is laid over the bone's projected length, kept between frames until it moves a whole pixel, along the
   polyline from the first point: two snapped ends would otherwise make a 4 px foot 4 to 5.4 px from frame to frame as
   its diagonal crosses pixels. It is held between 0.6 (rounded) and 1.25 of the sprite's drawn length, stopping short

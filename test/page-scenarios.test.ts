@@ -276,3 +276,16 @@ test('walking off an edge, the body falls from the edge height and is never pose
   }
   assert.deepEqual(jumps, [])
 })
+
+test('the painter changes the sprites and never the walkers\' motion', () => {
+  const frames = (painter: 'strip' | 'rotate'): string[] => {
+    const s = scenario(world, layout('page-test'), 7, 0, false, painter)
+    const seen: string[] = []
+    run(s, 20, () => {
+      s.cast.drawables().forEach(d => d.sprite())
+      seen.push(JSON.stringify(s.cast.moving().map(m => [m.name, m.frame.root])))
+    })
+    return seen
+  }
+  assert.deepEqual(frames('rotate'), frames('strip'))
+})

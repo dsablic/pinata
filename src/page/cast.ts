@@ -36,6 +36,7 @@ export type CastOptions = {
   count?: number
   measure?: boolean
   footprints?: boolean
+  painter?: 'strip' | 'rotate'
 }
 export type Sprite = { image: Image, camera: Camera, owner?: Int16Array, parts?: DrawnPart[], sector?: number }
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
@@ -101,6 +102,7 @@ type Character<K> = {
   interest?: string
   saying?: Saying
   view: { sector?: number }
+  angles: Map<string, number>
   lengths: Map<string, number>
   order: string[]
   anchors: Map<string, [number, number]>
@@ -171,6 +173,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       if (look.skin === undefined || database === undefined) return []
       const fresh = {
         view: {},
+        angles: new Map<string, number>(),
         lengths: new Map<string, number>(),
         order: [],
         anchors: new Map<string, [number, number]>(),
@@ -275,10 +278,12 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     for (const [name, p] of Object.entries(frame.joints)) pose[name] = [p[0] - x, p[1] - y, p[2] - z]
     const curves = Object.fromEntries(Object.entries(c.secondary.curves())
       .map(([joint, points]) => [joint, points.map((p): Vec3 => [p[0] - x, p[1] - y, p[2] - z])]))
+    const painted = options.painter === 'rotate'
+      ? { angles: c.angles, lengths: c.lengths, anchors: c.anchors }
+      : { painter: 'strip' as const, order: c.order, angles: c.angles, lengths: c.lengths, anchors: c.anchors }
     const { image, owner, parts, sector } = renderSkinnedLayers({
       mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view,
-      painter: 'strip', order: c.order, lengths: c.lengths, anchors: c.anchors, curves,
-      footprints: options.footprints === true
+      ...painted, curves, footprints: options.footprints === true
     })
     const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
     c.sprite = { image, camera: box, frame, ...layers }

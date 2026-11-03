@@ -46,6 +46,7 @@
     "layouts": "node src/cli/layouts.ts",
     "gates": "node src/cli/gates.ts",
     "glitches": "node src/cli/glitches.ts",
+    "rendering-panel": "node src/cli/rendering-panel.ts",
     "runtime": "npm run site && node src/cli/serve.ts _site",
     "artifact": "node src/cli/artifact.ts"
   },

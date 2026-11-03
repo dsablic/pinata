@@ -37,7 +37,7 @@ export const POP_SHARE = 0.5
 export const POP_FRAMES = 3
 export const BLANK_SHARE = 0.5
 export const WINDOW_SECONDS = 4
-const TURN_SECONDS = 1.5
+export const TURN_SECONDS = 1.5
 const TURN_RADIANS = Math.PI / 2
 const ON_THE_SPOT = 0.3
 const PULLED_SECONDS = 2
@@ -108,7 +108,7 @@ export function overSprite (parts: DrawnPart[]): DrawnPart[] {
 }
 
 export function missingJoints (parts: DrawnPart[]): DrawnPart[] {
-  return parts.filter(p => p.asked !== undefined && Math.abs(p.asked - (p.shown ?? p.asked)) >= MISSED_JOINT_PX)
+  return parts.filter(p => (p.missed ?? 0) >= MISSED_JOINT_PX)
 }
 
 export function againstUsual (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
@@ -146,7 +146,7 @@ export function silhouette (image: Image): number {
   return area
 }
 
-function emptyTally (): Tally {
+export function emptyTally (): Tally {
   const worst = { fragment: [], pop: [], stretch: [], refit: [], miss: [], flicker: [], blank: [] }
   const counts = {
     frames: 0, drops: 0, turns: 0, fragmentFrames: 0, pops: 0, stretchFrames: 0, refitFrames: 0, missFrames: 0,
@@ -163,7 +163,7 @@ function remember (list: Worst[], worst: Worst): void {
 }
 
 type Seen = { image: Image, parts: DrawnPart[], sector?: number, stray: Map<string, number> }
-type Track = { seen: Seen[], yaws: number[], speeds: number[], falling?: boolean }
+export type Track = { seen: Seen[], yaws: number[], speeds: number[], falling?: boolean }
 type Pulled = { at: number, last: number }
 type Below = { key: string, from: number, to: number, height: number }
 
@@ -173,6 +173,13 @@ function below (s: Scenario, c: CharacterState<string>): Below[] {
     if (surface === undefined || m.key === c.on) return []
     return -surface.height * s.fixture.pixelsPerMetre > c.y + 1 ? [{ key: m.key, ...surface }] : []
   })
+}
+
+export function stressDriver (s: Scenario, stress: Stress | undefined): (step: number) => void {
+  const pulled = { at: -1, last: 0 }
+  return step => {
+    if (stress !== undefined) stressed(s, stress, step, pulled)
+  }
 }
 
 function stressed (s: Scenario, stress: Stress, step: number, pulled: Pulled): void {
@@ -203,7 +210,7 @@ function visitBelow (s: Scenario, c: CharacterState<string>): void {
   }
 }
 
-function countMotion (track: Track, tally: Tally, falling: boolean, yaw: number, speed: number): void {
+export function countMotion (track: Track, tally: Tally, falling: boolean, yaw: number, speed: number): void {
   if (falling && track.falling === false) tally.drops++
   track.falling = falling
   track.yaws.push(yaw)
@@ -262,7 +269,7 @@ function judge (seen: Seen[], tally: Tally, where: string): void {
     const missed = missingJoints(frame.parts)
     if (missed.length > 0) {
       tally.missFrames++
-      const off = (p: DrawnPart): number => Math.abs((p.asked ?? 0) - (p.shown ?? 0))
+      const off = (p: DrawnPart): number => p.missed ?? 0
       const text = missed.map(p => `${p.name} ${off(p).toFixed(1)} px off its joint`).join(', ')
       remember(tally.worst.miss, { score: Math.max(...missed.map(off)), note: note(k, text), frames: strip(k) })
     }
@@ -304,9 +311,9 @@ export function survey (world: ReadWorld, runs: SurveyRun[], root: string): Map<
     const fixture = readLayout(root, r.layout)
     const s = scenario(world, fixture, r.seed ?? fixture.seed, r.wind ?? 0, true)
     const tracks = new Map<string, Track>(names.map(name => [name, { seen: [], yaws: [], speeds: [] }]))
-    const pulled = { at: -1, last: 0 }
+    const stress = stressDriver(s, r.stress)
     run(s, r.seconds, step => {
-      if (r.stress !== undefined) stressed(s, r.stress, step, pulled)
+      stress(step)
       for (const [name, track] of tracks) observe(track, tallies.get(name) as Tally, s, name)
     })
     const where = `${r.layout} seed ${r.seed ?? fixture.seed}${r.wind === undefined ? '' : ` wind ${r.wind}`}`

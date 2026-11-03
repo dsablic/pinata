@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fragmentPixels, offUsual, overSprite, pops, usualFits } from '../src/diagnostics/glitches.ts'
+import { fragmentPixels, missingJoints, offUsual, overSprite, pops, usualFits } from '../src/diagnostics/glitches.ts'
 import type { Layered } from '../src/diagnostics/glitches.ts'
 import { readWorld, run, scenario } from '../src/diagnostics/page-scenarios.ts'
 import { readLayout } from '../src/page/fixture.ts'
@@ -82,4 +82,9 @@ test('the page renderer reports every part\'s footprint and owned pixels without
     assert.ok(owner.every(o => o < parts.length))
   }
   assert.ok(covered > 0)
+})
+
+test('a part counts as off its joint from two pixels', () => {
+  const names = (parts: DrawnPart[]): string[] => missingJoints(parts).map(p => p.name)
+  assert.deepEqual(names([part('thigh', { missed: 1.9 }), part('shin', { missed: 2 }), part('sword')]), ['shin'])
 })

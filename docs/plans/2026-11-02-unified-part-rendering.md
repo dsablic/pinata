@@ -44,9 +44,12 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
   anchors' quarter-pixel hysteresis; two-joint parts painted by `paintStrip` through their snapped points (a rigid
   part's are its two joints), single-joint parts unrotated at their snapped joint; the order kept per character.
   Angles are no longer kept for the page. The skin command keeps its painters.
-- Changed while building: the strip is laid at the bone's projected length kept with a pixel of hysteresis, not at
-  the length between its snapped ends, which made short parts jump by a third of their length as diagonals crossed
-  pixels; and it is held to at most 1.25 of the sprite's drawn length as well as at least 0.6.
+- Changed while building, relaxing "one snap": the strip is laid at the bone's projected length kept with a pixel of
+  hysteresis, not at the length between its snapped ends, which made short parts jump by a third of their length as
+  diagonals crossed pixels; it is held to at most 1.25 of the sprite's drawn length as well as at least 0.6; and in
+  batch C rigid parts got back their 22.5-degree steps with hysteresis (below). What stays one snap: every part
+  starts at its snapped first joint, and cloth parts follow their snapped curve points. A rigid part's end is not
+  where its child starts, by up to about 2 px on a 10 px bone.
 
 ## Gates (fixed before implementation)
 
@@ -143,3 +146,44 @@ sprite; the per-view refit and the joint miss are reported, not gated.
   frames, every part popping). `reset` now drops the curves, and the player no longer lowers the body onto a foot
   over a drop.
 - The judge gate is batch C's.
+
+### C. The bar
+
+`npm run rendering-panel` builds the pairs: for each character a walk, a turn on the spot and a walk-off fall, chosen
+by fixed rules from the survey's runs, drawn by both renderers on the same motion (the cast's `painter: 'rotate'` is
+the current renderer); two controls are the current renderer against itself a frame later. Three fresh judges per
+round, both orders. The gate needs the new renderer preferred in at least 65% of non-control answers.
+
+| Round | Strips | New picked | Current picked | Can't tell | Ratings, new / current | Controls unseparated | Left picks |
+|---|---|---|---|---|---|---|---|
+| 1 | 8 frames, scale 3 | 2 of 72 | 2 | 68 | level (3.3-3.7 each) | 100% | 17% |
+| 2 | 4 frames, scale 5 | 2 of 72 | 9 | 61 | new a little lower on the dwarf's and wizard's walks | 83% | 33% |
+| 3 | 4 frames, scale 5, rigid parts snapped | 8 of 72 | 11 | 53 | level but the dwarf's turn (3.3 / 3.8) | 33% | 70% |
+
+- Missed in every round, both halves: the new renderer was never preferred, and in round 3 it was rated lower on
+  the dwarf's turn (3.3 against 3.8) and fall (3.0 against 3.2), with the current renderer picked more often (11
+  against 8; 9 against 2 in round 2). Most answers were can't tell. Round 3's controls were separated by two judges of
+  three and its picks leaned left (70%), so it says little either way.
+- The panel has little power for what the survey measures: a window is sampled to four frames, a frame every few,
+  so pops, tears and blank frames lasting one to three frames seldom reach the judges. Round 2 cut the strips from
+  eight frames to four after round 1, which made that worse. What the panel does show is the look of ordinary
+  motion, where the judges could not tell the renderers apart, and one real fault, found by looking at the strips the
+  judges preferred:
+- In round 2 the strip painter laid thin rigid parts at any angle, and a hat cone a few degrees off vertical came
+  out ragged under nearest sampling, where the current renderer's 22.5-degree steps keep it crisp. Rigid parts on
+  the strip now turn in 22.5-degree steps from their snapped joint with the current renderer's hysteresis, at their
+  kept length; cloth stays on its curves. Round 3 is that renderer.
+- The survey on it: fragments 0% and stretch 0% for every character; pops 17 (knight, against 57), 0, 2 (dwarf,
+  against 20), 0, so the pop gate is still missed for two; worst flicker windows 47.14% (65.20%), 47.19% (46.90%,
+  missed), 34.52% (37.17%), 30.54% (42.41%); no blank frames. Cost after the change: 4.8 to 6.0 ms at p95 on the
+  test and demo pages in Chrome.
+- The joint-miss count was redefined in batch C: B's column compared the length asked with the length drawn; C's
+  measures the distance from a drawn end to the joint the next part starts at, the only miss that shows. A part's
+  end is 2 px or more off it in 55%, 12%, 10% and 84% of frames (knight, rogue, dwarf, wizard): the stepped angle of
+  a 10 px thigh or shin leaves its end up to 2 px from the knee. The current renderer steps angles the same way but
+  does not report this, so it is not measured for it.
+- The new renderer stays on the page, as a judgement on these results rather than a gate met: it removes the tears,
+  blank frames and most pops the survey counts, and costs less, and on ordinary motion the judges could not tell it
+  from the current one, though they leaned slightly to the current one. The judge gate stays missed. The
+  natural-motion plan resumes at its batch C.
+

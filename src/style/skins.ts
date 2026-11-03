@@ -11,7 +11,7 @@ import { chooseView, counterpart, facingAngle, fitted, mirrored, spanOf } from '
 import type { ViewChoice } from './views.ts'
 import type { Rotated } from './rotsprite.ts'
 import { drawOrder } from './order.ts'
-import { paintStrip } from './strip.ts'
+import { endOf, paintStrip } from './strip.ts'
 
 export type SkinnedOptions = {
   mannequin: Mannequin
@@ -44,7 +44,7 @@ type Placement = {
   depth: number
   curve?: { points: Array<[number, number]>, span: number }
   points?: Array<[number, number]>
-  lay?: { length: number, heading: [number, number] }
+  lay?: { length: number, heading: [number, number], joint: [number, number] }
   drawn: number
   shown?: number
 }
@@ -105,9 +105,27 @@ function shadeFar (found: Placement[]): void {
   }
 }
 
-function snapped (o: SkinnedOptions, at: Vec3, key: string): Screen & { pixel: [number, number] } {
+function snapped (o: SkinnedOptions, at: Vec3, key: string): Snapped {
   const screen = project(o.camera, at)
   return { ...screen, pixel: steadyAnchor(screen, o.anchors, key) }
+}
+
+function turned (
+  o: SkinnedOptions, name: string, a: Snapped, b: Screen, length: number
+): Array<[number, number]> {
+  const angle = snapAngle(Math.atan2(b.y - a.y, b.x - a.x), o.angles?.get(name))
+  o.angles?.set(name, angle)
+  const { cos, sin } = exactTrig(angle)
+  return [a.pixel, [a.pixel[0] + cos * Math.max(1, length), a.pixel[1] + sin * Math.max(1, length)]]
+}
+
+type Snapped = Screen & { pixel: [number, number] }
+
+function layOf (
+  length: number, a: Snapped, b: Snapped, curve: Vec3[] | undefined, points: Array<[number, number]>
+): NonNullable<Placement['lay']> {
+  const joint = curve === undefined ? b.pixel : points[points.length - 1]
+  return { length, heading: [b.x - a.x, b.y - a.y], joint }
 }
 
 function stripPlacements (o: SkinnedOptions): Placement[] {
@@ -124,10 +142,10 @@ function stripPlacements (o: SkinnedOptions): Placement[] {
     const length = single ? undefined : steadyLength(arcLength(o, part, a, b), o.lengths?.get(part.name))
     if (length !== undefined) o.lengths?.set(part.name, length)
     const curve = single ? undefined : o.curves?.[part.b]
-    const points = single
+    const points = single || length === undefined
       ? undefined
       : curve === undefined
-        ? [a.pixel, b.pixel]
+        ? turned(o, part.name, a, b, length)
         : curve.map((at, k) => snapped(o, at, `${part.b}#${k}`).pixel)
     found.push({
       name: part.name,
@@ -140,7 +158,7 @@ function stripPlacements (o: SkinnedOptions): Placement[] {
       depth: (a.depth + b.depth) / 2,
       ...(points === undefined || length === undefined
         ? {}
-        : { points, lay: { length, heading: [b.x - a.x, b.y - a.y] as [number, number] } }),
+        : { points, lay: layOf(length, a, b, curve, points) }),
       drawn: span
     })
   }
@@ -422,9 +440,19 @@ function drawOutline (img: Image, colour: number): void {
 }
 
 export type DrawnPart = {
-  name: string, drawn: number, shown?: number, asked?: number, painted: number, footprint?: number[]
+  name: string, drawn: number, shown?: number, missed?: number, painted: number, footprint?: number[]
 }
 export type Layers = { image: Image, owner?: Int16Array, parts: DrawnPart[], sector?: number }
+
+function missedBy ({ points, lay, shown, joints }: Placement, placed: Placement[]): Pick<DrawnPart, 'missed'> {
+  if (points === undefined || lay === undefined || shown === undefined) return {}
+  const shares = (other: Placement): boolean => {
+    return other.joints[0] !== other.joints[1] && other.joints[0] !== joints[0] && other.joints.includes(joints[1])
+  }
+  if (!placed.some(shares)) return {}
+  const end = endOf(points, shown, lay.heading)
+  return { missed: Math.hypot(end[0] - lay.joint[0], end[1] - lay.joint[1]) }
+}
 
 export function renderSkinned (options: SkinnedOptions): Image {
   return renderSkinnedLayers(options).image
@@ -452,10 +480,10 @@ export function renderSkinnedLayers (options: SkinnedOptions): Layers {
   })
   if (ink !== undefined) innerLines(img, placed, ink)
   drawOutline(img, [...colours.values()].reduce((a, b) => luminance(b) < luminance(a) ? b : a))
-  const parts = placed.map(({ name, drawn, shown, lay }, i): DrawnPart => {
+  const parts = placed.map(({ name, drawn, shown }, i): DrawnPart => {
     const footprint = ink?.footprints?.[i]
-    const asked = lay === undefined ? {} : { asked: lay.length }
-    const lengths = { drawn, ...(shown === undefined ? {} : { shown }), ...asked }
+    const missed = options.footprints === true ? missedBy(placed[i], placed) : {}
+    const lengths = { drawn, ...(shown === undefined ? {} : { shown }), ...missed }
     return { name, ...lengths, painted: ink?.painted[i] ?? 0, ...(footprint === undefined ? {} : { footprint }) }
   })
   const sector = options.view?.sector

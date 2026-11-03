@@ -1,6 +1,6 @@
 import type { ReadWorld } from '../world/bundle.ts'
 import { createCast, FPS, pageEnvironment } from '../page/cast.ts'
-import type { Cast, CharacterState, Mark, Moving, Sample, Viewport } from '../page/cast.ts'
+import type { Cast, CastOptions, CharacterState, Mark, Moving, Sample, Viewport } from '../page/cast.ts'
 import type { LayoutFixture, Target } from '../page/fixture.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
 import { placeFor } from '../page/perception.ts'
@@ -32,12 +32,13 @@ export function marksOf (fixture: LayoutFixture, without: string[] = []): Array<
 }
 
 export function scenario (
-  world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0, footprints = false
+  world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0, footprints = false,
+  painter: CastOptions['painter'] = 'strip'
 ): Scenario {
   const { pixelsPerMetre, scale } = fixture
   const air = pageEnvironment(world.config, wind)
   const { cast: members, looks } = world
-  const options = { cast: members, looks, pixelsPerMetre, scale, seed, measure: true, footprints, ...air }
+  const options = { cast: members, looks, pixelsPerMetre, scale, seed, measure: true, footprints, painter, ...air }
   const cast = createCast<string>(options)
   cast.setLayout(marksOf(fixture))
   return { fixture, cast, viewport: { top: 0, height: fixture.height } }

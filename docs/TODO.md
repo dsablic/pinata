@@ -21,13 +21,17 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 [Plan](plans/2026-11-02-natural-page-motion.md): secondary motion (chains, cloth, a robe hem) in the page world, cloth
 drawn in skins, natural falls and landings, jumps up the page, structural draw order; judged against the old terrain
-demo and strong references. Batches A (secondary motion) and B (cloth in skins) done; it resumes at C (falls and
-landings) after the rework below.
+demo and strong references. Batches A (secondary motion) and B (cloth in skins) done. Next: batch C (falls and
+landings).
 
 ### 0. Unified part rendering on the page
 
-[Plan](plans/2026-11-02-unified-part-rendering.md): a standing glitch survey, then one painter, one pixel snap and one
-draw-order rule for every part on the page. Next: batch A (the survey).
+[Plan](plans/2026-11-02-unified-part-rendering.md): a standing glitch survey (`npm run glitches`), then one strip
+painter, steady draw order and joints snapped once for every part on the page. All three batches are built: no torn
+parts or blank frames, far fewer pops, cheaper frames. Still missed: the knight's and dwarf's pops, the rogue's worst
+flicker window, the dwarf's and wizard's cloth flicker, and the judge gate (the judges could not tell the renderers
+apart in three rounds, leaning slightly to the old one). Left: the skins' front-view feet, which don't match their
+bones from the page camera (the knight's pops).
 
 ### 0. P7: skins to a game-art bar
 

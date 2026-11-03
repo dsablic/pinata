@@ -121,3 +121,19 @@ test('every part touches the parts it shares a joint with, at any yaw', () => {
     }
   }
 })
+
+test('a rigid part turns in steps and reports how far its end lands from a joint another part starts at', () => {
+  const pose = turned(90 * DEGREES)
+  const angles = new Map<string, number>()
+  const { parts } = drawn(pose, 90 * DEGREES, { footprints: true, angles })
+  const byName = new Map(parts.map(p => [p.name, p]))
+  for (const name of ['thighL', 'thighR', 'shinL', 'upperArmL', 'upperArmR']) {
+    const missed = byName.get(name)?.missed
+    assert.ok(missed !== undefined && missed < 3, `${name} ${missed}`)
+  }
+  for (const name of ['footL', 'forearmL', 'plume']) {
+    assert.equal(byName.get(name)?.missed, undefined, `${name} ends where no other part starts`)
+  }
+  assert.ok([...angles.values()].every(a => Math.abs(a / (Math.PI / 8) - Math.round(a / (Math.PI / 8))) < 1e-9))
+  assert.equal(drawn(pose, 90 * DEGREES, { angles: new Map() }).parts.find(p => p.name === 'thighL')?.missed, undefined)
+})

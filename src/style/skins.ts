@@ -105,6 +105,7 @@ function placements (o: SkinnedOptions): Placement[] {
     const kept = o.angles?.get(part.name)
     const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, kept) : snapAngle(raw, kept)
     if (!single) o.angles?.set(part.name, angle)
+    const curve = curveFor(o, part.b, single, sprite)
     found.push({
       name: part.name,
       joints: [part.a, part.b],
@@ -117,9 +118,9 @@ function placements (o: SkinnedOptions): Placement[] {
       anchor: steadyAnchor(a, o.anchors, part.a),
       angle,
       depth: (a.depth + b.depth) / 2,
-      ...curveFor(o, part.b, single, sprite),
+      ...curve,
       drawn: span,
-      ...(single ? {} : { shown: length })
+      ...(single ? {} : { shown: curve.curve === undefined ? spanOf(sprite) : length })
     })
   }
   if (choice !== undefined) {

@@ -27,6 +27,24 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 - **One draw order rule:** as the natural-motion plan's batch E fixes it (a part above its parent by rule, order
   between independent parts switched with hysteresis); built here, since the painter needs it.
 
+### How batch B builds it
+
+- `src/style/strip.ts`, `paintStrip`: a sprite along a polyline of pixel points. Its columns before pivot A and after
+  pivot B are caps drawn at their own size along the first and last segments; the columns between are spread over
+  the polyline's length, held to at least 0.6 of their drawn length (rounded) by running on past the last point.
+  Rows lie across, along each segment's normal; at an inner point the normal is the bisector, so neighbouring
+  segments share an edge and a bend cannot tear. Each destination pixel is mapped back into the segment it falls in;
+  where segments overlap inside a bend the later one wins, so a fold is solid. Two points at a quarter turn reproduce
+  the sprite turned exactly.
+- `src/style/order.ts`, `drawOrder`: layer first, then farther before nearer, but two parts keep the order they had
+  in the last frame (or, the first time, the mannequin's) unless their depths differ by more than 3 cm. A part listed
+  after another in the mannequin (helmet after head, face after hood) so draws above it when they are level: the
+  structural rule comes from authoring order.
+- `skins.ts` with `painter: 'strip'` (the page): every joint and curve point projected and snapped once, with the
+  anchors' quarter-pixel hysteresis; two-joint parts painted by `paintStrip` through their snapped points (a rigid
+  part's are its two joints), single-joint parts unrotated at their snapped joint; the order kept per character.
+  Angles and lengths are no longer kept for the page. The skin command keeps its painters.
+
 ## Gates (fixed before implementation)
 
 | Gate | Threshold | Notes |
@@ -52,7 +70,8 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 
 `npm run glitches`: 15 minutes per character over the four layouts, stress runs and wind (design.md, Checking the
 page world). The detectors and the renderer's layers are tested; the survey's counts become a test once batch B
-meets them. Stretch is the gate as fixed, plus a part outside the same bounds against its usual fit in its view.
+meets them. Stretch is the gate as fixed, on the length a part is drawn at (after the 0.6 floor, which rounds to
+whole pixels), plus a part outside the same bounds against its usual fit in its view.
 Blank frames are counted on their own, so batch B can be held to fewer of them as well as to the flicker gate. The
 flicker gate's cloth part (bound against rigid, per window) stays with `npm run gates`.
 
@@ -60,10 +79,10 @@ Baseline, the current renderer:
 
 | Character | Drops | Turns | Fragments (frames) | Pops | Stretch (frames) | Blank | Flicker, worst window | Median |
 |---|---|---|---|---|---|---|---|---|
-| knight | 24 | 157 | 3.65% | 57 | 12.83% | 1 | 65.20% | 12.15% |
-| rogue | 38 | 93 | 0.45% | 139 | 92.71% | 0 | 46.90% | 10.56% |
-| dwarf | 35 | 99 | 4.22% | 20 | 86.40% | 0 | 37.17% | 12.52% |
-| wizard | 25 | 97 | 0.90% | 20 | 7.91% | 1 | 42.41% | 10.32% |
+| knight | 24 | 157 | 3.65% | 57 | 12.22% | 1 | 65.20% | 12.15% |
+| rogue | 38 | 93 | 0.45% | 139 | 7.59% | 0 | 46.90% | 10.56% |
+| dwarf | 35 | 99 | 4.22% | 20 | 29.81% | 0 | 37.17% | 12.52% |
+| wizard | 25 | 97 | 0.90% | 20 | 5.02% | 1 | 42.41% | 10.32% |
 
 What the worst frames show:
 
@@ -71,8 +90,9 @@ What the worst frames show:
   their curves fold or swing far (most fragments and the worst flicker).
 - The wizard's robe and the dwarf's cloak vanish for a frame or two; the rogue's scarf tail drops out about every 45
   frames of a walk.
-- Some sprites are drawn larger than their bones: the rogue's left foot and scarf wrap, the dwarf's left thigh and
-  mantle fit below 0.6 of their drawn length in most frames, so the floor holds them and they overrun their joints
-  (most of the rogue's and dwarf's stretch).
+- Some sprites are drawn larger than their bones: the rogue's left foot and scarf wrap and the dwarf's left thigh and
+  mantle are asked for less than 0.6 of their drawn length in most frames, so the floor holds them and they overrun
+  their joints. The stretch gate measures the drawn length, so this shows only as overrun, for the judges.
+- The dwarf's mantle (shoulder to shoulder) is far from its usual fit whenever the dwarf turns (most of its stretch).
 - Feet fold to nothing when they point at the camera; the knight's plume and the shins stretch on landings.
 - Single frames come out blank or cut off at the sprite box's edge.

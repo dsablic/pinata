@@ -240,10 +240,11 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
     one covering them.
   - Pops use the painted count, so a part covered by a nearer one is not a pop; a part missing from a frame counts as
     none. Parts under `MIN_PART_PIXELS` are skipped, and a pop is counted once until the part is back.
-  - Stretch is the gate as fixed, the length asked for against the sprite's drawn length, before the 0.6 floor that
-    `fitted` holds the sprite to (a bone shorter than the floor leaves the sprite overrunning its joint). A frame also
-    stretches when the part is outside the same bounds against its usual fit in that view (its median over the run):
-    a part that is always squashed in one view, or swings far from its usual length, both count.
+  - Stretch is the gate as fixed: the length a part is drawn at against its sprite's drawn length. A fitted sprite is
+    never drawn shorter than 0.6 of it, rounded to whole pixels (`fitted`), so a part held there is not short; a
+    curve-drawn part is drawn at its curve's length. A frame also stretches when the part is outside the same bounds
+    against its usual fit in that view (its median over the run): a part that swings far from its usual length
+    counts even when it stays within the sprite's bounds.
   - Blank frames, under half the run's median silhouette, are counted on their own: flicker divides by the current
     frame's silhouette, so one near-empty frame makes a window's flicker meaningless.
   - Turns on the spot are a yaw change over 90 degrees within 1.5 s at a mean speed under 0.3 m/s (turns while

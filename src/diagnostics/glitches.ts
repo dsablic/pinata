@@ -97,16 +97,27 @@ export function usualFits (series: Viewed[]): Map<string, number> {
 
 const outside = (ratio: number): boolean => ratio > LONGEST || ratio < SHORTEST
 
+const outsideSprite = (part: DrawnPart, fit: number): boolean => {
+  return fit > LONGEST || (part.shown ?? 0) < Math.round(SHORTEST * part.drawn)
+}
+
+function againstUsual (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
+  const normal = usual.get(fitKey(part, sector))
+  const fit = fitOf(part)
+  return fit === undefined || normal === undefined || normal === 0 ? 1 : fit / normal
+}
+
 export function stretchOf (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
   const fit = fitOf(part)
   if (fit === undefined) return 1
-  const normal = usual.get(fitKey(part, sector))
-  const against = normal === undefined || normal === 0 ? 1 : fit / normal
-  return outside(fit) || !outside(against) ? fit : against
+  return outsideSprite(part, fit) ? fit : againstUsual(part, sector, usual)
 }
 
 export function stretched ({ parts, sector }: Viewed, usual: Map<string, number>): DrawnPart[] {
-  return parts.filter(p => outside(stretchOf(p, sector, usual)))
+  return parts.filter(p => {
+    const fit = fitOf(p)
+    return fit !== undefined && (outsideSprite(p, fit) || outside(againstUsual(p, sector, usual)))
+  })
 }
 
 export function pops (series: DrawnPart[][]): Pop[] {

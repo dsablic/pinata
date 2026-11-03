@@ -50,6 +50,9 @@ test('a part stretches past its sprite\'s drawn length, or past its usual fit in
   assert.deepEqual(stretched(viewed(11, 2), usual).map(p => p.name), ['shin'])
   assert.deepEqual(stretched(viewed(8, 2), usual), [])
   assert.deepEqual(stretched({ parts: [part('head', { shown: undefined })] }, usual), [])
+  const floor = new Map<string, number>()
+  assert.deepEqual(stretched({ parts: [part('arm', { drawn: 7, shown: 4 })] }, floor), [])
+  assert.deepEqual(stretched({ parts: [part('arm', { drawn: 7, shown: 3.9 })] }, floor).map(p => p.name), ['arm'])
 })
 
 function sprites (footprints: boolean): Sprite[] {

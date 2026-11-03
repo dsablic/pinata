@@ -8,8 +8,8 @@ export const MIN_PART_PIXELS = 8
 type PartMap = Pick<GBuffer, 'width' | 'height' | 'part'>
 type Extent = { count: number, minX: number, maxX: number, minY: number, maxY: number }
 
-export function flickerFraction (images: Image[]): number {
-  let worst = 0
+export function flickerFrames (images: Image[]): number[] {
+  const found: number[] = []
   for (let k = 1; k + 1 < images.length; k++) {
     const [before, now, after] = [images[k - 1], images[k], images[k + 1]]
     let area = 0
@@ -22,9 +22,13 @@ export function flickerFraction (images: Image[]): number {
         if (c !== a && getPixel(after, x, y) === a) flicker++
       }
     }
-    if (area > 0) worst = Math.max(worst, flicker / area)
+    found.push(area > 0 ? flicker / area : 0)
   }
-  return worst
+  return found
+}
+
+export function flickerFraction (images: Image[]): number {
+  return Math.max(0, ...flickerFrames(images))
 }
 
 function extents (map: PartMap): Map<number, Extent> {

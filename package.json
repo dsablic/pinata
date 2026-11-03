@@ -45,6 +45,7 @@
     "site": "npm run build:web && node src/cli/site.ts",
     "layouts": "node src/cli/layouts.ts",
     "gates": "node src/cli/gates.ts",
+    "glitches": "node src/cli/glitches.ts",
     "runtime": "npm run site && node src/cli/serve.ts _site",
     "artifact": "node src/cli/artifact.ts"
   },

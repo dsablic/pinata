@@ -48,3 +48,31 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 - **C. The bar:** the judge panel; then the natural-motion plan resumes at batch C. Review.
 
 ## Results
+### A. The survey
+
+`npm run glitches`: 15 minutes per character over the four layouts, stress runs and wind (design.md, Checking the
+page world). The detectors and the renderer's layers are tested; the survey's counts become a test once batch B
+meets them. Stretch is the gate as fixed, plus a part outside the same bounds against its usual fit in its view.
+Blank frames are counted on their own, so batch B can be held to fewer of them as well as to the flicker gate. The
+flicker gate's cloth part (bound against rigid, per window) stays with `npm run gates`.
+
+Baseline, the current renderer:
+
+| Character | Drops | Turns | Fragments (frames) | Pops | Stretch (frames) | Blank | Flicker, worst window | Median |
+|---|---|---|---|---|---|---|---|---|
+| knight | 24 | 157 | 3.65% | 57 | 12.83% | 1 | 65.20% | 12.15% |
+| rogue | 38 | 93 | 0.45% | 139 | 92.71% | 0 | 46.90% | 10.56% |
+| dwarf | 35 | 99 | 4.22% | 20 | 86.40% | 0 | 37.17% | 12.52% |
+| wizard | 25 | 97 | 0.90% | 20 | 7.91% | 1 | 42.41% | 10.32% |
+
+What the worst frames show:
+
+- Cloth-bound parts tear: the knight's cape and the dwarf's cloak break into strips, streaks and speckled slabs when
+  their curves fold or swing far (most fragments and the worst flicker).
+- The wizard's robe and the dwarf's cloak vanish for a frame or two; the rogue's scarf tail drops out about every 45
+  frames of a walk.
+- Some sprites are drawn larger than their bones: the rogue's left foot and scarf wrap, the dwarf's left thigh and
+  mantle fit below 0.6 of their drawn length in most frames, so the floor holds them and they overrun their joints
+  (most of the rogue's and dwarf's stretch).
+- Feet fold to nothing when they point at the camera; the knight's plume and the shins stretch on landings.
+- Single frames come out blank or cut off at the sprite box's edge.

@@ -31,11 +31,14 @@ export function marksOf (fixture: LayoutFixture, without: string[] = []): Array<
   }))
 }
 
-export function scenario (world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0): Scenario {
+export function scenario (
+  world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0, footprints = false
+): Scenario {
   const { pixelsPerMetre, scale } = fixture
   const air = pageEnvironment(world.config, wind)
   const { cast: members, looks } = world
-  const cast = createCast<string>({ cast: members, looks, pixelsPerMetre, scale, seed, measure: true, ...air })
+  const options = { cast: members, looks, pixelsPerMetre, scale, seed, measure: true, footprints, ...air }
+  const cast = createCast<string>(options)
   cast.setLayout(marksOf(fixture))
   return { fixture, cast, viewport: { top: 0, height: fixture.height } }
 }

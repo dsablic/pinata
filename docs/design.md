@@ -224,6 +224,30 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - Layout reads are counted by wrapping `getBoundingClientRect`, `getClientRects` and `getComputedStyle` after the page
   has settled; with nothing changing, a frame must read none.
 - Gaps of `null` (nothing under a foot) count as off the surface.
+- **The glitch survey** (`npm run glitches`, `glitches.ts`): every skinned character, rendered frame by frame for 15
+  minutes: a minute on each of the four layouts, nine minutes of stress on three of them, and two stressed minutes in
+  6 m/s wind. Stress takes the characters on the page in turn, one a second: a poke every 4 s (fast walks and turns
+  on the spot), a visit to a lower element every 3 s (walk-off drops), and, at most every 5 s, the element under a
+  character taken away for 2 s (a fall from height). An element is taken only when another lies below the character:
+  with nothing under it the cast places the character somewhere else, and that jump and its reset cloth would be the
+  harness's glitch, not the renderer's. Asked with `footprints`, the renderer reports for each part the pixels it
+  painted, occluded ones included, as well as who owns each pixel, how many it painted, its length as asked and its
+  sprite's drawn length; the survey judges any renderer that reports these, and flicker reads the images. Worst frames
+  of each kind go to `reports/glitches/` as before-during-after strips, with `worst.txt` naming them.
+  - Fragments test the connectivity of a part's footprint (eight neighbours) and count the visible pixels of every
+    piece but the largest: a part painted under the torso is still whole, two strips are torn even where the torso
+    hides the gap between them. Owners alone can't tell these apart, since a later part beside both strips looks like
+    one covering them.
+  - Pops use the painted count, so a part covered by a nearer one is not a pop; a part missing from a frame counts as
+    none. Parts under `MIN_PART_PIXELS` are skipped, and a pop is counted once until the part is back.
+  - Stretch is the gate as fixed, the length asked for against the sprite's drawn length, before the 0.6 floor that
+    `fitted` holds the sprite to (a bone shorter than the floor leaves the sprite overrunning its joint). A frame also
+    stretches when the part is outside the same bounds against its usual fit in that view (its median over the run):
+    a part that is always squashed in one view, or swings far from its usual length, both count.
+  - Blank frames, under half the run's median silhouette, are counted on their own: flicker divides by the current
+    frame's silhouette, so one near-empty frame makes a window's flicker meaningless.
+  - Turns on the spot are a yaw change over 90 degrees within 1.5 s at a mean speed under 0.3 m/s (turns while
+    walking average about 0.7); drops are the starts of falls.
 
 ## Motion (`src/motion/`, `src/math/`)
 

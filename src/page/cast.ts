@@ -7,7 +7,8 @@ import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
 import { makeCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
-import { renderSkinned } from '../style/skins.ts'
+import { renderSkinnedLayers } from '../style/skins.ts'
+import type { DrawnPart } from '../style/skins.ts'
 import type { Image } from '../image.ts'
 import type { Hints } from './dom.ts'
 import { surfaceGraph } from './graph.ts'
@@ -34,8 +35,9 @@ export type CastOptions = {
   seed: number
   count?: number
   measure?: boolean
+  footprints?: boolean
 }
-export type Sprite = { image: Image, camera: Camera }
+export type Sprite = { image: Image, camera: Camera, owner?: Int16Array, parts?: DrawnPart[], sector?: number }
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
 export type Moving = {
   name: string
@@ -273,11 +275,12 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     for (const [name, p] of Object.entries(frame.joints)) pose[name] = [p[0] - x, p[1] - y, p[2] - z]
     const curves = Object.fromEntries(Object.entries(c.secondary.curves())
       .map(([joint, points]) => [joint, points.map((p): Vec3 => [p[0] - x, p[1] - y, p[2] - z])]))
-    const image = renderSkinned({
+    const { image, owner, parts, sector } = renderSkinnedLayers({
       mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view,
-      angles: c.angles, lengths: c.lengths, anchors: c.anchors, curves
+      angles: c.angles, lengths: c.lengths, anchors: c.anchors, curves, footprints: options.footprints === true
     })
-    c.sprite = { image, camera: box, frame }
+    const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
+    c.sprite = { image, camera: box, frame, ...layers }
     return c.sprite
   }
 

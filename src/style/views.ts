@@ -57,10 +57,14 @@ export function mirrored (sprite: SkinPart, twoJoint: boolean): SkinPart {
 
 const MIN_FIT = 0.6
 
+export function spanOf (sprite: SkinPart | undefined): number {
+  return sprite?.pivotA === undefined || sprite.pivotB === undefined ? 0 : sprite.pivotB[0] - sprite.pivotA[0]
+}
+
 export function fitted (sprite: SkinPart, length: number): SkinPart {
   const { rows, pivotA, pivotB } = sprite
   if (rows === undefined || pivotA === undefined || pivotB === undefined) return sprite
-  const drawn = pivotB[0] - pivotA[0]
+  const drawn = spanOf(sprite)
   const target = Math.max(1, Math.round(Math.max(length, MIN_FIT * drawn)))
   if (Math.abs(Math.max(length, MIN_FIT * drawn) - drawn) < 1 || drawn < 1) return sprite
   const fit = rows.map(row => {

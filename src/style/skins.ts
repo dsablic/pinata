@@ -7,7 +7,7 @@ import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import type { Pose } from '../motion/pose.ts'
 import { cleanRotation, toGrid } from './rotsprite.ts'
-import { chooseView, counterpart, facingAngle, fitted, mirrored } from './views.ts'
+import { chooseView, counterpart, facingAngle, fitted, mirrored, spanOf } from './views.ts'
 import type { ViewChoice } from './views.ts'
 import type { Rotated } from './rotsprite.ts'
 
@@ -21,6 +21,7 @@ export type SkinnedOptions = {
   lengths?: Map<string, number>
   anchors?: Map<string, [number, number]>
   curves?: Record<string, Vec3[]>
+  footprints?: boolean
   yaw?: number
   view?: { sector?: number }
 }
@@ -38,6 +39,8 @@ type Placement = {
   angle: number
   depth: number
   curve?: { points: Array<[number, number]>, span: number }
+  drawn: number
+  shown?: number
 }
 
 export const ANGLE_STEP = Math.PI / 8
@@ -59,7 +62,7 @@ function jointOf (m: Mannequin, pose: Pose, name: string): Vec3 {
   return pose[name] ?? m.joints[name]
 }
 
-type Shown = { sprite: SkinPart | undefined, unmirrored?: SkinPart }
+type Shown = { sprite: SkinPart | undefined, unmirrored?: SkinPart, span: number }
 
 function spriteFor (
   o: SkinnedOptions,
@@ -68,13 +71,16 @@ function spriteFor (
   choice: ViewChoice | undefined,
   length: number
 ): Shown {
-  if (choice === undefined || o.skin.views === undefined) return { sprite: o.skin.parts[name] }
+  if (choice === undefined || o.skin.views === undefined) {
+    return { sprite: o.skin.parts[name], span: spanOf(o.skin.parts[name]) }
+  }
   const parts = o.skin.views[choice.view].parts
   const drawn = parts[choice.mirror ? counterpart(name) : name] ?? parts[name]
-  if (drawn === undefined) return { sprite: undefined }
+  if (drawn === undefined) return { sprite: undefined, span: 0 }
   const sized = single ? drawn : fitted(drawn, length)
-  if (!choice.mirror) return { sprite: sized }
-  return { sprite: mirrored(sized, !single), ...(single ? {} : { unmirrored: sized }) }
+  const span = spanOf(drawn)
+  if (!choice.mirror) return { sprite: sized, span }
+  return { sprite: mirrored(sized, !single), ...(single ? {} : { unmirrored: sized }), span }
 }
 
 function placements (o: SkinnedOptions): Placement[] {
@@ -91,7 +97,7 @@ function placements (o: SkinnedOptions): Placement[] {
     const single = part.a === part.b
     const length = steadyLength(arcLength(o, part, a, b), o.lengths?.get(part.name))
     if (!single) o.lengths?.set(part.name, length)
-    const { sprite, unmirrored } = spriteFor(o, part.name, single, choice, length)
+    const { sprite, unmirrored, span } = spriteFor(o, part.name, single, choice, length)
     if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
       continue
     }
@@ -111,7 +117,9 @@ function placements (o: SkinnedOptions): Placement[] {
       anchor: steadyAnchor(a, o.anchors, part.a),
       angle,
       depth: (a.depth + b.depth) / 2,
-      ...curveFor(o, part.b, single, sprite)
+      ...curveFor(o, part.b, single, sprite),
+      drawn: span,
+      ...(single ? {} : { shown: length })
     })
   }
   if (choice !== undefined) {
@@ -163,7 +171,7 @@ function curveFor (o: SkinnedOptions, joint: string, single: boolean, sprite: Sk
     const screen = project(o.camera, at)
     return steadyAnchor(screen, o.anchors, `${joint}#${k}`)
   })
-  return { curve: { points, span: sprite.pivotB[0] - sprite.pivotA[0] } }
+  return { curve: { points, span: spanOf(sprite) } }
 }
 
 function steadyAnchor (at: Screen, kept: Map<string, [number, number]> | undefined, joint: string): [number, number] {
@@ -216,12 +224,15 @@ function rotated (p: Placement): Rotated {
   return { grid: turned.grid.map(row => [...row].reverse()), pivot: [width - 1 - turned.pivot[0], turned.pivot[1]] }
 }
 
-type Ink = { owner: Int16Array, index: number, shade: Map<number, number> }
+type Ink = { owner: Int16Array, index: number, shade: Map<number, number>, painted: number[], footprints?: number[][] }
 
 function put (img: Image, x: number, y: number, colour: number, p: Placement, ink?: Ink): void {
   if (x < 0 || y < 0 || x >= img.width || y >= img.height) return
   setPixel(img, x, y, ink !== undefined && p.far === true ? ink.shade.get(colour) ?? colour : colour)
-  if (ink !== undefined) ink.owner[y * img.width + x] = ink.index
+  if (ink === undefined) return
+  ink.owner[y * img.width + x] = ink.index
+  ink.painted[ink.index]++
+  ink.footprints?.[ink.index].push(y * img.width + x)
 }
 
 function paintClean (img: Image, p: Placement, colours: Map<string, number>, ink?: Ink): void {
@@ -344,13 +355,26 @@ function drawOutline (img: Image, colour: number): void {
   for (const [x, y] of edge) setPixel(img, x, y, colour)
 }
 
+export type DrawnPart = { name: string, drawn: number, shown?: number, painted: number, footprint?: number[] }
+export type Layers = { image: Image, owner?: Int16Array, parts: DrawnPart[], sector?: number }
+
 export function renderSkinned (options: SkinnedOptions): Image {
+  return renderSkinnedLayers(options).image
+}
+
+export function renderSkinnedLayers (options: SkinnedOptions): Layers {
   const img = createImage(options.camera.width, options.camera.height)
   const colours = new Map(Object.entries(options.skin.palette).map(([key, hex]) => [key, parseHex(hex)]))
   const placed = placements(options)
   const ink: Ink | undefined = options.skin.views === undefined
     ? undefined
-    : { owner: new Int16Array(img.width * img.height).fill(-1), index: 0, shade: darkerShades(colours) }
+    : {
+        owner: new Int16Array(img.width * img.height).fill(-1),
+        index: 0,
+        shade: darkerShades(colours),
+        painted: placed.map(() => 0),
+        ...(options.footprints === true ? { footprints: placed.map(() => []) } : {})
+      }
   placed.forEach((p, index) => {
     if (ink !== undefined) ink.index = index
     if (p.curve !== undefined) paintCurve(img, p, p.curve.points, p.curve.span, colours, ink)
@@ -359,5 +383,12 @@ export function renderSkinned (options: SkinnedOptions): Image {
   })
   if (ink !== undefined) innerLines(img, placed, ink)
   drawOutline(img, [...colours.values()].reduce((a, b) => luminance(b) < luminance(a) ? b : a))
-  return img
+  const parts = placed.map(({ name, drawn, shown }, i): DrawnPart => {
+    const footprint = ink?.footprints?.[i]
+    const lengths = { drawn, ...(shown === undefined ? {} : { shown }) }
+    return { name, ...lengths, painted: ink?.painted[i] ?? 0, ...(footprint === undefined ? {} : { footprint }) }
+  })
+  const sector = options.view?.sector
+  const owned = ink === undefined ? {} : { owner: ink.owner }
+  return { image: img, ...owned, parts, ...(sector === undefined ? {} : { sector }) }
 }

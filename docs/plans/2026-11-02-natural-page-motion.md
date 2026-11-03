@@ -43,6 +43,9 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
   with rises up to and just above each character's jump height, and on synthetic grounds as a supplement.
 - Then CMU takes for take-off and landing join the database, picked only while jumping (by vertical speed), so walking
   never matches them.
+- Super jumps are an option of the page world (`jumps: 'super'`; the default stays a leg length). They reach 6 m up
+  and 2 m across, so characters climb the demo and page layouts' 1.5-5 m rises with a cartoon leap; the arc, crouch
+  and landing are the same as a leg-length jump's. The demo page has a switch for them.
 
 ## Gates (fixed before implementation)
 
@@ -57,6 +60,7 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 | Landing absorbs | for drops of 0.6, 2 and 5 m, the deepest knee flexion within 0.5 s of landing grows with the drop and is at least 35 degrees at 5 m; the pelvis dips at least 4 cm at 2 m; no sole goes through the surface | every humanoid |
 | Recovery | after any landing the character is walking or resting normally (feet held, no mid-air) within 1.5 s | |
 | Jumps | on recorded layouts with rises up to the jump height, at least 95% of planned jumps land on the surface they aim for, and nobody climbs a rise above the jump height | |
+| Super jumps | with the option on, over 60 s on each recorded demo and page layout: at least 4 planned jumps, at least 95% of them land on the surface they aim for, and no sole more than the planted tolerance under a surface; with it off, page outputs byte-identical | |
 | No popping | over a minute on every recorded layout, no part of any character vanishes for one to three frames and comes back (pixel count of its colours to zero and back) unless a part nearer the camera covers it | structural draw order |
 | Cost | the page world with four characters, cloth and chains on, at most 8 ms of main thread per frame at p95 in Chrome | |
 | Natural motion | blind judge panel, walk and fall-and-land strips of each character: the new page world is preferred over the current page world in at least 75% of non-control answers, and is rated at least as natural (1-5) as the old terrain demo with skins | judges, both orders, controls |

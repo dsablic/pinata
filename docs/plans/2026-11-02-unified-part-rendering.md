@@ -62,6 +62,8 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 | Stretch | in at most 0.1% of frames per character | |
 | Flicker | each character's worst window no worse than with the current renderer, and bound cloth adds at most 1% over rigid in each window | the skins-show-cloth gate's flicker part |
 | Cost | at most 8 ms of main thread per frame at p95 in Chrome, four characters | |
+| Skins fit their bones | `npm run skin -- fit` flags no part view of any skin; the survey's pops, fragments and stretch no worse than batch C's for any character, and the knight's pops none | batch D, the sprites redrawn |
+| Redrawn sprites | blind panel of each redrawn skin's directions sheet against the current one: rated at least as good (1-5) on average, and the current preferred in at most 50% of non-control answers | judges, both orders, controls |
 | Judges | blind panel, walk, turn and fall strips of each character: the new renderer preferred over the current one in at least 65% of non-control answers, and rated at least as clean (1-5) | judges, both orders, controls |
 
 ## Batches
@@ -70,6 +72,8 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
   Review.
 - **B. One painter, one snap, one draw order:** the page renders through them; the survey and cost gates. Review.
 - **C. The bar:** the judge panel; then the natural-motion plan resumes at batch C. Review.
+- **D. Skins fitted to their bones:** the sprites `npm run skin -- fit` flags are redrawn at the length their bone
+  projects from the page camera; the fit and redrawn-sprites gates. Review.
 
 ## Results
 ### A. The survey

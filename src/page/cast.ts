@@ -101,8 +101,8 @@ type Character<K> = {
   interest?: string
   saying?: Saying
   view: { sector?: number }
-  angles: Map<string, number>
   lengths: Map<string, number>
+  order: string[]
   anchors: Map<string, [number, number]>
   sprite?: Sprite & { frame: WalkerFrame }
 }
@@ -171,8 +171,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       if (look.skin === undefined || database === undefined) return []
       const fresh = {
         view: {},
-        angles: new Map<string, number>(),
         lengths: new Map<string, number>(),
+        order: [],
         anchors: new Map<string, [number, number]>(),
         visited: new Set<K>(),
         sameSince: 0,
@@ -277,7 +277,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       .map(([joint, points]) => [joint, points.map((p): Vec3 => [p[0] - x, p[1] - y, p[2] - z])]))
     const { image, owner, parts, sector } = renderSkinnedLayers({
       mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view,
-      angles: c.angles, lengths: c.lengths, anchors: c.anchors, curves, footprints: options.footprints === true
+      painter: 'strip', order: c.order, lengths: c.lengths, anchors: c.anchors, curves,
+      footprints: options.footprints === true
     })
     const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
     c.sprite = { image, camera: box, frame, ...layers }

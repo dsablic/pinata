@@ -14,7 +14,7 @@ const LEAST_MINUTES = 10
 const LEAST_EVENTS = 20
 const MOST_SHARE = 0.001
 const STRIP = { scale: 4, gap: 4, background: 0xf4f1ea }
-const KINDS: Kind[] = ['fragment', 'pop', 'stretch', 'flicker', 'blank']
+const KINDS: Kind[] = ['fragment', 'pop', 'stretch', 'miss', 'refit', 'flicker', 'blank']
 
 function gate (met: boolean, text: string): string {
   return `${met ? 'GATE MET' : 'GATE MISSED'} ${text}`
@@ -30,6 +30,8 @@ function summary (name: string, t: Tally): string[] {
     gate(t.fragmentFrames <= MOST_SHARE * t.frames, `${name} fragments (${share(t.fragmentFrames)} of frames)`),
     gate(t.pops === 0, `${name} pops (${t.pops})`),
     gate(t.stretchFrames <= MOST_SHARE * t.frames, `${name} stretch (${share(t.stretchFrames)} of frames)`),
+    `${name} a part's end 2 px or more off its joint (not gated): ${share(t.missFrames)} of frames`,
+    `${name} far from their usual fit in the view (not gated): ${share(t.refitFrames)} of frames`,
     `${name} blank or cut-off frames: ${t.blankFrames}`,
     `${name} flicker: worst window ${(100 * Math.max(0, ...t.flicker)).toFixed(2)}%, ` +
       `median ${(100 * [...t.flicker].sort((a, b) => a - b)[t.flicker.length >> 1]).toFixed(2)}%`

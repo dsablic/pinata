@@ -175,6 +175,7 @@ export function createSecondary (member: Dressed, settings: SecondaryOptions): S
       return positions
     },
     reset: () => {
+      curves = {}
       for (const entry of chains) entry.started = false
       if (cloth !== undefined && resting !== undefined) restart(cloth, resting)
     },

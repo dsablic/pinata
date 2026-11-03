@@ -258,3 +258,21 @@ test('every character is drawn on every frame, and the dwarf never loses its hel
   assert.deepEqual(empty.slice(0, 5), [])
   assert.equal(bareHeaded, 0)
 })
+
+test('walking off an edge, the body falls from the edge height and is never posed on the lower ground first', () => {
+  const MOST_STEP_METRES = 0.5
+  const jumps: string[] = []
+  for (const seed of [1, 2, 3]) {
+    const s = scenario(world, layout('demo-390'), seed)
+    const before = new Map<string, number>()
+    run(s, 30, step => {
+      for (const { name, frame } of s.cast.moving()) {
+        const y = frame.joints.pelvis[1]
+        const last = before.get(name)
+        if (last !== undefined && Math.abs(y - last) > MOST_STEP_METRES) jumps.push(`${name} seed ${seed} step ${step}`)
+        before.set(name, y)
+      }
+    })
+  }
+  assert.deepEqual(jumps, [])
+})

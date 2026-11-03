@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { fragmentPixels, pops, stretched, usualFits } from '../src/diagnostics/glitches.ts'
+import { fragmentPixels, offUsual, overSprite, pops, usualFits } from '../src/diagnostics/glitches.ts'
 import type { Layered } from '../src/diagnostics/glitches.ts'
 import { readWorld, run, scenario } from '../src/diagnostics/page-scenarios.ts'
 import { readLayout } from '../src/page/fixture.ts'
@@ -41,18 +41,23 @@ test('a part that loses more than half its pixels and gets them back within thre
   assert.deepEqual(pops([[part('arm')], [], [part('arm')]]), [{ part: 'arm', from: 1, back: 2 }])
 })
 
-test('a part stretches past its sprite\'s drawn length, or past its usual fit in the same view', () => {
+test('a part stretches past its sprite\'s drawn length, the rounded floor aside', () => {
+  const names = (parts: DrawnPart[]): string[] => overSprite(parts).map(p => p.name)
+  assert.deepEqual(names([part('shin', { shown: 12.5 })]), [])
+  assert.deepEqual(names([part('shin', { shown: 12.6 })]), ['shin'])
+  assert.deepEqual(names([part('shin', { shown: 6 })]), [])
+  assert.deepEqual(names([part('shin', { shown: 5.9 })]), ['shin'])
+  assert.deepEqual(names([part('arm', { drawn: 7, shown: 4 }), part('arm', { drawn: 7, shown: 3.9 })]), ['arm'])
+  assert.deepEqual(names([part('head', { shown: undefined })]), [])
+})
+
+test('a part far from its usual fit in the same view is told apart from one in another view', () => {
   const viewed = (shown: number, sector: number) => ({ parts: [part('shin', { shown })], sector })
   const usual = usualFits([viewed(7, 2), viewed(7, 2), viewed(7, 2), viewed(13, 0), viewed(13, 0)])
-  assert.deepEqual(stretched(viewed(7, 2), usual), [])
-  assert.deepEqual(stretched(viewed(13, 0), usual).map(p => p.name), ['shin'])
-  assert.deepEqual(stretched(viewed(5, 0), usual).map(p => p.name), ['shin'])
-  assert.deepEqual(stretched(viewed(11, 2), usual).map(p => p.name), ['shin'])
-  assert.deepEqual(stretched(viewed(8, 2), usual), [])
-  assert.deepEqual(stretched({ parts: [part('head', { shown: undefined })] }, usual), [])
-  const floor = new Map<string, number>()
-  assert.deepEqual(stretched({ parts: [part('arm', { drawn: 7, shown: 4 })] }, floor), [])
-  assert.deepEqual(stretched({ parts: [part('arm', { drawn: 7, shown: 3.9 })] }, floor).map(p => p.name), ['arm'])
+  assert.deepEqual(offUsual(viewed(7, 2), usual), [])
+  assert.deepEqual(offUsual(viewed(13, 0), usual), [])
+  assert.deepEqual(offUsual(viewed(11, 2), usual).map(p => p.name), ['shin'])
+  assert.deepEqual(offUsual(viewed(7, 0), usual).map(p => p.name), ['shin'])
 })
 
 function sprites (footprints: boolean): Sprite[] {

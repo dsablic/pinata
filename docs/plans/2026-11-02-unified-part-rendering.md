@@ -43,7 +43,10 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 - `skins.ts` with `painter: 'strip'` (the page): every joint and curve point projected and snapped once, with the
   anchors' quarter-pixel hysteresis; two-joint parts painted by `paintStrip` through their snapped points (a rigid
   part's are its two joints), single-joint parts unrotated at their snapped joint; the order kept per character.
-  Angles and lengths are no longer kept for the page. The skin command keeps its painters.
+  Angles are no longer kept for the page. The skin command keeps its painters.
+- Changed while building: the strip is laid at the bone's projected length kept with a pixel of hysteresis, not at
+  the length between its snapped ends, which made short parts jump by a third of their length as diagonals crossed
+  pixels; and it is held to at most 1.25 of the sprite's drawn length as well as at least 0.6.
 
 ## Gates (fixed before implementation)
 
@@ -71,7 +74,10 @@ along a curve. Each decision crosses its boundary at its own moment, and each fi
 `npm run glitches`: 15 minutes per character over the four layouts, stress runs and wind (design.md, Checking the
 page world). The detectors and the renderer's layers are tested; the survey's counts become a test once batch B
 meets them. Stretch is the gate as fixed, on the length a part is drawn at (after the 0.6 floor, which rounds to
-whole pixels), plus a part outside the same bounds against its usual fit in its view.
+whole pixels). A per-view check (a part outside the same bounds against its usual fit in its view) was added to it
+here and then taken out of the gate in batch B, reported on its own as refit: it counts shoulder-to-shoulder parts
+foreshortening by a pixel as the body turns, which is geometry, not stretch. That loosens the measure this baseline
+used (the gate's wording never had the check); batch B's table measures both renderers both ways.
 Blank frames are counted on their own, so batch B can be held to fewer of them as well as to the flicker gate. The
 flicker gate's cloth part (bound against rigid, per window) stays with `npm run gates`.
 
@@ -96,3 +102,44 @@ What the worst frames show:
 - The dwarf's mantle (shoulder to shoulder) is far from its usual fit whenever the dwarf turns (most of its stretch).
 - Feet fold to nothing when they point at the camera; the knight's plume and the shins stretch on landings.
 - Single frames come out blank or cut off at the sprite box's edge.
+
+### B. One painter, one snap, one draw order
+
+The survey on both renderers with the same detectors. The current renderer runs on the motion as it was; the new
+one after two motion fixes the survey found (below). Stretch is the gate's measure, drawn length against the
+sprite; the per-view refit and the joint miss are reported, not gated.
+
+| Character | Renderer | Fragments | Pops | Stretch | Refit | Joint miss ≥ 2 px | Blank | Flicker, worst window | Median |
+|---|---|---|---|---|---|---|---|---|---|
+| knight | current | 3.65% | 57 | 6.24% | 10.35% | not measured | 1 | 65.20% | 12.15% |
+| knight | new | 0.00% | 72 | 0.00% | 6.44% | 4.83% | 0 | 36.90% | 10.51% |
+| rogue | current | 0.45% | 139 | 5.23% | 3.56% | not measured | 0 | 46.90% | 10.56% |
+| rogue | new | 0.00% | 0 | 0.00% | 11.72% | 2.27% | 0 | 48.18% | 10.38% |
+| dwarf | current | 4.22% | 20 | 5.14% | 27.52% | not measured | 0 | 37.17% | 12.52% |
+| dwarf | new | 0.00% | 4 | 0.00% | 15.06% | 6.99% | 0 | 32.98% | 11.73% |
+| wizard | current | 0.90% | 20 | 2.21% | 4.43% | not measured | 1 | 42.41% | 10.32% |
+| wizard | new | 0.00% | 0 | 0.00% | 3.52% | 1.51% | 0 | 32.42% | 11.97% |
+
+- Met: fragments for every character; pops for the rogue and wizard; cost, 5.4 to 6.8 ms of main thread per frame
+  at p95 on the demo page in Chrome with four characters (the current renderer measured 7.6 to 8.3 ms).
+- Stretch is met by construction: the strip painter holds every part between 0.6 and 1.25 of its sprite, so the
+  gate now says only that no sprite is distorted beyond those bounds. Where a bone asks for more or less, the part's
+  end misses its joint instead; the joint-miss column counts frames where that is 2 px or more (the plume and capes
+  in big swings, shins on landings, feet). The current renderer does not report a part's asked length, so its misses
+  (from 22.5-degree angle snapping) are not measured. The judges decide whether the trade shows.
+- Missed, and worse than the current renderer: the knight's pops, 72 against 57. They are its left foot as the
+  knight turns to face the front or back. That view's sprite is a pixel long where the bone projects four, so the
+  foot drawn true to its view has under half its side-on pixels, and it crosses back over half within three frames
+  as the stride carries on; stretching it to its bone would break the stretch bounds instead. The skin's front foot
+  does not match the mannequin from this camera.
+- Missed: the dwarf's four pops, its axe blade turning edge-on and its cloak folding within one to two frames.
+- Missed by 1.3 points: the rogue's worst flicker window, a fast turn that shows one view for a single frame, on
+  both renderers at the same frame.
+- The flicker gate's cloth part (`npm run gates`, bound against rigid per window, the natural-motion plan's): met
+  for the knight and rogue (the knight's worst was 15.38% before), missed for the dwarf (2.56%) and wizard (2.60%).
+- Found by the survey and fixed in motion, not rendering: a character dropped in elsewhere, or placed again, was drawn
+  for one frame with its cloth curves from where it had been (cloth parts popped, and the worst flicker windows came
+  from it); and a character walking off an edge was posed on the lower ground for one frame before it fell (blank
+  frames, every part popping). `reset` now drops the curves, and the player no longer lowers the body onto a foot
+  over a drop.
+- The judge gate is batch C's.

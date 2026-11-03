@@ -242,11 +242,13 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
     none. Parts under `MIN_PART_PIXELS` are skipped, and a pop is counted once until the part is back.
   - Stretch is the gate as fixed: the length a part is drawn at against its sprite's drawn length. A fitted sprite is
     never drawn shorter than 0.6 of it, rounded to whole pixels (`fitted`), so a part held there is not short; a
-    curve-drawn part is drawn at its curve's length. A frame also stretches when the part is outside the same bounds
-    against its usual fit in that view (its median over the run): a part that swings far from its usual length
-    counts even when it stays within the sprite's bounds.
+    part drawn by the page's strip painter is drawn at the length it reports.
   - Blank frames, under half the run's median silhouette, are counted on their own: flicker divides by the current
     frame's silhouette, so one near-empty frame makes a window's flicker meaningless.
+  - A part far from its usual fit in its view is reported but not gated: shoulder-to-shoulder parts (the dwarf's
+    mantle, the rogue's scarf wrap) foreshorten from one pixel to two as the body turns within a view, which is
+    geometry, not stretch.
+  - Pop notes list the views from the frame before to the frame back, so a view change is told from a renderer pop.
   - Turns on the spot are a yaw change over 90 degrees within 1.5 s at a mean speed under 0.3 m/s (turns while
     walking average about 0.7); drops are the starts of falls.
 
@@ -362,7 +364,9 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   kept it flat, so capes and robes read as armour at page size. The terrain world and the reports keep the materials.
 - The knight's plume is not bound: its sprite is a crest over the helmet.
 - `reset` puts cloth and chains back to rest, for a character moved, re-placed or dropped in; `shift` carries them
-  with a page element that moved.
+  with a page element that moved. It also drops the cloth curves: the move happens after that frame's step, so the
+  frame would otherwise be drawn with curves from where the character had been, and its cloth parts drawn off the
+  sprite. Until the next step those parts are drawn as rigid bones on the new pose.
 - Options the page sets and the terrain world leaves off, so the terrain world's outputs stay as they were: two
   collision passes per substep, eight more passes at the end of each frame (`settle`), and a full step on the frame
   cloth starts (otherwise it is only placed, and can start inside a body posed away from rest). Between them, no
@@ -534,6 +538,10 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   ground steeper than 60 degrees between heel and toe is a stair edge and does not tilt it.
 - The pelvis follows the lower foot's ground with a 0.12 s time constant, but not more than 0.2 m below the ground
   under the body: a foot over a drop (the end of a shelf on a page) must not pull the body down off its surface.
+- A foot whose ground is more than 0.5 m below the base (a foot stepping past an edge onto the lower ground) is over
+  a drop: the body does not follow its reference, a held foot there lets go, and a foot in the air there does not ask
+  the body to lower. Otherwise the body was posed on the lower ground for the one frame before the fall registered,
+  and fell from there instead of from the edge.
 - Held feet set how high the body may stand: low enough for each to reach (98.5% of the leg), high enough that none
   folds past 140 degrees of knee flexion (legs of more than three bones: a quarter of the reach). A held foot no height
   can reach steps off; when two held feet cannot both be kept, the one limiting reach steps off.
@@ -689,6 +697,30 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
     share a joint join without a line.
   - A colour's next shade down is the darker palette colour nearest in hue and saturation (the colour less its grey),
     with the step closest in brightness breaking ties; a colour with nothing darker keeps itself.
+
+### strip.ts and order.ts (the page's painter)
+
+- The page draws every two-joint part with one painter, `paintStrip`: the sprite laid along a polyline of pixel
+  points, a rigid part's two joints or a cloth-bound part's curve. Every joint and curve point of a character is
+  projected and snapped to a pixel once per frame (with the anchors' quarter-pixel hysteresis), and parts read only
+  those points, so a child part starts exactly where its parent ends and no part has an angle or length of its own to
+  dither. The skin command keeps the rotating painters, so its sheets stay as they are.
+- The middle is laid over the bone's projected length, kept between frames until it moves a whole pixel, along the
+  polyline from the first point: two snapped ends would otherwise make a 4 px foot 4 to 5.4 px from frame to frame as
+  its diagonal crosses pixels. It is held between 0.6 (rounded) and 1.25 of the sprite's drawn length, stopping short
+  of the last point or running on past it, so a sprite is never squashed or stretched beyond those bounds and the
+  part's end misses its joint instead (the survey reports how often by 2 px or more). Caps (the columns before
+  pivot A and after pivot B) keep their size along the first and last segments. Rows lie along each segment's
+  normal, the bisector at inner points, so neighbouring segments share an edge: a bend cannot tear, and where
+  segments overlap inside a fold the later one wins, so a fold is solid. Pixels are mapped back to the sprite and
+  sampled nearest. When a part's ends snap to the same pixel (a foot pointing at the camera) it is laid along its
+  projected direction, not an arbitrary one.
+- Draw order (`drawOrder`): layer first, then farther before nearer, but two parts keep last frame's order unless
+  their depths differ by more than 3 cm, so parts at nearly the same depth do not swap back and forth. Level parts
+  keep the mannequin's order, the later drawn above: authoring order is the structure (helmet after head, face after
+  hood). New parts are placed by the same rules. The rule is transitive (an interval order), so one insertion pass,
+  each part moved before the earliest it must precede, satisfies every required pair; moving a part ahead can carry
+  it past level parts between, so about one in two hundred level pairs swaps on such a frame.
 
 ### stylize.ts
 

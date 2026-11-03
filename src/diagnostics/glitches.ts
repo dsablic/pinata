@@ -13,7 +13,7 @@ export type Layered = { width: number, height: number, owner: Int16Array, parts:
 export type Viewed = { parts: DrawnPart[], sector?: number }
 export type Stress = { poke?: number, visitBelow?: number, pull?: number }
 export type SurveyRun = { layout: string, seed?: number, wind?: number, seconds: number, stress?: Stress }
-export type Kind = 'fragment' | 'pop' | 'stretch' | 'flicker' | 'blank'
+export type Kind = 'fragment' | 'pop' | 'stretch' | 'refit' | 'miss' | 'flicker' | 'blank'
 export type Worst = { score: number, note: string, frames: Image[] }
 export type Tally = {
   frames: number
@@ -22,6 +22,8 @@ export type Tally = {
   fragmentFrames: number
   pops: number
   stretchFrames: number
+  refitFrames: number
+  missFrames: number
   blankFrames: number
   flicker: number[]
   worst: Record<Kind, Worst[]>
@@ -30,6 +32,7 @@ export type Pop = { part: string, from: number, back: number }
 
 export const LONGEST = 1.25
 export const SHORTEST = 0.6
+export const MISSED_JOINT_PX = 2
 export const POP_SHARE = 0.5
 export const POP_FRAMES = 3
 export const BLANK_SHARE = 0.5
@@ -97,27 +100,25 @@ export function usualFits (series: Viewed[]): Map<string, number> {
 
 const outside = (ratio: number): boolean => ratio > LONGEST || ratio < SHORTEST
 
-const outsideSprite = (part: DrawnPart, fit: number): boolean => {
-  return fit > LONGEST || (part.shown ?? 0) < Math.round(SHORTEST * part.drawn)
+export function overSprite (parts: DrawnPart[]): DrawnPart[] {
+  return parts.filter(part => {
+    const fit = fitOf(part)
+    return fit !== undefined && (fit > LONGEST || (part.shown ?? 0) < Math.round(SHORTEST * part.drawn))
+  })
 }
 
-function againstUsual (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
+export function missingJoints (parts: DrawnPart[]): DrawnPart[] {
+  return parts.filter(p => p.asked !== undefined && Math.abs(p.asked - (p.shown ?? p.asked)) >= MISSED_JOINT_PX)
+}
+
+export function againstUsual (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
   const normal = usual.get(fitKey(part, sector))
   const fit = fitOf(part)
   return fit === undefined || normal === undefined || normal === 0 ? 1 : fit / normal
 }
 
-export function stretchOf (part: DrawnPart, sector: number | undefined, usual: Map<string, number>): number {
-  const fit = fitOf(part)
-  if (fit === undefined) return 1
-  return outsideSprite(part, fit) ? fit : againstUsual(part, sector, usual)
-}
-
-export function stretched ({ parts, sector }: Viewed, usual: Map<string, number>): DrawnPart[] {
-  return parts.filter(p => {
-    const fit = fitOf(p)
-    return fit !== undefined && (outsideSprite(p, fit) || outside(againstUsual(p, sector, usual)))
-  })
+export function offUsual ({ parts, sector }: Viewed, usual: Map<string, number>): DrawnPart[] {
+  return parts.filter(p => outside(againstUsual(p, sector, usual)))
 }
 
 export function pops (series: DrawnPart[][]): Pop[] {
@@ -146,8 +147,11 @@ export function silhouette (image: Image): number {
 }
 
 function emptyTally (): Tally {
-  const worst = { fragment: [], pop: [], stretch: [], flicker: [], blank: [] }
-  const counts = { frames: 0, drops: 0, turns: 0, fragmentFrames: 0, pops: 0, stretchFrames: 0, blankFrames: 0 }
+  const worst = { fragment: [], pop: [], stretch: [], refit: [], miss: [], flicker: [], blank: [] }
+  const counts = {
+    frames: 0, drops: 0, turns: 0, fragmentFrames: 0, pops: 0, stretchFrames: 0, refitFrames: 0, missFrames: 0,
+    blankFrames: 0
+  }
   return { ...counts, flicker: [], worst }
 }
 
@@ -247,13 +251,28 @@ function judge (seen: Seen[], tally: Tally, where: string): void {
       const score = Math.max(...frame.stray.values())
       remember(tally.worst.fragment, { score, note: note(k, text), frames: strip(k) })
     }
-    const long = stretched(frame, usual)
+    const long = overSprite(frame.parts)
     if (long.length > 0) {
       tally.stretchFrames++
-      const by = (p: DrawnPart): number => stretchOf(p, frame.sector, usual)
-      const score = Math.max(...long.map(p => Math.max(by(p), 1 / by(p))))
-      const text = long.map(p => `${p.name} x${by(p).toFixed(2)}`).join(', ')
+      const fit = (p: DrawnPart): number => fitOf(p) ?? 1
+      const score = Math.max(...long.map(p => Math.max(fit(p), 1 / fit(p))))
+      const text = long.map(p => `${p.name} ${p.shown?.toFixed(1)} of ${p.drawn} px`).join(', ')
       remember(tally.worst.stretch, { score, note: note(k, text), frames: strip(k) })
+    }
+    const missed = missingJoints(frame.parts)
+    if (missed.length > 0) {
+      tally.missFrames++
+      const off = (p: DrawnPart): number => Math.abs((p.asked ?? 0) - (p.shown ?? 0))
+      const text = missed.map(p => `${p.name} ${off(p).toFixed(1)} px off its joint`).join(', ')
+      remember(tally.worst.miss, { score: Math.max(...missed.map(off)), note: note(k, text), frames: strip(k) })
+    }
+    const refit = offUsual(frame, usual)
+    if (refit.length > 0) {
+      tally.refitFrames++
+      const by = (p: DrawnPart): number => againstUsual(p, frame.sector, usual)
+      const score = Math.max(...refit.map(p => Math.max(by(p), 1 / by(p))))
+      const text = refit.map(p => `${p.name} x${by(p).toFixed(2)} of its usual fit`).join(', ')
+      remember(tally.worst.refit, { score, note: note(k, text), frames: strip(k) })
     }
     if (areas[k] < BLANK_SHARE * typical) {
       tally.blankFrames++
@@ -263,7 +282,9 @@ function judge (seen: Seen[], tally: Tally, where: string): void {
   })
   for (const pop of pops(seen.map(frame => frame.parts))) {
     tally.pops++
-    const worst = { score: pop.back - pop.from, note: note(pop.from, `${pop.part} back at ${pop.back}`) }
+    const views = seen.slice(pop.from - 1, pop.back + 1).map(frame => frame.sector ?? '-').join(' ')
+    const text = `${pop.part} back at ${pop.back}, views ${views}`
+    const worst = { score: pop.back - pop.from, note: note(pop.from, text) }
     remember(tally.worst.pop, { ...worst, frames: strip(pop.from, pop.back) })
   }
   const size = WINDOW_SECONDS * FPS

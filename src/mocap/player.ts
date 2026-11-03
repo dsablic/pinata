@@ -547,10 +547,12 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     }
   }
 
+  const overTheDrop = (k: number): boolean => base - feet[k].reference > FALL_START_HEIGHT
+
   const settleBody = (hips: Vec3[], targets: Placed[]): number => {
     const bounds = (k: number): Bounds => heightBounds(hips[k], targets[k].ankle, k)
     const heldLegs = (): number[] => legIndices.filter(k => isHeld(feet[k]))
-    for (const k of heldLegs().filter(k => bounds(k).out)) stepOff(k)
+    for (const k of heldLegs().filter(k => bounds(k).out || overTheDrop(k))) stepOff(k)
     let floor = -Infinity
     let ceiling = Infinity
     for (let pass = 0; pass < legs.length; pass++) {
@@ -561,7 +563,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       const limiting = held.reduce((a, b) => bounds(b).ceiling < bounds(a).ceiling ? b : a)
       stepOff(limiting)
     }
-    const air = legIndices.filter(k => !isHeld(feet[k])).map(bounds)
+    const air = legIndices.filter(k => !isHeld(feet[k]) && !overTheDrop(k)).map(bounds)
     const airFloor = Math.max(-Infinity, ...air.map(b => b.floor))
     const airCeiling = Math.min(Infinity, ...air.map(b => b.ceiling))
     const free = Math.min(airCeiling, Math.max(airFloor, 0))
@@ -601,7 +603,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   }
 
   const standOnFeet = (pose: Pose, targets: Placed[]): number => {
-    const lowest = Math.max(supportUnderBody() - BELOW_SUPPORT, Math.min(...feet.map(f => f.reference)))
+    const near = feet.map(f => f.reference).filter(reference => base - reference <= FALL_START_HEIGHT)
+    const lowest = Math.max(supportUnderBody() - BELOW_SUPPORT, near.length === 0 ? base : Math.min(...near))
     base += (lowest - base) * (1 - Math.exp(-dt / BASE_SECONDS))
     const hips = legs.map(leg => toWorldPoint(add(pose[leg.hip], [0, base, 0])))
     const drop = settleBody(hips, targets)

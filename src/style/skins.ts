@@ -10,6 +10,8 @@ import { cleanRotation, toGrid } from './rotsprite.ts'
 import { chooseView, counterpart, facingAngle, fitted, mirrored, spanOf } from './views.ts'
 import type { ViewChoice } from './views.ts'
 import type { Rotated } from './rotsprite.ts'
+import { drawOrder } from './order.ts'
+import { paintStrip } from './strip.ts'
 
 export type SkinnedOptions = {
   mannequin: Mannequin
@@ -22,6 +24,8 @@ export type SkinnedOptions = {
   anchors?: Map<string, [number, number]>
   curves?: Record<string, Vec3[]>
   footprints?: boolean
+  painter?: 'strip'
+  order?: string[]
   yaw?: number
   view?: { sector?: number }
 }
@@ -39,6 +43,8 @@ type Placement = {
   angle: number
   depth: number
   curve?: { points: Array<[number, number]>, span: number }
+  points?: Array<[number, number]>
+  lay?: { length: number, heading: [number, number] }
   drawn: number
   shown?: number
 }
@@ -69,7 +75,7 @@ function spriteFor (
   name: string,
   single: boolean,
   choice: ViewChoice | undefined,
-  length: number
+  length?: number
 ): Shown {
   if (choice === undefined || o.skin.views === undefined) {
     return { sprite: o.skin.parts[name], span: spanOf(o.skin.parts[name]) }
@@ -77,20 +83,77 @@ function spriteFor (
   const parts = o.skin.views[choice.view].parts
   const drawn = parts[choice.mirror ? counterpart(name) : name] ?? parts[name]
   if (drawn === undefined) return { sprite: undefined, span: 0 }
-  const sized = single ? drawn : fitted(drawn, length)
+  const sized = single || length === undefined ? drawn : fitted(drawn, length)
   const span = spanOf(drawn)
   if (!choice.mirror) return { sprite: sized, span }
   return { sprite: mirrored(sized, !single), ...(single ? {} : { unmirrored: sized }), span }
 }
 
-function placements (o: SkinnedOptions): Placement[] {
-  const found: Placement[] = []
-  let choice: ViewChoice | undefined
-  if (o.skin.views !== undefined) {
-    if (o.yaw === undefined) throw new Error(`skin '${o.skin.name}' has eight directions: pass the character's yaw`)
-    choice = chooseView(facingAngle(o.camera, o.yaw), o.view?.sector)
-    if (o.view !== undefined) o.view.sector = choice.sector
+function chosenView (o: SkinnedOptions): ViewChoice | undefined {
+  if (o.skin.views === undefined) return undefined
+  if (o.yaw === undefined) throw new Error(`skin '${o.skin.name}' has eight directions: pass the character's yaw`)
+  const choice = chooseView(facingAngle(o.camera, o.yaw), o.view?.sector)
+  if (o.view !== undefined) o.view.sector = choice.sector
+  return choice
+}
+
+function shadeFar (found: Placement[]): void {
+  const byName = new Map(found.map(p => [p.name, p]))
+  for (const p of found) {
+    const other = byName.get(counterpart(p.name))
+    if (other !== undefined && other !== p && p.depth - other.depth > FAR_DEPTH) p.far = true
   }
+}
+
+function snapped (o: SkinnedOptions, at: Vec3, key: string): Screen & { pixel: [number, number] } {
+  const screen = project(o.camera, at)
+  return { ...screen, pixel: steadyAnchor(screen, o.anchors, key) }
+}
+
+function stripPlacements (o: SkinnedOptions): Placement[] {
+  const choice = chosenView(o)
+  const found: Placement[] = []
+  for (const part of o.mannequin.parts) {
+    const single = part.a === part.b
+    const { sprite, span } = spriteFor(o, part.name, single, choice)
+    if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
+      continue
+    }
+    const a = snapped(o, jointOf(o.mannequin, o.pose, part.a), part.a)
+    const b = snapped(o, jointOf(o.mannequin, o.pose, part.b), part.b)
+    const length = single ? undefined : steadyLength(arcLength(o, part, a, b), o.lengths?.get(part.name))
+    if (length !== undefined) o.lengths?.set(part.name, length)
+    const curve = single ? undefined : o.curves?.[part.b]
+    const points = single
+      ? undefined
+      : curve === undefined
+        ? [a.pixel, b.pixel]
+        : curve.map((at, k) => snapped(o, at, `${part.b}#${k}`).pixel)
+    found.push({
+      name: part.name,
+      joints: [part.a, part.b],
+      ...(sprite.layer === undefined ? {} : { layer: sprite.layer }),
+      rows: sprite.rows,
+      pivot: sprite.pivotA,
+      anchor: a.pixel,
+      angle: 0,
+      depth: (a.depth + b.depth) / 2,
+      ...(points === undefined || length === undefined
+        ? {}
+        : { points, lay: { length, heading: [b.x - a.x, b.y - a.y] as [number, number] } }),
+      drawn: span
+    })
+  }
+  if (choice !== undefined) shadeFar(found)
+  const ordered = drawOrder(found.map(p => ({ ...p, layer: p.layer ?? 0 })), o.order)
+  o.order?.splice(0, o.order.length, ...ordered.map(p => p.name))
+  return ordered
+}
+
+function placements (o: SkinnedOptions): Placement[] {
+  if (o.painter === 'strip') return stripPlacements(o)
+  const found: Placement[] = []
+  const choice = chosenView(o)
   for (const part of o.mannequin.parts) {
     const a: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.a))
     const b: Screen = project(o.camera, jointOf(o.mannequin, o.pose, part.b))
@@ -123,13 +186,7 @@ function placements (o: SkinnedOptions): Placement[] {
       ...(single ? {} : { shown: curve.curve === undefined ? spanOf(sprite) : length })
     })
   }
-  if (choice !== undefined) {
-    const byName = new Map(found.map(p => [p.name, p]))
-    for (const p of found) {
-      const other = byName.get(counterpart(p.name))
-      if (other !== undefined && other !== p && p.depth - other.depth > FAR_DEPTH) p.far = true
-    }
-  }
+  if (choice !== undefined) shadeFar(found)
   return found.sort((p, q) => (p.layer ?? 0) - (q.layer ?? 0) || q.depth - p.depth)
 }
 
@@ -315,6 +372,14 @@ function paintCurve (
   }
 }
 
+function paintAlong (img: Image, p: Placement, colours: Map<string, number>, ink?: Ink): number {
+  const sprite = { rows: p.rows, pivotA: p.pivot, pivotB: [p.pivot[0] + p.drawn, p.pivot[1]] as [number, number] }
+  return paintStrip(sprite, p.points ?? [], (x, y, cell) => {
+    const colour = colours.get(cell)
+    if (colour !== undefined) put(img, x, y, colour, p, ink)
+  }, p.lay)
+}
+
 function innerLines (img: Image, placed: Placement[], ink: Ink): void {
   const { owner, shade } = ink
   const joins = (p: Placement, q: Placement): boolean => p.joints.some(j => q.joints.includes(j))
@@ -356,7 +421,9 @@ function drawOutline (img: Image, colour: number): void {
   for (const [x, y] of edge) setPixel(img, x, y, colour)
 }
 
-export type DrawnPart = { name: string, drawn: number, shown?: number, painted: number, footprint?: number[] }
+export type DrawnPart = {
+  name: string, drawn: number, shown?: number, asked?: number, painted: number, footprint?: number[]
+}
 export type Layers = { image: Image, owner?: Int16Array, parts: DrawnPart[], sector?: number }
 
 export function renderSkinned (options: SkinnedOptions): Image {
@@ -378,15 +445,17 @@ export function renderSkinnedLayers (options: SkinnedOptions): Layers {
       }
   placed.forEach((p, index) => {
     if (ink !== undefined) ink.index = index
-    if (p.curve !== undefined) paintCurve(img, p, p.curve.points, p.curve.span, colours, ink)
+    if (p.points !== undefined) p.shown = paintAlong(img, p, colours, ink)
+    else if (p.curve !== undefined) paintCurve(img, p, p.curve.points, p.curve.span, colours, ink)
     else if (options.rotation === 'clean' && p.angle !== 0) paintClean(img, p, colours, ink)
     else paint(img, p, colours, ink)
   })
   if (ink !== undefined) innerLines(img, placed, ink)
   drawOutline(img, [...colours.values()].reduce((a, b) => luminance(b) < luminance(a) ? b : a))
-  const parts = placed.map(({ name, drawn, shown }, i): DrawnPart => {
+  const parts = placed.map(({ name, drawn, shown, lay }, i): DrawnPart => {
     const footprint = ink?.footprints?.[i]
-    const lengths = { drawn, ...(shown === undefined ? {} : { shown }) }
+    const asked = lay === undefined ? {} : { asked: lay.length }
+    const lengths = { drawn, ...(shown === undefined ? {} : { shown }), ...asked }
     return { name, ...lengths, painted: ink?.painted[i] ?? 0, ...(footprint === undefined ? {} : { footprint }) }
   })
   const sector = options.view?.sector

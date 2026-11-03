@@ -26,6 +26,8 @@ import type { Camera } from '../raster/camera.ts'
 import { rasterize } from '../raster/gbuffer.ts'
 import { toWorld } from '../sim/body.ts'
 import type { RootState } from '../motion/script.ts'
+import { pageCamera } from '../page/cast.ts'
+import { fitFlags, formatFlag } from '../style/fit.ts'
 import { renderSkinned } from '../style/skins.ts'
 import { stylize } from '../style/stylize.ts'
 import { ROOT } from './paths.ts'
@@ -34,13 +36,17 @@ const HEIGHT_PX = 48
 const MARGIN = 6
 const ELEVATION_DEG = 14
 const SCALE = 4
+const PAGE_PIXELS_PER_METRE = 54
+const PAGE_SCALE = 2
+const FIT_OFFSETS = [-20, 0, 20]
 const BACKGROUND = 0xc8c8c8
 const FPS = 24
 const VIEW_FACING: Record<typeof VIEWS[number], number> = {
   front: 0, frontSide: 45, side: 90, backSide: 135, back: 180
 }
 const USAGE = 'usage: node src/cli/skin.ts guide <character dir> <out dir>\n' +
-  '       node src/cli/skin.ts preview <character dir> <skin.json> <out dir> [--clean]'
+  '       node src/cli/skin.ts preview <character dir> <skin.json> <out dir> [--clean]\n' +
+  '       node src/cli/skin.ts fit <character dir> [<skin.json>] [--scale <n>] [--pixels-per-metre <n>]'
 
 function standingAtOrigin (yaw: number): RootState {
   return { position: [0, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
@@ -197,6 +203,28 @@ function preview (character: Character, dir: string, skinFile: string, out: stri
   return 0
 }
 
+function optionOf (args: string[], name: string, fallback: number): number {
+  const at = args.indexOf(name)
+  return at < 0 ? fallback : Number(args[at + 1])
+}
+
+function fit (character: Character, dir: string, args: string[]): number {
+  const skinFile = args[0] === undefined || args[0].startsWith('--') ? join(dir, 'skin.json') : resolve(args[0])
+  const read = validateSkin(JSON.parse(readFileSync(skinFile, 'utf8')))
+  if (read.value === undefined) {
+    console.error(formatErrors(skinFile, read.errors))
+    return 1
+  }
+  const pixelsPerMetre = optionOf(args, '--pixels-per-metre', PAGE_PIXELS_PER_METRE)
+  const spritePerMetre = pixelsPerMetre / optionOf(args, '--scale', PAGE_SCALE)
+  const flags = fitFlags({
+    mannequin: character.mannequin, skin: read.value, camera: pageCamera(spritePerMetre), offsetsDeg: FIT_OFFSETS
+  })
+  console.log(`${character.name}: ${flags.length} part views outside the drawn-length bounds by more than 1 px`)
+  for (const flag of flags) console.log(`  ${formatFlag(flag)}`)
+  return 0
+}
+
 function main (): number {
   const [command, dir, ...rest] = process.argv.slice(2)
   if (dir === undefined) {
@@ -215,6 +243,7 @@ function main (): number {
   if (command === 'preview' && rest[1] !== undefined) {
     return preview(loaded.value, resolve(dir), resolve(rest[0]), resolve(rest[1]), rest.includes('--clean'))
   }
+  if (command === 'fit') return fit(loaded.value, resolve(dir), rest)
   console.error(USAGE)
   return 2
 }

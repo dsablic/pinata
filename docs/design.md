@@ -833,6 +833,18 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   each part moved before the earliest it must precede, satisfies every required pair; moving a part ahead can carry
   it past level parts between, so about one in two hundred level pairs swaps on such a frame.
 
+### fit.ts (`npm run skin -- fit`)
+
+- Checks that each view's sprite span suits the bone it is drawn on. The rest pose is turned to each view's centre
+  facing (both the plain and the mirrored sector, since a mirrored sector draws the counterpart's sprite on this
+  part's bone) and to 20 degrees either side within the sector, then every two-joint part's bone is projected by the
+  page's camera (`pageCamera`, at the page's pixels per metre over its sprite scale). A part is flagged when the
+  projected length falls more than a pixel outside the painter's bounds for the span (`lengthBounds` in `strip.ts`,
+  the same function the painter clamps with), since the part is then drawn true to the sprite and misses its joint.
+- Rest is the check's pose: walking changes bone lengths, so a flag is a sprite that is wrong at rest and a pass is
+  not a guarantee. It is a separate subcommand, not part of `preview` or `check`, so their outputs stay as they are
+  (`check` reads no skin).
+
 ### stylize.ts
 
 - Selective outlines leave single pixels where the bordering part changes for one pixel, so outline pixels whose

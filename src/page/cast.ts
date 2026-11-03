@@ -160,13 +160,17 @@ export function spriteReach (pixelsPerMetre: number): number {
   return SPRITE_BOX_IN_CHARACTER_HEIGHTS * 2 * pixelsPerMetre
 }
 
+export function pageCamera (spritePerMetre: number): Camera {
+  return makeCamera({
+    azimuthDeg: 0, elevationDeg: CAMERA_ELEVATION_DEGREES, targetHeightPx: spritePerMetre, modelHeight: 1, margin: 0
+  })
+}
+
 export function createCast<K> (options: CastOptions): Cast<K> {
   const { cast, looks, pixelsPerMetre } = options
   const next = random(options.seed)
   const spritePerMetre = pixelsPerMetre / options.scale
-  const camera = makeCamera({
-    azimuthDeg: 0, elevationDeg: CAMERA_ELEVATION_DEGREES, targetHeightPx: spritePerMetre, modelHeight: 1, margin: 0
-  })
+  const camera = pageCamera(spritePerMetre)
   const characters: Array<Character<K>> = looks
     .flatMap((look, i) => {
       const database = cast[i].capture

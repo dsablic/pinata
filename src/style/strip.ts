@@ -15,6 +15,11 @@ const advance = (from: Vec, direction: Vec, length: number): Vec => {
   return [from[0] + direction[0] * length, from[1] + direction[1] * length]
 }
 
+export function lengthBounds (span: number): { floor: number, ceiling: number } {
+  const floor = Math.round(FLOOR_SHARE * span)
+  return { floor, ceiling: Math.max(floor, CEILING_SHARE * span) }
+}
+
 const gap = (a: Vec, b: Vec): number => Math.hypot(b[0] - a[0], b[1] - a[1])
 
 function direction (from: Vec, to: Vec): Vec {
@@ -158,10 +163,9 @@ export function paintStrip (
   const pivotY = sprite.pivotA[1]
   const low = -pivotY - 0.5
   const high = height - 0.5 - pivotY
-  const floorLength = Math.round(FLOOR_SHARE * (sprite.pivotB[0] - sprite.pivotA[0]))
   const laid = laidPoints(points, heading)
-  const ceiling = Math.max(floorLength, CEILING_SHARE * (sprite.pivotB[0] - sprite.pivotA[0]))
-  const target = Math.min(ceiling, Math.max(floorLength, length ?? arcLength(laid)))
+  const { floor, ceiling } = lengthBounds(sprite.pivotB[0] - sprite.pivotA[0])
+  const target = Math.min(ceiling, Math.max(floor, length ?? arcLength(laid)))
   const path = laidTo(laid, target)
   const quads = buildQuads(sprite, path)
   const boxes = quads.map(quad => corners(quad, low, high))

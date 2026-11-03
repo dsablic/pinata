@@ -420,7 +420,9 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
     (the cycle's end is the next cycle's start, so it is left out). The cycle length is read from the planted flags,
     not fixed, since it changes with the character and speed; it must be 8 to 48 frames long, steady walking on a surface
     throughout, and seen from the side (the facing angle within 22.5 degrees of a right angle to the camera), as the
-    page's characters mostly walk sideways and the references are side views.
+    page's characters mostly walk sideways and the references are side views. A cycle starts only once a landing has
+    recovered: no step in the `LANDING_RECOVERY_SECONDS` (1 s) before it was falling, so a walker still rising out of a
+    drop-in's dip is not shown.
   - A landing is 8 consecutive frames of a walk-off fall (the rendering panel's rule): the 2 airborne frames before
     touchdown, the touchdown, and the 5 after; a fall shorter than 2 frames has none. Landings are not required to
     be side views, so the facing may differ.
@@ -749,6 +751,12 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   rise and gone by six of them, applied under the settled height so the held legs' bounds still hold, and the knees
   of the feet the clip holds take it. The feet keep the clip's contact through it: holding every foot for the dip
   made a character walking on from a walk-off landing slide its planted feet by 1.3 to 2.8 px a frame.
+  A character that is walking (commanded speed above zero) 0.2 s after touchdown (`QUICK_DIP_AFTER_SECONDS`) rises out
+  of the dip on a clock four times as fast (`WALKING_DIP_CLOCK`): at its own pace the dip, still 40% of its depth
+  at three rises, left a drop-in's walker striding in a half-squat for half a second. The first 0.2 s are the dip's
+  own, so the touchdown and the frames after it are as before, and a standing character recovers as before.
+  `LANDING_RECOVERY_SECONDS` (1 s) is the time after which a landing is taken as recovered, for the walk frames and
+  the game panel.
 - While falling no foot takes contact from the clip: a foot held on the frame a fall starts stayed planted in mid air.
   The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
   placement follows, so the landing starts from where the feet are drawn.

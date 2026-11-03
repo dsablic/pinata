@@ -47,6 +47,12 @@ test('a stride runs from one planting of the first foot to the next, in 8 even f
   assert.deepEqual(frames.map(f => f - frames[0]), [0, 3, 6, 9, 12, 15, 18, 21])
 })
 
+test('a stride starts only after a landing has recovered', () => {
+  const run = [...steps(FROM), ...steps(3, { falling: true }), ...stride(24), ...stride(24), ...stride(24), step()]
+  const frames = strideWindow(run) as number[]
+  assert.equal(frames[0], FROM + 3 + 24)
+})
+
 test('a stride needs a side view, and steady walking', () => {
   assert.equal(strideWindow([...steps(FROM), ...stride(24, { side: false }), step()]), undefined)
   assert.equal(strideWindow([...steps(FROM), ...stride(24), ...stride(24, { speed: 0 }), step()]), undefined)

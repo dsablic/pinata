@@ -95,6 +95,8 @@ const DIP_RISE_SECONDS = 0.07
 const DIP_RISE_PER_SPEED = 0.008
 const DIP_LASTS = 6
 export const LANDING_RECOVERY_SECONDS = 1
+const WALKING_DIP_CLOCK = 4
+const QUICK_DIP_AFTER_SECONDS = 0.2
 const CROUCH_SECONDS = 0.18
 const LAUNCH_EASE_SECONDS = 0.2
 const SURFACE_TOLERANCE = 0.02
@@ -711,6 +713,11 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     elapsed: 0
   })
 
+  const dipClock = (): number => {
+    const started = landing !== undefined && landing.elapsed > QUICK_DIP_AFTER_SECONDS
+    return started && command.speed > 0 ? WALKING_DIP_CLOCK : 1
+  }
+
   const landingDip = (): number => {
     if (landing === undefined) return 0
     const x = landing.elapsed / landing.rise
@@ -806,7 +813,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       })
       const drop = fallSpeed === undefined ? standOnFeet(pose, targets) : launchDrop()
       if (fallSpeed === undefined) standingDrop = drop
-      if (landing !== undefined && fallSpeed === undefined) landing.elapsed += dt
+      if (landing !== undefined && fallSpeed === undefined) {
+        landing.elapsed += dt * dipClock()
+      }
       raise(pose, transforms, Object.keys(pose), base + drop)
       const clamped = solveLegs(pose, transforms, targets)
       frameCount++

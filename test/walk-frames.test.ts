@@ -11,7 +11,7 @@ const LAYOUT = 'demo-1200'
 const world = readWorld(worldBundle())
 const framed = withWalk(world, 'knight', 'side', readWalk(ROOT, 'knight-side'))
 
-test('a walking knight with drawn frames shows them, planted soles stay put, and the body stays near the walker', () => {
+test('a walking knight with drawn frames shows them, soles stay planted, the body stays near the walker', () => {
   const stats = walkStats(framed, LAYOUT, ROOT, SECONDS, 'knight')
   assert.ok(stats.shown > 0.3 * stats.walking, `frames on ${stats.shown} of ${stats.walking} walking frames`)
   assert.ok(stats.compared > 100, `${stats.compared} frame pairs compared`)

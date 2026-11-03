@@ -1,6 +1,7 @@
 import type { Image } from '../image.ts'
 import { FPS, pageCamera } from '../page/cast.ts'
 import { readLayout } from '../page/fixture.ts'
+import { recoveryTicks } from '../page/walk-frames.ts'
 import { facingAngle } from '../style/views.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import { countMotion, emptyTally, stressDriver, TURN_SECONDS } from './glitches.ts'
@@ -108,8 +109,12 @@ function steadyStride (steps: Step[], from: number, to: number): boolean {
   return steps.slice(from, to + 1).every(step => walking(step) && step.side)
 }
 
+function recovered (steps: Step[], i: number): boolean {
+  return steps.slice(Math.max(0, i - recoveryTicks(FPS)), i).every(step => !step.falling)
+}
+
 export function strideWindow (steps: Step[]): number[] | undefined {
-  const starts = plantings(steps).filter(i => i >= earliest)
+  const starts = plantings(steps).filter(i => i >= earliest && recovered(steps, i))
   for (let k = 0; k + 1 < starts.length; k++) {
     const [from, to] = [starts[k], starts[k + 1]]
     const length = to - from

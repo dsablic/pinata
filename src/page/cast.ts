@@ -11,6 +11,10 @@ import { makeCamera } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { renderSkinnedLayers } from '../style/skins.ts'
 import type { DrawnPart } from '../style/skins.ts'
+import { chooseView, facingAngle } from '../style/views.ts'
+import { silhouetteOf } from '../style/walk.ts'
+import { createWalkFrames } from './walk-frames.ts'
+import type { WalkFrames } from './walk-frames.ts'
 import type { Image } from '../image.ts'
 import type { Hints } from './dom.ts'
 import { surfaceGraph } from './graph.ts'
@@ -19,6 +23,7 @@ import { groundOf, surfaceBelow } from './surfaces.ts'
 import type { Box, Ground, Surface } from './surfaces.ts'
 import { createWalker, DROP_LIMIT, STEP_HEIGHT } from './walker.ts'
 import type { Activity, Place, Walker, WalkerFrame } from './walker.ts'
+import { legsOf } from '../formats/rig.ts'
 import { createSecondary } from '../motion/secondary.ts'
 import type { Secondary, SecondaryEnvironment } from '../motion/secondary.ts'
 import type { WorldConfig } from '../world/config.ts'
@@ -41,7 +46,15 @@ export type CastOptions = {
   footprints?: boolean
   painter?: 'strip' | 'rotate'
 }
-export type Sprite = { image: Image, camera: Camera, owner?: Int16Array, parts?: DrawnPart[], sector?: number }
+export type DrawnWalk = { sole: [number, number], planted: number, index: number }
+export type Sprite = {
+  image: Image
+  camera: Camera
+  owner?: Int16Array
+  parts?: DrawnPart[]
+  sector?: number
+  walk?: DrawnWalk
+}
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
 export type Moving = {
   name: string
@@ -110,6 +123,8 @@ type Character<K> = {
   order: string[]
   anchors: Map<string, [number, number]>
   sprite?: Sprite & { frame: WalkerFrame }
+  frames?: WalkFrames
+  lastAirStep: number
 }
 
 export const FPS = 24
@@ -187,6 +202,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
         visited: new Set<K>(),
         sameSince: 0,
         placedAgain: 0,
+        lastAirStep: -Infinity,
         steps: 0,
         ticks: 0
       }
@@ -231,6 +247,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
   const restart = (c: Character<K>): void => {
     c.secondary.reset()
     c.cloth = undefined
+    c.frames?.reset()
   }
   const moveTo = (c: Character<K>, walker: Walker, place: Place): void => {
     walker.moveTo(place)
@@ -247,6 +264,7 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       walker.shiftBy(dx, dy)
       c.secondary.shift([dx, dy, 0])
       c.cloth = c.cloth?.map((v, i) => i % 3 === 0 ? v + dx : i % 3 === 1 ? v + dy : v)
+      c.frames?.carry(Math.round(dx * spritePerMetre))
     }
     const x = walker.frame().root.position[0]
     const inside = Math.min(now.to, Math.max(now.from, x))
@@ -275,12 +293,28 @@ export function createCast<K> (options: CastOptions): Cast<K> {
       c.on = standingOn(c.walker.support())
     }
   }
-  const spriteOf = (c: Character<K>, frame: WalkerFrame): Sprite => {
-    if (c.sprite?.frame === frame) return c.sprite
-    const { mannequin, skin } = c.look.skin
+  const boxes = new Map<Character<K>, Camera>()
+  const boxOf = (c: Character<K>): Camera => {
+    const kept = boxes.get(c)
+    if (kept !== undefined) return kept
+    const { mannequin } = c.look.skin
     const height = Math.max(...Object.values(mannequin.joints).map(p => p[1]))
     const size = Math.ceil(SPRITE_BOX_IN_CHARACTER_HEIGHTS * height * spritePerMetre)
     const box: Camera = { ...camera, width: size, height: size, baseline: Math.round(size * FEET_LINE_SHARE_OF_BOX) }
+    boxes.set(c, box)
+    return box
+  }
+  for (const c of characters) {
+    const walkable = legsOf(c.database.options.rig).length === 2
+    const frames = createWalkFrames({
+      skin: c.look.skin.skin, box: boxOf(c), spritePerMetre, fps: FPS
+    })
+    if (walkable && frames !== undefined) c.frames = frames
+  }
+  const spriteOf = (c: Character<K>, frame: WalkerFrame): Sprite => {
+    if (c.sprite?.frame === frame) return c.sprite
+    const { mannequin, skin } = c.look.skin
+    const box = boxOf(c)
     const [x, , z] = frame.root.position
     const y = anchorHeight(frame)
     const pose: Pose = {}
@@ -297,6 +331,46 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
     c.sprite = { image, camera: box, frame, ...layers }
     return c.sprite
+  }
+
+  const gridOf = (frame: WalkerFrame): number => Math.round(frame.root.position[0] * spritePerMetre)
+  const framedSprite = (c: Character<K>): Sprite | undefined => {
+    const shown = c.frames?.shown()
+    if (shown === undefined) return undefined
+    const sector = c.view.sector
+    return {
+      image: shown.image,
+      camera: boxOf(c),
+      ...(sector === undefined ? {} : { sector }),
+      walk: { sole: shown.sole, planted: shown.planted, index: shown.index }
+    }
+  }
+  const visibleSprite = (c: Character<K>, frame: WalkerFrame): Sprite => {
+    return framedSprite(c) ?? spriteOf(c, frame)
+  }
+  const updateFrames = (c: Character<K>, frame: WalkerFrame, distance: number): void => {
+    if (c.frames === undefined) return
+    const facing = facingAngle(camera, frame.root.yaw)
+    const choice = chooseView(facing, c.view.sector)
+    c.view.sector = choice.sector
+    if (frame.falling || frame.jumpTo !== undefined) c.lastAirStep = c.steps
+    const box = boxOf(c)
+    const left = Math.round(frame.root.position[0] * spritePerMetre - box.width / 2)
+    const top = Math.round(-anchorHeight(frame) * spritePerMetre) - box.baseline
+    c.frames.update({
+      walker: frame,
+      choice,
+      facing,
+      distance,
+      sinceAir: c.steps - c.lastAirStep,
+      gridX: gridOf(frame),
+      top,
+      cutout: () => silhouetteOf(spriteOf(c, frame).image, left, top)
+    })
+  }
+
+  const gridCentre = (c: Character<K>, gridX: number): number => {
+    return (gridX + (boxOf(c).width % 2) / 2) * options.scale
   }
 
   const gapOf = ([x, y]: [number, number]): number | null => {
@@ -366,9 +440,11 @@ export function createCast<K> (options: CastOptions): Cast<K> {
 
   const stepOne = (c: Character<K>, walker: Walker, viewport: Viewport): void => {
     c.steps++
+    const from = walker.frame().root.position[0]
     const frame = walker.step()
     const [raised, lowered] = raisedRoot(frame)
     c.cloth = c.secondary.step(c.steps, raised, frame.joints, lowered, frame.transforms)
+    updateFrames(c, frame, Math.abs(frame.root.position[0] - from))
     if (frame.support === undefined) {
       replace(c, walker)
       c.placedAgain++
@@ -423,11 +499,12 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     drawables: () => characters.flatMap(c => {
       const frame = c.walker?.frame()
       if (frame === undefined) return []
+      const shown = c.frames?.shown()
       const drawable: Drawable = {
         name: c.name,
-        x: frame.root.position[0] * pixelsPerMetre,
+        x: shown === undefined ? frame.root.position[0] * pixelsPerMetre : gridCentre(c, shown.gridX),
         y: -anchorHeight(frame) * pixelsPerMetre,
-        sprite: () => spriteOf(c, frame),
+        sprite: () => visibleSprite(c, frame),
         ...(c.saying === undefined ? {} : { saying: c.saying.text })
       }
       return [drawable]

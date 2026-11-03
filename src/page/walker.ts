@@ -29,6 +29,7 @@ export type WalkerFrame = {
   feet: Foot[]
   heading: number
   moving: boolean
+  cruising: boolean
   activity: Activity
   started: number
   reached: boolean
@@ -129,7 +130,7 @@ export function createWalker (options: WalkerOptions): Walker {
     pose: Pose,
     transforms: Transforms,
     planted: boolean[],
-    moving: boolean
+    pace: number
   ): WalkerFrame => {
     const [dx, dy] = offset
     const position: Vec3 = [local.position[0] + dx, local.position[1] + dy, local.position[2]]
@@ -144,7 +145,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const falling = player?.falling() ?? false
     const under = supportAt(root.position[0])
     const support = under === undefined ? {} : { support: under }
-    const doing = { heading, moving, activity, started, reached, jumpTo }
+    const doing = { heading, moving: pace > 0, cruising: pace >= WALK_SPEED, activity, started, reached, jumpTo }
     return { joints, body, transforms, root, base: worldStanding(), falling, ...support, feet, ...doing }
   }
 
@@ -156,7 +157,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const root: RootState = { position: [place.x, 0, 0], yaw, velocity: [0, 0, 0], angularVelocity: 0 }
     const lifted: Pose = {}
     for (const [name, p] of Object.entries(rest)) lifted[name] = [p[0], p[1] + standing, p[2]]
-    current = frameOf(root, lifted, {}, legs.map(() => above === 0), false)
+    current = frameOf(root, lifted, {}, legs.map(() => above === 0), 0)
     route = []
     goal = undefined
     restUntil = time
@@ -277,7 +278,7 @@ export function createWalker (options: WalkerOptions): Walker {
       standing = player.height()
       if (!player.jumping()) jumpTo = undefined
       time += 1 / fps
-      current = frameOf(frame.root, frame.pose, frame.transforms, frame.planted, command.speed > 0)
+      current = frameOf(frame.root, frame.pose, frame.transforms, frame.planted, command.speed)
       return current
     },
     frame: () => current,

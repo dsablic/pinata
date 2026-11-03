@@ -204,6 +204,54 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   side-on, so characters read against a flat page. A sprite is rendered only when it is drawn and its frame changed.
 - Starting places are drawn with a seeded random generator, weighted by surface width, at least 0.3 m from a
   surface's ends (`MARGIN_FROM_SURFACE_ENDS`).
+- A character whose skin carries drawn walk frames (see `walk-frames.ts` below) draws them instead of its cut-outs
+  while it walks; the cast hands the controller each step's walker frame, the distance moved along the surface, the
+  facing, the time since the character was last in the air, and a lazy cut-out silhouette. Such a character's view
+  sector is kept up each step (a cut-out render would otherwise do it), its sprite carries `walk` (the drawn planted
+  sole in the box, which foot, which frame), and its drawable's `x` is snapped to the sprite pixel grid so a planted
+  sole is placed on a whole pixel. A skin with no walk frames takes none of these paths and draws as before.
+
+### Drawn walk frames (`walk-frames.ts`)
+
+- Frames are whole bodies drawn by hand, so while one shows nothing is rotated or slid: the controller picks a frame
+  and a place for it. The cut-outs keep everything else (standing, turning, falling, landing, jumping), and the
+  cloth simulation keeps stepping underneath so the cut-outs pick up where the frames leave off.
+- The phase advances by distance, never by a clock: a cycle is the drawn stride (`strideOf`, in sprite pixels) and
+  the character's travel along the surface (the walker's root, in metres, times sprite pixels per metre, which is
+  the page's `pixelsPerMetre / scale`) is divided by it. A character that slows, speeds up or stops runs the frames
+  slower, faster or holds one, and a planted foot has nothing to slide against.
+- A frame is placed so its planted sole sits on a whole pixel of the page's sprite grid, held for the whole stance.
+  Moving from one frame to the next moves the body by `travelBetween` (a foot on the ground in both frames, the
+  planted foot of the first preferred, moves back by that many pixels, so the body moves forward by them); on a
+  stance switch the new planted foot lands where it is drawn, and nothing else moves. Planted feet therefore cannot
+  skate by construction, and the stride is by the same rule the body's travel per cycle, so the drawn body does not
+  drift from the walker (the gate checks both). A foot is on the ground in a frame when its sole is within a pixel of
+  the frame's lowest sole.
+- The frame's sole row sits on the ground line of the sprite box, so the body bobs with the drawn sole rows, and the
+  box's feet line is the same as the cut-outs' (the surface's top edge).
+- When frames show: the character is on a surface (not falling, not a drop-in, not jumping), at least
+  `LANDING_RECOVERY_SECONDS` (1 s) since it was last in the air, the walker is cruising (its commanded speed is
+  walking speed, not the slowing over the last 0.5 m before a goal), its speed is inside the frames' range, it moves
+  the way it faces, and its facing is within 8 degrees of the view's sector (20 once showing). The range is derived
+  from the frames: a frame is held at most six ticks (a quarter second), which gives the lower bound
+  `slot * fps / 6` for the slot (stride / frames) in metres, and at most one frame per tick (`slot * fps`) the upper;
+  speeds below 80% of the lower bound end it. Hysteresis keeps a character from flickering at the bounds.
+- Switching: a switch is wanted only where the silhouette would change by at most 20% (entering) or 25% (leaving)
+  of the larger silhouette's pixels, XOR over the larger count, against the sprite drawn the step before, in page
+  pixels. Entering tries every frame at shifts up to 8 pixels either side of the feet's midpoint under the walker and
+  starts at the best (the cut-out's own pose is rendered every step the walker is moving, which is what the cut-out
+  path costs anyway). Leaving waits (at most 30 ticks) for a frame that matches; while it waits the frames follow the
+  cut-out, picking among the two frames either side the one nearest the cut-out's pose, the body moving by
+  `travelBetween` so feet still do not slide. A walk that ends at a stand has the cut-out standing still, which no
+  frame of a walk resembles, so those leaves happen during the slowing before the stop, and a leave that reaches the
+  time limit pops. Leaving at once is forced when the character is no longer on a surface, since a walking sprite
+  cannot be shown falling.
+- The mirrored sector mirrors the frames (`mirroredWalk`: columns reversed, feet swapped, which foot is planted
+  swapped), as part sprites mirror to their counterparts; frames are drawn facing right.
+- Measured against recorded layouts (`npm run gates -- --walk-frames`): the planted sole moves at most a pixel
+  between frames of one stance (x and y; y not compared across a step to a surface of another height, where the
+  ground itself moves), and the share of silhouette change at switches; the share of walking frames that show frames
+  is printed beside them so a gate cannot pass because frames never show.
 
 ### The overlay (`page.ts`)
 
@@ -268,6 +316,18 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   the pelvis and the unplanted feet the rule passed a character crouched for good or holding a foot half a metre up. The gates are printed
   with the others and with `--landings` alone; tests check the knee angle and the recovery rule on hand-made frames,
   not the gates.
+- **Walk frames** (`src/diagnostics/walk-frames.ts`, `npm run gates -- --walk-frames`, also in the full run): the
+  knight carries the test walk (`test/fixtures/walk-frames/knight-side.json`, eight of its own cut-out poses from one
+  steady cycle, whole frames, so it is a crude stand-in for drawn art) on every recorded layout for 60 s. Two gates and
+  one report: the planted sole's drawn position (the sole pixel in page pixels) moves at most 1 px in x and in y
+  between consecutive steps of one stance; switching in or out of the frames changes the silhouette (page pixels,
+  XOR over the larger count) by at most 25% against the step before in at least 95% of switches; and the share of
+  walking steps (on a surface, faster than 0.3 m/s) that show frames. The y comparison is skipped where the ground
+  under the character changed height, because the ground itself moved. The test skin's own numbers say little about
+  hand-drawn frames: they bound what the controller can do with frames cut from the cut-outs, which a mocap cycle
+  does not repeat exactly.
+- `npm run site -- _site --walk-frames=<file>` builds the site with a frames file on the knight's side view, so the
+  browser suite can measure the cost with frames showing.
 - **Jumps** (`src/diagnostics/jumps.ts`, `npm run gates -- --jumps`): every skinned character runs on the recorded
   jump page (`test/pages/jump-test.html`, layout `jumps`: a 22 m floor, a wall, and eight shelves at 18, 20, 23, 25,
   37, 39, 42 and 45 px, 0.33 to 0.83 m, so each character has rises up to and just above its jump height, with
@@ -917,6 +977,14 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   the columns between the pivots (repeated or dropped evenly). Within a pixel of the drawn length it is left as is; it
   is never shortened below 60% (`MIN_FIT`) of its drawn length, since a shorter foreshortened limb reads as a spike.
 
+### walk.ts
+
+- Helpers for drawn walk frames: a frame is drawn into the sprite box at a pixel origin; silhouettes are sets of page
+  pixels (so a frame and a cut-out in different boxes compare in page coordinates); the changed share is the XOR over
+  the larger silhouette. `sharedShare` compares a frame's own pixel list against a silhouette without building an
+  image, which is what lets entering try a hundred placements a step.
+- A mirrored walk is cached per walk, since the mirror is asked for every step.
+
 ## Cloth simulation (`src/sim/`)
 
 ### body.ts
@@ -1119,6 +1187,19 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - `layer` draws parts on a higher layer over lower ones whatever their depth (default 0).
 - `from` reuses another sprite, by part name in the same view or as `view.part`; the copy keeps its own `layer`.
   Chains of references are followed; a missing or circular reference is an error.
+- A view in a v2 skin may carry a `walk`: `{ "frames": [{ "rows", "soles", "planted" }, ...] }`, whole-body frames
+  drawn in the skin's palette facing the view's default direction (right), one cycle of two steps. `soles` is
+  `[[x, y], [x, y]]`, the pixel of the ground under each foot in the rig's leg order (the order of `legs` in the rig:
+  the knight's is left, right), the lowest opaque pixel of that foot's sole; `planted` is 0 or 1, the foot that
+  carries the weight in that frame. It is validated: at least four equal-sized frames, palette characters, soles
+  inside the frame, both feet planted somewhere, and a positive stride (the planted soles move backwards across the
+  cycle). Walk frames belong on `side`, `frontSide` and `backSide` (a front or back view has no sideways stride); a
+  rig with other than two legs ignores them. Eight frames is the usual count; the format asks only for four.
+- To supply frames, add `walk` to the view in the character's `skin.json`. A frames file for testing lives under
+  `test/fixtures/walk-frames/` (`{ "frames": [...] }`, regenerated from the knight's cut-outs by
+  `node test/fixtures/make-walk-frames.ts [frames]`); `withWalk(world, 'knight', 'side', walk)` puts it on a world, and
+  the gates and scenarios take that world, so a real skin's frames are tried the same way by setting `walk` in the
+  skin and running the gates.
 
 ## Judge panels (`src/judge/`)
 

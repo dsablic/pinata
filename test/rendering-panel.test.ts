@@ -1,14 +1,15 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  AFTER_LANDING, BEFORE_FALL, EARLIEST_SECONDS, fallWindow, MOST_FRAMES, sampled, walkWindow, WALK_FRAMES
+  AFTER_LANDING, AFTER_TOUCHDOWN, AIRBORNE_BEFORE_LANDING, BEFORE_FALL, EARLIEST_SECONDS, fallWindow, landingWindow,
+  MOST_FRAMES, sampled, strideWindow, STRIDE_FRAMES, walkWindow, WALK_FRAMES
 } from '../src/diagnostics/rendering-panel.ts'
 import type { Step } from '../src/diagnostics/rendering-panel.ts'
 import { FPS } from '../src/page/cast.ts'
 
 const FROM = EARLIEST_SECONDS * FPS
 const step = (extra: Partial<Step> = {}): Step => {
-  return { falling: false, activity: 'wander', onSurface: true, yaw: 0, speed: 0, ...extra }
+  return { falling: false, activity: 'wander', onSurface: true, yaw: 0, speed: 0, planted: false, side: true, ...extra }
 }
 const steps = (n: number, extra: Partial<Step> = {}): Step[] => Array.from({ length: n }, () => step(extra))
 
@@ -33,4 +34,31 @@ test('a fall counts only when the character walked off a surface, not when it wa
   const dropIn = [...steps(FROM + 14), ...steps(6, { falling: true, activity: 'drop' }), ...steps(20)]
   assert.equal(fallWindow(dropIn), undefined)
   assert.equal(fallWindow([...steps(FROM + 14), ...steps(6, { falling: true })]), undefined)
+})
+
+const stride = (length: number, extra: Partial<Step> = {}): Step[] => {
+  return Array.from({ length }, (_, i) => step({ speed: 1, planted: i < length / 2, ...extra }))
+}
+
+test('a stride runs from one planting of the first foot to the next, in 8 even frames', () => {
+  const run = [...steps(FROM), ...stride(24), ...stride(24), step()]
+  const frames = strideWindow(run) as number[]
+  assert.equal(frames.length, STRIDE_FRAMES)
+  assert.deepEqual(frames.map(f => f - frames[0]), [0, 3, 6, 9, 12, 15, 18, 21])
+})
+
+test('a stride needs a side view, and steady walking', () => {
+  assert.equal(strideWindow([...steps(FROM), ...stride(24, { side: false }), step()]), undefined)
+  assert.equal(strideWindow([...steps(FROM), ...stride(24), ...stride(24, { speed: 0 }), step()]), undefined)
+})
+
+test('a landing is two airborne frames, the touchdown and what follows, from a walk-off only', () => {
+  const walkOff = (air: number): Step[] => [...steps(FROM + 14), ...steps(air, { falling: true }), ...steps(20)]
+  const first = FROM + 14 + 6 - AIRBORNE_BEFORE_LANDING
+  const frames = landingWindow(walkOff(6)) as number[]
+  assert.equal(frames.length, AIRBORNE_BEFORE_LANDING + 1 + AFTER_TOUCHDOWN)
+  assert.deepEqual([frames[0], frames.at(-1)], [first, first + frames.length - 1])
+  assert.equal(landingWindow(walkOff(1)), undefined)
+  const dropIn = [...steps(FROM + 14), ...steps(6, { falling: true, activity: 'drop' }), ...steps(20)]
+  assert.equal(landingWindow(dropIn), undefined)
 })

@@ -352,6 +352,22 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   strip one frame later. The panel's seed names the round; a new round takes a new seed.
   - A sampled strip shows a frame every few, so glitches that last one to three frames (pops, tears, blank frames)
     seldom reach the judges: the panel judges the look of ordinary motion, the survey the rare frames.
+- **The game panel** (`npm run game-panel -- <LPC people dir>`, `game-panel.ts`): blind pairs of the page's walks and
+  landings against hand-drawn game sprites, the quality gate of the natural-page-motion plan. Windows come from the
+  rendering panel's machinery (`windowsIn` takes the finders), drawn by the page's strip painter at page scale and
+  not enlarged: the judge build scales both sides alike (`scale` 4).
+  - A walk is one stride cycle of two steps, from one planting of the first foot to its next, sampled to 8 even frames
+    (the cycle's end is the next cycle's start, so it is left out). The cycle length is read from the planted flags,
+    not fixed, since it changes with the character and speed; it must be 8 to 48 frames long, steady walking on a surface
+    throughout, and seen from the side (the facing angle within 22.5 degrees of a right angle to the camera), as the
+    page's characters mostly walk sideways and the references are side views.
+  - A landing is 8 consecutive frames of a walk-off fall (the rendering panel's rule): the 2 airborne frames before
+    touchdown, the touchdown, and the 5 after; a fall shorter than 2 frames has none. Landings are not required to
+    be side views, so the facing may differ.
+  - The references are frames 1 to 8 of the right-facing row of four LPC base walk sheets (frame 0 is the standing
+    pose), cropped without scaling. Their licences forbid keeping them in the repository, so they are read from a
+    given folder and written only under `reports/`. Each character's walk and landing take different references,
+    rotating; the controls pair male with female and soldier with its recolour.
 
 ## Motion (`src/motion/`, `src/math/`)
 

@@ -1,6 +1,7 @@
 import type { Image } from '../image.ts'
-import { FPS } from '../page/cast.ts'
+import { FPS, pageCamera } from '../page/cast.ts'
 import { readLayout } from '../page/fixture.ts'
+import { facingAngle } from '../style/views.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import { countMotion, emptyTally, stressDriver, TURN_SECONDS } from './glitches.ts'
 import type { SurveyRun, Track } from './glitches.ts'
@@ -8,10 +9,18 @@ import { run, scenario } from './page-scenarios.ts'
 import type { Scenario } from './page-scenarios.ts'
 
 export type MotionKind = 'walk' | 'turn' | 'fall'
-export type Step = { falling: boolean, activity: string, onSurface: boolean, yaw: number, speed: number }
+export type Step = {
+  falling: boolean
+  activity: string
+  onSurface: boolean
+  yaw: number
+  speed: number
+  planted: boolean
+  side: boolean
+}
 export type PanelWindow = {
   character: string
-  kind: MotionKind
+  kind: string
   run: SurveyRun
   seed: number
   frames: number[]
@@ -26,8 +35,14 @@ export const STEADY_BEFORE_FALL = 12
 export const AFTER_LANDING = 4
 export const AFTER_TURN = 4
 export const EARLIEST_SECONDS = 4
+export const STRIDE_FRAMES = 8
+export const SHORTEST_STRIDE = 8
+export const LONGEST_STRIDE = 48
+export const AIRBORNE_BEFORE_LANDING = 2
+export const AFTER_TOUCHDOWN = 5
 const WALKING_SPEED = 0.3
 const TURN_STARTED = 0.05
+const SIDE_TOLERANCE = Math.PI / 8
 
 const earliest = EARLIEST_SECONDS * FPS
 
@@ -81,19 +96,55 @@ export function turnWindow (steps: Step[]): number[] | undefined {
   return undefined
 }
 
-const FINDERS: Record<MotionKind, (steps: Step[]) => number[] | undefined> = {
-  walk: walkWindow, turn: turnWindow, fall: fallWindow
+export type Finders = Record<string, (steps: Step[]) => number[] | undefined>
+
+const FINDERS: Finders = { walk: walkWindow, turn: turnWindow, fall: fallWindow }
+
+function plantings (steps: Step[]): number[] {
+  return steps.flatMap((step, i) => step.planted && i > 0 && !steps[i - 1].planted ? [i] : [])
 }
 
-export function windowsIn (world: ReadWorld, runs: SurveyRun[], root: string): PanelWindow[] {
+function steadyStride (steps: Step[], from: number, to: number): boolean {
+  return steps.slice(from, to + 1).every(step => walking(step) && step.side)
+}
+
+export function strideWindow (steps: Step[]): number[] | undefined {
+  const starts = plantings(steps).filter(i => i >= earliest)
+  for (let k = 0; k + 1 < starts.length; k++) {
+    const [from, to] = [starts[k], starts[k + 1]]
+    const length = to - from
+    if (length < SHORTEST_STRIDE || length > LONGEST_STRIDE || !steadyStride(steps, from, to)) continue
+    return Array.from({ length: STRIDE_FRAMES }, (_, j) => from + Math.round(j * length / STRIDE_FRAMES))
+  }
+  return undefined
+}
+
+export function landingWindow (steps: Step[]): number[] | undefined {
+  const count = AIRBORNE_BEFORE_LANDING + 1 + AFTER_TOUCHDOWN
+  for (let i = Math.max(earliest, STEADY_BEFORE_FALL); i < steps.length; i++) {
+    if (!walkedOff(steps, i)) continue
+    const landed = steps.findIndex((step, k) => k > i && !step.falling)
+    const first = landed - AIRBORNE_BEFORE_LANDING
+    if (landed < 0 || first < i || landed + AFTER_TOUCHDOWN >= steps.length) continue
+    return Array.from({ length: count }, (_, j) => first + j)
+  }
+  return undefined
+}
+
+export const GAME_FINDERS: Finders = { walk: strideWindow, landing: landingWindow }
+
+export function windowsIn (
+  world: ReadWorld, runs: SurveyRun[], root: string, finders: Finders = FINDERS
+): PanelWindow[] {
   const names = world.cast.filter((_, i) => world.looks[i].skin !== undefined).map(m => m.name)
-  const wanted = names.flatMap(character => KINDS.map(kind => ({ character, kind })))
+  const wanted = names.flatMap(character => Object.keys(finders).map(kind => ({ character, kind })))
   const found: PanelWindow[] = []
   for (const r of runs) {
     const fixture = readLayout(root, r.layout)
     const seed = r.seed ?? fixture.seed
     const s = scenario(world, fixture, seed, r.wind ?? 0)
     const steps = new Map<string, Step[]>()
+    const camera = pageCamera(1)
     const stress = stressDriver(s, r.stress)
     run(s, r.seconds, step => {
       stress(step)
@@ -106,13 +157,15 @@ export function windowsIn (world: ReadWorld, runs: SurveyRun[], root: string): P
           activity: frame.activity,
           onSurface: frame.support !== undefined,
           yaw,
-          speed: Math.hypot(velocity[0], velocity[2])
+          speed: Math.hypot(velocity[0], velocity[2]),
+          planted: frame.feet[0]?.planted ?? false,
+          side: Math.abs(Math.abs(facingAngle(camera, yaw)) - Math.PI / 2) < SIDE_TOLERANCE
         }
       }
     })
     for (const { character, kind } of wanted) {
       if (found.some(w => w.character === character && w.kind === kind)) continue
-      const frames = FINDERS[kind](steps.get(character) ?? [])
+      const frames = finders[kind](steps.get(character) ?? [])
       if (frames !== undefined) found.push({ character, kind, run: r, seed, frames })
     }
   }

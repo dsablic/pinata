@@ -1,6 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { buildDatabase } from '../src/mocap/database.ts'
+import { DEFAULT_JUMP_KIND } from '../src/mocap/jump.ts'
 import { createWalker, STEP_HEIGHT } from '../src/page/walker.ts'
 import type { Walker, WalkerFrame } from '../src/page/walker.ts'
 import { surfaceBelow } from '../src/page/surfaces.ts'
@@ -222,7 +223,8 @@ test('a walker with jumping on gets onto a ledge above a step, and one without c
   const page = ground([[0, 12, 0], [4, 6, 0.4]])
   const place = { x: 1, height: 0 }
   const make = (jumps: boolean): Walker => createWalker({
-    database, fps: FPS, random: random(1), ground: page, place, yaw: EAST, ...(jumps ? { jumps: 'leg' as const } : {})
+    database, fps: FPS, random: random(1), ground: page, place, yaw: EAST,
+    ...(jumps ? { jumps: DEFAULT_JUMP_KIND } : {})
   })
   assert.equal(make(false).reaches({ x: 5, height: 0.4 }), false)
   const w = make(true)
@@ -245,7 +247,7 @@ function crouching (w: Walker): WalkerFrame {
 function ledgeWalker (): Walker {
   const page = ground([[0, 12, 0], [4, 6, 0.4]])
   const w = createWalker({
-    database, fps: FPS, random: random(1), ground: page, place: { x: 1, height: 0 }, yaw: EAST, jumps: 'leg'
+    database, fps: FPS, random: random(1), ground: page, place: { x: 1, height: 0 }, yaw: EAST, jumps: DEFAULT_JUMP_KIND
   })
   w.visit({ x: 5, height: 0.4 })
   return w

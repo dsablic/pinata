@@ -3,9 +3,8 @@ import { createCast, FPS, pageEnvironment } from '../page/cast.ts'
 import type { Cast, CastOptions, CharacterState, Mark, Moving, Sample, Viewport } from '../page/cast.ts'
 import type { LayoutFixture, Target } from '../page/fixture.ts'
 import { jumpOf } from '../mocap/jump.ts'
-import type { JumpKind } from '../mocap/jump.ts'
+import type { JumpKind, JumpReach } from '../mocap/jump.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
-import type { Jump } from '../page/graph.ts'
 import { placeFor } from '../page/perception.ts'
 import type { Ground } from '../page/surfaces.ts'
 import { DROP_LIMIT, STEP_HEIGHT } from '../page/walker.ts'
@@ -36,13 +35,14 @@ export function marksOf (fixture: LayoutFixture, without: string[] = []): Array<
 
 export function scenario (
   world: ReadWorld, fixture: LayoutFixture, seed = fixture.seed, wind = 0, footprints = false,
-  painter: CastOptions['painter'] = 'strip', jumps: JumpKind = 'leg'
+  painter: CastOptions['painter'] = 'strip', jumps?: JumpKind
 ): Scenario {
   const { pixelsPerMetre, scale } = fixture
   const air = pageEnvironment(world.config, wind)
   const { cast: members, looks } = world
+  const kind = jumps === undefined ? {} : { jumps }
   const options = {
-    cast: members, looks, pixelsPerMetre, scale, seed, measure: true, footprints, painter, jumps, ...air
+    cast: members, looks, pixelsPerMetre, scale, seed, measure: true, footprints, painter, ...kind, ...air
   }
   const cast = createCast<string>(options)
   cast.setLayout(marksOf(fixture))
@@ -63,7 +63,7 @@ export function placeOfTarget (s: Scenario, target: Target): Place | undefined {
   return placeFor(target.rect, own, s.cast.ground(), s.fixture.pixelsPerMetre)
 }
 
-export function jumpOfCast (world: ReadWorld, name: string): Jump {
+export function jumpOfCast (world: ReadWorld, name: string): JumpReach {
   const member = world.cast.find(m => m.name === name)
   const database = member?.capture
   if (database === undefined) throw new Error(`${name} has no motion database`)
@@ -71,7 +71,7 @@ export function jumpOfCast (world: ReadWorld, name: string): Jump {
 }
 
 export function canReach (
-  ground: Ground, c: CharacterState<string>, place: Place, pixelsPerMetre: number, jump?: Jump
+  ground: Ground, c: CharacterState<string>, place: Place, pixelsPerMetre: number, jump?: JumpReach
 ): boolean {
   if (c.falling) return false
   const reach = { step: STEP_HEIGHT, drop: DROP_LIMIT, body: TALLEST_BODY, ...(jump === undefined ? {} : { jump }) }

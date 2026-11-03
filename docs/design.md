@@ -83,9 +83,12 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   a narrow one), where a body's feet still stand on it. An edge is dropped when the take-off is not on the node,
   when the speed the arc needs is over 3.5 m/s, when a wall stands where the arc is below its top and within a body
   of its foot, or when another surface lies above the target's top within the apex's head room, or when a surface
-  whose top is between the two ends lies under the arc's span (a jump never rises through a card: the soles would be
-  under its top, and the feet are lifted onto it in two frames). The head room and the run-up use the jump's
-  clearance (`clearance`, default 10 cm; 1 m for super jumps). Several jump edges
+  whose top is between the two ends has the arc at or below that top somewhere over its overlap with the arc's span
+  (a jump never rises through a card: the soles would be under its top, and the feet are lifted onto it in two
+  frames; a low step under the descent, which the arc is already above, blocks nothing; the parabola is lowest at the
+  ends of the overlap, so the two ends are the test). The head room, the arc and the run-up use the jump's
+  clearance (`arcOver`'s default is `JUMP_CLEARANCE`, 10 cm, the one place it is set; 1 m for super jumps; the arc
+  carries the clearance it was made with). Several jump edges
   between the same nodes (from either side) are chosen between like parallel drops, by nearness to the goal, and a
   path given the walker's x takes, for each jump, the take-off nearest to where the walker is (the far side's take-off
   walked a character through the whole page first). A jump edge is its own type (`JumpEdge`, with `land`). The cast's
@@ -285,8 +288,16 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - **Super jumps** (`npm run gates -- --super-jumps`, also in the full run): each recorded demo and page layout (not the
   jump page) runs 60 s with `jumps: 'super'`. Met when at least 4 jumps are planned, at least 95% land on the surface
   they aim for, and no sole is more than 1 px under a surface in a jump (`deepestInJump`, from the samples' foot
-  gaps). A jump still in flight when the run ends is neither planned nor missed; counted as planned it made a clean
-  7 of 8.
+  gaps). After the 60 s the run keeps stepping, for at most 5 s more, until every jump planned within the 60 s has
+  resolved (a jump still unresolved then is a miss, and a jump planned after the 60 s does not count). The deepest
+  sole is read on the frames of a jump and one frame either side (take-off and touchdown). A foot's gap is null when
+  no surface lies at or below its soles within 20 cm; that is a sole over nothing, which is not under a surface, so
+  null is skipped rather than read as zero, and the measure sees a sole at most 20 cm under a top (a sole that
+  crosses that band within one frame is not seen). `countJumps` itself counts a jump in flight at the last frame as
+  planned and not landed, for the leg gates too.
+- A walker cannot hang in a super jump: the leg timeout covers the walk to the take-off, the crouch is 0.18 s and
+  either launches or clears the jump, and a flight ends at touchdown (a void under the landing is the falling-too-long
+  rule of the cast); the gate's settling shows every jump of a 6 m arc resolving within 5 s.
 - **The browser suite** (`npm run test:browser`, about 30 s) checks what needs a browser: the scan against an oracle
   that reads elements directly, after load, scrolling, resizing, adding, removing, inner scrolling and text reflow;
   characters standing on live surfaces (lowest sole within 8 px: mid-stride feet are a few pixels up, and the precise
@@ -670,7 +681,8 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   of base height above the target's top (a body's base is its
   feet's rest level), the launch speed `sqrt(2 g (rise + 10 cm))`, the flight time the way up plus the way down from
   the apex to the top, and the horizontal speed the run over that time. A jump is refused (`false`, nothing
-  changes) when the rise is over one leg length (or `options.jump.height`), when the horizontal speed is over 3.5 m/s, when the ground has no
+  changes) when the rise is over one leg length (or `options.jump.height`), when the horizontal speed is over
+  3.5 m/s, when the ground has no
   surface at the target's height under the landing x, or when the arc, sampled each step, has the base more than 5 cm
   under the target's top while over that surface (the body would go through its edge). It is also refused while
   jumping or falling.

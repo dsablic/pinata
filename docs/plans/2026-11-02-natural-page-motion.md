@@ -60,7 +60,7 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
 | Landing absorbs | for drops of 0.6, 2 and 5 m, the deepest knee flexion within 0.5 s of landing grows with the drop and is at least 35 degrees at 5 m; the pelvis dips at least 4 cm at 2 m; no sole goes through the surface | every humanoid |
 | Recovery | after any landing the character is walking or resting normally (feet held, no mid-air) within 1.5 s | |
 | Jumps | on recorded layouts with rises up to the jump height, at least 95% of planned jumps land on the surface they aim for, and nobody climbs a rise above the jump height | |
-| Super jumps | with the option on, over 60 s on each recorded demo and page layout: at least 4 planned jumps, at least 95% of them land on the surface they aim for, and no sole more than the planted tolerance under a surface; with it off, page outputs byte-identical | |
+| Super jumps | with the option on, over 60 s on each recorded demo and page layout: at least 4 planned jumps, at least 95% of them land on the surface they aim for, and no sole more than the planted tolerance under a surface; with it off, page outputs byte-identical | Met on page-test (5 of 5), demo-1200 (8 of 8) and demo-390 (14 of 14), deepest sole 0.00 px; missed on perception: 2 planned against 4, both landed |
 | No popping | over a minute on every recorded layout, no part of any character vanishes for one to three frames and comes back (pixel count of its colours to zero and back) unless a part nearer the camera covers it | structural draw order |
 | Cost | the page world with four characters, cloth and chains on, at most 8 ms of main thread per frame at p95 in Chrome | |
 | Natural motion | blind judge panel, walk and fall-and-land strips of each character: the new page world is preferred over the current page world in at least 75% of non-control answers, and is rated at least as natural (1-5) as the old terrain demo with skins | judges, both orders, controls |
@@ -134,16 +134,19 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
   - On the cast, the jump page gives about one jump a minute: wandering picks nodes by width, so the long floor wins.
   - Standing gates unchanged (34, 18, 40 and 61 frames in mid air on the four older layouts); landings still pass;
     knight pops 17 and dwarf pops 1 in the glitch survey, fragments 0, as before.
-- **Batch D, super jumps built** (`jumps: 'super'`: 6 m up, 2 m across; `npm run gates -- --super-jumps`). With the
-  option on, over 60 s: page-test 5 of 5 planned jumps landed, demo-1200 7 of 7, demo-390 14 of 14 and perception 2
-  of 2, with the deepest sole 0.00 px everywhere. **Met** on page-test, demo-1200 and demo-390; **missed** on
-  perception, which has only 2 planned jumps against the gate's 4 (every jump lands; the page has one 2.6 m ledge,
-  4.8 m wide of 26 m of ground, and wandering picks nodes by width). With the option off, `npm run gates -- --jumps`
-  prints the same lines as before, and `npm test` passes.
+- **Batch D, super jumps built** (`jumps: 'super'`: 6 m up, 2 m across, apex 1 m over the top; `npm run gates --
+  --super-jumps`). With the option on, over 60 s, and then up to 5 s more until every jump planned within the 60 s has
+  resolved: page-test 5 of 5 planned jumps landed, demo-1200 8 of 8, demo-390 14 of 14 and perception 2 of 2, with the
+  deepest sole 0.00 px everywhere. **Met** on page-test, demo-1200 and demo-390; **missed** on perception, which has 2
+  planned jumps against the gate's 4 (every jump lands; the page has one 2.6 m ledge, 4.8 m wide of 26 m of ground,
+  and wandering picks nodes by width).
+  - Verified byte-identical with the option off: the surface graphs at leg jump heights 0.34, 0.44, 0.70 and 0.79 m on
+    the synthetic jump grounds and all five recorded layouts have the same edges as before this change, and
+    `npm run gates -- --jumps` prints the same lines. Nothing more is claimed about the default world's output.
+  - Re-recording demo-1200 and demo-390 (the checkbox adds marks, and the tile text changed) changes the inputs of
+    the other gates on those two layouts, so earlier standing and flicker figures for them are not directly comparable.
   - Two things the first run showed. With the leg-jump arc (apex 10 cm over the top) a 5 m rise needs about 2 m of
     run-up, more than the floor beside a card, so demo-390 had no jump edge and perception and demo-1200 few; super
     jumps leap 1 m above the top, which needs about 0.7 m. And a jump that rose through another card put the soles up
-    to 10.7 px under its top (the feet were lifted onto it in two frames), so the graph drops a jump whose span has a
-    surface with its top between the two ends.
-  - A jump still in flight when a run ends was counted as planned but not landed (7 of 8 on demo-1200); it is now
-    neither. The leg-jump lines are unchanged by it.
+    to 10.7 px under its top (the feet were lifted onto it in two frames), so the graph drops a jump whose arc is at
+    or below the top of a surface between the two ends over that surface's x-extent.

@@ -30,7 +30,7 @@ async function start (): Promise<void> {
     scale: SCALE,
     seed: Number(seed.value) || 1,
     count: Number(count.value),
-    jumps: superJumps.checked ? 'super' : 'leg',
+    ...(superJumps.checked ? { jumps: 'super' as const } : {}),
     measure: new URLSearchParams(location.search).has('measure')
   })
   Object.assign(globalThis, { __pinata: world })

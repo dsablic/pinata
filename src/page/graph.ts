@@ -1,9 +1,8 @@
-import { arcOver, heightAt, JUMP_CLEARANCE, LAND_IN, MOST_JUMP_SPEED, runUp } from '../mocap/jump.ts'
+import { arcOver, heightAt, LAND_IN, MOST_JUMP_SPEED, runUp } from '../mocap/jump.ts'
 import type { Arc, JumpReach } from '../mocap/jump.ts'
 import type { Ground, Surface, Wall } from './surfaces.ts'
 
-export type Jump = JumpReach
-export type Reach = { step: number, drop: number, body: number, jump?: Jump }
+export type Reach = { step: number, drop: number, body: number, jump?: JumpReach }
 export type Node = { id: number, surface: number, from: number, to: number, height: number }
 export type StepEdge = { from: number, to: number, kind: 'walk' | 'drop', at: number }
 export type JumpEdge = { from: number, to: number, kind: 'jump', at: number, land: number }
@@ -92,22 +91,27 @@ function edgesFrom (ground: Ground, nodes: Node[], node: Node, reach: Reach): Ed
 }
 
 function unobstructed (
-  ground: Ground, from: Node, to: Node, span: [number, number], arc: Arc, body: number, clearance: number
+  ground: Ground, from: Node, to: Node, span: [number, number], arc: Arc, body: number
 ): boolean {
   const [low, high] = span[0] < span[1] ? span : [span[1], span[0]]
   const feetAt = (x: number): number => from.height + heightAt(arc, (x - span[0]) / arc.speed)
+  const lowestOver = (s: Surface): number => {
+    return Math.min(feetAt(Math.max(low, s.from)), feetAt(Math.min(high, s.to)))
+  }
   const hits = (w: Wall): boolean => w.top > feetAt(w.x) && w.bottom < feetAt(w.x) + body
   const walled = ground.walls.some(w => w.x >= low && w.x <= high && hits(w))
   const blocked = ground.surfaces.some(s => {
     const own = s.id === from.surface || s.id === to.surface
-    const above = s.height > to.height && s.height < to.height + clearance + body
-    const between = s.height > from.height && s.height < to.height
-    return !own && s.to >= low && s.from <= high && (above || between)
+    const above = s.height > to.height && s.height < to.height + arc.clearance + body
+    const crossed = s.height > from.height && s.height < to.height && lowestOver(s) <= s.height
+    return !own && s.to >= low && s.from <= high && (above || crossed)
   })
   return !walled && !blocked
 }
 
-function jumpEdge (ground: Ground, node: Node, target: Node, direction: -1 | 1, body: number, jump: Jump): JumpEdge[] {
+function jumpEdge (
+  ground: Ground, node: Node, target: Node, direction: -1 | 1, body: number, jump: JumpReach
+): JumpEdge[] {
   const rise = target.height - node.height
   const near = direction > 0 ? target.from : target.to
   const gap = Math.max(0, direction * (near - (direction > 0 ? node.to : node.from)))
@@ -117,7 +121,7 @@ function jumpEdge (ground: Ground, node: Node, target: Node, direction: -1 | 1, 
   const land = near + direction * Math.min(LAND_IN, (target.to - target.from) / 2)
   const arc = arcOver(rise, land - takeOff, jump.clearance)
   if (Math.abs(arc.speed) > MOST_JUMP_SPEED) return []
-  if (!unobstructed(ground, node, target, [takeOff, land], arc, body, jump.clearance ?? JUMP_CLEARANCE)) return []
+  if (!unobstructed(ground, node, target, [takeOff, land], arc, body)) return []
   return [{ from: node.id, to: target.id, kind: 'jump', at: takeOff, land }]
 }
 

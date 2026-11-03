@@ -1,10 +1,12 @@
-import { jumpOf } from '../mocap/jump.ts'
+import { DEFAULT_JUMP_KIND, jumpOf } from '../mocap/jump.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
 import { FPS } from '../page/cast.ts'
 import type { LayoutFixture } from '../page/fixture.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
 import type { Graph } from '../page/graph.ts'
 import type { Sample } from '../page/cast.ts'
+import { run } from './page-scenarios.ts'
+import type { Scenario } from './page-scenarios.ts'
 import { groundOf, surfaceBelow } from '../page/surfaces.ts'
 import type { Ground, Surface } from '../page/surfaces.ts'
 import { createWalker, DROP_LIMIT, STEP_HEIGHT } from '../page/walker.ts'
@@ -47,20 +49,63 @@ export function countJumps (frames: Jumping[]): JumpCount {
     if (frame.jumpTo !== undefined && before === undefined) planned++
     if (frame.jumpTo === undefined && before !== undefined && frame.surface === before) landed++
   })
-  const unfinished = frames.length > 0 && frames[frames.length - 1].jumpTo !== undefined
-  return { planned: unfinished ? planned - 1 : planned, landed }
+  return { planned, landed }
 }
 
 export type CastJumps = { name: string, jumps: JumpCount }
 
-export function countCastJumps (samples: Sample[]): CastJumps[] {
-  const names = [...new Set(samples.map(m => m.name))]
-  return names.map(name => ({ name, jumps: countJumps(samples.filter(m => m.name === name)) }))
+const SETTLE_SECONDS = 5
+
+function namesOf (samples: Sample[]): string[] {
+  return [...new Set(samples.map(m => m.name))]
+}
+
+function resolvedEnd (own: Sample[], end: number): number {
+  if (end === 0 || own[end - 1].jumpTo === undefined) return end
+  const done = own.findIndex((s, i) => i >= end && s.jumpTo === undefined)
+  return done < 0 ? own.length : done + 1
+}
+
+export function countCastJumps (samples: Sample[], ends: Map<string, number> = new Map()): CastJumps[] {
+  return namesOf(samples).map(name => {
+    const own = samples.filter(m => m.name === name)
+    const end = ends.get(name)
+    return { name, jumps: countJumps(end === undefined ? own : own.slice(0, resolvedEnd(own, end))) }
+  })
+}
+
+export function totalJumps (counts: CastJumps[]): JumpCount {
+  return {
+    planned: counts.reduce((sum, c) => sum + c.jumps.planned, 0),
+    landed: counts.reduce((sum, c) => sum + c.jumps.landed, 0)
+  }
+}
+
+export type Settled = { samples: Sample[], ends: Map<string, number> }
+
+export function runSettled (s: Scenario, seconds: number): Settled {
+  run(s, seconds)
+  const samples = s.cast.samples()
+  const ends = new Map(namesOf(samples).map(name => [name, samples.filter(m => m.name === name).length]))
+  const inFlight = (): boolean => {
+    return namesOf(samples).some(name => samples.findLast(m => m.name === name)?.jumpTo !== undefined)
+  }
+  for (let i = 0; i < SETTLE_SECONDS * FPS && inFlight(); i++) {
+    run(s, 1 / FPS)
+    samples.push(...s.cast.samples())
+  }
+  return { samples, ends }
 }
 
 export function deepestInJump (samples: Sample[]): number {
-  const gaps = samples.filter(s => s.jumpTo !== undefined).flatMap(s => s.feet.map(f => f.gap ?? 0))
-  return Math.max(0, -Math.min(0, ...gaps))
+  const depths = namesOf(samples).flatMap(name => {
+    const own = samples.filter(m => m.name === name)
+    return own.flatMap((frame, i) => {
+      const near = [own[i - 1], frame, own[i + 1]].some(m => m?.jumpTo !== undefined)
+      return near ? frame.feet.flatMap(f => f.gap === null ? [] : [-f.gap]) : []
+    })
+  })
+  return Math.max(0, ...depths)
 }
 
 export function tripArrived (frames: TripFrame[], aim: number): boolean {
@@ -163,7 +208,8 @@ function runLayout (layout: JumpLayout, database: MotionDatabase): Tally {
       path(jumping, a.id, b.id) !== undefined
   }
   const walker = createWalker({
-    database, fps: FPS, random: random(SEED), ground: layout.ground, place: layout.floors[0], yaw: EAST, jumps: 'leg'
+    database, fps: FPS, random: random(SEED), ground: layout.ground, place: layout.floors[0], yaw: EAST,
+    jumps: DEFAULT_JUMP_KIND
   })
   const frames: WalkerFrame[] = []
   const result = tally()

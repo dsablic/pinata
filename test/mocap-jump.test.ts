@@ -120,14 +120,31 @@ test('a jump cancelled in the crouch leaves the player standing where it was', (
   assert.deepEqual([player.jumping(), player.falling(), player.height()], [false, false, 0])
 })
 
-test('a character with a super jump height gets up a 4 m rise and one without is refused', () => {
-  const rise = 4
-  const attempt = (jump?: JumpReach): boolean => {
+test('a super jump reaches a 6 m rise over its 1 m clearance, refuses above it, and a leg jump refuses both', () => {
+  const super_ = jumpOf(database.options.rig, database.options.rest, 'super')
+  const attempt = (rise: number, jump?: JumpReach): boolean => {
     const ground = (x: number): number => x >= EDGE ? rise : 0
     const options = { database, fps: FPS, ground, ...(jump === undefined ? {} : { jump }) }
-    const player = createPlayer(options, { position: [EDGE - runUp(rise), 0, 0], yaw: EAST })
+    const player = createPlayer(options, { position: [EDGE - runUp(rise, jump?.clearance), 0, 0], yaw: EAST })
     for (let i = 0; i < FPS; i++) player.step()
     return player.jump({ x: EDGE + LAND_IN, height: rise })
   }
-  assert.deepEqual([attempt(), attempt(jumpOf(database.options.rig, database.options.rest, 'super'))], [false, true])
+  assert.deepEqual([attempt(6, super_), attempt(6.1, super_), attempt(4), attempt(6)], [true, false, false, false])
+})
+
+test('a super jump flies to its 1 m apex and lands on the 6 m ledge', () => {
+  const super_ = jumpOf(database.options.rig, database.options.rest, 'super')
+  const ground = (x: number): number => x >= EDGE ? 6 : 0
+  const start = { position: [EDGE - runUp(6, 1), 0, 0] as [number, number, number], yaw: EAST }
+  const player = createPlayer({ database, fps: FPS, ground, jump: super_ }, start)
+  for (let i = 0; i < FPS; i++) player.step()
+  assert.equal(player.jump({ x: EDGE + LAND_IN, height: 6 }), true)
+  const bases: number[] = []
+  for (let i = 0; i < 4 * FPS; i++) {
+    player.step()
+    bases.push(player.height())
+  }
+  assert.ok(Math.abs(Math.max(...bases) - 7) < 0.1, `apex ${Math.max(...bases).toFixed(2)}`)
+  assert.ok(Math.abs(bases.at(-1)! - 6) < 0.02, `ended at ${bases.at(-1)!.toFixed(2)}`)
+  assert.equal(player.jumping(), false)
 })

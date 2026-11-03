@@ -210,6 +210,20 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - **Measured gates** (`npm run gates`): the standing gate on every layout, printed as met or missed, in Node over
   60 s, or in Chrome over 20 s per page with `-- --browser`; tests assert only what must always hold (the scenarios
   bound mid-air frames at 1.5% as a guard against regressions).
+- **Landings** (`src/diagnostics/landings.ts`, `npm run gates -- --landings`): every skinned character is dropped from
+  0.6, 2 and 5 m onto a flat floor with the walker alone, seed 1, 3 s at the page's 24 steps per second, 54 pixels per
+  metre. The floor is 0.6 m wide, narrower than a wandering goal needs, so the character rests before and after the
+  drop instead of walking off at the landing. Knee flexion is 180 degrees minus the hip-knee-ankle angle, the larger
+  leg, deepest within 0.5 s of the landing frame (the first not falling after falling). The pelvis dip is measured
+  against the same character's pelvis height resting before the drop (median of 0.5 s), not against the height after
+  landing, so a character that stays crouched still shows its dip. Sole depth is the lowest sole under the floor over
+  the whole run, held to the page's 1 px planted tolerance. Recovery is the time from landing to the last frame that
+  is not normal: normal is not falling, the pelvis back within 3 cm of its resting height, at least one foot planted,
+  every planted foot within 1 px of the floor, no unplanted foot more than 20 cm up (a walking swing rises about
+  10), and not every foot more than 3 px up; a character not normal in the last frame has not recovered. Without
+  the pelvis and the unplanted feet the rule passed a character crouched for good or holding a foot half a metre up. The gates are printed
+  with the others and with `--landings` alone; tests check the knee angle and the recovery rule on hand-made frames,
+  not the gates.
 - **The browser suite** (`npm run test:browser`, about 30 s) checks what needs a browser: the scan against an oracle
   that reads elements directly, after load, scrolling, resizing, adding, removing, inner scrolling and text reflow;
   characters standing on live surfaces (lowest sole within 8 px: mid-stride feet are a few pixels up, and the precise
@@ -578,6 +592,16 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   where its soles are now, seen from there; so a trailing foot still over a ledge keeps the ledge after the body has
   dropped below it. Every other lookup is from the body. Ground that ignores the third argument (terrain) behaves as
   before.
+- Landings: when a fall reaches the ground, the body dips and comes back up. The dip's depth is 24% of the
+  shorter leg times `1 - exp(-v / 8 m/s)` for landing speed v, so it grows with the drop but levels off before the
+  knees reach their fold (a linear depth folded the rogue's and dwarf's knees fully at 2 m, and their flexion could
+  no longer grow with the drop). Its shape is `x e^(1-x)` over a rise of 0.07 s plus 0.008 s per m/s, peaking at the
+  rise and gone by six of them, applied under the settled height so the held legs' bounds still hold, and the knees
+  of the feet the clip holds take it. The feet keep the clip's contact through it: holding every foot for the dip
+  made a character walking on from a walk-off landing slide its planted feet by 1.3 to 2.8 px a frame.
+- While falling no foot takes contact from the clip: a foot held on the frame a fall starts stayed planted in mid air.
+  The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
+  placement follows, so the landing starts from where the feet are drawn.
 
 ## The world (`src/world/`)
 

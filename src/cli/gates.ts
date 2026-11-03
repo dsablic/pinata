@@ -4,6 +4,8 @@ import {
 import type { Standing } from '../diagnostics/page-scenarios.ts'
 import type { Sample } from '../page/cast.ts'
 import { LAYOUTS, readLayout } from '../page/fixture.ts'
+import { DROP_HEIGHTS, landings, PLANTED_TOLERANCE, REACTION_SECONDS } from '../diagnostics/landings.ts'
+import type { Landings } from '../diagnostics/landings.ts'
 import { flickerFraction } from '../diagnostics/stability.ts'
 import type { Image } from '../image.ts'
 import type { ReadWorld } from '../world/bundle.ts'
@@ -64,6 +66,34 @@ function clothFlicker (world: ReadWorld): void {
   }
 }
 
+const SMALLEST_DEEP_KNEE = 35
+const SMALLEST_DIP_CM = 4
+const LARGEST_RECOVERY_SECONDS = 1.5
+const [LOW, MIDDLE, HIGH] = DROP_HEIGHTS
+
+function landingGates (all: Landings[]): void {
+  const each = (values: number[], digits: number): string => values.map(v => v.toFixed(digits)).join(', ')
+  const heights = DROP_HEIGHTS.join(', ')
+  for (const { name, drops } of all) {
+    const knees = drops.map(d => d.knee)
+    const at = (height: number): number => drops.findIndex(d => d.height === height)
+    const grows = knees.every((k, i) => i === 0 || k > knees[i - 1])
+    const deep = knees[at(HIGH)] >= SMALLEST_DEEP_KNEE
+    const dips = drops[at(MIDDLE)].dip >= SMALLEST_DIP_CM
+    const under = Math.max(...drops.map(d => d.soleDepth))
+    const absorbs = grows && deep && dips && under <= 100 * PLANTED_TOLERANCE
+    console.log(`${absorbs ? 'GATE MET' : 'GATE MISSED'} ${name} absorbs a landing: knee flexion within ` +
+      `${REACTION_SECONDS} s grows with the drop and is at least ${SMALLEST_DEEP_KNEE} degrees at ${HIGH} m, the ` +
+      `pelvis dips at least ${SMALLEST_DIP_CM} cm at ${MIDDLE} m, no sole more than ${(100 * PLANTED_TOLERANCE)
+        .toFixed(1)} cm under (drops of ${heights} m: knee ${each(knees, 0)} degrees, pelvis dip ` +
+      `${each(drops.map(d => d.dip), 1)} cm, deepest sole ${each(drops.map(d => d.soleDepth), 1)} cm)`)
+    const recoveries = drops.map(d => d.recovery)
+    const recovers = recoveries.every(r => r <= LARGEST_RECOVERY_SECONDS)
+    console.log(`${recovers ? 'GATE MET' : 'GATE MISSED'} ${name} is walking or resting normally within ` +
+      `${LARGEST_RECOVERY_SECONDS} s of a landing (drops of ${heights} m: ${each(recoveries, 2)} s, ${LOW} m first)`)
+  }
+}
+
 async function main (): Promise<number> {
   if (process.argv.includes('--browser')) {
     await withSite(async session => {
@@ -74,12 +104,17 @@ async function main (): Promise<number> {
     return 0
   }
   const world = readWorld(worldBundle())
+  if (process.argv.includes('--landings')) {
+    landingGates(landings(world))
+    return 0
+  }
   clothFlicker(world)
   for (const spec of LAYOUTS) {
     const s = scenario(world, readLayout(ROOT, spec.name))
     run(s, NODE_SECONDS)
     report(standing(s.cast.samples()), `on ${spec.name} over ${NODE_SECONDS} s`)
   }
+  landingGates(landings(world))
   return 0
 }
 

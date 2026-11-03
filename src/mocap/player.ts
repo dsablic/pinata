@@ -79,6 +79,13 @@ const TILT_HEIGHT = 0.12
 const FALL_START_HEIGHT = 0.5
 const BELOW_SUPPORT = 0.2
 const GRAVITY = 9.81
+const DIP_SPEED = 8
+const DIP_LEG_SHARE = 0.24
+const DIP_RISE_SECONDS = 0.07
+const DIP_RISE_PER_SPEED = 0.008
+const DIP_LASTS = 6
+const REACH_DOWN_SHARE = 0.93
+const REACH_DOWN_SECONDS = 0.15
 const MAX_GRADE = Math.tan(60 * Math.PI / 180)
 const FORWARD: Vec3 = [0, 0, 1]
 const UP: Vec3 = [0, 1, 0]
@@ -222,6 +229,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const startGround = start.height ?? ground(body.position[0], body.position[2])
   let base = startGround
   let settle = 0
+  let landing: { depth: number, rise: number, elapsed: number } | undefined
+  let airborne = 0
   let fallSpeed: number | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
@@ -571,7 +580,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const ease = wanted < settle ? LOWER_SECONDS : BASE_SECONDS
     settle += (wanted - settle) * (1 - Math.exp(-dt / ease))
     if (!Number.isFinite(settle)) settle = 0
-    return Math.min(ceiling, Math.max(floor, settle))
+    return Math.min(ceiling, Math.max(floor, settle - landingDip()))
   }
 
   const supportUnderBody = (): number => ground(root.position[0], root.position[2])
@@ -598,8 +607,33 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     base = Math.max(support, base - fallSpeed * dt)
     for (const foot of feet) foot.reference = base
     if (base > support) return
+    landing = landingFrom(fallSpeed)
     fallSpeed = undefined
     settle = 0
+  }
+
+  const reachingDown = (placed: Placed, hip: Vec3, k: number): Placed => {
+    const under: Vec3 = [hip[0], hip[1] - REACH_DOWN_SHARE * reach[k], hip[2]]
+    const w = 1 - Math.exp(-airborne / REACH_DOWN_SECONDS)
+    const ankle = placed.ankle.map((v, i) => v + (under[i] - v) * w) as Vec3
+    feet[k].last = { ankle, rotation: placed.rotation }
+    return { ...placed, ankle }
+  }
+
+  const landingFrom = (speed: number): { depth: number, rise: number, elapsed: number } => ({
+    depth: DIP_LEG_SHARE * Math.min(...reach) * (1 - Math.exp(-speed / DIP_SPEED)),
+    rise: DIP_RISE_SECONDS + DIP_RISE_PER_SPEED * speed,
+    elapsed: 0
+  })
+
+  const landingDip = (): number => {
+    if (landing === undefined) return 0
+    const x = landing.elapsed / landing.rise
+    if (x > DIP_LASTS) {
+      landing = undefined
+      return 0
+    }
+    return landing.depth * x * Math.exp(1 - x)
   }
 
   const standOnFeet = (pose: Pose, targets: Placed[]): number => {
@@ -651,6 +685,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       stepBody()
       if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT && feetOverTheDrop()) {
         fallSpeed = 0
+        landing = undefined
         letGoOfTheGround()
       }
       const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
@@ -661,10 +696,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       lastFrame = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
       if (fallSpeed !== undefined) fall()
+      airborne = fallSpeed === undefined ? 0 : airborne + dt
       const targets = legs.map((leg, k) => {
-        return placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY, frame.contact[k] ?? true)
+        const contact = fallSpeed === undefined && (frame.contact[k] ?? true)
+        const placed = placeFoot(k, pose[leg.ankle], transforms[leg.ankle].rotation ?? IDENTITY, contact)
+        if (fallSpeed === undefined) return placed
+        return reachingDown(placed, toWorldPoint(add(pose[leg.hip], [0, base, 0])), k)
       })
       const drop = fallSpeed === undefined ? standOnFeet(pose, targets) : 0
+      if (landing !== undefined && fallSpeed === undefined) landing.elapsed += dt
       raise(pose, transforms, Object.keys(pose), base + drop)
       const clamped = solveLegs(pose, transforms, targets)
       frameCount++

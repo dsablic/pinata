@@ -88,3 +88,18 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
   - The natural-motion panel is run in batch E with fall-and-land strips, as its gate names them.
   - Existing outputs: the terrain world's captured actors change (bound joints, the wizard's panel, standing in
     wind), and the wizard's cloth report (its panel's anchors); the other reports and check outputs are byte-identical.
+- **Batch C built and reviewed.** A landing dip in the player that grows with the landing speed and levels off by leg
+  length; feet reaching down while falling, with no clip contact in the air. `npm run gates --
+  --landings` drops every humanoid from 0.6, 2 and 5 m onto a floor (`src/diagnostics/landings.ts`).
+  - Landing absorbs: knee flexion within 0.5 s of 57/68/75, 55/66/74, 56/66/74 and 56/67/75 degrees (knight,
+    rogue, dwarf, wizard, by height), growing with the drop and over 35 at 5 m; pelvis dips at 2 m of 9.0, 5.7, 4.3
+    and 10.2 cm; no sole under the floor. Before: no dip, and the same knee angle at every height. **Pass.**
+  - Recovery: back to normal (pelvis within 3 cm of resting, feet held or swinging low, none in mid air) in 0.25,
+    0.42 and 0.58 s for the knight, 0.17-0.46 for the rogue, 0-0.42 for the dwarf and 0.29-0.58 for the wizard,
+    against 1.5 s. **Pass.**
+  - The dwarf's dip at 2 m clears the 4 cm gate by 0.3 cm.
+  - No recovery step after big drops yet: the dip alone meets the gates.
+  - Other gates on the changed motion: the standing gates are as they were (34, 18, 40 and 61 frames in mid air);
+    the cloth flicker windows moved with the falls, the dwarf's worst to 2.76% (2.56% before) and the wizard's to
+    1.81%, both still missed. The terrain world's captured actors change wherever they fall (the plan allows it);
+    planted feet slide no more after walk-off landings than before.

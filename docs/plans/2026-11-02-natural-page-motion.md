@@ -150,3 +150,21 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
     jumps leap 1 m above the top, which needs about 0.7 m. And a jump that rose through another card put the soles up
     to 10.7 px under its top (the feet were lifted onto it in two frames), so the graph drops a jump whose arc is at
     or below the top of a surface between the two ends over that surface's x-extent.
+- **Batch E, game-like panel, round 1: missed.** `npm run game-panel -- <LPC dir>` builds a walk (one stride cycle,
+  eight frames, from the side) and a walk-off landing (two airborne frames, touchdown, five after) of each character
+  from the glitch survey's runs, drawn as the page draws them, against LPC walk strips (the unclothed male and female
+  base bodies and two soldiers, frames 1-8 facing right, kept outside the repository), two LPC-against-LPC controls.
+  Three judges on three models, both orders.
+  - "Made by software": the page strip picked in 16 of 48 non-control answers, 33% (gate at most 60%). **Pass.**
+  - Mean rating on real pairs: page strips 3.15, references 3.29 (gate at least equal). **Missed.** Lowest the rogue's
+    walk (2.7 against 3.3).
+  - The judges split by model. The largest picked the page strip as software in all 16 of its real answers and rated
+    it 2-3 against 4; the middle one picked the LPC side every time, taking the bald base bodies for a stock figure;
+    the smallest could not tell any pair apart. Controls unseparated by every judge; left picks 50%. The detection
+    pass rests on the two weaker judges, and two of the four references are unclothed base bodies, which flatters the
+    page strips; the strongest judge's answers are the signal.
+  - Its account of what gives the page strips away: parts stay rigid while the figure moves, the torso, robe or cape
+    keeping one stiff, tilted shape frame to frame as if pasted on rather than redrawn; legs and feet turn as solid
+    pieces, so the wizard's leg reads as a bucket and the knight slides forward with little change of pose; the lean
+    and outline stay the same every frame; no rhythmic body bob. The hand-drawn walks bend knees and arms through
+    their poses, shading follows the body, and the body bobs on the beat.

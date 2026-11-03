@@ -17,12 +17,12 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
-### 0. Drawn, not pasted
+### 0. Drawn walk frames
 
-[Plan](plans/2026-11-03-drawn-not-pasted.md): the game-like panel's strongest judge picks every page strip as
-software, for rigid pasted-on parts, legs turning as solid pieces, an unchanging outline and no bob. First: a beat
-and pose stage (bob on the steps, key-pose timing, a lean that moves), then limb sprites keyed by bend. This comes
-before the jump takes and the rest of batch E.
+[Plan](plans/2026-11-03-drawn-walk-frames.md): the walk drawn as hand-made whole-body frames, picked by distance
+travelled so planted feet stay put, the cut-outs kept for everything else. The knight's side walk first, judged alone
+against clothed references before the other skins are drawn. It follows
+[drawn, not pasted](plans/2026-11-03-drawn-not-pasted.md), whose beat-and-pose stage made the game-like ratings fall.
 
 ### 0. Natural motion on the page, game-like visuals
 

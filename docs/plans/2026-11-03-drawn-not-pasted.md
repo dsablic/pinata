@@ -42,3 +42,19 @@ goes after the cut-out look itself, cheapest first, and measures each step on th
 - **C. Cloth shapes:** only if the round after B still names stiff cloth. Review.
 
 ## Results
+- **Batch A, beat and pose: built, not kept.** A drawn-pose stage after the walker: a bob of up to 1.6 sprite px
+  locked to the steps, the body, arms and knees shown up to 1.5 frames late between the contact and passing keys (the
+  feet exactly the walker's, the knees re-solved), and a 4-degree lean peaking at push-off. Bob, feet-held, survey and
+  cost gates met; the bob gate was already met without the stage (78-96% of steps), so it did not discriminate.
+  - Game-like round 2 (new seed, three new judges on three models): page strips 3.06 against references 3.48, down
+    from round 1's 3.15 against 3.29; "made by software" 22 of 48, 46% (round 1 33%). The largest-model judge again
+    picked every page strip and rated it 2.1 against 4.0. By the plan's rule the step does not stay: the stage is not
+    merged.
+  - What that judge named this time: limbs and torsos rotated or slid rather than redrawn, no contact, passing or
+    squash poses, the knight crouched almost horizontally, the dwarf hunched, the wizard's robe a stiff block,
+    silhouettes that jump between frames.
+  - The knight's walk strip in both rounds is the first steps after a drop-in, frames 1-3 in the landing dip's deep
+    squat with the cape held out straight. It is what the page shows, but not a steady walk; the walk strips' rule
+    should start after a landing's recovery.
+  - The middle judge took the LPC base bodies (unclothed, identical faces) for the software side in both rounds;
+    clothed references make the panel stricter and are used from the next round.

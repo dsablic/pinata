@@ -1,5 +1,9 @@
-import { DEFAULT_JUMP_KIND, jumpOf } from '../mocap/jump.ts'
-import type { MotionDatabase } from '../mocap/database.ts'
+import { armsOf } from '../formats/rig.ts'
+import { chainLength } from '../motion/pose.ts'
+import type { Vec3 } from '../math/vec.ts'
+import { length, sub } from '../math/vec.ts'
+import { DEFAULT_JUMP_KIND, jumpOf, legLengthOf } from '../mocap/jump.ts'
+import type { JumpTake, MotionDatabase } from '../mocap/database.ts'
 import { FPS } from '../page/cast.ts'
 import type { LayoutFixture } from '../page/fixture.ts'
 import { nodeAt, path, surfaceGraph } from '../page/graph.ts'
@@ -18,8 +22,27 @@ import type { CastMember } from '../world/world.ts'
 export type Jumping = { jumpTo: number | undefined, surface: number }
 export type TripFrame = Jumping & { reached: boolean }
 export type JumpCount = { planned: number, landed: number }
-export type Tally = { trips: number, arrived: number, jumps: JumpCount, climbs: number, deepest: number }
-export type JumpRun = { name: string, jumpHeight: number, synthetic: Tally, recorded: Tally }
+export type Crouch = { drop: number, wrist: number }
+export type Tally = {
+  trips: number
+  arrived: number
+  jumps: JumpCount
+  climbs: number
+  deepest: number
+  crouches: Crouch[]
+  strays: number
+  takes: Record<string, number>
+}
+export type JumpRun = {
+  name: string
+  jumpHeight: number
+  legLength: number
+  armLength: number
+  synthetic: Tally
+  recorded: Tally
+}
+export type Played = { clip: string, jumpTo: number | undefined }
+export type JumpPose = { jumpTo: number | undefined, falling: boolean, pelvis: number, wrists: Vec3[] }
 export type JumpLayout = { name: string, ground: Ground, tops: Place[], floors: Place[] }
 
 export const CLIMB_TOLERANCE = 0.02
@@ -50,6 +73,57 @@ export function countJumps (frames: Jumping[]): JumpCount {
     if (frame.jumpTo === undefined && before !== undefined && frame.surface === before) landed++
   })
   return { planned, landed }
+}
+
+export type TakeLandings = ReadonlyMap<string, number>
+
+export function landingFrames (take: JumpTake, rate: number, fps: number): number {
+  return Math.ceil((take.settle - take.land) * fps / (rate * take.fps)) + 1
+}
+
+export function strayTakeFrames (frames: Played[], landings: TakeLandings): number {
+  let stray = 0
+  let commanded = false
+  let after = 0
+  frames.forEach(({ clip, jumpTo }, i) => {
+    const allowed = landings.get(clip)
+    if (allowed === undefined) return
+    if (landings.get(frames[i - 1]?.clip ?? '') === undefined) {
+      commanded = jumpTo !== undefined
+      after = 0
+    }
+    after = jumpTo === undefined ? after + 1 : 0
+    if (!commanded || after > allowed) stray++
+  })
+  return stray
+}
+
+export function takesStarted (frames: Played[], takes: ReadonlySet<string>): Record<string, number> {
+  const started: Record<string, number> = {}
+  frames.forEach(({ clip }, i) => {
+    if (takes.has(clip) && frames[i - 1]?.clip !== clip) started[clip] = (started[clip] ?? 0) + 1
+  })
+  return started
+}
+
+export function crouches (frames: JumpPose[]): Crouch[] {
+  const found: Crouch[] = []
+  let start = frames.findIndex(f => f.jumpTo !== undefined)
+  while (start >= 0) {
+    const end = frames.findIndex((f, i) => i > start && f.jumpTo === undefined)
+    const jump = frames.slice(start, end < 0 ? frames.length : end)
+    const liftOff = jump.findIndex(f => f.falling)
+    if (liftOff > 0) {
+      const before = jump.slice(0, liftOff)
+      const lowest = before.reduce((a, b) => b.pelvis < a.pelvis ? b : a)
+      const wrist = Math.max(0, ...jump.slice(jump.indexOf(lowest), liftOff + 1).flatMap(f => {
+        return f.wrists.map((w, k) => length(sub(w, lowest.wrists[k])))
+      }))
+      found.push({ drop: -lowest.pelvis, wrist })
+    }
+    start = end < 0 ? -1 : frames.findIndex((f, i) => i > end && f.jumpTo !== undefined)
+  }
+  return found
 }
 
 export type CastJumps = { name: string, jumps: JumpCount }
@@ -182,7 +256,9 @@ export function layoutOfFixture (fixture: LayoutFixture): JumpLayout {
 }
 
 function tally (): Tally {
-  return { trips: 0, arrived: 0, jumps: { planned: 0, landed: 0 }, climbs: 0, deepest: 0 }
+  return {
+    trips: 0, arrived: 0, jumps: { planned: 0, landed: 0 }, climbs: 0, deepest: 0, crouches: [], strays: 0, takes: {}
+  }
 }
 
 function combine (a: Tally, b: Tally): Tally {
@@ -191,7 +267,24 @@ function combine (a: Tally, b: Tally): Tally {
     arrived: a.arrived + b.arrived,
     jumps: { planned: a.jumps.planned + b.jumps.planned, landed: a.jumps.landed + b.jumps.landed },
     climbs: a.climbs + b.climbs,
-    deepest: Math.max(a.deepest, b.deepest)
+    deepest: Math.max(a.deepest, b.deepest),
+    crouches: [...a.crouches, ...b.crouches],
+    strays: a.strays + b.strays,
+    takes: Object.fromEntries([...Object.keys(a.takes), ...Object.keys(b.takes)].map(name => {
+      return [name, (a.takes[name] ?? 0) + (b.takes[name] ?? 0)]
+    }))
+  }
+}
+
+function poseOf (frame: WalkerFrame, database: MotionDatabase): JumpPose {
+  const { rig, rest } = database.options
+  const pelvis = frame.joints[rig.pelvis]
+  const wrists = armsOf(rig).map(arm => frame.joints[arm.joints[Math.min(2, arm.joints.length - 1)]])
+  return {
+    jumpTo: frame.jumpTo,
+    falling: frame.falling,
+    pelvis: pelvis[1] - frame.base - rest[rig.pelvis][1],
+    wrists: wrists.map(w => sub(w, pelvis))
   }
 }
 
@@ -212,12 +305,14 @@ function runLayout (layout: JumpLayout, database: MotionDatabase): Tally {
     jumps: DEFAULT_JUMP_KIND
   })
   const frames: WalkerFrame[] = []
+  const clips: string[] = []
   const result = tally()
   const wait = (seconds: number, until: (f: WalkerFrame) => boolean): WalkerFrame[] => {
     const run: WalkerFrame[] = []
     for (let i = 0; i < seconds * FPS; i++) {
       const frame = walker.step()
       run.push(frame)
+      clips.push(walker.clip())
       if (until(frame)) break
     }
     frames.push(...run)
@@ -248,6 +343,13 @@ function runLayout (layout: JumpLayout, database: MotionDatabase): Tally {
   result.jumps = countJumps(frames.map(f => ({ jumpTo: f.jumpTo, surface: f.support?.id ?? -1 })))
   result.climbs = climbs(frames, jump.height + CLIMB_TOLERANCE)
   result.deepest = Math.max(0, ...jumpFrames.map(f => deepestSole(f, layout.ground)))
+  const rate = database.options.style?.rate ?? 1
+  const landings: TakeLandings = new Map(database.jumpTakes.map(t => [t.name, landingFrames(t, rate, FPS)]))
+  const takes = new Set(landings.keys())
+  const played = frames.map((f, i): Played => ({ clip: clips[i], jumpTo: f.jumpTo }))
+  result.strays = strayTakeFrames(played, landings)
+  result.takes = takesStarted(played, takes)
+  result.crouches = crouches(frames.map(f => poseOf(f, database)))
   return result
 }
 
@@ -260,6 +362,8 @@ function runOf (member: CastMember, recorded: LayoutFixture[]): JumpRun {
   return {
     name: member.name,
     jumpHeight: jumpOf(rig, rest).height,
+    legLength: legLengthOf(rig, rest),
+    armLength: Math.min(...armsOf(rig).map(arm => chainLength(arm.joints.slice(0, 3), rest))),
     synthetic: sum(JUMP_LAYOUTS),
     recorded: sum(recorded.map(layoutOfFixture))
   }

@@ -45,6 +45,7 @@ export type Walker = {
   visit: (place: Place) => boolean
   reaches: (place: Place) => boolean
   support: () => Surface | undefined
+  clip: () => string
 }
 export type WalkerOptions = {
   database: MotionDatabase
@@ -108,6 +109,7 @@ export function createWalker (options: WalkerOptions): Walker {
   let reached = false
   let started = 0
   let jumpTo: number | undefined
+  let clip = ''
   const attraction = options.attraction ?? (() => 0)
 
   const begin = (next: Activity): void => {
@@ -275,12 +277,14 @@ export function createWalker (options: WalkerOptions): Walker {
       player.command(command)
       const frame: PlayerFrame = player.step()
       standing = player.height()
+      clip = frame.clip
       if (!player.jumping()) jumpTo = undefined
       time += 1 / fps
       current = frameOf(frame.root, frame.pose, frame.transforms, frame.planted, command.speed > 0)
       return current
     },
     frame: () => current,
+    clip: () => clip,
     setGround: next => {
       ground = next
       graph = surfaceGraph(ground, reach)

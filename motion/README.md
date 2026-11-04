@@ -15,6 +15,11 @@ npm run mocap -- fetch motion/takes.json <source-dir>
 npm run mocap -- convert motion/takes.json <source-dir> motion/clips
 ```
 
+A take in `takes.json` may also give `kind` and `range`. `kind: "jump"` marks a jump take: the converted clip carries
+the kind, the player plays it when a character jumps, and it is never a candidate for walking. `range` is the first
+and last source frame (at `sourceFps`) to keep, so a take is cut to its useful part. The `jump-*` takes are cut from
+about 0.3 s before the crouch to just after the landing settles.
+
 `humanoid.json` maps the clips' source skeleton onto the example humanoids' joints; each example's `retarget.json`
 adds which of its joints hang from the chest and head.
 

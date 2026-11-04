@@ -15,12 +15,13 @@ import type { JumpReach } from './jump.ts'
 import { arcOver, heightAt, jumpHeightOf, legLengthOf, MOST_JUMP_SPEED } from './jump.ts'
 import type { Arc } from './jump.ts'
 import { ankleVelocity, featureOf, featureWeights, HORIZONS } from './database.ts'
-import type { MotionDatabase } from './database.ts'
+import type { JumpTake, MotionDatabase } from './database.ts'
 import { assemble, raise } from './retarget.ts'
 import type { BodyFrame } from './retarget.ts'
 
 export type JumpTarget = { x: number, height: number }
 type Flight = { arc: Arc, from: number, elapsed: number, drop: number }
+type Taking = { take: JumpTake, t: number, phase: 'crouch' | 'flight' | 'landing' }
 type Jump = { target: JumpTarget, crouched: number, flight?: Flight }
 export type Command = { speed: number, heading: number }
 export type BodyTuning = {
@@ -96,6 +97,7 @@ const DIP_RISE_PER_SPEED = 0.008
 const DIP_LASTS = 6
 export const LANDING_RECOVERY_SECONDS = 1
 const CROUCH_SECONDS = 0.18
+const CROUCH_MOST_SECONDS = 0.4
 const LAUNCH_EASE_SECONDS = 0.2
 const SURFACE_TOLERANCE = 0.02
 const INSIDE_TOLERANCE = 0.05
@@ -235,8 +237,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   }
   const root = { position: [...body.position] as Vec3, yaw: start.yaw }
   let command: Command = { speed: 0, heading: start.yaw }
-  let entry = Math.max(0, entries.findIndex(e => e.endsAtRest))
-  let t = entries[entry].frames.length - 1
+  const restEntry = Math.max(0, entries.findIndex(e => e.endsAtRest))
+  let entry = restEntry
+  let t = entries[restEntry].frames.length - 1
   let frameCount = 0
   let blend: Blend | undefined
   let lastFrame: BodyFrame | undefined
@@ -250,6 +253,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   let fallSpeed: number | undefined
   let standingDrop = 0
   let jump: Jump | undefined
+  let taking: Taking | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const groundUnder = (p: Vec3): number => ground(p[0], p[2], p[1])
@@ -270,7 +274,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       body.position = add(body.position, scale(body.velocity, dt))
       return
     }
-    const want = wantedVelocity()
+    const want = taking === undefined ? wantedVelocity() : [0, 0, 0] as Vec3
     const relative = sub(wind, body.velocity)
     let drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
     const most = command.speed > 0 ? WIND_SHARE * tuning.maxAcceleration : 0
@@ -334,14 +338,16 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     if (best < 0) return
     const chosen = candidates[best]
     if (isPlaying(chosen)) return
-    if (lastFrame !== undefined) blend = blendFrom(lastFrame, previousFrame ?? lastFrame, frameCount)
+    startBlend()
     entry = chosen.entry
     t = chosen.frame
     switched = true
   }
 
   const playing = (): BodyFrame => {
-    const frame = sampleFrame(entries[entry].frames, t)
+    const frame = taking === undefined
+      ? sampleFrame(entries[entry].frames, t)
+      : sampleFrame(taking.take.frames, taking.t)
     if (blend === undefined) return frame
     const span = BLEND_SECONDS * fps
     const n = frameCount - blend.start + 1
@@ -350,6 +356,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       return frame
     }
     return blended(frame, blend, n, span)
+  }
+
+  const startBlend = (): void => {
+    if (lastFrame !== undefined) blend = blendFrom(lastFrame, previousFrame ?? lastFrame, frameCount)
+  }
+
+  const followBody = (): void => {
+    root.position = add(root.position, scale(sub(body.position, root.position), SYNC))
+    root.yaw += turnBetween(root.yaw, body.yaw) * SYNC
   }
 
   const advance = (): void => {
@@ -364,8 +379,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const delta = turnToLocal(sub(to.root.position, from.root.position), from.root.yaw)
     root.position = add(root.position, turnToWorld(delta, root.yaw))
     root.yaw += turnBetween(from.root.yaw, to.root.yaw)
-    root.position = add(root.position, scale(sub(body.position, root.position), SYNC))
-    root.yaw += turnBetween(root.yaw, body.yaw) * SYNC
+    followBody()
     t = next
   }
 
@@ -643,10 +657,12 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     base = Math.max(support, next)
     for (const foot of feet) foot.reference = base
     if (base > support) return
-    landing = landingFrom(fallSpeed)
+    const landed = taking !== undefined && jump !== undefined
+    landing = landed ? undefined : landingFrom(fallSpeed)
     fallSpeed = undefined
     settle = 0
     if (jump === undefined) return
+    if (taking !== undefined) taking = { ...taking, t: taking.take.land, phase: 'landing' }
     jump = undefined
     body.velocity = [0, 0, 0]
   }
@@ -689,15 +705,70 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     return jump.flight.drop * (1 - u * u * (3 - 2 * u))
   }
 
+  const resume = (): void => {
+    startBlend()
+    taking = undefined
+    entry = restEntry
+    t = entries[entry].frames.length - 1
+    switched = true
+    search(false)
+  }
+
+  const cancelJump = (): void => {
+    if (jump?.flight !== undefined) return
+    if (jump !== undefined && taking !== undefined) resume()
+    jump = undefined
+  }
+
+  const takeStep = (take: JumpTake): number => rate * take.fps / fps
+
+  const takeFor = (target: JumpTarget, arc: Arc): JumpTake => {
+    const run = Math.abs(target.x - body.position[0])
+    const apex = Math.max(target.height - base, 0) + arc.clearance
+    const leg = Math.min(...reach)
+    const miss = (take: JumpTake): number => ((take.run - run) / leg) ** 2 + ((take.apex - apex) / leg) ** 2
+    return database.jumpTakes.reduce((best, take) => miss(take) < miss(best) ? take : best)
+  }
+
+  const crouchStep = (take: JumpTake): number => {
+    const seconds = (take.launch - take.start) / (take.fps * rate)
+    return takeStep(take) * Math.max(1, seconds / CROUCH_MOST_SECONDS)
+  }
+
+  const crouchTake = (started: Jump, current: Taking): void => {
+    current.t += crouchStep(current.take)
+    if (current.t < current.take.launch) return
+    launch(started)
+    if (started.flight === undefined) resume()
+    else current.phase = 'flight'
+  }
+
+  const advanceTake = (): void => {
+    if (taking === undefined) return
+    const { take } = taking
+    if (taking.phase === 'flight') {
+      const flight = jump?.flight
+      const done = flight === undefined ? 1 : clamp(flight.elapsed / flight.arc.seconds, 0, 1)
+      taking.t = take.launch + done * (take.land - take.launch)
+    } else if (taking.phase === 'landing') {
+      taking.t += takeStep(take)
+      if (taking.t >= take.settle) resume()
+    }
+  }
+
   const crouch = (): void => {
     if (jump === undefined || fallSpeed !== undefined) return
+    if (taking !== undefined) {
+      crouchTake(jump, taking)
+      return
+    }
     jump.crouched += dt
     if (jump.crouched >= CROUCH_SECONDS) launch(jump)
   }
 
   const reachingDown = (placed: Placed, hip: Vec3, k: number): Placed => {
     const under: Vec3 = [hip[0], hip[1] - REACH_DOWN_SHARE * reach[k], hip[2]]
-    const w = 1 - Math.exp(-airborne / REACH_DOWN_SECONDS)
+    const w = taking === undefined ? 1 - Math.exp(-airborne / REACH_DOWN_SECONDS) : 0
     const ankle = placed.ankle.map((v, i) => v + (under[i] - v) * w) as Vec3
     const lift = jump === undefined ? 0 : liftAboveGround(soles(ankle, placed.rotation, k), 0)
     const lifted: Vec3 = [ankle[0], ankle[1] + lift, ankle[2]]
@@ -765,18 +836,26 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     height: () => base,
     falling: () => fallSpeed !== undefined,
     jumping: () => jump !== undefined,
-    cancelJump: () => {
-      if (jump?.flight === undefined) jump = undefined
-    },
+    cancelJump,
     jump: target => {
       const arc = jump === undefined && fallSpeed === undefined ? arcTo(target) : undefined
       if (arc === undefined) return false
       jump = { target, crouched: 0 }
       body.velocity = [0, 0, 0]
-      landing = { ...landingFrom(arc.launch), rise: CROUCH_SECONDS }
+      if (database.jumpTakes.length === 0) {
+        landing = { ...landingFrom(arc.launch), rise: CROUCH_SECONDS }
+        return true
+      }
+      startBlend()
+      const take = takeFor(target, arc)
+      taking = { take, t: take.start, phase: 'crouch' }
+      landing = undefined
       return true
     },
-    push: impulse => { body.velocity = add(body.velocity, [impulse[0], 0, impulse[2]]) },
+    push: impulse => {
+      if (taking?.phase === 'crouch') cancelJump()
+      body.velocity = add(body.velocity, [impulse[0], 0, impulse[2]])
+    },
     step: () => {
       switched = false
       stepBody()
@@ -786,9 +865,13 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
         landing = undefined
         letGoOfTheGround()
       }
+      advanceTake()
       const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
-      if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
-      if (frameCount > 0) advance()
+      if (taking !== undefined) followBody()
+      else {
+        if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
+        if (frameCount > 0) advance()
+      }
       if (inFlight()) root.position = [body.position[0], root.position[1], body.position[2]]
       const frame = playing()
       previousFrame = lastFrame
@@ -817,8 +900,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
         planted: feet.map(isHeld),
         switched,
         clamped,
-        clip: entries[entry].name,
-        frame: Math.round(t)
+        clip: taking === undefined ? entries[entry].name : taking.take.name,
+        frame: Math.round(taking === undefined ? t : taking.t)
       }
     }
   }

@@ -15,13 +15,22 @@ export type ClipFrame = {
   rotations: number[][]
   contact: { left: boolean, right: boolean }
 }
-export type Clip = { name: string, source: string, fps: number, bones: ClipBone[], frames: ClipFrame[] }
+export type ClipKind = 'jump'
+export type Clip = {
+  name: string
+  source: string
+  kind?: ClipKind
+  fps: number
+  bones: ClipBone[]
+  frames: ClipFrame[]
+}
 
 export type ConvertOptions = {
   name: string
   source: string
   sourceFps: number
   fps: number
+  kind?: ClipKind
   drop?: readonly string[]
   range?: [number, number]
 }
@@ -102,7 +111,8 @@ export function clipFromAmc (skeleton: AsfSkeleton, amc: AmcFrame[], options: Co
       contact: { left: footDown(pose, near, floor, dt, 'left'), right: footDown(pose, near, floor, dt, 'right') }
     }
   })
-  return { name: options.name, source: options.source, fps: options.fps, bones, frames }
+  const kind = options.kind === undefined ? {} : { kind: options.kind }
+  return { name: options.name, source: options.source, ...kind, fps: options.fps, bones, frames }
 }
 
 export function clipPose (clip: Clip, frame: ClipFrame): AsfPose {
@@ -120,6 +130,7 @@ const CLIP_SCHEMA: Schema = {
   fields: {
     name: { kind: 'string' },
     source: { kind: 'string', note: 'the motion-capture take the clip came from' },
+    kind: { kind: 'string', oneOf: ['jump'], note: 'a jump take is played by the player, never matched while walking' },
     fps: { kind: 'number', min: 1, max: 240 },
     bones: {
       kind: 'array',
@@ -148,7 +159,8 @@ const CLIP_SCHEMA: Schema = {
         }
       }
     }
-  }
+  },
+  optional: ['kind']
 }
 
 export function validateClip (input: unknown): Validated<Clip> {

@@ -285,6 +285,17 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   with at least 40 trips, 95% hits, no climbs and no sole under. The recorded layouts are also run for 60 s with the
   cast and their jumps counted from the samples (`jumpTo` and `surface`); they print only. Page-test, perception and
   both demos have rises of 1.5 to 5 m, beyond a leg-length jump, so no jumps happen there.
+- **Jump takes** (`npm run gates -- --jump-takes`, not in the full run, so its output stays as it was): over the same
+  runs as the jumps gate (the jump page and the synthetic grounds, one walker each), two gates per character. Walking
+  never plays a jump take (`strayTakeFrames`): a run of consecutive jump-take frames must begin on a frame with a
+  jump planned, and may go on after the jump ends (touchdown) for at most the take's landing (settle minus land, at
+  the player's speed, plus one frame), so a take that never hands back to matching fails. A real crouch
+  (`crouches`): for every planned jump, the pelvis drops at least 10% of the leg length below its rest height before
+  the first frame in the air, and, relative to the pelvis, a wrist travels at least 15% of the arm length between the
+  lowest pelvis and the first frame in the air. Rest height stands for standing: the characters' standing poses sit
+  within 0.016 m of it (the wizard's 1.6 cm is 2% of its leg), which flatters the drop by that much. The standing
+  gates' cast runs do not record clip names, so only the jumps' runs are checked for strays; a take that is not a
+  candidate cannot be matched in the others by construction.
 - **Super jumps** (`npm run gates -- --super-jumps`, also in the full run): each recorded demo and page layout (not the
   jump page) runs 60 s with `jumps: 'super'`. Met when at least 4 jumps are planned, at least 95% land on the surface
   they aim for, and no sole is more than 1 px under a surface in a jump (`deepestInJump`, from the samples' foot
@@ -576,6 +587,9 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 
 ### `clip.ts`
 
+- A clip may carry `kind: 'jump'` (from its entry in `motion/takes.json`, validated against that one value): a jump
+  take, played by the player and never matched while walking. A take entry may also give a `range` of source frames to
+  keep, so a jump take is cut to about 0.3 s before its crouch through its landing settling.
 - A clip stores, per frame, the root position (height above the ground, horizontal from the clip's start), a heading
   (yaw) and every bone's global rotation from rest as a quaternion [w, x, y, z], rounded to four digits to keep the
   committed JSON small.
@@ -620,6 +634,26 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
 - A frame is a candidate when the full path ahead of it lies in its clip. A clip that ends standing still (root slower
   than 0.15 m/s over its last quarter second) offers every frame, its path held at the end, so its end can be matched
   as a stop and its last frame held.
+
+- Jump takes are kept apart from the clips matching reads: `entries`, `candidates` and the feature spreads are built
+  from the walking clips only, so adding a take changes nothing a walking character does. `jumpTakes` holds each
+  take retargeted like any clip, with the phases cut from its contacts and its root height (scaled like the retargeted
+  root path, leg ratio times stride, since the retargeted root drops its height): the crouch begins where the root
+  first falls 3% below its height at the clip's start, the flight at the first frame with no foot down, the landing at
+  the first frame after with any foot down, and the landing ends where the root is back within 3% of standing. A take
+  that never crouches, flies and lands is an error.
+- A take's play starts at the real crouch: 3 frames before the last frame of the root's final descent into the
+  crouch's lowest point that is still within 1% of the height it descends from (the end of the last plateau or
+  local maximum, found by walking back from the lowest point). Any dip and rise before it, and standing still, are not
+  played, and the clips are cut so little precedes it.
+- A take also stores its flight's run (root travel across the ground, scaled) and apex (highest root over the
+  launch's), which is what the player fits a jump by. Apex rather than net rise: every take lands on the level it left,
+  and what differs between a short and a high jump is how high the body goes.
+- Take frames carry a clearance that keeps the soft lift from raising the pose by the capture's foot height in the
+  air: in flight it is the height the soles already have in the assembled pose (no lift), and it blends from the
+  captured clearance over 3 frames either side of the flight. Without it the capture's 0.4 m of foot lift is added
+  to the arc's own height. On the ground the captured clearance stays, so the soft lift lowers the pose to put the
+  soles on the floor, which is what drops the pelvis in the crouch and the landing.
 
 ### `player.ts`
 
@@ -716,10 +750,40 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
   the ordinary one (dip from the downward speed), with the body's horizontal speed removed at touchdown.
 - The pelvis keeps the settled drop the grounded legs had at launch, and eases it out over 0.2 s (smoothstep): the
   flight alone drops it, which moved the knight's pelvis 0.22 m in one frame at launch. No frame moves the pelvis by
-  more than the launch speed over a frame (3.3 m/s, 14 cm at 24 fps), which a test holds. In flight the feet see the
-  target's top (the ground from the target's height), so a sole over the target is lifted onto it instead of going
+  more than the launch speed over a frame (3.3 m/s, 14 cm at 24 fps; 1.25 times that with a take, whose push-off at
+  the faster crouch rises that quickly), which a test holds. In flight the feet see the target's top (the ground from the target's height), so a sole over the target is lifted onto it instead of going
   into its face or edge, and feet reaching down for the landing are lifted above the ground under them.
   Take-off is 30 cm back of the near end because the leading foot is that far ahead of the root.
+
+- With jump takes in the database a jump is played from a take instead of the procedural dip (a database without
+  takes jumps as before). `jump(target)` picks the take whose flight best fits the jump: the squared difference of run
+  (the distance to the target's x) and of apex (the arc's apex over the body's base, rise plus clearance) from the
+  take's, each over the shortest leg. The take plays from its start (3 frames before the crouch's final descent),
+  the crouch (start to lift-off) warped onto at most 0.4 s, faster than capture speed when it is longer (the
+  captures' 0.6 to 0.9 s wind-up is far longer than the anticipation of a game's jump), and the landing at its own
+  speed; both are scaled by the style's `rate` like walking. The body stands still (the wanted velocity is zero)
+  through the crouch and the landing. The crouch phase ends the take's own way,
+  at the first frame in the air, and that is when the arc launches (a launch the arc then refuses hands back to
+  matching). A shove during the crouch cancels the jump and hands back to matching: it would build a gap between the
+  root and the body that snaps shut at launch, or play a whole crouch before a refused arc. A shove in flight changes
+  the arc's speed as before.
+- In flight the take's frame follows the arc's clock: the time since launch over the arc's duration picks the point
+  between the take's first airborne frame and its landing frame, so a super jump's long flight plays the take slowly,
+  and a take's flight that is longer or shorter than the arc stays in step with the body's height. The feet keep the
+  take's own legs instead of reaching down (as in a fall), lifted over the target's top and kept within the legs'
+  range by the ground and reach code that already served the fall; the jump gates hold with them.
+- At touchdown the landing plays from the take's landing frame at its own speed, with no procedural dip (the take's
+  bent legs, soles on the floor, are the dip), until the root is back near standing; then the player resets to a
+  standing frame and matches again, blending from the take's last pose. The animated root follows the body through the
+  take (12% of the gap a frame) rather than by the clip's root motion. The pelvis's height comes from the take through
+  the clip's clearance and the usual leg bounds, not from a separate drop: the soles are held on the floor by the same
+  contact rules as walking, which a separate pelvis drop with the pelvis left at its rest height could not give (the
+  feet were 12 cm up and not held).
+- A jump takes about 1.1 s from command to the end of its landing (the crouch at most 0.4 s, against the dip's
+  0.18 s), so a character plans fewer jumps in a given time than with the dip.
+- Known limits: a fall that starts during a take's crouch, or a flight that overruns `arc.seconds`, loses the
+  procedural reach-down and dip; the landing is the take's small-jump landing whatever the height, so a super jump
+  lands as softly as a hop.
 
 ## The world (`src/world/`)
 

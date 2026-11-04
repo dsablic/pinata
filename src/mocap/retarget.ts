@@ -144,9 +144,13 @@ function setRootVelocities (frames: BodyFrame[], fps: number): void {
   })
 }
 
+export function clipScale (clip: Clip, options: RetargetOptions): number {
+  return legRatio(clip, options) * (options.style?.stride ?? 1)
+}
+
 export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFrame[] {
   const legs = legsOf(options.rig)
-  const ratio = legRatio(clip, options) * (options.style?.stride ?? 1)
+  const ratio = clipScale(clip, options)
   const directions = new Map(clip.bones.map(bone => [bone.name, bone.direction]))
   const sources = clip.frames.map(frame => clipPose(clip, frame))
   const floor = lowestFootPoints(sources)
@@ -205,17 +209,34 @@ function placeJoints (
   return { pose, transforms }
 }
 
+function soleHeight (pose: Pose, leg: Leg, options: RetargetOptions): number {
+  const radii = footRadii(leg, options.mannequin)
+  return Math.min(pose[leg.ankle][1] - radii.ankle, pose[leg.toe][1] - radii.toe)
+}
+
 function softLift (pose: Pose, clearance: BodyFrame['clearance'], options: RetargetOptions): number {
   const lift = legsOf(options.rig).map(leg => {
     const above = clearance[sideOf(leg)]
-    const radii = footRadii(leg, options.mannequin)
-    const sole = Math.min(pose[leg.ankle][1] - radii.ankle, pose[leg.toe][1] - radii.toe)
-    return { above, shift: above - sole }
+    return { above, shift: above - soleHeight(pose, leg, options) }
   })
   const nearest = Math.min(...lift.map(l => l.above))
   const weights = lift.map(l => Math.exp(-(l.above - nearest) / LIFT_SOFTNESS))
   const total = weights.reduce((a, b) => a + b, 0)
   return lift.reduce((sum, l, i) => sum + l.shift * weights[i], 0) / total
+}
+
+export function unliftedClearance (
+  rotations: Record<string, Matrix>,
+  options: RetargetOptions,
+  hierarchy: Hierarchy
+): BodyFrame['clearance'] {
+  const { pose } = placeJoints(rotations, options, hierarchy)
+  const clearance = { left: Infinity, right: Infinity }
+  for (const leg of legsOf(options.rig)) {
+    clearance[sideOf(leg)] = Math.min(clearance[sideOf(leg)], soleHeight(pose, leg, options))
+  }
+  const finite = (v: number): number => Number.isFinite(v) ? v : 0
+  return { left: finite(clearance.left), right: finite(clearance.right) }
 }
 
 export function assemble (

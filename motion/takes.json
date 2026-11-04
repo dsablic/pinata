@@ -62,6 +62,39 @@
       "subject": "69",
       "trial": "16",
       "description": "turn in place"
+    },
+    {
+      "name": "jump-forward-5",
+      "subject": "16",
+      "trial": "5",
+      "description": "forward jump",
+      "kind": "jump",
+      "range": [
+        40,
+        245
+      ]
+    },
+    {
+      "name": "jump-forward-7",
+      "subject": "16",
+      "trial": "7",
+      "description": "forward jump",
+      "kind": "jump",
+      "range": [
+        165,
+        365
+      ]
+    },
+    {
+      "name": "jump-forward-10",
+      "subject": "16",
+      "trial": "10",
+      "description": "forward jump",
+      "kind": "jump",
+      "range": [
+        170,
+        405
+      ]
     }
   ]
 }

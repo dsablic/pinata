@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { climbs, countCastJumps, countJumps, deepestInJump, tripArrived } from '../src/diagnostics/jumps.ts'
-import type { TripFrame } from '../src/diagnostics/jumps.ts'
+import {
+  climbs, countCastJumps, countJumps, crouches, deepestInJump, strayTakeFrames, tripArrived
+} from '../src/diagnostics/jumps.ts'
+import type { JumpPose, TripFrame } from '../src/diagnostics/jumps.ts'
 import type { Sample } from '../src/page/cast.ts'
 import type { Surface } from '../src/page/surfaces.ts'
 
@@ -66,4 +68,28 @@ test('the deepest sole is read on the jump frames and one frame either side, and
   assert.equal(deepestInJump(frames), 4)
   assert.equal(deepestInJump(frames.slice(0, 1)), 0, 'no jump')
   assert.equal(deepestInJump([sample('a', 3, 0, [null])]), 0, 'a sole over nothing is not under a surface')
+})
+
+test('a take frame is stray unless it plays from a jump command to the end of its landing', () => {
+  const landings = new Map([['jump', 2]])
+  const at = (clip: string, jumpTo?: number): { clip: string, jumpTo: number | undefined } => ({ clip, jumpTo })
+  const clean = [at('walk'), at('jump', 3), at('jump', 3), at('jump'), at('jump'), at('walk')]
+  assert.equal(strayTakeFrames(clean, landings), 0)
+  const picked = [at('walk'), at('jump'), at('jump'), at('walk'), at('jump', 3)]
+  assert.equal(strayTakeFrames(picked, landings), 2, 'a take run that starts without a command')
+  const stuck = [at('jump', 3), at('jump'), at('jump'), at('jump'), at('jump')]
+  assert.equal(strayTakeFrames(stuck, landings), 2, 'a take that does not hand back after its landing')
+})
+
+test('a crouch is the pelvis drop before lift-off and the wrist travel between the lowest point and lift-off', () => {
+  const pose = (jumpTo: number | undefined, falling: boolean, pelvis: number, wrist: number): JumpPose => {
+    return { jumpTo, falling, pelvis, wrists: [[0, wrist, 0]] }
+  }
+  const frames = [
+    pose(undefined, false, 0, 0), pose(3, false, -0.05, 0), pose(3, false, -0.2, 0.1), pose(3, false, -0.1, 0.3),
+    pose(3, true, 0, 0.5), pose(3, true, 0, 0.9), pose(undefined, false, 0, 0)
+  ]
+  const [found] = crouches(frames)
+  assert.deepEqual([found.drop, found.wrist], [0.2, 0.4], 'later flight does not count')
+  assert.deepEqual(crouches([pose(3, false, -0.1, 0), pose(undefined, false, 0, 0)]), [], 'never left the ground')
 })

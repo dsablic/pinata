@@ -1,7 +1,7 @@
 import { length, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
 import { legsOf } from '../formats/rig.ts'
-import { assemble, hierarchyOf, retargetRotations } from './retarget.ts'
+import { assemble, clipScale, hierarchyOf, retargetRotations, unliftedClearance } from './retarget.ts'
 import type { BodyFrame, Hierarchy, RetargetOptions } from './retarget.ts'
 import type { Clip } from './clip.ts'
 import { turnBetween, turnToLocal } from '../world/yaw.ts'
@@ -13,9 +13,22 @@ export type MotionEntry = {
   ankles: Vec3[][]
   endsAtRest: boolean
 }
+export type JumpTake = {
+  name: string
+  fps: number
+  frames: BodyFrame[]
+  start: number
+  launch: number
+  land: number
+  settle: number
+  run: number
+  apex: number
+}
+export type JumpPhases = { start: number, crouch: number, launch: number, land: number, settle: number }
 export type Candidate = { entry: number, frame: number, feature: number[] }
 export type MotionDatabase = {
   entries: MotionEntry[]
+  jumpTakes: JumpTake[]
   candidates: Candidate[]
   scales: number[]
   hierarchy: Hierarchy
@@ -25,6 +38,10 @@ export type MotionDatabase = {
 export const HORIZONS = [8, 16]
 const REST_SPEED = 0.15
 const REST_SECONDS = 0.25
+const CROUCH_DROP_SHARE = 0.03
+const LEVEL_FRAMES = 3
+const LEAD_FRAMES = 3
+const DESCENT_SHARE = 0.01
 
 export function featureOf (
   path: Array<{ position: Vec3, yaw: number }>,
@@ -90,11 +107,65 @@ function featureSpreads (candidates: Candidate[]): number[] {
   })
 }
 
+function descentStart (heights: number[], launch: number): number {
+  const lowest = heights.slice(0, launch).reduce((low, h, i) => h < heights[low] ? i : low, 0)
+  const ripple = DESCENT_SHARE * heights[0]
+  let top = lowest
+  while (top > 0 && heights[top - 1] >= heights[top]) top--
+  let last = top
+  for (let i = top; i <= lowest; i++) if (heights[i] >= heights[top] - ripple) last = i
+  return Math.max(0, last - LEAD_FRAMES)
+}
+
+export function jumpPhases (contacts: boolean[][], heights: number[]): JumpPhases {
+  const crouch = heights.findIndex(height => height < heights[0] * (1 - CROUCH_DROP_SHARE))
+  const launch = contacts.findIndex((down, i) => i > crouch && crouch >= 0 && down.every(d => !d))
+  const land = contacts.findIndex((down, i) => i > launch && launch >= 0 && down.some(d => d))
+  if (crouch < 0 || launch < 0 || land < 0) throw new Error('a jump take must crouch, fly and land')
+  const risen = heights.findIndex((height, i) => i > land && height >= heights[0] * (1 - CROUCH_DROP_SHARE))
+  return { start: descentStart(heights, launch), crouch, launch, land, settle: risen < 0 ? heights.length - 1 : risen }
+}
+
+function levelFlight (frames: BodyFrame[], phases: JumpPhases, options: RetargetOptions, hierarchy: Hierarchy): void {
+  frames.forEach((frame, i) => {
+    const away = i < phases.launch ? phases.launch - i : i - phases.land + 1
+    const level = i >= phases.launch && i < phases.land ? 1 : Math.max(0, 1 - away / (LEVEL_FRAMES + 1))
+    if (level === 0) return
+    const flat = unliftedClearance(frame.rotations, options, hierarchy)
+    for (const side of ['left', 'right'] as const) {
+      frame.clearance[side] += (flat[side] - frame.clearance[side]) * level
+    }
+  })
+}
+
+function jumpTakeOf (clip: Clip, options: RetargetOptions, hierarchy: Hierarchy): JumpTake {
+  const ratio = clipScale(clip, options)
+  const frames = retargetRotations(clip, options)
+  const heights = clip.frames.map(frame => ratio * frame.root[1])
+  const phases = jumpPhases(frames.map(frame => frame.contact), heights)
+  levelFlight(frames, phases, options, hierarchy)
+  const [from, to] = [frames[phases.launch].root.position, frames[phases.land].root.position]
+  const flight = heights.slice(phases.launch, phases.land)
+  return {
+    name: clip.name,
+    fps: clip.fps,
+    frames,
+    start: phases.start,
+    launch: phases.launch,
+    land: phases.land,
+    settle: phases.settle,
+    run: Math.hypot(to[0] - from[0], to[2] - from[2]),
+    apex: Math.max(...flight) - heights[phases.launch]
+  }
+}
+
 export function buildDatabase (clips: Clip[], options: RetargetOptions): MotionDatabase {
   const hierarchy = hierarchyOf(options.rig, options.map)
-  const entries = clips.map(clip => entryOf(clip, options, hierarchy))
+  const walking = clips.filter(clip => clip.kind !== 'jump')
+  const entries = walking.map(clip => entryOf(clip, options, hierarchy))
+  const jumpTakes = clips.filter(clip => clip.kind === 'jump').map(clip => jumpTakeOf(clip, options, hierarchy))
   const candidates = candidatesOf(entries)
-  return { entries, candidates, scales: featureSpreads(candidates), hierarchy, options }
+  return { entries, jumpTakes, candidates, scales: featureSpreads(candidates), hierarchy, options }
 }
 
 export function ankleVelocity (entry: MotionEntry, frame: number, leg: number): Vec3 {

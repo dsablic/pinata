@@ -2,8 +2,16 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseAmc, parseAsf } from '../mocap/asf.ts'
 import { clipFromAmc } from '../mocap/clip.ts'
+import type { ClipKind } from '../mocap/clip.ts'
 
-type Take = { name: string, subject: string, trial: string, description: string }
+type Take = {
+  name: string
+  subject: string
+  trial: string
+  description: string
+  kind?: ClipKind
+  range?: [number, number]
+}
 type Takes = { database: string, fps: number, sourceFps: number, drop: string[], takes: Take[] }
 
 const BASE = 'http://mocap.cs.cmu.edu/subjects'
@@ -32,7 +40,13 @@ function convert (takes: Takes, dir: string, out: string): void {
     const skeleton = parseAsf(readFileSync(join(dir, asf), 'utf8'))
     const source = `${takes.database}, subject ${take.subject}, trial ${take.trial} (${take.description})`
     const clip = clipFromAmc(skeleton, parseAmc(readFileSync(join(dir, amc), 'utf8')), {
-      name: take.name, source, sourceFps: takes.sourceFps, fps: takes.fps, drop: takes.drop
+      name: take.name,
+      source,
+      sourceFps: takes.sourceFps,
+      fps: takes.fps,
+      drop: takes.drop,
+      ...(take.kind === undefined ? {} : { kind: take.kind }),
+      ...(take.range === undefined ? {} : { range: take.range })
     })
     writeFileSync(join(out, `${take.name}.json`), `${JSON.stringify(clip)}\n`)
     console.log(`${take.name}: ${clip.frames.length} frames from ${amc}`)

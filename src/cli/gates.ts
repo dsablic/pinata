@@ -122,6 +122,29 @@ function jumpGates (runs: JumpRun[]): void {
   }
 }
 
+const SMALLEST_CROUCH_SHARE = 0.1
+const SMALLEST_WRIST_SHARE = 0.15
+
+function jumpTakeGates (runs: JumpRun[]): void {
+  const percent = (value: number): string => (100 * value).toFixed(1)
+  for (const run of runs) {
+    const crouches = [...run.synthetic.crouches, ...run.recorded.crouches]
+    const strays = run.synthetic.strays + run.recorded.strays
+    const drop = Math.min(...crouches.map(c => c.drop)) / run.legLength
+    const wrist = Math.min(...crouches.map(c => c.wrist)) / run.armLength
+    const used = Object.entries(run.synthetic.takes).map(([name, n]) => `${name} ${n}`).join(', ')
+    const crouched = crouches.length > 0 && drop >= SMALLEST_CROUCH_SHARE && wrist >= SMALLEST_WRIST_SHARE
+    const where = `${run.name}: ${crouches.length} planned jumps`
+    console.log(`${strays === 0 ? 'GATE MET' : 'GATE MISSED'} walking never plays a jump take outside a jump ` +
+      `(${where}, ${strays} take frames outside a jump command to the end of its landing)`)
+    console.log(`${crouched ? 'GATE MET' : 'GATE MISSED'} a real crouch: in every planned jump the pelvis drops ` +
+      `at least ${100 * SMALLEST_CROUCH_SHARE}% of the leg length before lift-off and a wrist travels at least ` +
+      `${100 * SMALLEST_WRIST_SHARE}% of the arm length between crouch and flight (${where}: smallest drop ` +
+      `${percent(drop)}% of ${run.legLength.toFixed(2)} m, smallest wrist travel ${percent(wrist)}% of ` +
+      `${run.armLength.toFixed(2)} m; takes on the synthetic grounds: ${used})`)
+  }
+}
+
 function eachOf (counts: CastJumps[]): string {
   return counts.map(c => `${c.name} ${c.jumps.landed} of ${c.jumps.planned}`).join(', ')
 }
@@ -172,6 +195,10 @@ async function main (): Promise<number> {
   if (process.argv.includes('--jumps')) {
     jumpGates(jumps(world, [readLayout(ROOT, 'jumps')]))
     recordedJumps(world)
+    return 0
+  }
+  if (process.argv.includes('--jump-takes')) {
+    jumpTakeGates(jumps(world, [readLayout(ROOT, 'jumps')]))
     return 0
   }
   if (process.argv.includes('--super-jumps')) {

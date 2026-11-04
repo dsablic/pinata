@@ -26,8 +26,10 @@ artefacts, in [`docs/plans/done/`](plans/done).
 
 ## Next: Phase 1, the minimum viable tool
 
-From [`ROADMAP.md`](ROADMAP.md), Phase 1: an agent, from a prompt, produces an eight-direction character that walks,
-idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. To plan first, gates fixed:
+[Plan](plans/2026-11-04-phase-1-tool.md), gates fixed: an agent, from a prompt, produces an eight-direction
+character that walks, idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. Batches:
+A recorder and export, B one command line and the MCP server, C behaviours and Aseprite, D authoring and the exit
+test.
 
 - **Interfaces:** `pinata check`, `pinata render` and `pinata export` as one CLI, and an MCP server wrapping them.
 - **Export:** sprite sheets with JSON frame data, then Aseprite files.

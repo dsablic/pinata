@@ -1,8 +1,9 @@
 # Running a blind judge panel
 
 How to ask blind AI judges whether one set of images beats another, with the safeguards the proofs settled on (see
-[`docs/FINDINGS.md`](FINDINGS.md), "How it was tested"): neutral names, every pair in both orders, a control the judges must
-not be able to separate, the answer key kept out of the judges' folder, and three fresh judges per question.
+[`docs/FINDINGS.md`](FINDINGS.md), "How it was tested"): neutral names, every pair in both orders, a control the
+judges must not be able to separate, the answer key kept out of the judges' folder, and three fresh judges per
+question.
 
 1. **Write a panel spec** (JSON). `a` is the candidate and `b` the reference in each pair; paths are relative to the
    spec file. At least one pair must be a control (`"control": true`): two references of similar, known quality.
@@ -24,7 +25,8 @@ not be able to separate, the answer key kept out of the judges' folder, and thre
    `name` names the panel in the key and the score only; judges never see it. `rating` asks for a 1-5 score for each
    side, which separates "both good" from "both bad"; it is optional, but the skins spike recommends always including
    it, and when present every answer must carry one. `scale` (default 8)
-   and `gap` (default 2, in source pixels) set the layout; `background` defaults to `#c8c8c8`. Change `seed` for a
+   and `gap` (default 2, in source pixels) set the layout; `layout` is `side` (default) or `stacked`, which puts the
+   left image above the right one for wide strips; `background` defaults to `#c8c8c8`. Change `seed` for a
    new round to get a new order.
 
 2. **Build the packet**, with the key outside it:

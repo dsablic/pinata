@@ -33,11 +33,11 @@ check its own work.
 - **Checking quality:** every feature is built against gates fixed before the code, and visual quality is judged by
   blind AI judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)).
 
-## In progress
+## Next
 
-- **Physical bodies** ([plan](docs/plans/done/2026-10-30-physical-walking.md)) for creatures without motion-capture data.
-- Then weather and particles and a physics engine. The [roadmap](docs/ROADMAP.md) and [TODO](docs/TODO.md) have the
-  order.
+- **The minimum viable tool:** one CLI (`check`, `render`, `export`) and an MCP server, sprite-sheet export, and a
+  behaviour library (idle, crouch, a simple attack beside walk, turn and jump), so an agent can go from a prompt to
+  an exported, skinned character ([plan](docs/plans/2026-11-04-phase-1-tool.md)).
 
 ## Running it
 
@@ -56,7 +56,7 @@ npm run mocap -- convert motion/takes.json <cmu-dir> motion/clips   # rebuild th
 npm run demo                   # render the walking piñata demo to reports/demo/
 ```
 
-The original proof-of-concept runners (`npm run p1` to `p6`, `skins`, each with a `:verify` variant that adds a
+The original proof-of-concept runners (`npm run p1` to `p4`, `p6` and `skins`, each with a `:verify` variant that adds a
 determinism re-run) still work and keep their outputs byte-identical. They write reports to `reports/<poc>/` and exit 0
 when every gate passes, 1 when one fails and 2 when the harness itself fails.
 
@@ -87,7 +87,7 @@ being built. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the details.
 - [`refs/`](refs): CC0 reference sprites from the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
 - [`docs/`](docs): the [roadmap](docs/ROADMAP.md), [TODO](docs/TODO.md), [findings](docs/FINDINGS.md),
   [authoring guide](docs/authoring.md), [judging guide](docs/judging.md), and [plans](docs/plans) with their gates and
-  findings logs.
+  findings logs (finished ones in [`docs/plans/done/`](docs/plans/done)).
 
 ## Licence
 

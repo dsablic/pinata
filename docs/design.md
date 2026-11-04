@@ -2,7 +2,7 @@
 
 Implementation choices and the reasons for them. Code carries no comments: names and structure say what it does,
 this document says why. Plans and their gates live in [`plans/`](plans); this file describes how things are built
-as they stand now.
+as they stand.
 
 ## Conventions
 
@@ -121,7 +121,7 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 - With `jumps` on, the walker's graph has jump edges for a jump height of one leg length (the shorter leg's hip-knee-
   ankle chain: knight 0.70 m, wizard 0.79, rogue 0.44, dwarf 0.34), which is as high as a character can put its hip
   without folding; a share of 0.6 left the rogue and dwarf below a step, so they could jump nowhere. Only the page's
-  cast turns it on; walkers made without it, and drop-ins, behave as before.
+  cast turns it on; walkers made without it, and drop-ins, have no jump edges.
 - `jumps` is a kind, `'leg'` or `'super'` (`jumpOf(rig, rest, kind)` in `mocap/jump.ts`), and the walker hands the
   resulting `{ height, reach, clearance }` to its graph and to its player, so both agree on what a jump can reach. A
   super jump reaches 6 m up and 2 m across, with an apex 1 m above the target's top instead of 10 cm: the demo and
@@ -264,10 +264,10 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   the whole run, held to the page's 1 px planted tolerance. Recovery is the time from landing to the last frame that
   is not normal: normal is not falling, the pelvis back within 3 cm of its resting height, at least one foot planted,
   every planted foot within 1 px of the floor, no unplanted foot more than 20 cm up (a walking swing rises about
-  10), and not every foot more than 3 px up; a character not normal in the last frame has not recovered. Without
-  the pelvis and the unplanted feet the rule passed a character crouched for good or holding a foot half a metre up. The gates are printed
-  with the others and with `--landings` alone; tests check the knee angle and the recovery rule on hand-made frames,
-  not the gates.
+  10), and not every foot more than 3 px up; a character not normal in the last frame has not recovered. The pelvis
+  and unplanted-feet conditions are there because without them a character crouched for good, or holding a foot half
+  a metre up, would count as recovered. The gates are printed with the others and with `--landings` alone; tests
+  check the knee angle and the recovery rule on hand-made frames, not the gates.
 - **Jumps** (`src/diagnostics/jumps.ts`, `npm run gates -- --jumps`): every skinned character runs on the recorded
   jump page (`test/pages/jump-test.html`, layout `jumps`: a 22 m floor, a wall, and eight shelves at 18, 20, 23, 25,
   37, 39, 42 and 45 px, 0.33 to 0.83 m, so each character has rises up to and just above its jump height, with
@@ -278,7 +278,7 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   jumps in between). A trip counts as a planned jump when the top needs one (no route without jump edges, one with)
   and is accepted or refused; it is a hit only if the walker ends resting on the aimed surface with every jump of
   the trip having landed on its aim. A refusal, a time-out (30 s), a short landing or a landing elsewhere is a miss;
-  counting the trips that reached their take-off only was flattering. A climb is a standing frame (base within 1 cm
+  a trip that only reached its take-off is not a hit. A climb is a standing frame (base within 1 cm
   of the surface under it) whose surface is more than the jump height (and 2 cm) above the previous standing one,
   however it got there. The deepest sole is measured on the jump's frames (crouch to landing) against the surface a
   sole is over, within 20 cm above it, and held to the page's 1 px planted tolerance. The gate is met per character
@@ -339,7 +339,7 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
     one covering them.
   - Pops use the painted count, so a part covered by a nearer one is not a pop; a part missing from a frame counts as
     none. Parts under `MIN_PART_PIXELS` are skipped, and a pop is counted once until the part is back.
-  - Stretch is the gate as fixed: the length a part is drawn at against its sprite's drawn length. A fitted sprite is
+  - Stretch is the length a part is drawn at against its sprite's drawn length. A fitted sprite is
     never drawn shorter than 0.6 of it, rounded to whole pixels (`fitted`), so a part held there is not short; a
     part drawn by the page's strip painter is drawn at the length it reports.
   - Blank frames, under half the run's median silhouette, are counted on their own: flicker divides by the current
@@ -351,8 +351,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   - Turns on the spot are a yaw change over 90 degrees within 1.5 s at a mean speed under 0.3 m/s (turns while
     walking average about 0.7); drops are the starts of falls.
 - **The rendering panel** (`npm run rendering-panel`, `rendering-panel.ts`): blind pairs of the page's strip painter
-  against the rotating painter it replaced (`CastOptions.painter: 'rotate'`, which keeps the per-character angle,
-  length and anchor maps the cast kept before and draws exactly what it drew), on the same motion. For each skinned
+  against the rotating painter (`CastOptions.painter: 'rotate'`, which draws the page with the per-character angle,
+  length and anchor maps of the rotating painters), on the same motion. For each skinned
   character, the first survey run after 4 s holding a walk (`WALK_FRAMES` frames above 0.3 m/s on a surface), a turn
   on the spot (the survey's count, from its start to 4 frames after) or a fall (3 frames before take-off to 4 after
   landing) is the window, sampled evenly to `MOST_FRAMES`; no window is picked by hand, and a character or kind with
@@ -382,7 +382,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
     given folder and written only under `reports/`. Each character's walk and landing take different references,
     rotating; the controls pair male with female and soldier with its recolour.
 - **The jump panel** (`npm run jump-panel`, `jump-panel.ts`): blind pairs of each skinned character's jump drawn with
-  the CMU jump takes against the same jump with the old procedural crouch and dip, for batch B of the jump-takes plan.
+  the CMU jump takes against the same jump with the procedural crouch and dip, the quality gate of the jump-takes
+  plan.
   The procedural version is the same world bundle without the `kind: 'jump'` clips (`worldBundle`'s `jumpTakes`
   option): the player falls back to the dip when the database has no jump takes, so nothing else differs.
   - A jump window is one planned jump: the walker's `jumpTo` is set from the command (the crouch's start) until the
@@ -535,8 +536,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 ### Skeleton (`skeleton.ts`)
 
 - A transform places a point relative to its rest position: posed = rotation · rest + translation, body-local. An
-  absent rotation is the identity, and then posed = rest + translation exactly, so joints that never rotate keep the
-  arithmetic they had before transforms existed.
+  absent rotation is the identity, and then posed = rest + translation exactly, so joints that never rotate use exact
+  arithmetic.
 - Parents: the pelvis is the root; upperBody joints hang from the pelvis and `attached` joints from the joint they
   name; each limb is a chain from its first joint, whose parent is the pelvis (or, for an appendage, its `parent`);
   an arm's carried joints hang from its last joint.
@@ -725,14 +726,14 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   on the ground it meets, where the feet take hold again. Waiting for the soles keeps a trailing foot still on a ledge
   from being dragged through its corner. The legs keep their grip on the air: commands still change the body's
   speed while it falls (without that, a body leaving an edge at walking speed overshot the surfaces below the page's
-  drops). Smaller drops are stepped down as before. `height` (the base) and `falling` are exposed for
+  drops). Smaller drops are stepped down. `height` (the base) and `falling` are exposed for
   the page, whose ground depends on how high the body stands, and a player can start at a given height (`height` in
   its start), above the ground, to fall in.
 - The ground function may take the height a point is seen from (`ground(x, z, from)`). Two lookups use it: whether
   the soles are over the drop before a fall starts, and a swinging foot's reference, which also takes the ground under
   where its soles are now, seen from there; so a trailing foot still over a ledge keeps the ledge after the body has
-  dropped below it. Every other lookup is from the body. Ground that ignores the third argument (terrain) behaves as
-  before.
+  dropped below it. Every other lookup is from the body. Ground that ignores the third argument (terrain) is
+  unaffected.
 - Landings: when a fall reaches the ground, the body dips and comes back up. The dip's depth is 24% of the
   shorter leg times `1 - exp(-v / 8 m/s)` for landing speed v, so it grows with the drop but levels off before the
   knees reach their fold (a linear depth folded the rogue's and dwarf's knees fully at 2 m, and their flexion could
@@ -740,8 +741,6 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   rise and gone by six of them, applied under the settled height so the held legs' bounds still hold, and the knees
   of the feet the clip holds take it. The feet keep the clip's contact through it: holding every foot for the dip
   made a character walking on from a walk-off landing slide its planted feet by 1.3 to 2.8 px a frame.
-  A faster rise for a character walking on from a landing (a clock two to four times as fast after the first 0.2 or
-  0.3 s) was tried and left out: it made the dwarf's survey pops 3 instead of 1 at every setting.
   `LANDING_RECOVERY_SECONDS` (1 s) is the time after which a landing is taken as recovered, for the game panel.
 - While falling no foot takes contact from the clip: a foot held on the frame a fall starts stayed planted in mid air.
   The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
@@ -766,22 +765,22 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - The pelvis keeps the settled drop the grounded legs had at launch, and eases it out over 0.2 s (smoothstep): the
   flight alone drops it, which moved the knight's pelvis 0.22 m in one frame at launch. No frame moves the pelvis by
   more than the launch speed over a frame (3.3 m/s, 14 cm at 24 fps; 1.25 times that with a take, whose push-off at
-  the faster crouch rises that quickly), which a test holds. In flight the feet see the target's top (the ground from the target's height), so a sole over the target is lifted onto it instead of going
-  into its face or edge, and feet reaching down for the landing are lifted above the ground under them.
-  Take-off is 30 cm back of the near end because the leading foot is that far ahead of the root.
+  the faster crouch rises that quickly), which a test holds. In flight the feet see the target's top (the ground from
+  the target's height), so a sole over the target is lifted onto it instead of going into its face or edge, and feet
+  reaching down for the landing are lifted above the ground under them.
 
 - With jump takes in the database a jump is played from a take instead of the procedural dip (a database without
-  takes jumps as before). `jump(target)` picks the take whose flight best fits the jump: the squared difference of run
-  (the distance to the target's x) and of apex (the arc's apex over the body's base, rise plus clearance) from the
-  take's, each over the shortest leg. The take plays from its start (3 frames before the crouch's final descent),
-  the crouch (start to lift-off) warped onto at most 0.4 s, faster than capture speed when it is longer (the
+  takes uses the procedural dip). `jump(target)` picks the take whose flight best fits the jump: the squared
+  difference of run (the distance to the target's x) and of apex (the arc's apex over the body's base, rise plus
+  clearance) from the take's, each over the shortest leg. The take plays from its start (3 frames before the crouch's final
+  descent), the crouch (start to lift-off) warped onto at most 0.4 s, faster than capture speed when it is longer (the
   captures' 0.6 to 0.9 s wind-up is far longer than the anticipation of a game's jump), and the landing at its own
   speed; both are scaled by the style's `rate` like walking. The body stands still (the wanted velocity is zero)
   through the crouch and the landing. The crouch phase ends the take's own way,
   at the first frame in the air, and that is when the arc launches (a launch the arc then refuses hands back to
   matching). A shove during the crouch cancels the jump and hands back to matching: it would build a gap between the
   root and the body that snaps shut at launch, or play a whole crouch before a refused arc. A shove in flight changes
-  the arc's speed as before.
+  the arc's speed.
 - In flight the take's frame follows the arc's clock: the time since launch over the arc's duration picks the point
   between the take's first airborne frame and its landing frame, so a super jump's long flight plays the take slowly,
   and a take's flight that is longer or shorter than the arc stays in step with the body's height. The feet keep the
@@ -892,8 +891,7 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   exact quarter turns are exact.
 - The mode filter breaks a tie to the centre sample, then to an opaque colour, then by character order.
 - The result is cut to its opaque pixels, keeping the pivot's place.
-- `rotateNearest` is the plain nearest-sampled rotation the first renderer drew, kept for comparison and for the
-  jaggedness gate.
+- `rotateNearest` is the plain nearest-sampled rotation, the baseline the jaggies test compares RotSprite with.
 - Jaggies count pixels that break clean pixel-art lines: orphans (an opaque pixel with no 8-neighbour of its colour)
   and the extra pixel of an L-step (a 2x2 block with three pixels of one opaque colour whose fourth is transparent or
   another colour, where that colour does not fill the 4x4 neighbourhood around the block: a doubled step on a thin
@@ -923,7 +921,7 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - A mirrored two-joint part turns its unmirrored sprite by the mirrored angle and flips the result, so left- and
   right-facing directions are exact mirrors of each other.
 - Clean rotations are cached by sprite, pivot and step; at most 4096 are kept, oldest dropped first.
-- Eight-direction skins also get inner lines and darker far limbs; one-view skins render as they always have.
+- Eight-direction skins also get inner lines and darker far limbs; one-view skins render without them.
   - Of each left and right pair, the one more than 5 cm deeper (`FAR_DEPTH`) than its counterpart is drawn a shade
     darker.
   - Inner lines are drawn as a pixel artist draws them where one part overlaps another: wherever a part's pixel borders
@@ -1014,9 +1012,10 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - Cape anchors and chain anchors sit just outside the body parts their cloth collides with (a pinned particle inside
   a part counts as cloth inside the body). Parts that would push a hanging panel from the wrong side are left out
   of its collisions: the dwarf's axe, the wizard's forearms and hands. The wizard's robe sways through a back panel
-  hung from the hips; a closed skirt round the legs was tried, but walking legs push through its front between the
-  particles at any practical spacing, failing the cloth gates. The panel's anchors sit outside the robe and it collides with the robe:
-  ignoring the robe let a panel flung over the head in a fall come down through the body and stay in front.
+  hung from the hips; a closed skirt round the legs would let walking legs push through its front between the
+  particles at any practical spacing, failing the cloth gates. The panel's anchors sit outside the robe and it
+  collides with the robe: ignoring the robe let a panel flung over the head in a fall come down through the body and
+  stay in front.
 
 ### solver.ts
 

@@ -71,8 +71,8 @@ automatically readable motion at 48 px.
 A character is a directory of JSON files; one command (`npm run check`) validates it, runs every static, locomotion
 and cloth gate, and prints a hint per failure naming the part, frame and fix. Before the experiment, a review found
 the guide and hints pointing the wrong way on the most likely failure (sliding feet are fixed by raising step height,
-not lowering it); with that fixed, every author passed. The authors' main complaint, that simulated cloth was not
-drawn in the stills, has since been fixed.
+not lowering it); with that fixed, every author passed. The authors' main complaint was that simulated cloth was not
+drawn in the stills; chains and capes with a `render` entry are now drawn into the sheet and the walk strip.
 
 ### P6: style swap ([findings](plans/done/p6-findings.md))
 
@@ -121,12 +121,14 @@ them, not with expert work.
 
 The motion engine works: scripted locomotion, IK and physics-driven secondary motion, authored by AI through text
 formats and a single check command with actionable hints, with style independent of motion. The procedural visual
-layer does not pass as hand-made; per-part sprites drawn by an AI artist are the most promising replacement, and
-whether they reach a game-art bar is the main open question. The next steps are in [`docs/ROADMAP.md`](ROADMAP.md).
+layer does not pass as hand-made; per-part sprites drawn by an AI artist are the most promising replacement. They beat
+modest references, but later attempts to close the gap to hand-drawn game sprites (a beat-and-pose stage, hand-drawn
+walk frames, a restyle of the knight) missed their judge gates, so human-drawn skins remain the way past that bar. The
+next steps are in [`docs/ROADMAP.md`](ROADMAP.md).
 
 ## Open questions
 
-- Can AI-drawn skins reach game-quality art across 8 directions and several sizes (P7)?
-- Can characters run live in a browser within a real-time frame budget, reacting to events (P8)?
+- Can AI-drawn skins hold up at several sizes (the P7 size gate needs per-size skins) and pass a human pixel artist's
+  review?
 - Can composable behaviours be authored by agents as reliably as characters were in P5?
 - How well do the gait planner and gates hold up for short-legged and many-legged bodies (general limbs work)?

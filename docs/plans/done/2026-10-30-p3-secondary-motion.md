@@ -4,7 +4,8 @@
 
 **Goal:** Prove that cloth and hair driven by the body's motion read as inertia (lag, overshoot, settle), that
 materials and wind are distinguishable by motion alone, and that the simulation is stable, collision-free and
-deterministic. Design: [`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P3 Secondary motion".
+deterministic. Design: [`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P3
+Secondary motion".
 
 **Architecture:** The P1 knight is the collision body, moved as a rigid whole by a scripted root transform (position
 plus yaw). A cape (a particle grid) and a plume (a particle chain) are pinned to body anchors and simulated with
@@ -157,7 +158,8 @@ export function anchorWorld (m: Mannequin, joint: string, root: RootState): Vec3
 The distance is the union (minimum) of the included parts' SDFs, evaluated in body-local space
 (`local = R(-yaw) * (p - position)`). Cull by bounding sphere: skip a part when the distance to its bounding sphere
 already exceeds the current minimum. The normal is the central-difference gradient in local space, rotated back to
-world space. Reuse [`src/raster/sdf.ts`](../../../src/raster/sdf.ts) and [`src/raster/bounds.ts`](../../../src/raster/bounds.ts).
+world space. Reuse [`src/raster/sdf.ts`](../../../src/raster/sdf.ts) and
+[`src/raster/bounds.ts`](../../../src/raster/bounds.ts).
 
 Tests: a point 1 m in front of a sphere part at the origin has distance 1 - r and normal +Z; the same with
 `yaw = pi/2` faces +X; excluded parts don't collide; `anchorWorld` rotates and translates joints.
@@ -229,7 +231,10 @@ penetration depth (`particleRadius - distance` when positive). Metrics, each a p
 `windAlignment(restHem)`, and `frameHashes` (sha256 of each frame's positions). Test each with small synthetic
 recordings whose answers are known.
 
-### Task C2: Drawing primitives and P3 stills ([`src/diagnostics/draw.ts`](../../../src/diagnostics/draw.ts), [`src/diagnostics/motion-images.ts`](../../../src/diagnostics/motion-images.ts))
+### Task C2: Drawing primitives and P3 stills
+
+Files: [`src/diagnostics/draw.ts`](../../../src/diagnostics/draw.ts),
+[`src/diagnostics/motion-images.ts`](../../../src/diagnostics/motion-images.ts)
 
 `draw.ts`: `line(img, x0, y0, x1, y1, rgb)` (Bresenham), `disc(img, cx, cy, r, rgb)`, and
 `plot(series: Array<{ values: number[], rgb: number }>, options: { width, height, yMin, yMax })` returning an Image
@@ -245,14 +250,16 @@ plane; that is enough for stills. Tests: line endpoints and length, plot axes in
   bend 1e-4, damping 0.5, drag 0.015; leather mass 0.04, stretch 1e-8, bend 1e-5, damping 1.0, drag 0.01.
 - `turn-stop.json`, `wind.json`, `soak.json`: body `../p1-static-style/knight.json`, excluding `capeL`, `capeR`,
   `plume`; a cape between new body anchors (add `capeAnchorL`/`capeAnchorR` joints to a copy of the knight in
-  [`pocs/p3-secondary-motion/knight.json`](../../../pocs/p3-secondary-motion/knight.json) rather than changing P1's file); a plume chain from the helmet top.
+  [`pocs/p3-secondary-motion/knight.json`](../../../pocs/p3-secondary-motion/knight.json) rather than changing P1's
+  file); a plume chain from the helmet top.
 - `gates.ts`: the gate table above with rationales.
 - `run.ts`: runs every scenario for every material, records, computes metrics, evaluates gates, writes
   `reports/p3/` (`metrics.json`, `summary.txt`, stills per scenario and material, a rigid-control onion skin for the
   judge panel), checks determinism in a child process the way P1 does, and uses P1's exit-code contract (0 pass,
   1 gate failed, 2 harness error, a stale report is cleared at the start).
 
-Review batch C, then run the judge panel (controller task) and log findings in [`docs/plans/done/p3-findings.md`](p3-findings.md).
+Review batch C, then run the judge panel (controller task) and log findings in
+[`docs/plans/done/p3-findings.md`](p3-findings.md).
 
 ## Gate amendment (after the batch C review, all gates passing)
 

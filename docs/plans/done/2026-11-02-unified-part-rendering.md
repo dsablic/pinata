@@ -199,7 +199,8 @@ the rogue's scarf wrap and the dwarf's mantle in the three-quarter views. The ba
 grip, three columns with the hand in the middle, so the foreshortened sword keeps its proportions.
 
 - Fit: no flags for the rogue, dwarf and wizard; one for the knight, its back three-quarter foot sprites (both span
-  3), each of which also draws the other foot in the mirrored sector. The two bones project 1.3-3.7 px and 0.97-3.3 px; span 3 misses
+  3), each of which also draws the other foot in the mirrored sector. The two bones project 1.3-3.7 px and 0.97-3.3 px;
+  span 3 misses
   the second by 0.03 px and span 2 misses the first, so no span fits both. **Missed**, narrowly; fixing it needs a
   skin to hold a sprite for the mirrored sector.
 - Survey: fragments and stretch 0% for every character; pops 1 (knight, against 17), 0, 1 (dwarf, against 2), 0.

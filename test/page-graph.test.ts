@@ -148,7 +148,7 @@ test('a super jump reaches a 4 m rise across 2 m that a leg jump cannot, and a w
   assert.deepEqual([surfaceGraph(apart, JUMPING), surfaceGraph(apart, super_)].map(g => g.edges.length), [0, 1])
 })
 
-test('a jump rises through no surface between its ends but clears one beneath its descent; a high leap starts nearer', () => {
+test('a jump rises through no surface between its ends but clears one beneath its descent; a leap starts near', () => {
   const high = { ...REACH, jump: { height: 6, reach: 2, clearance: 1 } }
   const low = { ...REACH, jump: { height: 6, reach: 2 } }
   const open = ground([[0, 6, 0], [5, 9, 4]])

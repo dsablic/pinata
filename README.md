@@ -1,7 +1,8 @@
 # Piñata
 
 <p align="center">
-  <img src="docs/assets/logo.gif" alt="A fat pixel-art unicorn piñata hanging from a rope, hit every few seconds, swinging with its limp legs, rainbow mane and tail flopping (simulated cloth physics, seamless loop)" width="400">
+  <img src="docs/assets/logo.gif" width="400"
+    alt="A pixel-art unicorn piñata hanging from a rope, hit every few seconds, swinging with a flopping mane">
 </p>
 
 Piñata is a character animation engine built for AI agents, and it is a work in progress. An agent describes a
@@ -103,7 +104,8 @@ being built. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the details.
 - [`mods/pinata/`](mods/pinata): the Claude Code mod.
 - [`pocs/`](pocs): the proof-of-concept runners, with their assets and gates.
 - [`test/`](test): unit tests.
-- [`refs/`](refs): CC0 reference sprites from the P1 judge panel, with sources in [`refs/LICENSES.md`](refs/LICENSES.md).
+- [`refs/`](refs): CC0 reference sprites from the P1 judge panel, with sources in
+  [`refs/LICENSES.md`](refs/LICENSES.md).
 - [`docs/`](docs): the [roadmap](docs/ROADMAP.md), [TODO](docs/TODO.md), [findings](docs/FINDINGS.md),
   [authoring guide](docs/authoring.md), [judging guide](docs/judging.md), and [plans](docs/plans) with their gates and
   findings logs (finished ones in [`docs/plans/done/`](docs/plans/done)).

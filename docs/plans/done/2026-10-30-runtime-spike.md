@@ -59,7 +59,8 @@ walking characters, skins, multiple characters, a public API commitment.
    computer people": one or more live characters in a small scene, reacting to behaviour buttons, fake agent events
    and pokes, with panels to tweak the environment (wind, gravity, rope length, background) and motion (swing and
    twist damping, twist stiffness, limb stiffness, render sub-samples, reduced motion), and a live frame-time readout.
-   It is built by a GitHub Actions workflow from the same bundle and character artifact for every release tag (`v*`) or a manual run, so
+   It is built by a GitHub Actions workflow from the same bundle and character artifact for every release tag (`v*`) or
+   a manual run, so
    it never drifts from a release; the Playwright tests run against the built page before it deploys.
 
 ## Tests (Playwright, headless Chromium)

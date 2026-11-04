@@ -22,7 +22,8 @@ Gates fixed in [`docs/plans/done/2026-10-30-remaining-proofs.md`](2026-10-30-rem
 ## Judge panel
 
 Frame-difference strips, ours vs the control, both orders, 3 blind judges: all 6 answers picked the control as the
-one that shimmers more, confidence 5. Artefacts in [`docs/plans/done/p2-judge/`](p2-judge). This is an easy question (the control is
+one that shimmers more, confidence 5. Artefacts in [`docs/plans/done/p2-judge/`](p2-judge). This is an easy question
+(the control is
 far worse), so it confirms the metric rather than testing a fine distinction.
 
 ## Verdict

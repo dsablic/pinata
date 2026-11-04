@@ -72,7 +72,7 @@ A character is a directory of JSON files; one command (`npm run check`) validate
 and cloth gate, and prints a hint per failure naming the part, frame and fix. Before the experiment, a review found
 the guide and hints pointing the wrong way on the most likely failure (sliding feet are fixed by raising step height,
 not lowering it); with that fixed, every author passed. The authors' main complaint was that simulated cloth was not
-drawn in the stills; chains and capes with a `render` entry are now drawn into the sheet and the walk strip.
+drawn in the stills; chains and capes with a `render` entry are drawn into the sheet and the walk strip.
 
 ### P6: style swap ([findings](plans/done/p6-findings.md))
 

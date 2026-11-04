@@ -20,8 +20,10 @@
 
 ## Checking work
 
-- `npm run typecheck`, `npm test`, and `npm run site && npm run test:browser` (Chrome, driven over the DevTools
-  protocol) before committing.
+- A batch is done when `npm run verify` passes: typecheck, tests, `npm run lint`, `npm run examples`, the site build
+  and browser suite (Chrome, driven over the DevTools protocol), and the rendering panel and gates output against
+  their baselines. A meant output change is accepted with `npm run verify -- --accept <step>` and named in the plan's
+  results. `--only` and `--skip` are for speed while working.
 - After each batch, an independent review told to assume the code is wrong; fix what it finds.
 - Visual quality is judged by blind judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)): fresh
   agents, neutral names, both orders, controls; gates count every answer, can't-tell included.

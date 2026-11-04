@@ -137,7 +137,8 @@ characters on the same clip never move in lockstep.
   and the blade is held low, in `examples/knight/retarget.json`; new strips, new seed). Mocap picked in 82% of the
   *decided* picks on real pairs, which was first reported here as a pass; but the gate counts non-control answers,
   and "can't tell" is an answer: 18 of 24 answers, 75%, under the 80% gate, as in rounds 1 and 2. Corrected
-  2026-10-31; from now on every panel gate is scored over answers, can't-tell included. Round 3 detail: the wizard and dwarf 6 of 6, the rogue 5 of 6, the knight 1 of 6 (procedural 4, can't tell
+  2026-10-31; from now on every panel gate is scored over answers, can't-tell included. Round 3 detail: the wizard and
+  dwarf 6 of 6, the rogue 5 of 6, the knight 1 of 6 (procedural 4, can't tell
   1). Controls left unseparated by 83% of judges, left picks 46%. Caveats: this is the third round, the pass is
   narrow, and the knight still reads better procedurally; the judges are three instances of one model and often
   answer alike. Rounds 1 and 2 stay recorded as fails.

@@ -65,7 +65,8 @@ To ask which of several labels an image has (for example the direction a charact
 and a key with the true labels; each judge answers `{ "choice": <label> }` or `cant_tell`; `score` prints, per label,
 how many answers were right and what was named instead, and the share of correct answers over all of them
 (`cant_tell` and missing answers count as wrong). An item with `"control": true` is a known case that is scored
-apart (`score` prints the controls' accuracy and leaves them out of the share and the labels' counts). `npm run direction-panel` builds the facing panel of the exported
+apart (`score` prints the controls' accuracy and leaves them out of the share and the labels' counts).
+`npm run direction-panel` builds the facing panel of the exported
 idle frames of the four skinned humanoids into `reports/export-panel/`; `npm run behaviour-panel` builds the
 action panel (idle, crouch and attack strips, with walk and jump strips as controls) into
 `reports/behaviour-panel/`.

@@ -21,7 +21,8 @@ or `attack` marks a behaviour take that the player plays on command (`perform`),
 (subject 137, a standing take that keeps its feet down, looped), `crouch-squat` (subject 86, a squat down and up) and
 `attack-punch` (subject 141, a punch). An idle take's first 12 frames are the overlap its loop cross-fades into.
 
-`range` is the first and last source frame (at `sourceFps`) to keep, so a take is cut to its useful part. The `jump-*` takes are cut from
+`range` is the first and last source frame (at `sourceFps`) to keep, so a take is cut to its useful part. The `jump-*`
+takes are cut from
 about 0.3 s before the crouch to just after the landing settles.
 
 `humanoid.json` maps the clips' source skeleton onto the example humanoids' joints; each example's `retarget.json`

@@ -93,7 +93,8 @@ Load errors have the form `file: path: message`, for example
 `mannequin.json: parts[3].material: material 'steel' has no ramp in style 'bolt'; add materials['steel']`.
 All errors found are listed at once, but cross-file errors (a name that refers to another file, rig coverage, cape
 anchors, `height` against the parts) are only checked after every file is valid on its own, so a second batch of
-errors can appear once the first is fixed. Every JSON object rejects unknown fields (`unknown field 'x'; known fields: ...`), so
+errors can appear once the first is fixed. Every JSON object rejects unknown fields
+(`unknown field 'x'; known fields: ...`), so
 spell field names exactly as in this guide. JSON allows no comments and no trailing commas.
 
 The `report/` directory is ignored by version control.
@@ -208,7 +209,8 @@ The box length is the distance from `a` to `b`. `a` and `b` must be different jo
   while it is planted and makes the slide and ground gates fail.
 - **Knees.** Knees bend forward, or backward for a leg with `bend: "backward"` (the IK solver decides the direction).
   The rest position of the knee joint only sets the thigh length (hip to knee) and the shin length (knee to ankle);
-  it does not choose which way the knee bends. The two joints of each of these bones (hip and knee, knee and ankle, ankle and toe, shoulder and elbow,
+  it does not choose which way the knee bends. The two joints of each of these bones (hip and knee, knee and ankle,
+  ankle and toe, shoulder and elbow,
   elbow and wrist) must not be at the same position: that is a load error.
 - **Floor.** No part other than the feet may reach below y = 0: every capsule needs joint y >= its radius at that end,
   and every box corner must stay above the floor.
@@ -300,7 +302,8 @@ is listed nowhere is an error. Decal anchors, cape anchors and chain anchors are
 `upperBody` and for the first joint of legs and arms, the previous joint along a limb, the last arm joint for
 `carried`, the named joint for `attached` and for an appendage's `parent`), and a joint that nothing else moves
 follows its parent's position and rotation. A limb joint turns with the bone that leaves it, the last joint of a limb
-with the bone that arrives (a joint attached to a knee stays on the shin, one attached to a toe stays on the foot). Cloth and chains pinned to a joint turn with it too. Cape anchors must
+with the bone that arrives (a joint attached to a knee stays on the shin, one attached to a toe stays on the foot).
+Cloth and chains pinned to a joint turn with it too. Cape anchors must
 still move with the body as one piece: `upperBody`, or attached joints whose parents lead to the pelvis through
 `upperBody` only.
 
@@ -409,7 +412,8 @@ Leg length is hip y minus ankle y in the rest pose. Starting values for two legs
 `footSpacing` hip distance, `stepHeight` roughly 0.15 x leg length, `stanceFraction` 0.55, `bobAmplitude` 0.015,
 `armSwingDegrees` 20. A stride much longer than that makes the pelvis drop to keep the feet on the floor (it shows
 as ground penetration, `reachViolations` or a wrong `rootSpeedError`, not as an obvious stride problem), so check
-`strideLength` against the leg length before chasing joints. For more legs, start from `pinata new` with the matching template, whose gait is scaled from leg
+`strideLength` against the leg length before chasing joints. For more legs, start from `pinata new` with the matching
+template, whose gait is scaled from leg
 length, or from the dog values above. `stepHeight` and `stanceFraction` trade off: a foot that is lifted too little
 slides at lift-off and touch-down (fix: raise `stepHeight`), and a high `stepHeight` makes the knee flex fast (fix:
 lower `stanceFraction`, or lengthen the stride a little: a longer stride, within the ratio to the leg length above,
@@ -558,7 +562,8 @@ drawn as thin capsules) are not part of them: they are thin by design, so `maxTh
   it as a bug rather than changing the character.
 - **maxThinFraction.** A part that is one pixel wide flickers and vanishes. At 32 px a part must be at least 2 px
   across, which is `height / 16` metres (0.075 m for a 1.2 m character); aim for 3 px (`3 * height / 32`). "Across"
-  is a diameter: a capsule is `2 * radius` (of the thinner end), so 0.075 m across needs a radius of 0.0375 m; for a box use the smaller of `width` and `thickness`. Parts with fewer
+  is a diameter: a capsule is `2 * radius` (of the thinner end), so 0.075 m across needs a radius of 0.0375 m; for a box
+  use the smaller of `width` and `thickness`. Parts with fewer
   than 4 visible pixels in a view are ignored. A side covered by a part in front is not an edge, so hiding a wide part
   behind another does not make it thin. What fails is a 1-px strip of a part that is still visible past a part in front
   of it (a foot peeking out under a shin in the back view, a hand beside a thigh). The hint names the part and the
@@ -831,7 +836,8 @@ automated gates: PASS
 ```
 
 Things this example shows: the feet are capsules from ankle to toe with the ankle at the foot's `radiusA` height
-(0.06) and the toe at `radiusB` height (0.04), so the foot is level; the knees sit 0.03 m in front of the hip-ankle line (this only sets the thigh and shin lengths; knees always bend forward); every joint
+(0.06) and the toe at `radiusB` height (0.04), so the foot is level; the knees sit 0.03 m in front of the hip-ankle line
+(this only sets the thigh and shin lengths; knees always bend forward); every joint
 (including eye, lamp and antenna joints) is listed exactly once in the rig; the thin `antenna` part has
 `allowThin: true` and is listed in `exclude` because the chain represents it; hands are larger than the forearms and
 the arms hang away from the torso so they are not hidden in side views.

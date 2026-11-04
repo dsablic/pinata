@@ -93,12 +93,12 @@ metre, scale 2) and by the Node tests.
   - Attraction: pass. Over 10 seeds of 60 s, 3.14 times as long per metre on the element with attraction 3 (1.10 with
     none).
   - Liveliness: pass. Over 60 s, 13-16 activities and 2-3 elements per character.
-- **Batch D built.** The site's front page is now the page world on its own cards and tiles; the generated-terrain
+- **Batch D built.** The site's front page is the page world on its own cards and tiles; the generated-terrain
   page is gone (the world engine and its config stay for the tests). Characters that have stood on one element for
   30 s drop back in from above. Fixes found on the demo: drops need landing room, a body keeps its speed across the
   page while it falls, a fall waits until no sole is over ground near the body, and a placed foot looks ground up from
-  its own height (a trailing foot used to sink through a ledge's corner as the body stepped off).
-  - Review fixes: a point sees ground only 2 cm above itself, so feet no longer climb rises; a falling body keeps its
+  its own height (a trailing foot sank through a ledge's corner as the body stepped off).
+  - Review fixes: a point sees ground only 2 cm above itself, so feet do not climb rises; a falling body keeps its
     traction again (without it, drops overshot their landings); a drop-in starts where nothing is between it and its
     place; the demo's cards alternate sides across rows at phone widths, so every card leads down to the floor; the
     suites are selectable and an unknown one is an error.

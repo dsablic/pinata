@@ -5,7 +5,7 @@ springs, oscillators, behaviours) and the image follows by a 2D mesh warp, re-pi
 depends on named body parts: a point is a point, and what moves it is configuration. Templates (biped, quadruped,
 hexapod, octopod) stay as starting points: a preset set of points and drivers that the author refines.
 
-**Status:** approved by the user on 2026-10-30, batch A first, then the runtime spike (P8) on top of it (decisions: 2D
+**Status:** approved by the user, batch A first, then the runtime spike (P8) on top of it (decisions: 2D
 mesh warp; points placed by the author, with a helper that can propose them; one shared motion core with the 3D
 mannequin and the image warp as two renderers). P2's `partAreaJump` stays a recorded fail; area change is measured
 properly by this plan's `areaChange` gate instead.
@@ -46,7 +46,7 @@ A driver moves a chain or a subtree of points, and is attached by point names, n
 | `gait` | chains ending in planted points: footstep plan plus IK | legs (planner, two-bone and FABRIK IK) |
 | `swing` | a chain rotating about its first point, in phase with a gait chain | arm swing |
 | `spring` | a chain following its rest direction relative to its parent, with an optional oscillator | appendages |
-| `cloth` | particles pinned to points (now with rotation) | cape, chains |
+| `cloth` | particles pinned to points (with rotation) | cape, chains |
 | behaviours | layers, additive overlays and events over point masks | composable behaviours spec |
 
 Masks in the composable-behaviours spec become sets of points (subtrees or tags) instead of limb names.
@@ -60,7 +60,7 @@ win; nothing requires a template.
 
 ### Translation
 
-Today's packages translate on load, as `legs`/`arms` translate to `limbs` now: `pelvis` becomes the root,
+Today's packages translate on load, as `legs`/`arms` translate to `limbs`: `pelvis` becomes the root,
 `upperBody` and `carried` become children of the root and the hand, each limb becomes a chain with its driver, and
 mannequin parts attach to their two joints. The translated model must reproduce today's poses exactly.
 
@@ -174,7 +174,7 @@ ordinary `points.json` the author edits. `check` validates any points file the s
   attached to it turns with that segment.
 - An appendage hanging from a joint that turns starts moving with that joint's first-frame velocity.
 - Known limit: cloth and chain particles start at the rest pose, so a chain pinned to a limb jumps to the posed pin
-  (now rotated as well as moved) on the first substep, as chains on the body always did by the pelvis offset.
+  (rotated as well as moved) on the first substep, as chains on the body always did by the pelvis offset.
 - Format, kept small until batch B's `points.json`: a rig field `attached` (`{ joint: parent }`) for joints that ride
   rigidly on any joint, and an appendage field `parent`. The hierarchy (`parentsOf`) is derived from the rig;
   cycles are load errors. Legs and arms still hang from the pelvis.

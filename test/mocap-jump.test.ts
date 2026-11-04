@@ -69,7 +69,7 @@ function pelvisThroughJump (height: number): number[] {
   return [frames.at(-1)!.pose[pelvis][1], ...run]
 }
 
-test('the pelvis never moves between two frames by more than 1.25 times the launch speed gives, crouch to landing', () => {
+test('the pelvis never moves between two frames by more than 1.25 times the launch speed gives, to landing', () => {
   for (const height of [0.3, 0.45]) {
     const heights = pelvisThroughJump(height)
     const most = Math.max(...heights.slice(1).map((y, i) => Math.abs(y - heights[i])))

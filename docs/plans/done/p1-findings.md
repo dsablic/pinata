@@ -1,6 +1,7 @@
 # P1 Findings
 
-Gate thresholds are locked (see [`pocs/p1-static-style/gates.ts`](../../../pocs/p1-static-style/gates.ts)). Each run changes one thing.
+Gate thresholds are locked (see [`pocs/p1-static-style/gates.ts`](../../../pocs/p1-static-style/gates.ts)). Each run
+changes one thing.
 
 ## Run 1 (baseline, plan assets)
 

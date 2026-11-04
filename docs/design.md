@@ -372,7 +372,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   not enlarged: the judge build scales both sides alike (`scale` 4).
   - A walk is one stride cycle of two steps, from one planting of the first foot to its next, sampled to 8 even frames
     (the cycle's end is the next cycle's start, so it is left out). The cycle length is read from the planted flags,
-    not fixed, since it changes with the character and speed; it must be 8 to 48 frames long, steady walking on a surface
+    not fixed, since it changes with the character and speed; it must be 8 to 48 frames long, steady walking on a
+    surface
     throughout, and seen from the side (the facing angle within 22.5 degrees of a right angle to the camera), as the
     page's characters mostly walk sideways and the references are side views. A cycle starts only once a landing has
     recovered: no step in the `LANDING_RECOVERY_SECONDS` (1 s) before it was falling, so a walker still rising out of a
@@ -694,7 +695,7 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   own root motion and closes 12% of its gap to the body each frame, in position and heading.
 - Each foot's sole ends (heel and toe tip) are held where they touch the ground: the clip says when a foot is down,
   the height (within 2.5 cm) says which ends touch. An end is held where it was last frame only if it was on the ground
-  there too; otherwise where it is now, so a foot stepping past an edge is never held over the drop. While both ends
+  there too; otherwise where it is, so a foot stepping past an edge is never held over the drop. While both ends
   are held the foot's rotation is frozen.
 - A held foot is pressed down until its lowest held end touches the ground (before the ends are kept from sliding):
   captured contacts sit up to 2.5 cm above the floor, more than a CSS pixel on a page.
@@ -708,7 +709,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - A swinging foot keeps its ends 3 cm clear of the ground (real toes clear it by 1 to 3 cm), easing in and out at
   0.4 m/s.
 - A foot's ground reference is the ground under its held end, or, while swinging, the highest ground under its ends
-  now and 0.2 s ahead, which it rises to at 1.5 m/s and sinks to at 1.2 m/s; where the foot actually is, the ground is
+  under it and 0.2 s ahead, which it rises to at 1.5 m/s and sinks to at 1.2 m/s; where the foot actually is, the ground
+  is
   kept below it when it is placed. This lifts feet over stair edges ahead without snapping.
 - Near the ground (below 12 cm) a foot tilts to the ground under it about its heel, in proportion to how low it is;
   ground steeper than 60 degrees between heel and toe is a stair edge and does not tilt it.
@@ -738,13 +740,13 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   its start), above the ground, to fall in.
 - The ground function may take the height a point is seen from (`ground(x, z, from)`). Two lookups use it: whether
   the soles are over the drop before a fall starts, and a swinging foot's reference, which also takes the ground under
-  where its soles are now, seen from there; so a trailing foot still over a ledge keeps the ledge after the body has
+  where its soles are, seen from there; so a trailing foot still over a ledge keeps the ledge after the body has
   dropped below it. Every other lookup is from the body. Ground that ignores the third argument (terrain) is
   unaffected.
 - Landings: when a fall reaches the ground, the body dips and comes back up. The dip's depth is 24% of the
   shorter leg times `1 - exp(-v / 8 m/s)` for landing speed v, so it grows with the drop but levels off before the
   knees reach their fold (a linear depth folded the rogue's and dwarf's knees fully at 2 m, and their flexion could
-  no longer grow with the drop). Its shape is `x e^(1-x)` over a rise of 0.07 s plus 0.008 s per m/s, peaking at the
+  do not grow with the drop). Its shape is `x e^(1-x)` over a rise of 0.07 s plus 0.008 s per m/s, peaking at the
   rise and gone by six of them, applied under the settled height so the held legs' bounds still hold, and the knees
   of the feet the clip holds take it. The feet keep the clip's contact through it: holding every foot for the dip
   made a character walking on from a walk-off landing slide its planted feet by 1.3 to 2.8 px a frame.
@@ -779,7 +781,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - With jump takes in the database a jump is played from a take instead of the procedural dip (a database without
   takes uses the procedural dip). `jump(target)` picks the take whose flight best fits the jump: the squared
   difference of run (the distance to the target's x) and of apex (the arc's apex over the body's base, rise plus
-  clearance) from the take's, each over the shortest leg. The take plays from its start (3 frames before the crouch's final
+  clearance) from the take's, each over the shortest leg. The take plays from its start (3 frames before the crouch's
+  final
   descent), the crouch (start to lift-off) warped onto at most 0.4 s, faster than capture speed when it is longer (the
   captures' 0.6 to 0.9 s wind-up is far longer than the anticipation of a game's jump), and the landing at its own
   speed; both are scaled by the style's `rate` like walking. The body stands still (the wanted velocity is zero)
@@ -823,7 +826,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   plan, a root track planned into footsteps on the terrain from where its feet stand, so plans join without a jump.
   The world is deterministic for a seed.
 - Characters keep 1 m from the world's ends; turns smaller than 0.05 rad are skipped.
-- The upper body has life: a damped lean spring toward the body's forward acceleration (looking a few frames ahead in the
+- The upper body has life: a damped lean spring toward the body's forward acceleration (looking a few frames ahead in
+  the
   plan for anticipation), its turning and the wind, plus a slow sway while standing; a squash at footfalls; breathing;
   and a head that lags on its own spring. The lean pivots about the pelvis and never moves the legs.
 - A character with a motion database moves by motion matching instead of planned footsteps. Its steps become the same
@@ -1229,8 +1233,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - The old scripts keep their files and their printed lines; what changed, on purpose: `export` prints its report in
   the new format (`ok`, `FAIL`, `note`, `n/a`, hint lines, a verdict that counts engine notes) and exits 0 when only
   engine gates miss; `export` refuses extra arguments (exit 2) and exits 2 with a message, not a stack trace, for a
-  character that cannot be recorded; `skin` exits 2 with a message when a file it reads is missing (it used to end on
-  an uncaught error); `check` prints a file error's message without a stack.
+  character that cannot be recorded; `skin` exits 2 with a message when a file it reads is missing (not an
+  uncaught error); `check` prints a file error's message without a stack.
 - The MCP tool for a subcommand builds the argument vector the command line takes from its JSON arguments (`argv` in
   `commands.ts`) and runs the same function, so a tool and its command cannot drift: the agreement test compares the
   printed lines, the files and the status of each. Arguments are validated against the tool's schema first
@@ -1428,9 +1432,11 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 ### Labelled panels (`choice.ts`)
 
 - A pairwise panel cannot ask which of eight directions an image shows, so a panel whose spec says `"kind":
-  "choice"` and has `labels` and `items` (`{ id, image, label }`) instead of `pairs` is a labelled panel: one image per item, shuffled by the seed under
+  "choice"` and has `labels` and `items` (`{ id, image, label
+  }`) instead of `pairs` is a labelled panel: one image per item, shuffled by the seed under
   neutral names, and the key gives each item's true label. A judge answers `{ "choice": <label> }` or `cant_tell`;
-  `cant_tell`, a wrong label and a missing answer are all wrong (the number asked stays the full count), so the share correct counts every answer. The score lists, per label,
+  `cant_tell`, a wrong label and a missing answer are all wrong (the number asked stays the full count), so the share
+  correct counts every answer. The score lists, per label,
   how often it was right and what was named instead. There are no control pairs: chance is one in the number of
   labels, and the confusions show bias. Images are not trimmed, so the cell's size and baseline are kept.
   `npm run judge -- build` and `score` pick the kind from the spec's `kind` and the key's.
@@ -1477,3 +1483,28 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 
 - The site needs the compiled browser code (`npm run build:web` first). The world config, every cast member's
   files and the motion capture of members that have a `retarget.json` are bundled into one file for the browser.
+
+### Verify, lint and examples (`verify.ts`, `lint.ts`, `examples.ts`, `src/checks/`)
+
+- `verify` runs every step even after one fails, so one run lists everything that is wrong: `typecheck`, `test`,
+  `lint`, `examples`, `browser` (site build and browser suite), `rendering-panel` and `gates`. Orphaned headless Chrome
+  is stopped before the browser suite, which is run once more when it fails on a busy debugging port or a lost mouse
+  event, the two failures that come from a leftover browser and not from the code.
+- `rendering-panel` and `gates` are compared with baselines in `reports/baselines/`, which is git-ignored: the pixels
+  depend on the machine's engine, so a baseline is only meaningful on the machine that accepted it. The panel
+  directory is cleared before the run so the compared files are exactly the run's output, and its baseline is a
+  SHA-256 per file. The `gates` baseline is the `GATE MET` and `GATE MISSED` lines; the output has no timings, so
+  nothing is stripped, and a missed gate is not a failure of `verify` unless its line changed. A step with no baseline
+  fails with the command that stores one, and is not run.
+- `--accept <step>` (or `all`) runs the step, stores its output as the baseline and prints what changed, so a meant
+  change is a deliberate act that the plan's results name. `--only` and `--skip` are for speed while developing; a
+  batch is done on a full run.
+- `lint` finds comments with a small tokenizer (strings, template literals with nested `${}`, regex literals and
+  `//` inside URLs are not comments), so it does not misread code the way a pattern search would. Documents are
+  checked for line length outside tables and fenced code, relative link files that exist (anchors are not checked),
+  and, in `docs/` outside `docs/plans/done/`, dates and the journal phrases `now`, `no longer`, `was changed`,
+  `at first`, `first version` and `used to`, counted outside inline code and link targets. A phrase that is right in
+  a decision is reworded, since a decision reads the same at any time. Generated `guide/` folders, `report/`,
+  `reports/`, `dist/`, `_site/` and `node_modules/` are not linted.
+- `examples` calls the `check` and `export` commands in process and keeps their output in a scratch folder, never in
+  the example; `export` runs only for characters with both `skin.json` and `retarget.json`.

@@ -18,7 +18,7 @@ batch either passes them or says exactly what failed.
   repository (they depend on the machine's engine), under `reports/baselines/`.
 - **Style lint (`npm run lint`).** Code: no comments, lines within 120 columns. Documents: lines within 120 columns
   outside tables and code blocks, relative links that resolve, no dates or journal phrasing in `docs/` outside
-  `docs/plans/done/` (a short list: "now", "no longer", "was changed", "at first", "first version", dates). Each
+  `docs/plans/done/` (a short list of journal phrases, and dates). Each
   finding names the file and line.
 - **Example gates (`npm run examples`).** Every example character through `pinata check`, and every skinned one
   through `pinata export`, exiting non-zero if any author gate fails.

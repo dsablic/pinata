@@ -1,10 +1,12 @@
 # P5 Findings
 
-Gates fixed in [`docs/plans/done/2026-10-30-p5-authoring-loop.md`](2026-10-30-p5-authoring-loop.md) before implementation.
+Gates fixed in [`docs/plans/done/2026-10-30-p5-authoring-loop.md`](2026-10-30-p5-authoring-loop.md) before
+implementation.
 
 ## Before the experiment
 
-The batch A/B review checked [`docs/authoring.md`](../../authoring.md) against the code and tried to trigger every hint with broken
+The batch A/B review checked [`docs/authoring.md`](../../authoring.md) against the code and tried to trigger every hint
+with broken
 variants. It found the guide and hints pointing the wrong way on the most likely failure (sliding feet are usually
 fixed by raising `stepHeight`, not lowering it), stale report files after a failed run, a thin-part hint that could ask
 for a part to grow to its current size, a sole diagnosis that checked height instead of tilt, `height` not checked
@@ -13,8 +15,10 @@ were fixed before the experiment. A hint-following test on a goblin (not one of 
 
 ## Experiment
 
-Three fresh agents, each with one prompt, [`docs/authoring.md`](../../authoring.md), an empty folder and the `check` command (10 runs max).
-The finished packages are in [`examples/rogue/`](../../../examples/rogue), [`examples/dwarf/`](../../../examples/dwarf) and [`examples/wizard/`](../../../examples/wizard).
+Three fresh agents, each with one prompt, [`docs/authoring.md`](../../authoring.md), an empty folder and the `check`
+command (10 runs max).
+The finished packages are in [`examples/rogue/`](../../../examples/rogue), [`examples/dwarf/`](../../../examples/dwarf)
+and [`examples/wizard/`](../../../examples/wizard).
 
 | Prompt | Runs to pass | Exit-2 (format) runs | Notes |
 |---|---|---|---|

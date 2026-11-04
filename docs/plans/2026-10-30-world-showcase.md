@@ -6,7 +6,7 @@ dog, horse, beetle, spider, unicorn) each go about their own business: wandering
 over to another character and standing face to face for a chat, sometimes running, and scurrying off when poked. The
 piñata hangs from a beam in the middle of it. Everything is simulated and rendered live in the browser by the engine.
 
-**Decisions (user, 2026-10-30):** every character simulated and rendered live, smaller (about 32-40 px, 1-2 samples
+**Decisions (user):** every character simulated and rendered live, smaller (about 32-40 px, 1-2 samples
 per axis); movement over ramps and steps, no jumping yet; side-on 2.5D view. The showcase shows the component;
 agent wiring stays out of it.
 
@@ -25,11 +25,12 @@ agent wiring stays out of it.
    stand) planned from its current feet (`initialPlants`), so successive windows join without a snap. Windows join at
    standing moments.
 4. **Activities as behaviour compositions** (`src/world/life.ts`): the world is the test bed and showcase for phase 2
-   of [composable behaviours](2026-10-30-composable-behaviours.md) (user, 2026-10-30): `stand`, `walk` and `run` as
+   of [composable behaviours](2026-10-30-composable-behaviours.md) (user): `stand`, `walk` and `run` as
    bases, layers while moving (`lookAt` another character, `wave`), interactions between characters (visit, face,
    chat, follow, flee), blending between bases, and events with consequences (a poke startles one character and a
    neighbour turns to look). Activities are written as compositions in that format, not hard-coded, and pass its gates
-   (masks, continuity, determinism) plus the locomotion gates on terrain. The chooser: a per-character, seeded, deterministic chooser: wander to a reachable spot,
+   (masks, continuity, determinism) plus the locomotion gates on terrain. The chooser: a per-character, seeded,
+   deterministic chooser: wander to a reachable spot,
    look around (turn in place, pause), visit another character (walk up, face each other, a small speech-bubble glyph
    above each), run to a far spot, rest (stand a while); a poke interrupts with a startle and a run away. Characters
    avoid walking through each other (a reserved spot per character, waiting when a path is blocked).
@@ -57,20 +58,20 @@ agent wiring stays out of it.
 - **B. Windows and activities** (Node): `initialPlants`, the activity chooser, liveliness and join gates. Review.
 - **C. World rendering and page** (browser): compositing, terrain tiles, the page, budget and poke gates in Chrome.
   Review, then tag a release to deploy.
-- **F. Weather, events and particle effects** (user, 2026-10-30): declarative in `world.json`. Weather: wind (live
-  now for cloth), rain and snow, earthquakes (the ground shakes; characters brace, stagger or stop). Each event has a
+- **F. Weather, events and particle effects** (user): declarative in `world.json`. Weather: wind (live
+  for cloth), rain and snow, earthquakes (the ground shakes; characters brace, stagger or stop). Each event has a
   reaction in the activities, the way a poke does, so characters visibly adapt (hurry or huddle in rain, widen their
   stance in a quake). Particle effects as emitters: rain and snow drops, dust puffs at footsteps and landings, confetti
   when the piñata is hit, a burst on a poke; drawn as pixels in the scene's palette, moved by wind and gravity,
   deterministic for a seed.
-- **G. Styles in the world** (user, 2026-10-30): a style selector over the existing style variants (palettes, shading
+- **G. Styles in the world** (user): a style selector over the existing style variants (palettes, shading
   bands, outline modes, as P6 showed), then skinned characters (the skins spike's per-part pixel-art sprites), then the
   image-and-points renderer; the procedural capsule render is the baseline, not the target look.
-- **D. Later: a physics engine spike** (user, 2026-10-30): props, character-to-character bumps and ragdoll falls
+- **D. Later: a physics engine spike** (user): props, character-to-character bumps and ragdoll falls
   (knocked off a platform) through a rigid-body engine behind a narrow interface, with characters staying kinematic.
   Candidates: Box3D, Rapier, Jolt (WebAssembly builds); judged on bundle size, frame cost and Node-browser
   determinism, installed through the safe-install scan. Gates fixed in its own plan before building.
-- **E. Later: the page as the world** (user, 2026-10-30): characters live on an existing web page. Elements marked by
+- **E. Later: the page as the world** (user): characters live on an existing web page. Elements marked by
   CSS (`--pinata: platform | wall | ledge`, read with getComputedStyle) or attributes (`data-pinata`) become
   platforms (top edges) and walls (sides), rebuilt by ResizeObserver, MutationObserver and scroll; characters draw on
   a transparent overlay that only takes clicks on themselves; a perception layer tells behaviours which elements are
@@ -105,11 +106,11 @@ agent wiring stays out of it.
   optional glyph shown above the head), chosen by weight; a poke replaces the current activity with the `poke`
   reaction once the feet are next all planted. Walks are limited by time at the character's own speed (8 s for a
   wander, 14 s for a dash), so slow creatures do as many things as fast ones. Layers (lookAt, wave) wait for upper-body
-  drivers, which the joint hierarchy now allows.
+  drivers, which the joint hierarchy allows.
 - Characters walk in separate depth lanes, so they pass in front of and behind each other instead of colliding.
 - **Liveliness gate restated (needs the user's confirmation):** "at least 3 different activities and 10 m in 60 s"
   could not hold for the beetle (0.14 m/s: 10 m is 71 s of non-stop walking) and depended on luck (three wanders count
-  as one activity). It now reads: every character starts at least 4 activities, at least 2 of them different, and
+  as one activity). It reads: every character starts at least 4 activities, at least 2 of them different, and
   covers at least 25% of the distance non-stop walking at its own reference speed would cover; at least one visit
   happens; no two characters stand within 0.3 m of each other.
 - The walkable graph from item 1 is not built: the terrain is one profile along x; stacked platforms come with batch E.
@@ -117,14 +118,14 @@ agent wiring stays out of it.
 ## Batch A review fixes
 
 - The tread nudge fired at every ramp-to-flat kink and could move a plant a whole foot length (feet planting behind
-  their partner, zero-length steps). Now a continuous surface (no rise steeper than 60 degrees between footprint
+  their partner, zero-length steps). A continuous surface (no rise steeper than 60 degrees between footprint
   samples) pitches the foot along its heel-to-toe line and lifts it over any convex kink; only a real height jump
   nudges, by at most 40% of the foot length.
-- The swing clearance measured against a level foot, so on ramps the ankle popped up 2-4 px at lift-off; it now
+- The swing clearance measured against a level foot, so on ramps the ankle popped up 2-4 px at lift-off; it
   measures against the foot's pitched sole, and the one-frame vertical jumps match flat ground (0.56 px biped,
   1.50 px quadruped).
 - The body's base and pitch came from the ground under the hips, so on stairs the pitch swung with where the hips
-  fell over risers (43 degrees on a 25-degree flight). Both now come from the planted feet: the front feet's soles
+  fell over risers (43 degrees on a 25-degree flight). Both come from the planted feet: the front feet's soles
   against the hind feet's.
 - Generator: no endless loop when maxHeight is below a quarter rise (one flat run), heights never exceed maxHeight,
   no ramps with a zero slope, a `minTread` (the world passes its longest foot plus 15%), and `terrainOf` refuses empty,
@@ -134,7 +135,7 @@ agent wiring stays out of it.
 
 ## Decisions during batch C
 
-- **Declarative config (user, 2026-10-30):** everything about the world that is tuning rather than mechanism lives in
+- **Declarative config (user):** everything about the world that is tuning rather than mechanism lives in
   one file, `site/world.json`: the cast, terrain limits, lanes, motion timing, how far walks go, the activities and
   the poke reaction, the view (scale, size, camera, samples, palette) and the bubble glyphs. It is checked by a small
   declarative schema checker (`src/formats/schema.ts`: numbers with ranges, enums, ranges, colours, arrays, maps,
@@ -146,19 +147,19 @@ agent wiring stays out of it.
   Chrome, 8 characters run at 19.6 ms mean, 19.8 ms p95 per frame.
 - Pages: `index.html` is the world; the hanging piñata moved to `pinata.html`. The site builder writes
   `world.bundle.json` (config plus the cast's mannequin, style and rig), validated in the browser.
-- **Secondary motion and environment (user, 2026-10-30: "no secondary motion", "too wooden and stiff"):** capes and
+- **Secondary motion and environment (user: "no secondary motion", "too wooden and stiff"):** capes and
   chains from each character's motion file are simulated live on its moving body with the existing cloth solver
   (pins turn with their joints); `environment` in the config (gravity, wind, gusts, cloth substeps) drives them and
   the page changes it live, with scenes (named palettes) and terrain hilliness. A `life` section adds a damped lean
   spring for the upper body (into acceleration and turns, overshooting at stops), breathing, and a weight-shifting
   sway while standing; the legs and pelvis are untouched, so feet stay planted.
 - Each character's render box is sized from its full reach (farthest joint, thickest part, and the length of its cape
-  or chains), which fixed the spider's legs being cut off. The rasterizer now skips pixels outside the rectangle its
+  or chains), which fixed the spider's legs being cut off. The rasterizer skips pixels outside the rectangle its
   primitives' screen discs can touch (exact: byte-identical on every output), so the larger boxes cost nothing: the
   world runs at about 24 ms per frame for 8 characters in headless Chrome.
 - A wander that would leave the world is reflected instead of clamped: a character at the edge kept choosing the wall
   and stood still for a minute.
-- **Animation principles (user, 2026-10-30: "more dynamic instead of stick figure like"; chose motion now, skins
+- **Animation principles (user: "more dynamic instead of stick figure like"; chose motion first, skins
   next):** `life` gains squash at footfalls (the upper body compresses and spreads, recovering over a fraction of a
   second), anticipation (the lean spring looks two frames ahead in the plan, so characters lean back before setting
   off), a lagging head (upper-body joints above a height fraction nod on their own spring, pushed by the torso's lean
@@ -166,11 +167,11 @@ agent wiring stays out of it.
   the larger cause of the stick-figure impression; skins (batch G) address it next.
 - **Weather that everyone feels (user: "wind and gust and gravity don't do much"):** wind and gravity only moved cloth,
   which only four characters have (and a cape is edge-on from the side). Spring chains (tails, manes, ears, antennae)
-  now take an outside force (a share of gravity and wind drag, `environment.springs`), and bodies lean into the wind
+  take an outside force (a share of gravity and wind drag, `environment.springs`), and bodies lean into the wind
   (`life.lean.perWind`), all from the same gusting wind the cloth uses. Offline renders pass no force, so their output
   is unchanged.
 - `dress` in the config draws the simulated capes and chains in the world (material and radius) and hides the fixed
   mannequin parts they replace (the knight's rigid cape boxes).
 
-- **2026-10-31, user direction.** Once page-as-world works (batch E: DOM elements as platforms), rework the world demo
+- **User direction.** Once page-as-world works (batch E: DOM elements as platforms), rework the world demo
   to stand on the page's own elements instead of the generated terrain.

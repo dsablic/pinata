@@ -4,7 +4,8 @@
 
 **Goal:** Prove that a behaviour script (walk, turn, stop, idle) compiles into believable locomotion: feet planted
 without sliding, legs solved by IK within joint limits, no knee pops, root speed matching the script, readable from
-several directions. Design: [`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P4 Planner and IK".
+several directions. Design: [`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section
+"P4 Planner and IK".
 
 **Architecture:** A pose is a map of joint positions in body-local space (no bone hierarchy). A rig file says which
 joints form each leg and arm and which move rigidly with the pelvis. Each frame, the gait planner turns the root
@@ -24,7 +25,8 @@ write code test-first; each batch is reviewed.
 - Units, axes and yaw as P3 (Y up, the knight faces +Z at yaw 0, positive yaw turns the front toward +X).
 - 24 fps output. The gait is evaluated per output frame (it is kinematic, no substeps).
 - The ground is the plane y = 0.
-- Body-local to world: `world = R(yaw) * local + rootPosition`, as `toWorld` in [`src/sim/body.ts`](../../../src/sim/body.ts).
+- Body-local to world: `world = R(yaw) * local + rootPosition`, as `toWorld` in
+  [`src/sim/body.ts`](../../../src/sim/body.ts).
 
 ## Gates (locked before implementation)
 
@@ -86,7 +88,9 @@ exactly one of legs, arms, pelvis or upperBody (otherwise it would silently stay
 and ranges for the gait values. Stride length can vary with speed: `stride(speed) = strideLength * sqrt(speed /
 referenceSpeed)`, clamped to [0.5, 1.5] x strideLength, so faster walking takes longer and quicker steps.
 
-### Task A2: Pose and two-bone IK ([`src/motion/pose.ts`](../../../src/motion/pose.ts), [`src/motion/ik.ts`](../../../src/motion/ik.ts))
+### Task A2: Pose and two-bone IK
+
+Files: [`src/motion/pose.ts`](../../../src/motion/pose.ts), [`src/motion/ik.ts`](../../../src/motion/ik.ts)
 
 ```ts
 export type Pose = Record<string, Vec3>                // body-local joint positions
@@ -201,7 +205,8 @@ Tests: sizes, ground line present, planted footprints counted.
   footprint traces, leg onion skins (ours and control), pixel strips (ours and control, side view) and an 8-direction
   contact sheet of one mid-stride frame; determinism via a child process.
 
-Review batch C, then run the judge panel (controller) and log findings in [`docs/plans/done/p4-findings.md`](p4-findings.md).
+Review batch C, then run the judge panel (controller) and log findings in
+[`docs/plans/done/p4-findings.md`](p4-findings.md).
 
 ## Amendment after batch B (before batch C)
 
@@ -254,7 +259,8 @@ any part other than the feet (capsule end spheres; box corners) below y = 0, at 
 
 ## Amendment after the batch C review (stricter; the judge panel is re-run)
 
-A first judge panel ran before this review; its results are kept in [`docs/plans/done/p4-judge/`](p4-judge) but superseded, because
+A first judge panel ran before this review; its results are kept in [`docs/plans/done/p4-judge/`](p4-judge) but
+superseded, because
 the review found the stills and the control unfair:
 - `rootSpeedError` compared the root with the track it came from (always 0). It now measures the gait: the forward
   advance of the planted feet over each steady window (first to last plant, projected on the path) divided by the

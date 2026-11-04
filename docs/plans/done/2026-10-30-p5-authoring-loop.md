@@ -4,7 +4,8 @@
 
 **Goal:** Prove that an AI agent with no human help can author a new character (body, materials, style, rig, cape or
 hair, motion) from a one-line text prompt, using only the tool's documentation and its diagnostics, and reach a
-passing result within a small budget of runs. Design: [`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P5 AI
+passing result within a small budget of runs. Design:
+[`docs/plans/done/2026-10-30-viability-design.md`](2026-10-30-viability-design.md), section "P5 AI
 authoring loop".
 
 **Architecture:** A character is a directory of text files. One command, `npm run check -- <dir>`, validates the
@@ -19,7 +20,9 @@ body posed by P4.
 
 ## Batch A: cloth on a walking body
 
-### Task A1: Posed collider and pins ([`src/sim/solver.ts`](../../../src/sim/solver.ts), [`src/sim/body.ts`](../../../src/sim/body.ts))
+### Task A1: Posed collider and pins
+
+Files: [`src/sim/solver.ts`](../../../src/sim/solver.ts), [`src/sim/body.ts`](../../../src/sim/body.ts)
 
 `step` today builds the collider and pin positions from the rest mannequin moved by the root. Add an optional
 `pose?: (t: number) => Pose` to the step options: when present, the collider and pins use `posedMannequin(m,
@@ -53,7 +56,9 @@ All existing validators apply; add `loadCharacter(dir): Validated<Character>` th
 `file: path: message`, and cross-checks (rig against mannequin, style materials against mannequin parts, cape and
 chain joints, sim materials).
 
-### Task B2: `check` command ([`src/cli/check.ts`](../../../src/cli/check.ts), [`package.json`](../../../package.json) script `check`)
+### Task B2: `check` command
+
+Files: [`src/cli/check.ts`](../../../src/cli/check.ts), [`package.json`](../../../package.json) script `check`
 
 `npm run check -- <dir> [--out <dir>]` (default output `<dir>/report/`):
 1. Validate (exit 2 with every error listed if invalid).
@@ -89,7 +94,8 @@ Three prompts, chosen to stress different parts:
 2. "A short, stocky dwarf with a heavy fur cloak and a big axe."
 3. "A tall, thin wizard with a pointed hat and a long flowing robe."
 
-For each prompt, one fresh agent (no project context) gets: the prompt, [`docs/authoring.md`](../../authoring.md), a working directory, and
+For each prompt, one fresh agent (no project context) gets: the prompt, [`docs/authoring.md`](../../authoring.md), a
+working directory, and
 permission to run only `npm run check -- <dir>` and read its report (including the PNGs). Its instructions: create the
 character, run the check, fix and re-run until all gates pass or 10 runs are used, never edit anything outside the
 working directory, then report. The controller records every run's summary.
@@ -101,4 +107,5 @@ Gates (fixed now):
   prompts and match them. Pass if each judge matches all three correctly (chance 1 in 6 per judge), or at least 2 of
   3 judges do.
 - No agent edited files outside its working directory (checked with `git status` and a file listing).
-Findings, including where agents struggled and which hints helped, go in [`docs/plans/done/p5-findings.md`](p5-findings.md).
+Findings, including where agents struggled and which hints helped, go in
+[`docs/plans/done/p5-findings.md`](p5-findings.md).

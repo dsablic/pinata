@@ -24,7 +24,13 @@ artefacts, in [`docs/plans/done/`](plans/done).
   [drawn walk frames](plans/done/2026-11-03-drawn-walk-frames.md),
   [game sprite style](plans/done/2026-11-04-game-sprite-style.md)).
 
-## Next: Phase 1, the minimum viable tool
+## Next: automated checks, then the Phase 1 exit test
+
+[Plan](plans/2026-11-05-automated-checks.md), gates fixed: `npm run verify` (every check and the byte-identical
+baselines in one command), a style lint, every example through its gates, a judge runner that starts the judges
+itself, and gates declared with failing and passing cases. Then Phase 1's exit test.
+
+## Phase 1, the minimum viable tool
 
 [Plan](plans/2026-11-04-phase-1-tool.md), gates fixed: an agent, from a prompt, produces an eight-direction
 character that walks, idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. Batches:

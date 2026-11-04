@@ -11,9 +11,6 @@ import {
 } from '../diagnostics/jumps.ts'
 import type { CastJumps, JumpRun, Tally } from '../diagnostics/jumps.ts'
 import { flickerFraction } from '../diagnostics/stability.ts'
-import {
-  FEWEST_SMOOTH_SWITCHES, MOST_SOLE_MOVE_PX, MOST_SWITCH_CHANGE, readWalk, walkStats, withWalk
-} from '../diagnostics/walk-frames.ts'
 import type { Image } from '../image.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import type { LayoutSpec } from '../page/fixture.ts'
@@ -30,8 +27,6 @@ const FLICKER_WARMUP_SECONDS = 4
 const FLICKER_SECONDS = 4
 const MOST_ADDED_FLICKER = 0.01
 const BROWSER_SECONDS = 20
-const WALK_CHARACTER = 'knight'
-const WALK_FIXTURE = 'knight-side'
 
 function report (m: Standing, where: string): void {
   const line = (met: boolean, name: string, detail: string): string => {
@@ -160,25 +155,6 @@ function recordedJumps (world: ReadWorld): void {
   }
 }
 
-function walkFrameGates (world: ReadWorld): void {
-  const framed = withWalk(world, WALK_CHARACTER, 'side', readWalk(ROOT, WALK_FIXTURE))
-  for (const spec of LAYOUTS) {
-    const w = walkStats(framed, spec.name, ROOT, NODE_SECONDS, WALK_CHARACTER)
-    const planted = w.worstX <= MOST_SOLE_MOVE_PX && w.worstY <= MOST_SOLE_MOVE_PX
-    console.log(`${planted ? 'GATE MET' : 'GATE MISSED'} ${WALK_CHARACTER}'s planted sole moves at most ` +
-      `${MOST_SOLE_MOVE_PX} px in x and y between frames of one stance on ${spec.name} over ${NODE_SECONDS} s ` +
-      `(worst ${w.worstX.toFixed(2)} px in x, ${w.worstY.toFixed(2)} px in y over ${w.compared} frame pairs in ` +
-      `${w.stances} stances)`)
-    const smooth = w.switches > 0 && w.smooth >= FEWEST_SMOOTH_SWITCHES * w.switches
-    console.log(`${smooth ? 'GATE MET' : 'GATE MISSED'} switching in or out of ${WALK_CHARACTER}'s walk frames ` +
-      `changes the drawn silhouette by at most ${100 * MOST_SWITCH_CHANGE}% in at least ` +
-      `${100 * FEWEST_SMOOTH_SWITCHES}% of switches on ${spec.name} (${w.smooth} of ${w.switches} switches)`)
-    const share = w.walking === 0 ? 0 : 100 * w.shown / w.walking
-    console.log(`walk frames on ${spec.name}: shown on ${w.shown} of ${w.walking} walking frames ` +
-      `(${share.toFixed(0)}%)`)
-  }
-}
-
 async function main (): Promise<number> {
   if (process.argv.includes('--browser')) {
     await withSite(async session => {
@@ -198,10 +174,6 @@ async function main (): Promise<number> {
     recordedJumps(world)
     return 0
   }
-  if (process.argv.includes('--walk-frames')) {
-    walkFrameGates(world)
-    return 0
-  }
   if (process.argv.includes('--super-jumps')) {
     superJumpGates(world)
     return 0
@@ -216,7 +188,6 @@ async function main (): Promise<number> {
   jumpGates(jumps(world, [readLayout(ROOT, 'jumps')]))
   recordedJumps(world)
   superJumpGates(world)
-  walkFrameGates(world)
   return 0
 }
 

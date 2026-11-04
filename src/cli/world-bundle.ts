@@ -2,9 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './paths.ts'
 
-export type DrawnWalk = { character: string, view: string, walk: unknown }
-
-export function worldBundle (examples = join(ROOT, 'examples'), drawn?: DrawnWalk): unknown {
+export function worldBundle (examples = join(ROOT, 'examples')): unknown {
   const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
   const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
   const cast = config.cast.map(name => {
@@ -16,7 +14,7 @@ export function worldBundle (examples = join(ROOT, 'examples'), drawn?: DrawnWal
       rig: read(join(dir, 'rig.json')),
       materials: read(join(dir, 'materials.json')),
       motion: read(join(dir, 'motion.json')),
-      ...(existsSync(join(dir, 'skin.json')) ? { skin: skinOf(name, read(join(dir, 'skin.json')), drawn) } : {})
+      ...(existsSync(join(dir, 'skin.json')) ? { skin: read(join(dir, 'skin.json')) } : {})
     }
   })
   const clipDir = join(ROOT, 'motion', 'clips')
@@ -25,10 +23,4 @@ export function worldBundle (examples = join(ROOT, 'examples'), drawn?: DrawnWal
     .filter(name => existsSync(join(examples, name, 'retarget.json')))
     .map(name => [name, read(join(examples, name, 'retarget.json'))]))
   return { config, cast, capture: { clips, base: read(join(ROOT, 'motion', 'humanoid.json')), members } }
-}
-
-function skinOf (name: string, skin: unknown, drawn: DrawnWalk | undefined): unknown {
-  if (drawn === undefined || drawn.character !== name) return skin
-  const own = skin as { views: Record<string, object> }
-  return { ...own, views: { ...own.views, [drawn.view]: { ...own.views[drawn.view], walk: drawn.walk } } }
 }

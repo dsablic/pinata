@@ -26,9 +26,7 @@ restyle of the knight's sprites with a bigger helmet and stronger shading
 ([game sprite style](plans/2026-11-04-game-sprite-style.md)).
 The visual bar stays where it is; effort moves to the rest of this list. Left over:
 
-- The walk-frames path (`src/page/walk-frames.ts`, the skin's `walk`) is built but no skin uses it, and an
-  independent review's findings are open (the planted-sole gate cannot fail, turns keep stale frames up to 1.25 s,
-  silent clipping). Remove it or fix the findings; nothing should be built on it as it is.
+- The walk-frames path (whole-body frames in a skin's `walk`) was removed; it is in the history at 2ca4379.
 - The judging tool's side-by-side layout puts long strips 2 px apart and one judge read two strips as one; strip
   panels need a wider gap or the stacked layout.
 - The knight's restyled skin is in [`pocs/game-sprite-style/`](../pocs/game-sprite-style); judges preferred its landing

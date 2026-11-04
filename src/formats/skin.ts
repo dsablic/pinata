@@ -15,17 +15,12 @@ export type SkinPart = {
 export const VIEWS = ['front', 'frontSide', 'side', 'backSide', 'back'] as const
 export type ViewName = typeof VIEWS[number]
 
-export type Pixel = [number, number]
-export type WalkFrame = { rows: string[], soles: [Pixel, Pixel], planted: 0 | 1 }
-export type Walk = { frames: WalkFrame[] }
-export type SkinView = { parts: Record<string, SkinPart>, walk?: Walk }
-
 export type Skin = {
   name: string
   view?: 'side-right'
   palette: Record<string, string>
   parts: Record<string, SkinPart>
-  views?: Record<ViewName, SkinView>
+  views?: Record<ViewName, { parts: Record<string, SkinPart> }>
 }
 
 export const TRANSPARENT_CHAR = '.'
@@ -33,11 +28,6 @@ export const MAX_COLOURS = 16
 export const MAX_SPRITE_SIZE = 64
 
 const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
-export const WALK_VIEWS = ['frontSide', 'side', 'backSide'] as const
-export type WalkView = typeof WALK_VIEWS[number]
-export const FEWEST_WALK_FRAMES = 4
-const WALK_FIELDS = ['frames'] as const
-const WALK_FRAME_FIELDS = ['rows', 'soles', 'planted'] as const
 const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden', 'upright', 'layer', 'from'] as const
 
 export function validateSkin (input: unknown): Validated<Skin> {
@@ -61,7 +51,7 @@ export function validateSkin (input: unknown): Validated<Skin> {
           errors.push({ path: `views.${view}`, message: 'expected { parts: { partName: sprite } }' })
           return false
         }
-        checkKnownKeys(drawn, ['parts', 'walk'], `views.${view}`, errors)
+        checkKnownKeys(drawn, ['parts'], `views.${view}`, errors)
         return true
       })
       if (errors.length > 0) return { errors }
@@ -75,10 +65,6 @@ export function validateSkin (input: unknown): Validated<Skin> {
             partsOf(view)[name] = laidDown(part as SkinPart, path, errors)
           }
         }
-      }
-      for (const view of drawnViews) {
-        const walk = (views[view] as { walk?: unknown }).walk
-        if (walk !== undefined) validateWalk(walk, `views.${view}.walk`, view, palette, errors)
       }
       if (errors.length > 0) return { errors }
       const skin = { ...(structuredClone(input) as unknown as Skin), views: views as Skin['views'] }
@@ -144,78 +130,6 @@ function validatePart (part: unknown, path: string, palette: Set<string>, errors
     if (key === 'pivotB' && part.pivotB === undefined) continue
     validatePivot(part[key], `${path}.${key}`, size, errors)
   }
-}
-
-function validateWalk (
-  walk: unknown, path: string, view: ViewName, palette: Set<string>, errors: ValidationError[]
-): void {
-  if (!(WALK_VIEWS as readonly string[]).includes(view)) {
-    const message = `a ${view} view has no sideways stride; walk frames go on ${WALK_VIEWS.join(', ')}`
-    errors.push({ path, message })
-    return
-  }
-  if (!isRecord(walk) || !Array.isArray(walk.frames)) {
-    errors.push({ path, message: 'expected { frames: [{ rows, soles, planted }] }' })
-    return
-  }
-  checkKnownKeys(walk, WALK_FIELDS, path, errors)
-  if (walk.frames.length < FEWEST_WALK_FRAMES) {
-    const message = `has ${walk.frames.length} frames; a walk needs at least ${FEWEST_WALK_FRAMES}`
-    errors.push({ path: `${path}.frames`, message })
-  }
-  const sizes = walk.frames.map((frame, i) => validateWalkFrame(frame, `${path}.frames[${i}]`, palette, errors))
-  const [first] = sizes
-  const differs = (size: Size): boolean => {
-    return size !== undefined && (size.width !== first?.width || size.height !== first.height)
-  }
-  if (first !== undefined && sizes.some(differs)) {
-    errors.push({ path: `${path}.frames`, message: 'all frames must be the same size' })
-  }
-  const planted = new Set(walk.frames.map(frame => isRecord(frame) ? frame.planted : undefined))
-  if (!planted.has(0) || !planted.has(1)) {
-    errors.push({ path: `${path}.frames`, message: 'both feet must be planted somewhere in the cycle' })
-  }
-  if (errors.every(e => !e.path.startsWith(path))) {
-    const stride = strideOf(walk as Walk)
-    if (stride <= 0) {
-      const message = 'planted soles must move backwards through the cycle (stride > 0)'
-      errors.push({ path: `${path}.frames`, message })
-    }
-  }
-}
-
-function validateWalkFrame (frame: unknown, path: string, palette: Set<string>, errors: ValidationError[]): Size {
-  if (!isRecord(frame)) {
-    errors.push({ path, message: 'expected { rows, soles, planted }' })
-    return undefined
-  }
-  checkKnownKeys(frame, WALK_FRAME_FIELDS, path, errors)
-  const size = validateRows(frame.rows, `${path}.rows`, palette, errors)
-  if (frame.planted !== 0 && frame.planted !== 1) {
-    errors.push({ path: `${path}.planted`, message: 'expected 0 or 1: the index of the foot that carries the weight' })
-  }
-  const soles = frame.soles
-  if (!Array.isArray(soles) || soles.length !== 2) {
-    errors.push({ path: `${path}.soles`, message: 'expected [[x, y], [x, y]]: the ground pixel under each foot' })
-  } else {
-    soles.forEach((sole, k) => validatePivot(sole, `${path}.soles[${k}]`, size, errors))
-  }
-  return size
-}
-
-function onGround (frame: WalkFrame, foot: number): boolean {
-  return frame.soles[foot][1] >= Math.max(frame.soles[0][1], frame.soles[1][1]) - 1
-}
-
-export function travelBetween (from: WalkFrame, to: WalkFrame): number {
-  const keeps = (foot: number): boolean => onGround(from, foot) && onGround(to, foot)
-  const foot = from.planted === to.planted ? from.planted : [from.planted, to.planted].find(keeps)
-  return foot === undefined ? 0 : from.soles[foot][0] - to.soles[foot][0]
-}
-
-export function strideOf (walk: Walk): number {
-  const { frames } = walk
-  return frames.reduce((sum, frame, i) => sum + travelBetween(frame, frames[(i + 1) % frames.length]), 0)
 }
 
 type Size = { width: number, height: number } | undefined

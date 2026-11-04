@@ -6,7 +6,7 @@ import type { Camera } from '../raster/camera.ts'
 
 export type ViewChoice = { view: ViewName, mirror: boolean, sector: number }
 
-export const SECTOR = Math.PI / 4
+const SECTOR = Math.PI / 4
 const HYSTERESIS = 10 * Math.PI / 180
 const BY_SECTOR: ViewName[] = ['front', 'frontSide', 'side', 'backSide', 'back']
 

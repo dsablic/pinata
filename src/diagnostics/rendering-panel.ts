@@ -1,7 +1,7 @@
 import type { Image } from '../image.ts'
 import { FPS, pageCamera } from '../page/cast.ts'
 import { readLayout } from '../page/fixture.ts'
-import { recoveryTicks } from '../page/walk-frames.ts'
+import { LANDING_RECOVERY_SECONDS } from '../mocap/player.ts'
 import { facingAngle } from '../style/views.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import { countMotion, emptyTally, stressDriver, TURN_SECONDS } from './glitches.ts'
@@ -110,7 +110,7 @@ function steadyStride (steps: Step[], from: number, to: number): boolean {
 }
 
 function recovered (steps: Step[], i: number): boolean {
-  return steps.slice(Math.max(0, i - recoveryTicks(FPS)), i).every(step => !step.falling)
+  return steps.slice(Math.max(0, i - Math.ceil(LANDING_RECOVERY_SECONDS * FPS)), i).every(step => !step.falling)
 }
 
 export function strideWindow (steps: Step[]): number[] | undefined {

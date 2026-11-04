@@ -1,20 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
+import { cpSync, existsSync, readdirSync, rmSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { writeOutput } from '../diagnostics/report.ts'
 import { ROOT } from './paths.ts'
 import { worldBundle } from './world-bundle.ts'
-import type { DrawnWalk } from './world-bundle.ts'
 
-const FLAG = '--walk-frames='
-const [out] = process.argv.slice(2).filter(arg => !arg.startsWith('--'))
-const OUT = resolve(out ?? join(ROOT, '_site'))
-
-function drawnWalk (): DrawnWalk | undefined {
-  const file = process.argv.find(arg => arg.startsWith(FLAG))?.slice(FLAG.length)
-  if (file === undefined) return undefined
-  return { character: 'knight', view: 'side', walk: JSON.parse(readFileSync(resolve(file), 'utf8')) }
-}
+const OUT = resolve(process.argv[2] ?? join(ROOT, '_site'))
 
 function commit (): string {
   try {
@@ -40,7 +31,7 @@ function main (): number {
       join(ROOT, 'src', 'cli', 'artifact.ts'), join(examples, name), join(OUT, 'characters', `${name}.json`)
     ], { stdio: 'inherit' })
   }
-  writeOutput(join(OUT, 'world.bundle.json'), JSON.stringify(worldBundle(examples, drawnWalk())))
+  writeOutput(join(OUT, 'world.bundle.json'), JSON.stringify(worldBundle(examples)))
   writeOutput(join(OUT, 'build.json'), JSON.stringify({ commit: commit(), characters }))
   writeOutput(join(OUT, '.nojekyll'), '')
   console.log(`site: ${OUT} (${characters.length} characters)`)

@@ -39,7 +39,7 @@ function crop (image: Image, x0: number, y0: number): Image {
   return out
 }
 
-function walkFrames (dir: string, name: string): Image[] {
+function referenceFrames (dir: string, name: string): Image[] {
   const image = decodePng(readFileSync(join(dir, `${name}.png`)))
   return Array.from({ length: WALK_FRAMES }, (_, k) => crop(image, (k + 1) * CELL, RIGHT_FACING_ROW * CELL))
 }
@@ -51,7 +51,7 @@ function writeStrip (name: string, frames: Image[]): string {
 }
 
 function pairsOf (windows: PanelWindow[], strips: Map<PanelWindow, Strips>, dir: string): object[] {
-  const references = SHEETS.map(name => writeStrip(`lpc-${name}`, walkFrames(dir, name)))
+  const references = SHEETS.map(name => writeStrip(`lpc-${name}`, referenceFrames(dir, name)))
   const characters = [...new Set(windows.map(w => w.character))]
   const real = ['walk', 'landing'].flatMap((kind, k) => characters.map((character, c) => {
     const w = windows.find(x => x.character === character && x.kind === kind) as PanelWindow

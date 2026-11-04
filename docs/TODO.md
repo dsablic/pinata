@@ -17,22 +17,22 @@ Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and 
 
 ## Next, in order
 
-### 0. Drawn walk frames
+### 0. The visual bar is settled
 
-[Plan](plans/2026-11-03-drawn-walk-frames.md): the walk drawn as hand-made whole-body frames, picked by distance
-travelled so planted feet stay put, the cut-outs kept for everything else. The knight's side walk first, judged alone
-against clothed references before the other skins are drawn. It follows
-[drawn, not pasted](plans/2026-11-03-drawn-not-pasted.md), whose beat-and-pose stage made the game-like ratings fall.
-Batch A is built (the skin's `walk`, phase from distance, planted-sole placement, the gates on a test walk; the landing
-squat fix is not: it raised the dwarf's pops); its numbers are in the plan. Next: batch B, the knight's drawn side walk, then the knight-alone round. The
-switching gate misses on the test walk (leaves at a stop), so the drawn frames need a pose near the cut-out's slowing
-step, or the leave rule needs the art's help.
+Three attempts to close the gap to hand-drawn game sprites missed their judge gates: a beat-and-pose stage on the
+cut-outs ([drawn, not pasted](plans/2026-11-03-drawn-not-pasted.md)), hand-drawn whole-body walk frames
+([drawn walk frames](plans/2026-11-03-drawn-walk-frames.md), drafts in [`pocs/drawn-walk/`](../pocs/drawn-walk)) and a
+restyle of the knight's sprites with a bigger helmet and stronger shading
+([game sprite style](plans/2026-11-04-game-sprite-style.md)).
+The visual bar stays where it is; effort moves to the rest of this list. Left over:
 
-Where it stands: batch A (format, renderer path, gates on a test skin) is built, with an independent review's
-findings open (the planted-sole gate cannot fail, turns keep stale frames up to 1.25 s, silent clipping). Batch B
-missed twice: the knight's drawn walk was rated 3.05 and then 3.00 against the references' 3.7 and picked as software
-in 83% and 96% of answers, so the frames are not kept (drafts in [`pocs/drawn-walk/`](../pocs/drawn-walk)). Next is a
-decision on the visual bar (see the plan's results) before more art or framework work.
+- The walk-frames path (`src/page/walk-frames.ts`, the skin's `walk`) is built but no skin uses it, and an
+  independent review's findings are open (the planted-sole gate cannot fail, turns keep stale frames up to 1.25 s,
+  silent clipping). Remove it or fix the findings; nothing should be built on it as it is.
+- The judging tool's side-by-side layout puts long strips 2 px apart and one judge read two strips as one; strip
+  panels need a wider gap or the stacked layout.
+- The knight's restyled skin is in [`pocs/game-sprite-style/`](../pocs/game-sprite-style); judges preferred its landing
+  strip 5 to 0, and its walk strip did not separate.
 
 ### 0. Natural motion on the page, game-like visuals
 

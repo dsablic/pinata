@@ -1,5 +1,6 @@
 import { getPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
+import type { JumpKind } from '../mocap/jump.ts'
 import type { CharacterState, Sprite } from '../page/cast.ts'
 import { FPS } from '../page/cast.ts'
 import { readLayout } from '../page/fixture.ts'
@@ -12,7 +13,14 @@ import { flickerFrames, MIN_PART_PIXELS } from './stability.ts'
 export type Layered = { width: number, height: number, owner: Int16Array, parts: DrawnPart[] }
 export type Viewed = { parts: DrawnPart[], sector?: number }
 export type Stress = { poke?: number, visitBelow?: number, pull?: number }
-export type SurveyRun = { layout: string, seed?: number, wind?: number, seconds: number, stress?: Stress }
+export type SurveyRun = {
+  layout: string
+  seed?: number
+  wind?: number
+  seconds: number
+  stress?: Stress
+  jumps?: JumpKind
+}
 export type Kind = 'fragment' | 'pop' | 'stretch' | 'refit' | 'miss' | 'flicker' | 'blank'
 export type Worst = { score: number, note: string, frames: Image[] }
 export type Tally = {

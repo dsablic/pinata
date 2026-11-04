@@ -18,6 +18,7 @@ export type Step = {
   speed: number
   planted: boolean
   side: boolean
+  jumping: boolean
 }
 export type PanelWindow = {
   character: string
@@ -136,6 +137,33 @@ export function landingWindow (steps: Step[]): number[] | undefined {
   return undefined
 }
 
+export const JUMP_FRAMES = 8
+export const FLIGHT_FRAMES = 2
+
+function jumpsIn (steps: Step[]): { first: number, last: number }[] {
+  const spans: { first: number, last: number }[] = []
+  steps.forEach((step, i) => {
+    const before = i > 0 && steps[i - 1].jumping
+    if (step.jumping && !before) spans.push({ first: i, last: i })
+    if (step.jumping) spans[spans.length - 1].last = i
+  })
+  return spans.filter(({ last }) => last + 1 < steps.length)
+}
+
+export function jumpWindowNumber (n: number): (steps: Step[]) => number[] | undefined {
+  return steps => {
+    const whole = jumpsIn(steps).filter(({ first, last }) => {
+      const frames = sampled(first, last, JUMP_FRAMES)
+      return first >= earliest && frames.length === JUMP_FRAMES &&
+        frames.filter(i => steps[i].falling).length >= FLIGHT_FRAMES
+    })
+    const span = whole[n]
+    return span === undefined ? undefined : sampled(span.first, span.last, JUMP_FRAMES)
+  }
+}
+
+export const JUMP_FINDERS: Finders = { jump: jumpWindowNumber(0), 'jump-again': jumpWindowNumber(1) }
+
 export const GAME_FINDERS: Finders = { walk: strideWindow, landing: landingWindow }
 
 export function windowsIn (
@@ -147,7 +175,7 @@ export function windowsIn (
   for (const r of runs) {
     const fixture = readLayout(root, r.layout)
     const seed = r.seed ?? fixture.seed
-    const s = scenario(world, fixture, seed, r.wind ?? 0)
+    const s = scenario(world, fixture, seed, r.wind ?? 0, false, 'strip', r.jumps)
     const steps = new Map<string, Step[]>()
     const camera = pageCamera(1)
     const stress = stressDriver(s, r.stress)
@@ -164,7 +192,8 @@ export function windowsIn (
           yaw,
           speed: Math.hypot(velocity[0], velocity[2]),
           planted: frame.feet[0]?.planted ?? false,
-          side: Math.abs(Math.abs(facingAngle(camera, yaw)) - Math.PI / 2) < SIDE_TOLERANCE
+          side: Math.abs(Math.abs(facingAngle(camera, yaw)) - Math.PI / 2) < SIDE_TOLERANCE,
+          jumping: frame.jumpTo !== undefined
         }
       }
     })
@@ -190,7 +219,7 @@ export function render (world: ReadWorld, windows: PanelWindow[], root: string):
     const fixture = readLayout(root, r.layout)
     const seed = r.seed ?? fixture.seed
     const [page, current] = (['strip', 'rotate'] as const).map(painter => {
-      return scenario(world, fixture, seed, r.wind ?? 0, false, painter)
+      return scenario(world, fixture, seed, r.wind ?? 0, false, painter, r.jumps)
     })
     const drivers = [page, current].map(s => stressDriver(s, r.stress))
     const kept = new Map<string, Image>()

@@ -2,14 +2,17 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   AFTER_LANDING, AFTER_TOUCHDOWN, AIRBORNE_BEFORE_LANDING, BEFORE_FALL, EARLIEST_SECONDS, fallWindow, landingWindow,
-  MOST_FRAMES, sampled, strideWindow, STRIDE_FRAMES, walkWindow, WALK_FRAMES
+  JUMP_FRAMES, jumpWindowNumber, MOST_FRAMES, sampled, strideWindow, STRIDE_FRAMES, walkWindow, WALK_FRAMES
 } from '../src/diagnostics/rendering-panel.ts'
 import type { Step } from '../src/diagnostics/rendering-panel.ts'
 import { FPS } from '../src/page/cast.ts'
 
 const FROM = EARLIEST_SECONDS * FPS
 const step = (extra: Partial<Step> = {}): Step => {
-  return { falling: false, activity: 'wander', onSurface: true, yaw: 0, speed: 0, planted: false, side: true, ...extra }
+  return {
+    falling: false, activity: 'wander', onSurface: true, yaw: 0, speed: 0, planted: false, side: true, jumping: false,
+    ...extra
+  }
 }
 const steps = (n: number, extra: Partial<Step> = {}): Step[] => Array.from({ length: n }, () => step(extra))
 
@@ -67,4 +70,18 @@ test('a landing is two airborne frames, the touchdown and what follows, from a w
   assert.equal(landingWindow(walkOff(1)), undefined)
   const dropIn = [...steps(FROM + 14), ...steps(6, { falling: true, activity: 'drop' }), ...steps(20)]
   assert.equal(landingWindow(dropIn), undefined)
+})
+
+test('a jump window spans the command to the end of the landing and holds flight frames', () => {
+  const jump = (flight: number, whole: number): Step[] => Array.from({ length: whole }, (_, k) => {
+    return step({ jumping: true, falling: k >= 10 && k < 10 + flight })
+  })
+  const both = [...steps(FROM), ...jump(10, 26), ...steps(10), ...jump(10, 26), ...steps(10)]
+  const first = jumpWindowNumber(0)(both) as number[]
+  assert.equal(first.length, JUMP_FRAMES)
+  assert.deepEqual([first[0], first.at(-1)], [FROM, FROM + 25])
+  assert.equal((jumpWindowNumber(1)(both) as number[])[0], FROM + 36)
+  assert.equal(jumpWindowNumber(2)(both), undefined)
+  assert.equal(jumpWindowNumber(0)([...steps(FROM), ...jump(1, 26), ...steps(10)]), undefined)
+  assert.equal(jumpWindowNumber(0)([...steps(FROM), ...jump(10, 26)]), undefined)
 })

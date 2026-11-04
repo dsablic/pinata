@@ -381,6 +381,21 @@ Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
     pose), cropped without scaling. Their licences forbid keeping them in the repository, so they are read from a
     given folder and written only under `reports/`. Each character's walk and landing take different references,
     rotating; the controls pair male with female and soldier with its recolour.
+- **The jump panel** (`npm run jump-panel`, `jump-panel.ts`): blind pairs of each skinned character's jump drawn with
+  the CMU jump takes against the same jump with the old procedural crouch and dip, for batch B of the jump-takes plan.
+  The procedural version is the same world bundle without the `kind: 'jump'` clips (`worldBundle`'s `jumpTakes`
+  option): the player falls back to the dip when the database has no jump takes, so nothing else differs.
+  - A jump window is one planned jump: the walker's `jumpTo` is set from the command (the crouch's start) until the
+    player's jump ends (the landing's end), recorded as `Step.jumping`; 8 frames sampled evenly across it, and at
+    least 2 of them must be airborne (`falling`), so crouch, flight and landing all show. Each version takes its own
+    start and end, since the take's jump is longer than the dip's. A jump before the 4 s settling time, or one cut
+    off by the run's end, is skipped.
+  - Both versions use the same run for a character: the runs (the jumps layout at its seed and seeds 1 to 3, then
+    super jumps on the page, demo and narrow layouts, which `SurveyRun.jumps` selects) are tried in order and the first
+    run where both worlds give the character a window is used. The jumps themselves differ between versions, since
+    the timings differ and the wandering diverges. Controls pair a character's first takes jump with its second
+    (the knight and the wizard), a pair that should come out can't-tell.
+  - A character with no window in any run stops the build.
 
 ## Motion (`src/motion/`, `src/math/`)
 

@@ -76,3 +76,21 @@ Known limits, not fixed in this batch:
   and dip. A super jump lands with the take's small-jump landing whatever the height.
 - The look of the take's flight (the legs stay the take's own, lifted over the target, and do not reach down as in a
   fall) has not been judged; batch B's panel does.
+
+### Batch B: the panel
+
+`npm run jump-panel` draws each character's jump with the takes and with the procedural jump (a world built without
+jump takes), eight frames from the jump command to the end of the landing, from the same run per character (the
+jumps layout for the knight, wizard and rogue; page-test with super jumps for the dwarf, which found no leg jump), and
+two controls (the knight's and the wizard's first take jump against their second).
+
+- Looks better: the takes picked in 18 of 24 non-control answers, 75% (gate at least 2/3), three judges on three
+  models, both orders, stacked layout. **Met.** Ratings: wizard 3.2 against 1.8, rogue 3.3 against 2.0, dwarf 2.7
+  against 2.3, knight 3.0 against 2.2. Controls unseparated by 50% of judges; left (top) picks 54%.
+- What the judges named: the procedural strips read as a walk or a shuffle with no crouch and no airborne pose; the
+  takes have a crouch, a lean into the leap, a stretched pose in the air and a landing. The largest judge rated no
+  strip above 3: stretched poses in mid-air look generated.
+- Caveats: the two versions' wandering diverges once their timings differ, so each pair is the same run but not the
+  same jump; the knight's procedural strip turns towards the viewer partway through, which the largest judge counted
+  against it; the middle judge said it could not match every image to its item number with confidence, and its
+  answers are counted as given.

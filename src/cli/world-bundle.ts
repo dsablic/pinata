@@ -2,7 +2,9 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './paths.ts'
 
-export function worldBundle (examples = join(ROOT, 'examples')): unknown {
+export type BundleOptions = { jumpTakes?: boolean }
+
+export function worldBundle (examples = join(ROOT, 'examples'), { jumpTakes = true }: BundleOptions = {}): unknown {
   const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
   const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
   const cast = config.cast.map(name => {
@@ -19,6 +21,7 @@ export function worldBundle (examples = join(ROOT, 'examples')): unknown {
   })
   const clipDir = join(ROOT, 'motion', 'clips')
   const clips = readdirSync(clipDir).filter(f => f.endsWith('.json')).sort().map(f => read(join(clipDir, f)))
+    .filter(clip => jumpTakes || (clip as { kind?: string }).kind !== 'jump')
   const members = Object.fromEntries(config.cast
     .filter(name => existsSync(join(examples, name, 'retarget.json')))
     .map(name => [name, read(join(examples, name, 'retarget.json'))]))

@@ -48,6 +48,7 @@
     "glitches": "node src/cli/glitches.ts",
     "rendering-panel": "node src/cli/rendering-panel.ts",
     "game-panel": "node src/cli/game-panel.ts",
+    "jump-panel": "node src/cli/jump-panel.ts",
     "runtime": "npm run site && node src/cli/serve.ts _site",
     "artifact": "node src/cli/artifact.ts"
   },

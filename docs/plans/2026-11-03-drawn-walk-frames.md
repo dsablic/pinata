@@ -104,3 +104,20 @@ is what the page shows at walking speed (one frame per slot, none skipped).
   keeps one outline, the sword stays at one angle as if pinned to the hip, the arms do not swing and the torso does
   not turn. The largest also noted the knight's style against the references': thinner outlines, flatter shading, a
   smaller head on a taller body.
+
+### Batch B: round 2, after the critique
+
+The frames redrawn against round 1's critique: the torso squashing and leaning on the down frame, the sword arm
+swinging 8 px against the near leg with the blade turning from hanging to level, the far arm swinging behind the body,
+a 2 px bob, the cape's spread and hem changing every frame, the plume flicking.
+
+- Knight alone, same references, new seed, three new judges on three models: the knight rated 3.00 against 3.67, picked
+  as software in 23 of 24 answers, 96%, rated 3.0 by the largest-model judge (round 1: 2.0). **Missed.** Controls
+  unseparated by 83% of judges; left picks 50%.
+- What the judges named: the sword swinging like a pendulum from the hand while the body hardly turns, the helmet
+  sliding over the torso, the cape changing shape without following the body, pieces that stay stiff and move
+  separately; and the knight's style against the references' (heavier outlines, flatter shading).
+- By the plan's rule the frames are not kept: the knight's skin has no walk again, and the drafts stay in
+  `pocs/drawn-walk/`. The frames were laid out by a program from separately posed pieces (`compose.py`) and then
+  checked by eye; the judges' answer to "assembled by software from separately drawn parts" is, for these frames,
+  correct.

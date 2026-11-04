@@ -66,22 +66,34 @@ def leg(hip, knee, ankle, heel, toe, near):
   for x, y, s in seg_pixels(heel, toe, (1.7, 1.4)) | seg_pixels(ankle, heel, (1.8, 1.7)):
     px[(x, y)] = boot[0] if s < -0.5 else boot[1] if s < 0.5 else boot[2]
   return px
-def cape(hip_y, sway, k):
+def cape(hip_y, sway, k, lift_hem=0):
   px = {}
   top = hip_y - 16
-  for y in range(top, hip_y + 9):
-    f = (y - top) / (hip_y + 9 - top)
+  bottom = hip_y + 9 - lift_hem
+  for y in range(top, bottom):
+    f = (y - top) / (bottom - top)
     right = 21 - round(f * 3)
-    left = round(19 - f * (10 + 1.5 * sway) - 1.5 * math.sin(f * 4 + k * 0.8))
+    left = round(19 - f * (8 + 2.5 * sway) - 2 * math.sin(f * 4 + k * 0.8))
     for x in range(left, right + 1):
       band = (x + round(f * 4) + k) % 4
       px[(x, y)] = 'R' if band == 0 else 'r' if band in (1, 2) else 'q' if f < 0.25 and band == 3 else 'r'
   hem = hip_y + 9
   return px
+def far_arm(hip_y, swing):
+  sh = (23.5, hip_y - 11)
+  elbow = (23 + swing * 0.6, hip_y - 5)
+  hand = (25 + swing * 1.3, hip_y - 1)
+  px = {}
+  for a, b in ((sh, elbow), (elbow, hand)):
+    for x, y, s in seg_pixels(a, b, (2.0, 1.7)):
+      px[(x, y)] = 'm' if s < 0 else 'd'
+  hx, hy = hand
+  for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)): px[(round(hx) + dx - 1, round(hy) + dy)] = 'L'
+  return px
 def arm(hip_y, swing):
   sh = (25.5, hip_y - 11)
-  elbow = (25 + swing * 0.5, hip_y - 5)
-  hand = (29 + swing, hip_y - 2)
+  elbow = (25 + swing * 0.6, hip_y - 5)
+  hand = (29 + swing * 1.2, hip_y - 2 + abs(swing) * 0.25)
   px = {}
   for a, b in ((sh, elbow), (elbow, hand)):
     for x, y, s in seg_pixels(a, b, (2.2, 1.9)):
@@ -90,7 +102,8 @@ def arm(hip_y, swing):
     for x, c in enumerate(row):
       if c != '.': px[(22 + x, hip_y - 16 + y)] = c
   hx, hy = hand
-  blade = [(hx + 2 + i, hy + 2 + i * 0.55) for i in range(13)]
+  ang = math.radians(26 - swing * 5)
+  blade = [(hx + 2 + i * math.cos(ang), hy + 2 + i * math.sin(ang)) for i in range(13)]
   for i, (x, y) in enumerate(blade):
     for d, c in ((-1, 'w'), (0, 'h'), (1, 'm')):
       px[(round(x), round(y) + d)] = c
@@ -111,14 +124,21 @@ def frame(p):
   bob = p['bob']
   hip_y = HIP_Y0 + bob
   canvas = {}
-  canvas = outline(cape(hip_y, p['sway'], p['k']), canvas)
+  canvas = outline(cape(hip_y, p['sway'], p['k'], p.get('hem', 0)), canvas)
   far = leg(*[(x, y) for x, y in p['far']], near=False)
   canvas = outline(far, canvas)
-  up = {(x, y + bob): c for (x, y), c in UPPER.items()}
+  canvas = outline(far_arm(hip_y, -p['swing']), canvas)
+  squash = p.get('squash', 0)
+  lean = p.get('lean', 0)
+  up = {}
+  for (x, y), c in UPPER.items():
+    ny = y + bob + (squash if y < 24 else 0)
+    if squash and y == 23: continue
+    up[(x + (lean if y < 22 else 0), ny)] = c
   tail = {}
   lift = -bob
   for i, (dx, dy, c) in enumerate(((0, 0, 'R'), (-1, 0, 'R'), (-2, 1, 'r'), (-3, 1, 'r'), (-4, 2, 'R'), (-2, 0, 'R'), (-3, 2, 'c'))):
-    tail[(18 + dx, 4 + bob + dy + (lift if i >= 2 else 0))] = c
+    tail[(18 + dx + p.get('lean', 0) + (p.get('flick', 0) if i >= 4 else 0), 4 + bob + p.get('squash', 0) + dy + (lift if i >= 2 else 0))] = c
   canvas = outline(tail, canvas)
   canvas.update(up)
   canvas = outline(leg(*[(x, y) for x, y in p['near']], near=True), canvas)
@@ -126,16 +146,16 @@ def frame(p):
   return [''.join(canvas.get((x, y), '.') for x in range(W)) for y in range(H)]
 def L(hipdy, knee, ankle, heel, toe): return [(25, HIP_Y0 + hipdy), knee, ankle, heel, toe]
 POSES = [
-  dict(bob=0, sway=0, k=0, swing=-2, ball=33,
+  dict(bob=0, sway=0, k=0, swing=-4, hem=0, lean=0, squash=0, flick=0, ball=33,
        near=L(0, (28, 41), (30.5, 47.5), (29.5, 49.5), (34.5, 46.5)),
        far=L(0, (22, 41.5), (18.5, 46.5), (17.5, 45.5), (22, 49.5))),
-  dict(bob=1, sway=2, k=1, swing=-1, ball=30,
+  dict(bob=1, sway=1, k=1, swing=-2, hem=-1, lean=1, squash=1, flick=1, ball=30,
        near=L(1, (28, 42), (27.5, 48), (25.5, 49.5), (31.5, 49.5)),
        far=L(1, (21.5, 42.5), (16.5, 46), (15.5, 44.5), (19, 48))),
-  dict(bob=0, sway=3, k=2, swing=0, ball=27,
+  dict(bob=0, sway=3, k=2, swing=1, hem=1, lean=0, squash=0, flick=0, ball=27,
        near=L(0, (26, 41), (24.5, 48), (22.5, 49.5), (28.5, 49.5)),
        far=L(0, (25.5, 40), (22, 45), (21, 44), (25, 46.5))),
-  dict(bob=-1, sway=1, k=3, swing=1, ball=24,
+  dict(bob=-1, sway=2, k=3, swing=3, hem=2, lean=0, squash=0, flick=-1, ball=24,
        near=L(-1, (24, 40), (21, 46), (20, 45), (25, 49.5)),
        far=L(-1, (29, 38.5), (31.5, 45), (30.5, 45.5), (35, 44.5))),
 ]

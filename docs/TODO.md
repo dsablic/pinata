@@ -28,14 +28,11 @@ squat fix is not: it raised the dwarf's pops); its numbers are in the plan. Next
 switching gate misses on the test walk (leaves at a stop), so the drawn frames need a pose near the cut-out's slowing
 step, or the leave rule needs the art's help.
 
-Where it stands: batch A (format, renderer path, gates on a test skin) is built; the planted-feet gate is met and the
-switching gate missed (81% of switches within 25%, every miss a leave at a stop, where no walk frame resembles the
-standing cut-out). The landing squat is not fixed (a quicker rise raised the dwarf's pops). The knight's hand-drawn
-side walk is drafted in [`pocs/drawn-walk/`](../pocs/drawn-walk). Next:
-- an independent review of batch A, and tests for the frame carry, mirrored entry and skipped slots;
-- a leave rule for stops (a standing-like exit frame or leaving mid-stride) so the switching gate can be met;
-- the draft's soles mapped to the format (the rig's leg order, left then right; the lowest opaque sole pixel), the
-  frames in the knight's skin, a look on the page, then the knight-alone round with clothed references.
+Where it stands: batch A (format, renderer path, gates on a test skin) is built, with an independent review's
+findings open (the planted-sole gate cannot fail, turns keep stale frames up to 1.25 s, silent clipping). Batch B
+missed twice: the knight's drawn walk was rated 3.05 and then 3.00 against the references' 3.7 and picked as software
+in 83% and 96% of answers, so the frames are not kept (drafts in [`pocs/drawn-walk/`](../pocs/drawn-walk)). Next is a
+decision on the visual bar (see the plan's results) before more art or framework work.
 
 ### 0. Natural motion on the page, game-like visuals
 

@@ -85,3 +85,22 @@ sprite pixels per metre: its cycle is 1.2 m). It is a stand-in for drawn art and
   squat itself is not fixed.
 - Survey (`npm run glitches`, real skins without frames, with the landing change left out): fragments 0, stretch 0
   for all four; pops knight 1, rogue 0, dwarf 1, wizard 0, as before.
+
+### Batch B: the knight's side walk, round 1
+
+Eight hand-drawn frames (`pocs/drawn-walk/`; in `examples/knight/skin.json` as the side view's `walk`): contact, down,
+passing and up for each foot, knees bending through them, a 1 px bob, the cape's hem swinging, the plume lagging; the
+helmet and a hand-drawn torso reused across frames. The judged strip is the eight frames on their planted sole, which
+is what the page shows at walking speed (one frame per slot, none skipped).
+
+- On the page the frames rarely show (0-23% of walking frames on the five layouts): the entry rule needs the frame
+  within 20% of the cut-out's silhouette and the drawn walk differs from it by 31-45%, almost all in the bottom rows
+  (wider strides, the sword's and the cape hem's positions).
+- Knight alone, against the four clothed references (LPC soldier, soldier in its other colours, princess, the male
+  body wearing the LPC pants), three judges on three models, both orders: the knight rated 3.05 against the
+  references' 3.69 (gate at least equal), picked as software in 20 of 24 answers, 83% (gate at most 60%), rated 2.0 by
+  the largest-model judge (gate 3.5). **Missed.** Controls unseparated by 83% of judges; left picks 50%.
+- All three judges named the same thing: only the legs change; the torso, helmet and plume stay the same, the cape
+  keeps one outline, the sword stays at one angle as if pinned to the hip, the arms do not swing and the torso does
+  not turn. The largest also noted the knight's style against the references': thinner outlines, flatter shading, a
+  smaller head on a taller body.

@@ -1,7 +1,7 @@
 import { after, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../src/image.ts'
@@ -165,6 +165,8 @@ test('the CLI builds a packet from PNG files and refuses a key inside the packet
   assert.equal(built.status, 0, built.stderr)
   const files = ['item-01.png', 'item-02.png', 'item-03.png', 'item-04.png', 'questions.md']
   assert.deepEqual(readdirSync(packet).sort(), files)
+  const panelName = JSON.parse(readFileSync(join(scratch, 'panel.json'), 'utf8')).name
+  assert.ok(!readFileSync(join(packet, 'questions.md'), 'utf8').includes(panelName))
   writeFileSync(join(scratch, 'judge1.json'), JSON.stringify(answersFor(() => 'cant_tell')))
   const scored = judge('score', join(scratch, 'key.json'), join(scratch, 'judge1.json'))
   assert.equal(scored.status, 0, scored.stderr)

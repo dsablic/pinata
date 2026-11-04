@@ -5,6 +5,8 @@ import { solePoints } from '../src/motion/metrics.ts'
 import { validateWorldConfig } from '../src/world/config.ts'
 import { createWorld } from '../src/world/world.ts'
 import type { World } from '../src/world/world.ts'
+import { worldBundle } from '../src/cli/world-bundle.ts'
+import { readWorld } from '../src/diagnostics/page-scenarios.ts'
 import { activityStarts, distanceAlongX, FPS, plainCast, run, showcaseConfig as config } from './world-fixtures.ts'
 
 const cast = plainCast()
@@ -89,4 +91,10 @@ test('a poke startles a character into moving away within half a second', () => 
   assert.ok(startled >= 0 && startled <= FPS / 2, `startled after ${startled} frames`)
   assert.equal(after[startled].actors[0].say, '!')
   assert.ok(after[after.length - 1].actors[0].root.position[0] > x + 0.3, 'it moved away from the poke')
+})
+
+test('a world whose cast wears cloth builds and steps', () => {
+  const { cast } = readWorld(worldBundle())
+  const clothed = createWorld({ seed: 3, cast, config, fps: FPS })
+  assert.equal(run(clothed, FPS).length, FPS)
 })

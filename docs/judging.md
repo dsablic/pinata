@@ -21,8 +21,9 @@ not be able to separate, the answer key kept out of the judges' folder, and thre
    }
    ```
 
-   `rating` asks for a 1-5 score for each side, which separates "both good" from "both bad"; it is optional, but the
-   skins spike recommends always including it, and when present every answer must carry one. `scale` (default 8)
+   `name` names the panel in the key and the score only; judges never see it. `rating` asks for a 1-5 score for each
+   side, which separates "both good" from "both bad"; it is optional, but the skins spike recommends always including
+   it, and when present every answer must carry one. `scale` (default 8)
    and `gap` (default 2, in source pixels) set the layout; `background` defaults to `#c8c8c8`. Change `seed` for a
    new round to get a new order.
 

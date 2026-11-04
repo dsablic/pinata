@@ -41,7 +41,10 @@ reaching down in falls) and D's jump mechanics (jump edges up to a leg length, b
 jump page) done. The demo and page layouts' rises are 1.5-5 m, beyond a leg-length jump, so characters climb the
 page with super jumps (`jumps: 'super'`, a checkbox on the demo; the gate is met on three of four layouts, perception
 has too few planned jumps). Jumps play CMU take-off and landing takes ([jump takes](plans/2026-11-04-jump-takes.md),
-judged better than the procedural jump). Next: batch E.
+judged better than the procedural jump). Batch E is measured: no popping missed narrowly (one pop each for the knight
+and dwarf), natural motion missed against the page world before the plan (50% against 75%: the knight much better,
+the wizard worse) and met against the old terrain demo. Left: the wizard's robe walk and landing (head turning away,
+legs tucked), the knight's sword behind the cape.
 
 ### 0. Unified part rendering on the page
 

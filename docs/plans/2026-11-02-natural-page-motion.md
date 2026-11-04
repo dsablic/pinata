@@ -168,3 +168,26 @@ wizard's robe has no simulation at all. Falls are a body sliding down under grav
     pieces, so the wizard's leg reads as a bucket and the knight slides forward with little change of pose; the lean
     and outline stay the same every frame; no rhythmic body bob. The hand-drawn walks bend knees and arms through
     their poses, shading follows the body, and the body bobs on the beat.
+- **Batch E, the bar.** The structural draw order (a part above its parent by rule, order between independent parts
+  with hysteresis, one anchor) is the unified renderer's
+  ([unified part rendering](2026-11-02-unified-part-rendering.md), batch B); the game-like gate is settled where it
+  is ([drawn walk frames](2026-11-03-drawn-walk-frames.md),
+  [game sprite style](2026-11-04-game-sprite-style.md)).
+  - No popping (`npm run glitches`, 15 min per character): knight 1, rogue 0, dwarf 1, wizard 0. **Missed narrowly.**
+    The knight's is its sword passing behind the cape in the back view (cloth drawn along its curve is not counted as
+    covering); the dwarf's its cloak folding within a frame.
+  - Natural motion against the page world before this plan (commit 88c7d25, the same layouts, seeds and window rules;
+    walk and walk-off landing strips of each character, stacked, three judges on three models, both orders): the
+    page world now picked in 24 of 48 non-control answers, 50% (gate at least 75%). **Missed.** The knight is clearly
+    better (walk 5 to 1, landing 6 to 0, rated 3.8 and 3.5 against 2.7 and 1.7: the cape trails, the body crouches
+    on landing); the wizard is worse (walk 1 to 5, landing 0 to 6, 2.7 against 3.7: the head turning away for frames,
+    the legs tucked together under the robe); the rogue and dwarf close. Controls unseparated by 17% of judges.
+  - Natural motion against the old terrain demo with skins (walks only: the terrain demo has no drops): the page world
+    now rated 3.2 against 2.83 (gate at least as natural). **Met.** The rogue's walk is the exception (2.7 against
+    3.5). Controls unseparated by 0% of judges: the control strips come from different runs and differ more than a
+    control should, so the panel's floor is weak.
+  - A first run of both panels was void: the judge tool printed the panel's name, which named the versions compared
+    (not which side was which), at the top of the judges' questions. The tool no longer shows judges the name; the
+    void runs read 48% and 2.88 against 3.05, both missed.
+  - Building the terrain demo's strips found `createWorld` failing for any cast with bound cloth (the environment was
+    read before it was set); fixed, with a test.

@@ -137,6 +137,7 @@ export function createWorld (options: WorldOptions): World {
   let frameIndex = 0
 
   const { exaggerate } = config.life
+  const environment = structuredClone(config.environment)
   const actors: Actor[] = cast.map((original, i) => {
     const { gait } = original.rig
     const bobAmplitude = gait.bobAmplitude * exaggerate.bob
@@ -283,7 +284,6 @@ export function createWorld (options: WorldOptions): World {
   }
 
   type Turns = ReturnType<typeof poseAt>['transforms']
-  const environment = structuredClone(config.environment)
 
   const forwardSpeed = (root: RootState): number => {
     return root.velocity[0] * Math.sin(root.yaw) + root.velocity[2] * Math.cos(root.yaw)

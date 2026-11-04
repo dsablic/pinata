@@ -124,7 +124,7 @@ function questionsText (spec: PanelSpec, names: string[]): string {
     ? '{ "choice": "left" | "right" | "cant_tell" }'
     : '{ "choice": "left" | "right" | "cant_tell", "rating": { "left": 1-5, "right": 1-5 } }'
   return [
-    `# ${spec.name}`,
+    '# Questions',
     '',
     spec.layout === 'stacked'
       ? `Each image shows two characters, one above the other: "left" means the top one and "right" the bottom one. ` +

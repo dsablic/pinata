@@ -1,7 +1,8 @@
 # Piñata Roadmap
 
-This roadmap turns the proof-of-concept results into a plan for building the tool. The results are summarised in [`docs/FINDINGS.md`](FINDINGS.md). Every proof's plan, gates,
-findings and judge artefacts are in [`docs/plans/`](plans).
+This roadmap turns the proof-of-concept results into a plan for building the tool. The results are summarised in
+[`docs/FINDINGS.md`](FINDINGS.md). Open plans are in [`docs/plans/`](plans); finished ones, with every proof's gates,
+findings and judge artefacts, in [`docs/plans/done/`](plans/done). [`docs/TODO.md`](TODO.md) says what is next.
 
 ## What the proofs showed
 
@@ -39,39 +40,34 @@ for previews, collision geometry and checks.
 
 ## Body plans and rigid-body behaviours (in progress)
 
-- **General limbs** (done; [`docs/plans/2026-10-30-general-limbs.md`](plans/2026-10-30-general-limbs.md)): any number of legs with any segment count, arms,
-  and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
-  octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under
-  the front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.
-- **Effects and weather** (user, 2026-10-30): a particle effects layer for the runtime component (emitters attached
-  to joints or events: dust at footsteps, confetti on a hit, rain, snow, sparks), drawn in the active style and
-  deterministic; weather and world events (wind, rain, earthquakes) that characters react to through behaviours.
-  First in the world showcase ([plan](plans/2026-10-30-world-showcase.md), batch F).
+- **General limbs** (done; [plan](plans/done/2026-10-30-general-limbs.md)): any number of legs with any segment count,
+  arms, and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
+  octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under the
+  front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.
+- **Effects and weather:** a particle effects layer for the runtime component (emitters attached to joints or events:
+  dust at footsteps, confetti on a hit, rain, snow, sparks), drawn in the active style and deterministic; weather and
+  world events (wind, rain, earthquakes) that characters react to through behaviours. First in the world showcase
+  ([plan](plans/2026-10-30-world-showcase.md), batch F).
 - **Rigid-body behaviours:** a prototype hung the unicorn piñata from a rope, whacked it, and let it swing and twist
   with limp legs, mane and tail (simulated as cloth on the moving body). To make that a motion script like walking:
   a root with full 3D orientation (today it can only yaw), a `hang` behaviour (rope or spring from an anchor), scripted
   `hit` events (impulse and spin at a point), and limp limbs as low-stiffness appendages.
 
-## The page as the world (in progress)
+## Built since the proofs
 
-[Plan](plans/2026-10-31-page-world.md): characters live on an ordinary web page. Marked elements are ground and walls;
-characters walk, step up and drop between them over a click-through overlay, then react to the page (hovered,
-focused and nearby elements), and the world demo is rebuilt on its own page's elements instead of generated terrain.
-All four batches are built: surfaces and the overlay, moving over the page, perception, and the demo page; the
-standing gate is missed narrowly (see the plan).
-
-## Next: live runtime spike (P8)
-
-Spec: [`docs/plans/2026-10-30-runtime-spike.md`](plans/2026-10-30-runtime-spike.md). Can a character be animated
-live in a browser, reacting to events in real time (for example a piñata in a chat window reacting while an AI agent
-works), from a compact character file and a small JavaScript runtime? The spike bundles the engine for the browser,
-adds online (frame-by-frame) motion for the hanging piñata with `hit()` and a few behaviours, renders at 64 px in a
-canvas, and tests real-time frame budget, reactions, behaviour transitions and Node-browser determinism headlessly
-with Playwright. Its result decides whether the runtime can use the procedural renderer or needs skins first.
-Behaviours are compositions of simple primitives (base motion, limb-masked layers, additive overlays, events,
-blending, a state machine), specified in
-[`docs/plans/2026-10-30-composable-behaviours.md`](plans/2026-10-30-composable-behaviours.md); the spike builds the
-first phase of that model, and the rest (stand and walk as bases, `check` gates, an authoring test) follows it.
+- **The live runtime (P8)** ([spike](plans/done/2026-10-30-runtime-spike.md)): characters animate live in the browser
+  (`<pinata-character>`, the hanging piñata, the Claude Code mod), with behaviours composed from simple primitives
+  ([composable behaviours](plans/2026-10-30-composable-behaviours.md)).
+- **The page as the world** ([plan](plans/2026-10-31-page-world.md)): characters live on an ordinary web page; marked
+  elements are ground and walls; characters walk, step up, drop, jump and react to the page over a click-through
+  overlay, and the front page is built on it.
+- **Natural motion:** humanoids move by retargeted motion capture with motion matching and a light physical body
+  ([motion data](plans/done/2026-10-30-motion-data.md)); capes, cloaks and robes are simulated cloth drawn in the
+  skins; falls dip and absorb; jumps play capture take-offs and landings
+  ([natural page motion](plans/done/2026-11-02-natural-page-motion.md),
+  [jump takes](plans/done/2026-11-04-jump-takes.md)).
+- **The visual bar is settled** where it is: after P7, a beat-and-pose stage, hand-drawn walk frames and a restyle
+  each missed their gates against hand-drawn game sprites (see P7 below and [`TODO.md`](TODO.md)).
 
 ## Phase 0: consolidate (about 1-2 weeks)
 
@@ -81,8 +77,8 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
    regression suites (each runner's gates become tests that must keep passing).
 2. ~~Render simulated cloth and chains into the pixel output.~~ Done: chains and capes with a `render` entry are drawn
    as thin capsule parts, in the demo and in the `check` contact sheet and walk strip.
-3. Judge tooling in TypeScript: replace the shell and JavaScript packet scripts with a `judge` module (packet
-   building with correct spacing, keys, scoring, controls), used by every future visual check.
+3. ~~Judge tooling in TypeScript.~~ Done: `npm run judge` builds packets (neutral, both orders, stacked or side by
+   side), keeps keys out of them and scores answers with controls; see [`docs/judging.md`](judging.md).
 4. Fix gate definitions the proofs found weak: area jumps that count occlusion (P2), speed windows that return
    Infinity with few plants (P4), the thin-part metric's non-monotonic behaviour, and the borderline knight values
    (thin fraction at 0.25, stray pixels at 2).
@@ -99,24 +95,22 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
 
 Exit: all proof suites pass from the library; cloth is visible in rendered frames; one command per proof.
 
-## Phase 1: minimum viable tool (about 4-6 weeks)
+## Phase 1: minimum viable tool (next)
 
-1. **Skins v1.** Per-part sprites for 4 and then 8 directions, with view buckets and pivots; rotation that keeps
-   pixel art clean (pre-drawn angle variants for limbs, or a RotSprite-style algorithm instead of nearest-neighbour
-   at 22.5 degree steps); skin validation and stills in `check`. An AI artist guide alongside [`docs/authoring.md`](authoring.md).
-   Proof gate before building it out: **P7** (below).
+1. ~~**Skins v1.**~~ Done through P7: per-part sprites for eight directions with view buckets and pivots, RotSprite
+   rotation, skin validation, the fit check, and an AI artist guide alongside [`docs/authoring.md`](authoring.md).
 2. **Interfaces.** `pinata check`, `pinata render` and `pinata export` as a CLI, and an MCP server wrapping them, so
    agents in Claude Code and other clients use the tool directly.
 3. **Export.** Sprite sheets with JSON frame data, Aseprite files; Spine/Rigby export later.
-4. **Behaviour library.** Walk, run, idle, turn and pivot (proven), plus jump (ballistic root, landing IK), crouch
-   and a simple attack, each with gates in the P4 style.
+4. **Behaviour library.** Walk, run, idle, turn, pivot and jump (built), plus crouch and a simple attack, each with
+   gates in the P4 style.
 5. **Authoring hints.** Act on the P5 authors' notes: decals for small features, stride-to-leg-length guidance and
    diagnosis, palette budgeting, radius vs diameter wording, a reliable edit path for agents.
 
 Exit: an agent, from a prompt, produces an 8-direction walking, idling and jumping character with a cape, skinned,
 exported as a sprite sheet, and it passes every gate.
 
-### P7 (runs in parallel with P8): skins to a game-art bar
+### P7: skins to a game-art bar
 
 **Visual bar:** characters must stand up to game art, wherever they are used (game sprites or characters in a web
 UI). A mascot that looks hand-made beats one that looks procedural in any context, so this bar applies to the whole
@@ -138,8 +132,10 @@ readability layer (exaggerated contact and passing poses, holds). Gates to fix b
 humanoids, a readability layer, skins in the world. Passed: artist, view consistency, real-time, quality against
 references (second round). Failed: rotation preference, readability. Open: the size gate (needs per-size skins),
 the human review. Live capes on skinned characters are built on the page: the artist's cape, cloak, robe and scarf
-sprites are drawn along their simulated cloth ([natural-motion plan](plans/2026-11-02-natural-page-motion.md)).
-Details in the [P7 plan](plans/2026-10-31-p7-skins.md).
+sprites are drawn along their simulated cloth ([natural-motion plan](plans/done/2026-11-02-natural-page-motion.md)).
+Details in the [P7 plan](plans/2026-10-31-p7-skins.md). Later attempts to close the gap to hand-drawn game sprites
+(a beat-and-pose stage, hand-drawn walk frames, a restyle with bigger heads and stronger shading) missed their gates,
+so the bar is settled where it is and human-drawn skins remain the way past it.
 
 **Honest risk:** game-quality art is where the evidence is thinnest. If P7 cannot reach strong references even with
 clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics

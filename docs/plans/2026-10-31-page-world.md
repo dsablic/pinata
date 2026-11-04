@@ -104,7 +104,7 @@ metre, scale 2) and by the Node tests.
     suites are selectable and an unknown one is an error.
   - In Chrome on the demo: cost (p95 3.8 ms), no layout reads, surfaces, standing on live surfaces, clicks, pokes,
     hover and focus sending visits with their words, and reduced motion: pass. On the demo's recorded layouts in Node
-    (see the [harness plan](2026-11-02-page-harness.md)): the nearest character arriving within 8 s and saying the
+    (see the [harness plan](done/2026-11-02-page-harness.md)): the nearest character arriving within 8 s and saying the
     words, falls with no sole through a surface, liveliness, drop-ins and connectivity at 1200 and 390 px: pass.
   - **Missed: standing** (`npm run gates`). In Node over 60 s per layout, planted feet: 10-38 of about 7000 more than
     1 CSS px off, the worst 1.12-1.13 px; mid-air: 21-49 of 5759 frames (0.4-0.9%). In Chrome over 20 s per page:

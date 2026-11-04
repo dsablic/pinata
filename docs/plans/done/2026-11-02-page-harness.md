@@ -28,7 +28,7 @@ Chrome in real time (about 5 minutes), depends on rAF timing and random wanderin
 | Gate | Threshold | Notes |
 |---|---|---|
 | Existing outputs | byte-identical | |
-| Coverage | every gate of the [page-world plan](2026-10-31-page-world.md) is measured by the Node scenarios, `npm run gates` or the browser suite | listed in design.md |
+| Coverage | every gate of the [page-world plan](../2026-10-31-page-world.md) is measured by the Node scenarios, `npm run gates` or the browser suite | listed in design.md |
 | Real layouts | the Node scenarios run on recorded layouts of the test page, the perception page and the demo at 1200 and 390 px wide | |
 | Determinism | two runs of the Node scenarios give identical results | a test |
 | Speed | the Node scenarios add at most 60 s to `npm test`; the browser suite takes at most 90 s | on this machine |

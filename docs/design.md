@@ -241,7 +241,7 @@ Plan: [page world](plans/2026-10-31-page-world.md).
 
 ### Checking the page world
 
-Plan: [a faster, deterministic harness](plans/2026-11-02-page-harness.md).
+Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 
 - **Layout fixtures** (`test/fixtures/layouts/`, `fixture.ts`): the marked boxes, hints and interactive targets (with
   their words and the ground element they are inside) of the test page, the perception page and the demo at 1200 and

@@ -35,7 +35,7 @@ check its own work.
 
 ## In progress
 
-- **Physical bodies** ([plan](docs/plans/2026-10-30-physical-walking.md)) for creatures without motion-capture data.
+- **Physical bodies** ([plan](docs/plans/done/2026-10-30-physical-walking.md)) for creatures without motion-capture data.
 - Then weather and particles and a physics engine. The [roadmap](docs/ROADMAP.md) and [TODO](docs/TODO.md) have the
   order.
 

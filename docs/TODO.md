@@ -2,104 +2,78 @@
 
 Where the project stands and what to do next, written so a fresh session (or another machine) can pick it up.
 Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and [`docs/ROADMAP.md`](ROADMAP.md)
-(the plan).
+(the plan). Open plans are in [`docs/plans/`](plans); finished and settled ones, with the proofs' findings and judge
+artefacts, in [`docs/plans/done/`](plans/done).
 
 ## Current state
 
-- All proofs are done (P1-P6 and the skins spike); results in [`docs/FINDINGS.md`](FINDINGS.md).
-- General limbs, the joint hierarchy (image-and-points batch A), the live runtime (P8: `<pinata-character>`, the
-  hanging piñata, the Claude Code mod) and the world showcase are done and reviewed.
-- Natural motion ([plan](plans/2026-10-30-motion-data.md)): humanoids move by retargeted CMU motion capture with
-  motion matching, feet held on terrain and a light physical body; batches A-C done and reviewed; released as v0.2.0
-  (the Pages site shows it). Cross-engine determinism was dropped (user): Node and Chrome compute Math functions
-  differently. `src/motion/walker.ts` is a first draft of a physical body for creatures without capture data.
-- Direction (user, 2026-10-30): reach game-worthy pixel-art animation, working through this list autonomously.
+- The proofs (P1-P6, the skins spike), general limbs, the joint hierarchy, the live runtime (P8: `<pinata-character>`,
+  the hanging piñata, the Claude Code mod) and the world showcase are done; results in [`FINDINGS.md`](FINDINGS.md).
+- Humanoids move by retargeted CMU motion capture with motion matching, feet held on the ground and a light physical
+  body ([motion data](plans/done/2026-10-30-motion-data.md)); jumps play CMU take-off and landing takes
+  ([jump takes](plans/done/2026-11-04-jump-takes.md)). Node and Chrome compute Math functions differently, so the
+  engine is deterministic per engine, not across them.
+- Characters live on an ordinary web page: marked elements are ground and walls, characters walk, drop, jump (super
+  jumps on the demo) and react to the page; capes, cloaks, robes and plumes are simulated cloth drawn in the skins;
+  one strip painter draws every part ([page world](plans/2026-10-31-page-world.md),
+  [natural page motion](plans/done/2026-11-02-natural-page-motion.md),
+  [unified part rendering](plans/done/2026-11-02-unified-part-rendering.md)). Released as v0.6.0.
+- The visual bar is settled where it is: a beat-and-pose stage, hand-drawn walk frames and a restyle of the knight
+  each missed their judge gates against hand-drawn game sprites
+  ([drawn, not pasted](plans/done/2026-11-03-drawn-not-pasted.md),
+  [drawn walk frames](plans/done/2026-11-03-drawn-walk-frames.md),
+  [game sprite style](plans/done/2026-11-04-game-sprite-style.md)).
 
-## Next, in order
+## Next: Phase 1, the minimum viable tool
 
-### 0. The visual bar is settled
+From [`ROADMAP.md`](ROADMAP.md), Phase 1: an agent, from a prompt, produces an eight-direction character that walks,
+idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. To plan first, gates fixed:
 
-Three attempts to close the gap to hand-drawn game sprites missed their judge gates: a beat-and-pose stage on the
-cut-outs ([drawn, not pasted](plans/2026-11-03-drawn-not-pasted.md)), hand-drawn whole-body walk frames
-([drawn walk frames](plans/2026-11-03-drawn-walk-frames.md), drafts in [`pocs/drawn-walk/`](../pocs/drawn-walk)) and a
-restyle of the knight's sprites with a bigger helmet and stronger shading
-([game sprite style](plans/2026-11-04-game-sprite-style.md)).
-The visual bar stays where it is; effort moves to the rest of this list. Left over:
+- **Interfaces:** `pinata check`, `pinata render` and `pinata export` as one CLI, and an MCP server wrapping them.
+- **Export:** sprite sheets with JSON frame data, then Aseprite files.
+- **Behaviour library:** idle, crouch and a simple attack beside walk, turn and jump, each with gates, built on the
+  [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
+- **Authoring hints:** the P5 authors' notes (decals for small features, stride guidance, palette budgeting, a
+  reliable edit path for agents).
 
-- The walk-frames path (whole-body frames in a skin's `walk`) was removed; it is in the history at 2ca4379.
-- The judging tool's side-by-side layout puts long strips 2 px apart and one judge read two strips as one; strip
-  panels need a wider gap or the stacked layout.
-- The knight's restyled skin is in [`pocs/game-sprite-style/`](../pocs/game-sprite-style); judges preferred its landing
-  strip 5 to 0, and its walk strip did not separate.
+## Open, from earlier work
 
-### 0. Natural motion on the page, game-like visuals
-
-[Plan](plans/2026-11-02-natural-page-motion.md): secondary motion (chains, cloth, a robe hem) in the page world, cloth
-drawn in skins, natural falls and landings, jumps up the page, structural draw order; judged against the old terrain
-demo and strong references. Batches A (secondary motion), B (cloth in skins), C (landings that dip and absorb, legs
-reaching down in falls) and D's jump mechanics (jump edges up to a leg length, ballistic arcs, gated on a recorded
-jump page) done. The demo and page layouts' rises are 1.5-5 m, beyond a leg-length jump, so characters climb the
-page with super jumps (`jumps: 'super'`, a checkbox on the demo; the gate is met on three of four layouts, perception
-has too few planned jumps). Jumps play CMU take-off and landing takes ([jump takes](plans/2026-11-04-jump-takes.md),
-judged better than the procedural jump). Batch E is measured: no popping missed narrowly (one pop each for the knight
-and dwarf), natural motion missed against the page world before the plan (50% against 75%: the knight much better,
-the wizard worse) and met against the old terrain demo. Left: the wizard's robe walk and landing (head turning away,
-legs tucked), the knight's sword behind the cape.
-
-### 0. Unified part rendering on the page
-
-[Plan](plans/2026-11-02-unified-part-rendering.md): a standing glitch survey (`npm run glitches`), then one strip
-painter, steady draw order and joints snapped once for every part on the page. All three batches are built: no torn
-parts or blank frames, far fewer pops, cheaper frames. Still missed: the knight's and dwarf's pops, the rogue's worst
-flicker window, the dwarf's and wizard's cloth flicker, and the judge gate (the judges could not tell the renderers
-apart in three rounds, leaning slightly to the old one). Batch D redrew the skin sprites that did not fit their bones
-from the page camera: the knight's pops fell from 17 to 1; one knight foot sprite still misses the fit check, since a
-mirrored view draws it on the other foot's bone and a skin cannot hold a sprite for the mirrored view.
-
-### 0. P7: skins to a game-art bar
-
-[P7 plan](plans/2026-10-31-p7-skins.md): built and released as v0.3.0 (eight-direction skins for the four humanoids,
-skins in the world). Left: the size gate (per-size skins), the human review. Live capes on skinned characters are
-built on the page (natural-motion batch B).
-
-### 0a. The page as the world
-
-[Page-world plan](plans/2026-10-31-page-world.md): marked DOM elements become ground and walls, characters walk,
-step and drop between them on a click-through overlay, react to the page, and the front page is built on it. All
-four batches built and reviewed. The standing gate is missed narrowly on every layout
-(`npm run gates`: 0.4-0.9% of frames mid-air, from turn, start and stop clips, and about 0.3% of planted feet over
-1 px). Next for it: the corrective-step overlap in the turn clips, and jumping, so characters can climb. The page
-world is checked in Node on recorded layouts ([harness plan](plans/2026-11-02-page-harness.md)); after changing a
-test page or the demo, run `npm run layouts`.
-
-### 0b. World showcase, remaining batches
-
-[World showcase plan](plans/2026-10-30-world-showcase.md): weather and particles (F), styles and skins (G, folds
-into P7 batch D), physics engine spike (D), page-as-world (E, now the page-world plan above). Once page-as-world
-works, the world demo is rebuilt on the page's elements instead of the generated terrain (done: the front page).
-
-### 0c. Per-character motion settings
-
-A few settings per character applied to every retargeted take, as an auto-rigging tool's clip sliders do: arm space
-(the arms held out so bulky characters' arms clear their torso, as the knight's and dwarf's do not), stride scale and
-playback speed. One setting per character in the retarget step, not a fix per take; judged by the glitch survey and a
-blind panel. A browsable page of every take retargeted onto every skin helps pick takes (the jump takes first).
-
-### 1. Leftovers from general limbs
-
-- [ ] Several new examples sit exactly on `maxThinFraction` (0.25).
-- [ ] Appendages: a very soft appendage on a very fast spin flails (swing frames are singular near 180 degrees); no
-      script does that today.
+- **Page world** ([plan](plans/2026-10-31-page-world.md)): the standing gate is missed narrowly on every layout
+  (0.4-0.9% of frames mid-air from the turn, start and stop clips; about 0.3% of planted feet over 1 px); the
+  corrective-step overlap in the turn clips. Super jumps miss their count on the perception layout (too few planned).
+  After changing a test page or the demo, run `npm run layouts`.
+- **Page motion leftovers:** one pop each for the knight (its sword behind the cape in the back view) and the dwarf
+  (its cloak folding within a frame); the wizard's walk and landing judged less natural than before the natural-motion
+  work (head turning away for frames, legs tucked under the robe); the rogue's worst flicker window and the dwarf's
+  and wizard's cloth flicker; one knight foot sprite misses the fit check (a mirrored view draws it on the other
+  foot's bone). A take ends in the take's small landing whatever the height, and a fall starting during a take's
+  crouch loses the procedural reach-down and dip.
+- **P7 skins** ([plan](plans/2026-10-31-p7-skins.md)): the size gate (per-size skins) and the human review.
+- **Image and points** ([plan](plans/2026-10-30-image-points.md)): batches B and C, the point-driven workflow (an
+  image plus arbitrary points, no fixed body parts).
+- **World showcase** ([plan](plans/2026-10-30-world-showcase.md)): weather and particles (batch F), the physics engine
+  spike (batch D).
+- **Per-character motion settings:** a few settings per character applied to every retargeted take, as an
+  auto-rigging tool's clip sliders do: arm space (bulky characters' arms clear their torso, which the knight's and
+  dwarf's do not), stride scale and playback speed; one setting per character in the retarget step, judged by the
+  glitch survey and a blind panel. A browsable page of every take on every skin helps pick takes.
+- **General limbs:** several examples sit exactly on `maxThinFraction` (0.25); a very soft appendage on a very fast
+  spin flails (swing frames are singular near 180 degrees), which no script does today.
+- **Judging:** strip panels use the stacked layout (side by side, long strips read as one); control strips from
+  different runs differ more than a control should.
+- Drafts kept outside the engine: the knight's hand-drawn walk frames ([`pocs/drawn-walk/`](../pocs/drawn-walk)) and
+  its restyled skin ([`pocs/game-sprite-style/`](../pocs/game-sprite-style)); the walk-frames renderer is in the
+  history at 2ca4379.
 
 ## Smaller items
 
-- [ ] Rigid-body behaviours in the engine (needed by P8 anyway): root with full 3D orientation, `hang`, scripted `hit`.
+- [ ] Rigid-body behaviours in the engine: root with full 3D orientation, `hang`, scripted `hit`.
 - [ ] Stray pixels left after the outline fix: single pixels of `allowThin` parts peeking past their neighbours
       (the unicorn's mane and ears; the author opted into thin parts, so they are left alone) and a few isolated
       outline pixels (knight, spider).
 - [ ] Quadruped gait tuning for short legs (knee speed) and turning (the dragon only passed at 0.1 m/s, no turn).
-- P2 gate `partAreaJump` counts occlusion as instability; decided (2026-10-30) to leave P2's fail as recorded and to
-  measure area change with the image-and-points `areaChange` gate instead.
+- P2 gate `partAreaJump` counts occlusion as instability; P2's fail stays as recorded, and area change is measured
+  with the image-and-points `areaChange` gate instead.
 - [ ] Remaining renderer speedups that keep pixels: PNG compression and sheet assembly.
 
 ## Logo
@@ -114,7 +88,10 @@ between the first frame and one cycle later (normal frame-to-frame change is abo
 ## How to work on this project
 
 - Node 24+, TypeScript run directly (type stripping), no build: `npm install`, `npm test`, `npm run typecheck`.
-- Runners: `npm run p1` ... `p6`, `npm run check -- <dir>`, `npm run demo`, `npm run skins -- <skin.json>`; add
+- Page world: `npm run gates` (standing, flicker, jumps; `--landings`, `--jumps`, `--super-jumps`, `--jump-takes`),
+  `npm run glitches` (the survey, about an hour), `npm run rendering-panel`, `npm run game-panel -- <LPC dir>`,
+  `npm run jump-panel`, `npm run skin -- fit <dir>`; `npm run site && npm run test:browser` for Chrome.
+- Proof runners: `npm run p1` ... `p6`, `npm run check -- <dir>`, `npm run demo`, `npm run skins -- <skin.json>`; add
   `--verify` (or `npm run pN:verify`) for the determinism re-run.
 - Fix gates in a plan before building; only tighten them afterwards, and log why; add a control that must fail.
 - After each batch, an independent review told to assume the code is wrong; fix before moving on.

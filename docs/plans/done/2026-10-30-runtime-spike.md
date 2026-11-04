@@ -34,7 +34,7 @@ walking characters, skins, multiple characters, a public API commitment.
    - limp legs, mane and tail as cloth chains on the moving body (existing solver, stepped per frame);
    - events applied at the next frame: `hit({ impulse, spin })`, plus behaviour changes.
 4. **Behaviour API**, built on the composition model in
-   [`docs/plans/2026-10-30-composable-behaviours.md`](2026-10-30-composable-behaviours.md) (phase 1 of it): the five
+   [`docs/plans/2026-10-30-composable-behaviours.md`](../2026-10-30-composable-behaviours.md) (phase 1 of it): the five
    behaviours below are compositions in a `behaviours.json` (base `hang`, layers, additive overlays, events,
    blending and a state machine), not hard-coded. A small runtime object:
    - `createCharacter(artifact, canvas, options)`

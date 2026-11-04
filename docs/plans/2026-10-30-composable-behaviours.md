@@ -2,7 +2,7 @@
 
 **Goal:** complex animation is built from simple, separately checked pieces that an AI agent composes, instead of
 every behaviour being written by hand. The same composition model drives offline renders (motion scripts) and the
-live runtime (P8, [`docs/plans/2026-10-30-runtime-spike.md`](2026-10-30-runtime-spike.md)).
+live runtime (P8, [`docs/plans/done/2026-10-30-runtime-spike.md`](done/2026-10-30-runtime-spike.md)).
 
 This follows standard animation practice: sequencing, layering with limb masks, additive overlays, blending,
 state machines and procedural layers. Piñata's difference is that most pieces are procedural (physics, IK,

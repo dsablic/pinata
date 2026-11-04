@@ -35,7 +35,7 @@ separate, swappable layer?
 | P6 style swap | Pass | One character's motion is byte-identical across three styles; judges grouped six images by character and by style without error. |
 | Skins spike | Promising, formally inconclusive | An AI artist's per-part sprites validated first try; judges preferred the skinned walk over the procedural one, and rated it more hand-made than CC0 references in 44 of 54 comparisons, but the control rule failed in every round. |
 
-### P1: procedural style ([findings](plans/p1-findings.md))
+### P1: procedural style ([findings](plans/done/p1-findings.md))
 
 Rendering a mannequin of capsules and boxes into a G-buffer and stylising it (banded shading, outlines, decals) gives
 readable sprites, but not hand-made-looking ones. A second round added hue-shifted ramps, selective outlines, accent
@@ -43,21 +43,21 @@ decals and an asymmetric pose; the judges' complaints moved from "uniform outlin
 shading, assembled parts", and their confidence rose. Facing direction read correctly in 3/4 views but not from a pure
 side camera.
 
-### P2: pixel stability ([findings](plans/p2-findings.md))
+### P2: pixel stability ([findings](plans/done/p2-findings.md))
 
 Slow rotation initially flickered just over the 1% limit at 32 px. Temporal hysteresis in the rasterizer (a pixel
 changes in or out of the silhouette only past a coverage margin) fixed it without changing single-frame output. The
 part-area-jump gate failed because its "motion cause" test missed occlusion (a forearm sweeping over a thigh); it was
 recorded as failed rather than redefined after the fact.
 
-### P3: secondary motion ([findings](plans/p3-findings.md))
+### P3: secondary motion ([findings](plans/done/p3-findings.md))
 
 An XPBD solver with per-material compliance, damping and drag, colliding against the body's distance field, gives
 cloth that lags, overshoots and settles in material order (silk slowest, leather fastest) and streams in wind. The
 first gates passed for a rigid cape too (settle clock during deceleration, no lag floor, wind direction without
 magnitude, penetration checked only after collision); after tightening, the rigid control fails every motion gate.
 
-### P4: locomotion ([findings](plans/p4-findings.md))
+### P4: locomotion ([findings](plans/done/p4-findings.md))
 
 Footsteps planned from distance travelled, landing targets predicted from the root's future position and heading,
 two-bone IK and a pelvis drop give planted feet with no measurable slide. Knee-speed peaks came from three
@@ -66,7 +66,7 @@ straight, compressed swing edges). The skating control initially also locked its
 panel unfair; it was rerun with a fair control and clean images. The result stands: correct motion is not
 automatically readable motion at 48 px.
 
-### P5: AI authoring loop ([findings](plans/p5-findings.md))
+### P5: AI authoring loop ([findings](plans/done/p5-findings.md))
 
 A character is a directory of JSON files; one command (`npm run check`) validates it, runs every static, locomotion
 and cloth gate, and prints a hint per failure naming the part, frame and fix. Before the experiment, a review found
@@ -74,12 +74,12 @@ the guide and hints pointing the wrong way on the most likely failure (sliding f
 not lowering it); with that fixed, every author passed. The authors' main complaint, that simulated cloth was not
 drawn in the stills, has since been fixed.
 
-### P6: style swap ([findings](plans/p6-findings.md))
+### P6: style swap ([findings](plans/done/p6-findings.md))
 
 Motion never reads the style, so swapping styles is free: three styles written by an agent from one-line briefs
 render the same two characters with identical motion data, each style passing the static and flicker gates.
 
-### Skins spike ([findings](plans/skins-findings.md))
+### Skins spike ([findings](plans/done/skins-findings.md))
 
 Per-part sprites drawn by an AI artist, placed and rotated on the rig's projected bones, look far more hand-made than
 procedural rendering, and walk better. The A/B panel's control rule (judges should answer "can't tell" between two

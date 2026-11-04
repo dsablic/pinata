@@ -1,6 +1,5 @@
 {
   "name": "pinata",
-  "version": "0.0.0",
   "private": true,
   "description": "AI-driven pixel-art character animation: scripted physics, IK and secondary motion with machine-checkable diagnostics",
   "license": "MIT",
@@ -19,15 +18,8 @@
   ],
   "type": "module",
   "bin": {
-    "pinata": "dist/node/src/cli/pinata.js"
+    "pinata": "src/cli/pinata.ts"
   },
-  "files": [
-    "dist/node",
-    "motion/clips",
-    "motion/humanoid.json",
-    "docs/authoring.md",
-    "site/world.json"
-  ],
   "engines": {
     "node": ">=24"
   },
@@ -35,7 +27,6 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "test:browser": "node src/cli/browser-test.ts",
     "typecheck": "tsc",
-    "build": "node -e \"require('node:fs').rmSync('dist/node', { recursive: true, force: true })\" && tsc -p tsconfig.build.json",
     "p1": "node pocs/p1-static-style/run.ts",
     "p1:verify": "node pocs/p1-static-style/run.ts --verify",
     "p2": "node pocs/p2-pixel-stability/run.ts",

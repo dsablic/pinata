@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "pinata": {
+      "command": "node",
+      "args": ["src/cli/pinata.ts", "mcp"]
+    }
+  }
+}

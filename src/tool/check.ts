@@ -1,0 +1,127 @@
+import { rmSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
+import { formatCharacterErrors, loadCharacter } from '../formats/character.ts'
+import type { Character } from '../formats/character.ts'
+import { simulateCharacter } from '../motion/character.ts'
+import { encodePng } from '../png/encode.ts'
+import { writeOutput } from '../diagnostics/report.ts'
+import { clothChecks, hasCloth } from '../cli/cloth.ts'
+import { locomotionChecks, locomotionRecording } from '../cli/locomotion.ts'
+import { contactSheet, renderStatic, staticChecks } from '../cli/static.ts'
+import { clothOnionSkin, footprints, walkStrip, withSettledCloth } from '../cli/stills.ts'
+import { formatSummary, runChecks } from '../cli/summary.ts'
+import type { Check } from '../cli/summary.ts'
+import { messageOf } from './io.ts'
+import type { Invoke, Io } from './io.ts'
+
+export const checkUsage = (invoke: Invoke): string => `usage: ${invoke('check')} <character dir> [--out <dir>]`
+const OUTPUTS = ['summary.txt', 'metrics.json', 'sheet.png', 'walk.png', 'footprints.png', 'cloth.png']
+
+type Args = { dir: string, out: string }
+
+function parseArgs (argv: string[], usage: string): Args | string {
+  const positional: string[] = []
+  let out: string | undefined
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--out') {
+      out = argv[++i]
+      if (out === undefined) return `--out needs a directory\n${usage}`
+    } else if (argv[i].startsWith('--')) return `unknown option '${argv[i]}'\n${usage}`
+    else positional.push(argv[i])
+  }
+  if (positional.length !== 1) return usage
+  return { dir: resolve(positional[0]), out: resolve(out ?? join(positional[0], 'report')) }
+}
+
+function finite (key: string, value: unknown): unknown {
+  return typeof value === 'number' && !Number.isFinite(value) ? String(value) : value
+}
+
+function pathKind (path: string): 'directory' | 'other' | 'missing' {
+  try {
+    return statSync(path).isDirectory() ? 'directory' : 'other'
+  } catch {
+    return 'missing'
+  }
+}
+
+function writeError (args: Args, message: string, io: Io): void {
+  io.err(message)
+  if (pathKind(args.dir) !== 'directory') return
+  try {
+    writeOutput(join(args.out, 'summary.txt'), `automated gates: ERROR\n${message}\n`)
+  } catch (err) {
+    io.err(`could not write ${join(args.out, 'summary.txt')}: ${messageOf(err)}`)
+  }
+}
+
+function isFileError (err: unknown): boolean {
+  return err instanceof Error && 'code' in err
+}
+
+function failureText (err: unknown): string {
+  if (isFileError(err) || !(err instanceof Error)) return messageOf(err)
+  return err.stack ?? err.message
+}
+
+function clearReport (out: string): void {
+  try {
+    for (const name of OUTPUTS) rmSync(join(out, name), { force: true })
+  } catch {
+    return
+  }
+}
+
+function analyse (character: Character, out: string, io: Io): number {
+  const started = performance.now()
+  const frames = renderStatic(character.mannequin, character.style)
+  const run = simulateCharacter({
+    mannequin: character.mannequin, rig: character.rig, scenario: character.scenario, materials: character.materials
+  })
+  const recording = locomotionRecording(character, run)
+  const cloth = hasCloth(character)
+  const shown = cloth ? renderStatic(withSettledCloth(character, recording, run.recording), character.style) : frames
+  writeOutput(join(out, 'sheet.png'), encodePng(contactSheet(shown)))
+  writeOutput(join(out, 'walk.png'), encodePng(walkStrip(character, recording, cloth ? run.recording : undefined)))
+  writeOutput(join(out, 'footprints.png'), encodePng(footprints(character, recording)))
+  if (cloth) writeOutput(join(out, 'cloth.png'), encodePng(clothOnionSkin(character, recording, run.recording)))
+  const checks: Check[] = [
+    ...staticChecks(character.mannequin, character.style, frames),
+    ...locomotionChecks(character, recording),
+    ...(cloth ? clothChecks(character, run) : [])
+  ]
+  const results = runChecks(checks)
+  const seconds = (performance.now() - started) / 1000
+  const header = `check: ${character.name} (${character.dir})${cloth ? '' : ' [no cloth: cloth gates skipped]'}`
+  const summary = formatSummary(header, results)
+  writeOutput(join(out, 'summary.txt'), `${summary}\n`)
+  const metricsReport = { gates: results, timing: { seconds, ...run.timing } }
+  writeOutput(join(out, 'metrics.json'), JSON.stringify(metricsReport, finite, 2))
+  io.out(summary)
+  io.out(`report: ${out} (${seconds.toFixed(1)} s)`)
+  return results.every(r => r.pass) ? 0 : 1
+}
+
+export function runCheck (argv: string[], io: Io, invoke: Invoke): number {
+  const args = parseArgs(argv, checkUsage(invoke))
+  if (typeof args === 'string') {
+    io.err(args)
+    return 2
+  }
+  if (pathKind(args.dir) === 'other') {
+    io.err(`'${args.dir}' is not a directory; pass the directory that holds character.json`)
+    return 2
+  }
+  clearReport(args.out)
+  try {
+    const loaded = loadCharacter(args.dir)
+    if (loaded.value === undefined || loaded.errors.length > 0) {
+      writeError(args, formatCharacterErrors(loaded.errors), io)
+      return 2
+    }
+    return analyse(loaded.value, args.out, io)
+  } catch (err) {
+    writeError(args, failureText(err), io)
+    return 2
+  }
+}

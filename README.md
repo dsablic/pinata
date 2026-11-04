@@ -30,6 +30,9 @@ check its own work.
   - **In Claude Code:** the `pinata` mod shows the piñata in a pane beside the chat, reacting as the agent works. In
     this repository it is enabled once you trust the folder; elsewhere run
     `/plugin install pinata --marketplace dsablic/pinata`, then `/pinata` opens the pane. It needs Node.js 24.
+- **One command and an MCP server:** `pinata new|check|skin|render|export` over the engine, and `pinata mcp`, the
+  same commands as MCP tools over stdio with the authoring guide as a resource. The repository's `.mcp.json`
+  registers it for Claude Code. See [`docs/authoring.md`](docs/authoring.md).
 - **Checking quality:** every feature is built against gates fixed before the code, and visual quality is judged by
   blind AI judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)).
 
@@ -50,6 +53,8 @@ npm test                       # unit tests
 npm run typecheck              # tsc, no emit
 npm run runtime                # build the site and serve the world at http://127.0.0.1:8080/
 npm run check -- examples/knight                 # check a character package
+npm run pinata -- help                           # the pinata command: new, check, skin, render, export, mcp
+node src/cli/pinata.ts export examples/knight out    # a sprite sheet and Aseprite-format JSON in eight directions
 npm run new -- --template hexapod my-bug         # write a starter package (biped, quadruped, hexapod or octopod)
 npm run judge -- build panel.json packet/ key.json   # build a blind judge panel
 npm run mocap -- convert motion/takes.json <cmu-dir> motion/clips   # rebuild the motion clips

@@ -1,0 +1,192 @@
+import { join, resolve } from 'node:path'
+import { TEMPLATE_NAMES } from '../formats/templates.ts'
+import { checkUsage, runCheck } from './check.ts'
+import { exportUsage, runExport } from './export.ts'
+import type { Invoke, Io } from './io.ts'
+import { newUsage, runNew } from './new.ts'
+import { renderUsage, runRender } from './render.ts'
+import { runSkin, skinUsage } from './skin.ts'
+
+export type Args = Record<string, unknown>
+type Property = { type: 'string' | 'number' | 'boolean', description?: string, enum?: string[] }
+type Schema = {
+  type: 'object'
+  properties: Record<string, Property>
+  required: string[]
+  additionalProperties: false
+}
+export type Command = {
+  name: string
+  summary: string
+  description: string
+  schema: Schema
+  argv: (args: Args) => string[] | string
+  output: (args: Args) => string | undefined
+  usage: (invoke: Invoke) => string
+  run: (argv: string[], io: Io, invoke: Invoke) => number
+}
+
+const PATHS = 'relative paths resolve against the server\'s working directory'
+const DIR: Property = {
+  type: 'string', description: `the character directory (holds character.json and the other files); ${PATHS}`
+}
+const OUT: Property = { type: 'string', description: `the directory to write into (created if missing); ${PATHS}` }
+
+function text (args: Args, key: string): string | undefined {
+  const value = args[key]
+  return typeof value === 'string' && value !== '' ? value : undefined
+}
+
+function required (args: Args, keys: string[]): string | undefined {
+  const missing = keys.filter(key => text(args, key) === undefined)
+  return missing.length === 0 ? undefined : `missing argument${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`
+}
+
+function flag (args: Args, key: string, flagName: string): string[] | string {
+  const value = args[key]
+  if (value === undefined) return []
+  return typeof value === 'number' && Number.isFinite(value) ? [flagName, String(value)] : `${key} must be a number`
+}
+
+function fitArgv (args: Args, dir: string): string[] | string {
+  const flags = [flag(args, 'scale', '--scale'), flag(args, 'pixelsPerMetre', '--pixels-per-metre')]
+  const bad = flags.find(value => typeof value === 'string')
+  if (bad !== undefined) return bad as string
+  const skin = text(args, 'skin')
+  return ['fit', dir, ...(skin === undefined ? [] : [skin]), ...flags.flat()]
+}
+
+function skinArgv (args: Args): string[] | string {
+  const missing = required(args, ['action', 'dir'])
+  if (missing !== undefined) return missing
+  const [action, dir] = [text(args, 'action') as string, text(args, 'dir') as string]
+  if (action === 'fit') return fitArgv(args, dir)
+  const noOut = required(args, ['out'])
+  if (noOut !== undefined) return noOut
+  const out = text(args, 'out') as string
+  if (action === 'guide') return ['guide', dir, out]
+  if (action === 'preview') {
+    const skin = text(args, 'skin') ?? join(dir, 'skin.json')
+    return ['preview', dir, skin, out, ...(args.clean === true ? ['--clean'] : [])]
+  }
+  return `unknown action '${action}'; use guide, preview or fit`
+}
+
+function pair (args: Args, keys: string[]): string[] | string {
+  return required(args, keys) ?? keys.map(key => text(args, key) as string)
+}
+
+export const COMMANDS: Command[] = [
+  {
+    name: 'new',
+    summary: 'write a starter character from a template',
+    description: 'Write a starter character package (biped, quadruped, hexapod or octopod) into a new directory.',
+    schema: {
+      type: 'object',
+      properties: {
+        template: { type: 'string', enum: [...TEMPLATE_NAMES] },
+        dir: { ...DIR, description: 'a new or empty directory' }
+      },
+      required: ['template', 'dir'],
+      additionalProperties: false
+    },
+    argv: args => required(args, ['template', 'dir']) ??
+      ['--template', text(args, 'template') as string, text(args, 'dir') as string],
+    output: args => text(args, 'dir'),
+    usage: newUsage,
+    run: runNew
+  },
+  {
+    name: 'check',
+    summary: 'run the gates on a character and write a report with hints',
+    description: 'Run the static, locomotion and cloth gates on a character package. Failed gates carry hints ' +
+      'naming the file to fix. Writes summary.txt, metrics.json and stills (sheet, walk, footprints, cloth).',
+    schema: {
+      type: 'object',
+      properties: { dir: DIR, out: { ...OUT, description: `the report directory (default: <dir>/report); ${PATHS}` } },
+      required: ['dir'],
+      additionalProperties: false
+    },
+    argv: args => required(args, ['dir']) ??
+      [text(args, 'dir') as string, ...(text(args, 'out') === undefined ? [] : ['--out', text(args, 'out') as string])],
+    output: args => resolve(text(args, 'out') ?? join(text(args, 'dir') ?? '.', 'report')),
+    usage: checkUsage,
+    run: runCheck
+  },
+  {
+    name: 'skin',
+    summary: 'draw guides, preview and fit-check skins',
+    description: 'Skin tools. action guide: per-view drawing guide (needs out). action preview: render the skin in ' +
+      'eight directions, a turntable and walks (needs out; skin defaults to <dir>/skin.json). action fit: list part ' +
+      'views whose drawn length is off (prints only).',
+    schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['guide', 'preview', 'fit'] },
+        dir: DIR,
+        out: OUT,
+        skin: { type: 'string', description: 'a skin file (default: <dir>/skin.json)' },
+        clean: { type: 'boolean', description: 'preview with clean rotation' },
+        scale: { type: 'number', description: 'fit: the page scale' },
+        pixelsPerMetre: { type: 'number', description: 'fit: pixels per metre on the page' }
+      },
+      required: ['action', 'dir'],
+      additionalProperties: false
+    },
+    argv: skinArgv,
+    output: args => text(args, 'action') === 'fit' ? undefined : text(args, 'out'),
+    usage: skinUsage,
+    run: runSkin
+  },
+  {
+    name: 'render',
+    summary: 'render the skinned idle in eight directions and a walk strip',
+    description: 'Draw a skinned character with motion capture: its idle in eight directions and a walk strip. ' +
+      'Writes idle-directions.png and walk-strip.png.',
+    schema: {
+      type: 'object', properties: { dir: DIR, out: OUT }, required: ['dir', 'out'], additionalProperties: false
+    },
+    argv: args => pair(args, ['dir', 'out']),
+    output: args => text(args, 'out'),
+    usage: renderUsage,
+    run: runRender
+  },
+  {
+    name: 'export',
+    summary: 'record every animation in eight directions and write a sprite sheet with its JSON',
+    description: 'Record idle, walk, run, turn and jump in eight directions, write the sprite sheet PNG and an ' +
+      'Aseprite-format JSON, and print the export gates. Engine notes do not fail the command.',
+    schema: {
+      type: 'object', properties: { dir: DIR, out: OUT }, required: ['dir', 'out'], additionalProperties: false
+    },
+    argv: args => pair(args, ['dir', 'out']),
+    output: args => text(args, 'out'),
+    usage: exportUsage,
+    run: runExport
+  }
+]
+
+export function invalidArguments (command: Command, args: Args): string | undefined {
+  const { properties } = command.schema
+  for (const [key, value] of Object.entries(args)) {
+    const property = properties[key]
+    if (property === undefined) return `unknown argument '${key}'; arguments: ${Object.keys(properties).join(', ')}`
+    if (typeof value !== property.type) return `argument '${key}' must be a ${property.type}, not ${typeof value}`
+    if (property.enum !== undefined && !property.enum.includes(value as string)) {
+      return `argument '${key}' must be one of ${property.enum.join(', ')}`
+    }
+  }
+  return undefined
+}
+
+export function commandNamed (name: string): Command | undefined {
+  return COMMANDS.find(command => command.name === name)
+}
+
+export function helpText (invoke: Invoke = c => `pinata ${c}`): string {
+  const width = Math.max(...COMMANDS.map(command => command.name.length), 'mcp'.length)
+  const listed = [...COMMANDS, { name: 'mcp', summary: 'serve the commands as MCP tools over stdio' }]
+  const lines = listed.map(c => `  ${c.name.padEnd(width)}  ${c.summary}`)
+  const usages = COMMANDS.map(command => command.usage(invoke).replace(/^usage: /, '  ').replace(/\n {7}/g, '\n  '))
+  return ['usage: pinata <command> [arguments]', '', 'commands:', ...lines, '', 'arguments:', ...usages].join('\n')
+}

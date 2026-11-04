@@ -56,9 +56,11 @@ export function clippedPixels (track: Track): number {
 export const GROUND_PX = 1
 export const ANCHOR_PX = 0.5
 
-export function groundOffset (track: Track): number {
-  const rows = track.frames[0].feet.flatMap(foot => foot.sole === undefined ? [] : [Math.abs(foot.sole.y + 1)])
-  return Math.max(...rows)
+export const GROUND_DIRECTIONS = ['right', 'left']
+
+export function groundOffset (track: Track): number | undefined {
+  const rows = track.frames[0].feet.flatMap(foot => foot.sole === undefined ? [] : [foot.sole.y + 1])
+  return rows.length === 0 ? undefined : rows.reduce((worst, row) => Math.abs(row) > Math.abs(worst) ? row : worst)
 }
 
 export function anchorOffset (cell: Cell): number {

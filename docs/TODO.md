@@ -30,12 +30,13 @@ artefacts, in [`docs/plans/done/`](plans/done).
 character that walks, idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. Batches:
 A recorder and export, B one command line and the MCP server, C behaviours and Aseprite, D authoring and the exit
 test. Batch A (recorder, sheet and JSON export, the loop, feet, direction-packet and round-trip gates) is built;
-the direction panel waits for its judges.
+the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
 
-- **Interfaces:** `pinata check`, `pinata render` and `pinata export` as one CLI, and an MCP server wrapping them.
 - **Export:** sprite sheets with JSON frame data, then Aseprite files.
 - **Behaviour library:** idle, crouch and a simple attack beside walk, turn and jump, each with gates, built on the
   [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
+- **Packaging (Phase 1 follow-up):** `pinata` runs from a checkout only, because Node does not strip types under
+  `node_modules`; an installed package needs a built JavaScript bin.
 - **Authoring hints:** the P5 authors' notes (decals for small features, stride guidance, palette budgeting, a
   reliable edit path for agents).
 

@@ -82,7 +82,7 @@
         "LLLLl",
         "tLLLl",
         ".lll."
-      ], "pivotA": [1, 2], "pivotB": [3, 2] },
+      ], "pivotA": [1, 3], "pivotB": [3, 3] },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",
@@ -102,7 +102,7 @@
         "LLLLl",
         "tLLLl",
         ".lll."
-      ], "pivotA": [1, 2], "pivotB": [3, 2] },
+      ], "pivotA": [1, 3], "pivotB": [3, 3] },
       "shoulderL": { "rows": [
         ".mCCm.",
         "mCCmmc",
@@ -227,7 +227,7 @@
         "LLLLLl.",
         "lLLLLLL",
         ".llllll"
-      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      ], "pivotA": [2, 2], "pivotB": [5, 2] },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",
@@ -246,7 +246,7 @@
         "LLLLLl.",
         "lLLLLLL",
         ".llllll"
-      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      ], "pivotA": [2, 2], "pivotB": [5, 2] },
       "shoulderL": { "rows": [
         ".mCCm.",
         "mCCmmc",
@@ -368,7 +368,7 @@
         "LLLLLLLl.",
         "lLLLLLLLl",
         ".llllllll"
-      ], "pivotA": [2, 1], "pivotB": [7, 1] },
+      ], "pivotA": [2, 3], "pivotB": [7, 3] },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",
@@ -388,7 +388,7 @@
         "LLLLLLLl.",
         "lLLLLLLLl",
         ".llllllll"
-      ], "pivotA": [2, 1], "pivotB": [7, 1] },
+      ], "pivotA": [2, 3], "pivotB": [7, 3] },
       "shoulderL": { "rows": [
         ".mCCm.",
         "mCCmmc",
@@ -507,7 +507,7 @@
         "LLLLLl.",
         "lLLLLLL",
         ".llllll"
-      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      ], "pivotA": [2, 2], "pivotB": [5, 2] },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",
@@ -526,7 +526,7 @@
         "LLLLLl.",
         "lLLLLLL",
         ".llllll"
-      ], "pivotA": [2, 1], "pivotB": [5, 1] },
+      ], "pivotA": [2, 2], "pivotB": [5, 2] },
       "shoulderL": { "rows": [
         ".mCCm.",
         "mCCmmc",

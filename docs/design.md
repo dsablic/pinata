@@ -1206,6 +1206,66 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - `from` reuses another sprite, by part name in the same view or as `view.part`; the copy keeps its own `layer`.
   Chains of references are followed; a missing or circular reference is an error.
 
+## Command line and MCP server (`src/tool/`, `src/cli/pinata.ts`)
+
+- Every subcommand is a function `(argv, io, invoke) => exit code` in `src/tool/`; the old npm scripts (`check`,
+  `new`, `skin`, `export`) are three-line entry points over the same functions. `io` is a pair of line writers
+  (console for the command line, a buffer for the server) and `invoke` names how the command is called in usage and
+  hints (`npm run check --`, `pinata check`), so no text is written twice. Commands never call `process.exit` or
+  `console`.
+- The old scripts keep their files and their printed lines; what changed, on purpose: `export` prints its report in
+  the new format (`ok`, `FAIL`, `note`, `n/a`, hint lines, a verdict that counts engine notes) and exits 0 when only
+  engine gates miss; `export` refuses extra arguments (exit 2) and exits 2 with a message, not a stack trace, for a
+  character that cannot be recorded; `skin` exits 2 with a message when a file it reads is missing (it used to end on
+  an uncaught error); `check` prints a file error's message without a stack.
+- The MCP tool for a subcommand builds the argument vector the command line takes from its JSON arguments (`argv` in
+  `commands.ts`) and runs the same function, so a tool and its command cannot drift: the agreement test compares the
+  printed lines, the files and the status of each. Arguments are validated against the tool's schema first
+  (`additionalProperties: false`): an unknown name, a wrong type or a value outside an enum is an error result naming
+  the argument, never ignored (`clean: "true"` is not `false`).
+- A tool result has two text blocks, the command's lines with the files written and `exit status: n`, then the
+  same `status` and `files` as JSON, which is also `structuredContent`. `isError` is true for any non-zero status,
+  and argument errors have the same shape with status 2. The files listed are those the command wrote: the entries of
+  the output directory that are new or changed, and everything inside a new subdirectory; a directory that was
+  already there is not walked (an output directory may hold anything), and a refusal (status 2) lists nothing. Every
+  failure of a command, including an unwritable output directory, is a result; JSON-RPC errors are for the protocol
+  (malformed JSON, an unknown method, tool or resource, bad parameters), because the agent is meant to read a failed
+  gate and act. Relative paths resolve against the server's working directory.
+- Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files, with a hint naming the file; 2 a usage
+  error, an unloadable package or a character the command cannot work on (for example `export` of an unskinned
+  one). `check`'s gates all measure the character, so all fail a run. `check` removes only the report files it
+  writes from its output directory and writes nothing outside it.
+- In `export` the gates that measure the engine, whose misses no character file can fix, are printed as `note` lines
+  (`engine note`) and do not set exit 1: `feet` (the drawn sole slide in walks and runs: the boot is redrawn as the
+  ankle rotates), `facing` (the view drawn against the direction), `border` (pixels on a cell's edge: the cell is cut
+  from the measured extent) and `anchor` (root against pivot: both are the engine's). The gates a file can fix fail:
+  `ground` (the skin's feet sit off the ground line: `skin.json`) and `loop` (the cycle's end does not match its
+  start: `motion.json` for cloth, `rig.json` for the gait).
+- `ground` is measured in the side views only (idle right and left). There the line under the root is where the feet
+  stand. From the front or back the camera, 14 degrees above the horizon, projects a toe that points at the viewer
+  below the line under the root, so a correct skin misses by perspective, not by drawing. The offset is signed (below
+  the line, or floating above it), each with its own hint, and a view in which no sole pixel is visible fails. The
+  left view is an engine note (`mirroredGround`): it mirrors the right view's sprites, so each foot's sprite is drawn
+  on the other foot's bone, and a rig whose legs are not symmetric at rest (the knight's) puts a foot off the line
+  that no skin can correct, since a skin holds no sprites for the mirrored view.
+- `render` draws the skinned idle in eight directions and the right-facing walk from the recorder (the same drawing
+  as `export`, so what is looked at is what is exported); unskinned characters are drawn by `check`'s stills.
+- `pinata mcp` is a small JSON-RPC 2.0 server over stdio, newline-delimited, without the SDK: the protocol subset is
+  `initialize` (the client's protocol version is echoed when it is `2025-06-18` or `2024-11-05`, otherwise
+  `2025-06-18` is offered; `2025-03-26` is not accepted because it requires batch arrays, which are not
+  implemented), notifications (no reply), `ping`, `tools/list`, `tools/call`, `resources/list` and `resources/read`,
+  with `docs/authoring.md` as the resource `pinata://docs/authoring`. No dependency: the subset is small, and an SDK
+  would be the project's first runtime dependency.
+- A running command blocks the server: commands run synchronously in the server's process (2 to 6 s for `render`
+  and `export`), and no other request, `ping` included, is answered until the command returns. Stdio use with one
+  request at a time accepts this.
+- Logging goes to stderr only. While serving, `console.log`, `info`, `debug`, `dir` and `table` and
+  `process.stdout.write` all write to stderr; only the protocol's own writer holds the real stdout.
+- `pinata` runs from a checkout (`node src/cli/pinata.ts`, `npm run pinata --`, or `npm link`, which resolves to the
+  checkout). Node does not strip types under `node_modules`, so an installed package cannot run its `bin`; packaging
+  needs a built JavaScript bin (see the TODO). The repository's `.mcp.json` registers the server for Claude Code
+  with `node src/cli/pinata.ts mcp`.
+
 ## Export (`src/export/`)
 
 ### `record.ts`
@@ -1279,12 +1339,14 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   counted as flickers, not measured; pairs where the foot has no visible pixel are counted as hidden. A boot redrawn as
   the ankle and toe rotate moves its lowest row by several pixels, so this gate is missed (see the plan's results). An
   earlier measure on the projected skeleton ends held 1 px; it tested the player, not the exported frames.
-- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the standing frames facing front and
-  right, the lowest pixel row of each foot part is within 1 px of the ground line (the pivot's row edge).
+- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the standing frames facing right and
+  left, the lowest pixel row of each foot part is within 1 px of the ground line (the pivot's row edge); the other
+  views are not measured, for the reason in the command line section.
 - Facing: the view sector the painter used for every frame of idle, walk, run and jump is the direction's. Turns
   change sector on the way and are not checked. Border: no opaque pixel on the cell's edge.
 - `npm run export -- <character dir> <out dir>` writes `<name>.png` and `<name>.json`, prints each check (`ok`,
-  `FAIL`, or `n/a` for not measured) and exits 1 when a measured one fails. The character's directory name is its
+  `FAIL`, `note` for an engine gate that missed, or `n/a` for not measured) and exits 1 when a measured gate that a
+  character file can fix fails. The character's directory name is its
   name; the config (environment, dress) is the world's (`site/world.json`).
 
 ## Judge panels (`src/judge/`)

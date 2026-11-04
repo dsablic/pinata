@@ -11,7 +11,7 @@ import { exportFiles, MOST_SHEET_PX } from '../src/export/sheet.ts'
 import { createImage, setPixel } from '../src/image.ts'
 import { decodePng } from '../src/png/decode.ts'
 
-const MISSED_GATES = ['feet', 'ground']
+const MISSED_GATES = ['feet', 'mirroredGround']
 const world = readWorld(worldBundle())
 const recordings = new Map<string, Recording>()
 
@@ -71,7 +71,9 @@ test('a repeated frame at the seam fails, and identical frames are not measured'
 })
 
 for (const name of SKINNED_HUMANOIDS) {
-  test(`${name}: every animation is recorded in eight directions and passes every export gate but the recorded misses (feet, ground)`, () => {
+  const title = `${name}: every animation is recorded in eight directions and passes every export gate but the ` +
+    'recorded misses (feet, the mirrored view\'s ground)'
+  test(title, () => {
     const recording = recorded(name)
     assert.equal(recording.tracks.length, BEHAVIOURS.length * DIRECTIONS.length)
     const failed = checksOf(recording).filter(check => check.measured && !check.pass)

@@ -95,6 +95,39 @@
         170,
         405
       ]
+    },
+    {
+      "name": "idle-wait",
+      "subject": "137",
+      "trial": "28",
+      "description": "normal wait",
+      "kind": "idle",
+      "range": [
+        200,
+        510
+      ]
+    },
+    {
+      "name": "crouch-squat",
+      "subject": "86",
+      "trial": "2",
+      "description": "walk, squats, run, stretch, jumps, punches, and drinking",
+      "kind": "crouch",
+      "range": [
+        1090,
+        1370
+      ]
+    },
+    {
+      "name": "attack-punch",
+      "subject": "141",
+      "trial": "14",
+      "description": "punch and kick",
+      "kind": "attack",
+      "range": [
+        60,
+        215
+      ]
     }
   ]
 }

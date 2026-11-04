@@ -5,7 +5,7 @@ import type { Validated, ValidationError } from '../formats/validate.ts'
 import { parseHex } from '../image.ts'
 import type { Image } from '../image.ts'
 
-export type ChoiceItem = { id: string, image: string, label: string }
+export type ChoiceItem = { id: string, image: string, label: string, control?: boolean }
 export type ChoiceSpec = {
   kind: 'choice'
   name: string
@@ -20,16 +20,25 @@ export type ChoiceKey = {
   name: string
   kind: 'choice'
   labels: string[]
-  items: Record<string, { id: string, label: string }>
+  items: Record<string, { id: string, label: string, control?: boolean }>
 }
 export type ChoicePacket = { images: Record<string, Image>, questions: string, key: ChoiceKey }
 export type ChoiceAnswers = Record<string, { choice: string }>
 export type LabelScore = { label: string, asked: number, right: number, named: Record<string, number> }
-export type ChoiceScore = { labels: LabelScore[], asked: number, right: number, share: number, missing: string[] }
+export type ControlScore = { asked: number, right: number }
+export type ChoiceScore = {
+  labels: LabelScore[]
+  asked: number
+  right: number
+  share: number
+  controls: ControlScore
+  missing: string[]
+}
 
 export const CANT_TELL = 'cant_tell'
 const SPEC_FIELDS = ['kind', 'name', 'seed', 'question', 'labels', 'scale', 'background', 'items'] as const
 const ITEM_FIELDS = ['id', 'image', 'label'] as const
+const ITEM_KEYS = [...ITEM_FIELDS, 'control'] as const
 const DEFAULTS = { scale: 8, background: '#c8c8c8' }
 
 export function isChoiceSpec (input: unknown): boolean {
@@ -72,7 +81,10 @@ export function validateChoiceSpec (input: unknown): Validated<ChoiceSpec> {
         errors.push({ path: here, message: 'expected an object' })
         return
       }
-      checkKnownKeys(item, ITEM_FIELDS, here, errors)
+      checkKnownKeys(item, ITEM_KEYS, here, errors)
+      if (item.control !== undefined && typeof item.control !== 'boolean') {
+        errors.push({ path: `${here}.control`, message: 'expected true or false' })
+      }
       for (const field of ITEM_FIELDS) {
         if (isNonEmptyString(item[field])) continue
         errors.push({ path: `${here}.${field}`, message: 'expected a non-empty string' })
@@ -121,7 +133,7 @@ export function buildChoicePacket (spec: ChoiceSpec, load: (path: string) => Ima
     const cell = { image: load(item.image), anchor: [0, 0] as [number, number] }
     const look = { scale: spec.scale, gap: spec.scale, background: parseHex(spec.background) }
     images[`${name}.png`] = sheet([[cell]], look)
-    key.items[name] = { id: item.id, label: item.label }
+    key.items[name] = { id: item.id, label: item.label, ...(item.control === true ? { control: true } : {}) }
   })
   return { images, questions: questionsText(spec, Object.keys(images)), key }
 }
@@ -143,20 +155,25 @@ export function choiceProblems (answers: unknown, key: ChoiceKey): string[] {
 
 export function scoreChoices (key: ChoiceKey, judges: ChoiceAnswers[]): ChoiceScore {
   const labels = key.labels.map((label): LabelScore => ({ label, asked: 0, right: 0, named: {} }))
+  const controls: ControlScore = { asked: 0, right: 0 }
   const missing: string[] = []
   for (const [item, entry] of Object.entries(key.items)) {
     const own = labels.find(l => l.label === entry.label) as LabelScore
     judges.forEach((answers, j) => {
       const choice = answers[item]?.choice
-      own.asked++
+      if (entry.control === true) {
+        controls.asked++
+        if (choice === entry.label) controls.right++
+      } else own.asked++
       if (choice === undefined) missing.push(`judge ${j + 1}: ${item}`)
-      else if (choice === entry.label) own.right++
-      else own.named[choice] = (own.named[choice] ?? 0) + 1
+      else if (choice === entry.label) {
+        if (entry.control !== true) own.right++
+      } else if (entry.control !== true) own.named[choice] = (own.named[choice] ?? 0) + 1
     })
   }
   const asked = labels.reduce((sum, l) => sum + l.asked, 0)
   const right = labels.reduce((sum, l) => sum + l.right, 0)
-  return { labels, asked, right, share: asked === 0 ? NaN : right / asked, missing }
+  return { labels, asked, right, share: asked === 0 ? NaN : right / asked, controls, missing }
 }
 
 export function formatChoiceScore (key: ChoiceKey, score: ChoiceScore): string {
@@ -169,6 +186,9 @@ export function formatChoiceScore (key: ChoiceKey, score: ChoiceScore): string {
     }),
     `correct in ${score.right}/${score.asked} answers (${percent(score.share)}), ` +
       'cant_tell and missing answers counted as wrong',
+    ...(score.controls.asked > 0
+      ? [`controls: ${score.controls.right}/${score.controls.asked} right (not in the share above)`]
+      : []),
     ...(score.missing.length > 0 ? [`missing answers: ${score.missing.join(', ')}`] : [])
   ].join('\n')
 }

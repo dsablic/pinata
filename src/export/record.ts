@@ -3,11 +3,13 @@ import type { Leg } from '../formats/rig.ts'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Vec3 } from '../math/vec.ts'
-import type { MotionDatabase } from '../mocap/database.ts'
+import type { PerformanceKind } from '../mocap/clip.ts'
+import type { MotionDatabase, PerformanceTake } from '../mocap/database.ts'
 import { DEFAULT_JUMP_KIND, jumpOf } from '../mocap/jump.ts'
 import type { JumpReach } from '../mocap/jump.ts'
 import { createPlayer } from '../mocap/player.ts'
 import type { Player } from '../mocap/player.ts'
+import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import { FPS, pageEnvironment, pageSecondary, raisedRoot } from '../page/cast.ts'
 import type { CastOptions } from '../page/cast.ts'
@@ -17,20 +19,20 @@ import { jointsOf } from '../page/walker.ts'
 import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
 import { chooseView, facingAngle } from '../style/views.ts'
-import { changedPixels, medianOf, ratioOf, repeated, steps } from './loops.ts'
+import { changedPixels, medianOf, ratioOf, repeated, seamFrom, steps } from './loops.ts'
 import type { Seam } from './loops.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import type { CastMember } from '../world/world.ts'
 import { turnToLocal, turnToWorld } from '../world/yaw.ts'
 
-export type Behaviour = 'idle' | 'walk' | 'run' | 'turn' | 'jump'
+export type Behaviour = PerformanceKind | 'walk' | 'run' | 'turn' | 'jump'
 export type Moment = { joints: Pose, curves: Record<string, Vec3[]>, position: Vec3, yaw: number, planted: boolean[] }
 export type Span = { from: number, to: number }
 export type Take = { frames: Moment[], from: number, to: number, loop: boolean }
 export type Air = Pick<CastOptions, 'environment' | 'springSubsteps'>
 export type Subject = { name: string, member: CastMember, look: Skinned, air: Air }
 export type Sole = { x: number, y: number }
-export type Foot = { planted: boolean, sole: Sole | undefined }
+export type Foot = { planted: boolean, sole: Sole | undefined, level: number }
 export type Frame = { image: Image, sector: number | undefined, travel: [number, number], feet: Foot[] }
 export type Track = { behaviour: Behaviour, direction: Direction, loop: boolean, frames: Frame[] }
 export type Cell = { width: number, height: number, pivot: [number, number], root: [number, number] }
@@ -42,7 +44,7 @@ export const DIRECTIONS = [
 ] as const
 export type Direction = typeof DIRECTIONS[number]
 export const SKINNED_HUMANOIDS = ['knight', 'rogue', 'dwarf', 'wizard']
-export const BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run', 'turn', 'jump']
+export const BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run', 'turn', 'jump', 'crouch', 'attack']
 
 const EAST = Math.PI / 2
 const QUARTER = Math.PI / 4
@@ -60,11 +62,20 @@ const MOST_CANDIDATES = 40
 const STILL_METRES = 0.002
 const STILL_FRAMES = 6
 const MOST_ONE_SHOT_FRAMES = 240
-type Looping = { warm: number, window: number, lengths: [number, number], speed: number }
+type Looping = {
+  warm: number
+  window: number
+  lengths: [number, number]
+  speed: number
+  candidates: number
+  holding: boolean
+}
+const IDLE_WARM = 240
+const GAIT = { warm: 144, candidates: MOST_CANDIDATES, holding: false }
+const IDLE_PERIODS = 4
 const LOOPS: Partial<Record<Behaviour, Looping>> = {
-  idle: { warm: 48, window: 36, lengths: [12, 12], speed: 0 },
-  walk: { warm: 144, window: 144, lengths: [12, 72], speed: WALK_SPEED },
-  run: { warm: 144, window: 96, lengths: [8, 48], speed: RUN_SPEED }
+  walk: { ...GAIT, window: 144, lengths: [12, 72], speed: WALK_SPEED },
+  run: { ...GAIT, window: 96, lengths: [8, 48], speed: RUN_SPEED }
 }
 
 export function yawOf (direction: Direction): number {
@@ -156,16 +167,20 @@ function period (found: Candidate[]): number {
   return Math.min(...near.map(f => f.length))
 }
 
-export function loopOf (frames: Moment[], images: Image[][], lengths: [number, number]): Span {
+export function loopOf (
+  frames: Moment[],
+  images: Image[][],
+  { lengths, candidates, holding }: Pick<Looping, 'lengths' | 'candidates' | 'holding'>
+): Span {
   const found = candidatesOf(frames, lengths)
   const base = period(found)
   const near = found.filter(f => Math.abs(f.length - base) <= PERIOD_SLACK)
-    .sort((a, b) => a.miss - b.miss || a.from - b.from).slice(0, MOST_CANDIDATES)
+    .sort((a, b) => a.miss - b.miss || a.from - b.from).slice(0, candidates)
   const consecutive = images.map(steps)
-  const seams = (c: Candidate): Seam[] => images.map((own, d) => ({
-    seam: changedPixels(own[c.from + c.length - 1], own[c.from]),
-    median: medianOf(consecutive[d].slice(c.from, c.from + c.length - 1))
-  }))
+  const seams = (c: Candidate): Seam[] => images.map((own, d) => {
+    const inside = consecutive[d].slice(c.from, c.from + c.length - 1)
+    return seamFrom(inside, changedPixels(own[c.from + c.length - 1], own[c.from]), holding)
+  })
   const scored = near.map(c => ({ c, seams: seams(c) }))
   const worst = (seam: Seam[]): number => Math.max(...seam.map(ratioOf))
   const fresh = scored.filter(({ seams }) => !seams.some(repeated))
@@ -194,9 +209,28 @@ function untilStill (s: Stepper, first: Moment): Moment[] {
   return frames.slice(0, frames.length - Math.max(0, still - 1))
 }
 
-function looping (s: Stepper, behaviour: Behaviour): Take {
-  const { warm, window, speed } = LOOPS[behaviour] as Looping
+function performanceOf (subject: Subject, kind: PerformanceKind): PerformanceTake {
+  const take = subject.member.capture!.performances.find(own => own.kind === kind)
+  if (take === undefined) throw new Error(`${subject.name}'s motion has no ${kind} take`)
+  return take
+}
+
+function idleLooping (subject: Subject): Looping {
+  const { frames, fps } = performanceOf(subject, 'idle')
+  const rate = subject.member.capture!.options.style?.rate ?? 1
+  const period = Math.round((frames.length - 1) * FPS / (fps * rate))
+  const window = IDLE_PERIODS * period + LEAD_FRAMES + COMPARED_FRAMES
+  return { warm: IDLE_WARM, window, lengths: [period, period], speed: 0, candidates: window, holding: true }
+}
+
+function loopingOf (subject: Subject, behaviour: Behaviour): Looping | undefined {
+  return behaviour === 'idle' ? idleLooping(subject) : LOOPS[behaviour]
+}
+
+function looping (s: Stepper, subject: Subject, behaviour: Behaviour): Take {
+  const { warm, window, speed } = loopingOf(subject, behaviour) as Looping
   s.player.command({ speed, heading: EAST })
+  if (behaviour === 'idle') s.player.perform('idle')
   stepsOf(s, warm)
   const frames = stepsOf(s, window)
   return { frames, from: 0, to: frames.length, loop: true }
@@ -212,8 +246,12 @@ function oneShot (s: Stepper, start: () => void): Take {
 
 export function takeOf (subject: Subject, behaviour: Behaviour): Take {
   const s = stepper(subject)
-  if (LOOPS[behaviour] !== undefined) return looping(s, behaviour)
+  if (loopingOf(subject, behaviour) !== undefined) return looping(s, subject, behaviour)
   if (behaviour === 'turn') return oneShot(s, () => s.player.command({ speed: 0, heading: EAST + TURN_ANGLE }))
+  if (behaviour === 'crouch' || behaviour === 'attack') {
+    performanceOf(subject, behaviour)
+    return oneShot(s, () => { s.player.perform(behaviour) })
+  }
   return oneShot(s, () => {
     const { run } = standingJump(subject.member.capture!)
     if (!s.player.jump({ x: run, height: 0 })) throw new Error(`${subject.name} cannot jump ${run.toFixed(2)} m`)
@@ -261,8 +299,13 @@ function soleOf (sprite: Sprite, names: string[], box: Camera): Sole | undefined
 }
 
 function feetOf (subject: Subject, m: Moment, sprite: Sprite, box: Camera): Foot[] {
+  const { mannequin } = subject.member
   return legsOf(subject.member.rig).map((leg, k) => {
-    return { planted: m.planted[k] ?? false, sole: soleOf(sprite, footParts(subject, leg), box) }
+    const rows = solePoints(m.joints, leg, mannequin).map(point => {
+      return project(box, [point[0] - m.position[0], point[1] - m.position[1], point[2] - m.position[2]]).y
+    })
+    const level = Math.max(...rows) - box.baseline
+    return { planted: m.planted[k] ?? false, sole: soleOf(sprite, footParts(subject, leg), box), level }
   })
 }
 
@@ -345,10 +388,10 @@ export function record (subject: Subject, behaviours: Behaviour[] = BEHAVIOURS):
   const tracks = behaviours.flatMap(behaviour => {
     const take = takeOf(subject, behaviour)
     const drawn = DIRECTIONS.map(direction => drawTake(subject, take.frames, direction, canvas))
-    const lengths = (LOOPS[behaviour] as Looping | undefined)?.lengths
-    const { from, to } = lengths === undefined
+    const looped = loopingOf(subject, behaviour)
+    const { from, to } = looped === undefined
       ? take
-      : loopOf(take.frames, drawn.map(frames => frames.map(frame => frame.image)), lengths)
+      : loopOf(take.frames, drawn.map(frames => frames.map(frame => frame.image)), looped)
     return DIRECTIONS.map((direction, d): Track => {
       return { behaviour, direction, loop: take.loop, frames: drawn[d].slice(from, to) }
     })

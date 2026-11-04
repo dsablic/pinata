@@ -15,7 +15,9 @@ export type ClipFrame = {
   rotations: number[][]
   contact: { left: boolean, right: boolean }
 }
-export type ClipKind = 'jump'
+export const PERFORMANCE_KINDS = ['idle', 'crouch', 'attack'] as const
+export type PerformanceKind = typeof PERFORMANCE_KINDS[number]
+export type ClipKind = 'jump' | PerformanceKind
 export type Clip = {
   name: string
   source: string
@@ -130,7 +132,11 @@ const CLIP_SCHEMA: Schema = {
   fields: {
     name: { kind: 'string' },
     source: { kind: 'string', note: 'the motion-capture take the clip came from' },
-    kind: { kind: 'string', oneOf: ['jump'], note: 'a jump take is played by the player, never matched while walking' },
+    kind: {
+      kind: 'string',
+      oneOf: ['jump', ...PERFORMANCE_KINDS],
+      note: 'a take with a kind is played on command by the player, never matched while walking'
+    },
     fps: { kind: 'number', min: 1, max: 240 },
     bones: {
       kind: 'array',

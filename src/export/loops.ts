@@ -1,7 +1,9 @@
 import { getPixel } from '../image.ts'
 import type { Image } from '../image.ts'
 
-export type Seam = { seam: number, median: number }
+export type Seam = { seam: number, median: number, holds: number, steps: number, holding: boolean }
+
+export const HOLD_SHARE = 0.2
 
 export function changedPixels (a: Image, b: Image): number {
   let changed = 0
@@ -21,16 +23,22 @@ export function steps (images: Image[]): number[] {
   return images.slice(1).map((image, k) => changedPixels(images[k], image))
 }
 
-export function seamOf (images: Image[]): Seam {
-  return { seam: changedPixels(images[images.length - 1], images[0]), median: medianOf(steps(images)) }
+export function seamFrom (stepped: number[], seam: number, holding: boolean): Seam {
+  const holds = stepped.filter(changed => changed === 0).length
+  return { seam, median: medianOf(stepped), holds, steps: stepped.length, holding }
+}
+
+export function seamOf (images: Image[], holding = false): Seam {
+  return seamFrom(steps(images), changedPixels(images[images.length - 1], images[0]), holding)
 }
 
 export function measured ({ median }: Seam): boolean {
   return median > 0
 }
 
-export function repeated ({ seam, median }: Seam): boolean {
-  return seam === 0 && median > 0
+export function repeated ({ seam, median, holds, steps, holding }: Seam): boolean {
+  const holdsStill = holding && holds >= HOLD_SHARE * steps
+  return seam === 0 && median > 0 && !holdsStill
 }
 
 export function seamless (seam: Seam): boolean {

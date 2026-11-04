@@ -31,7 +31,7 @@ function main (): number {
       join(ROOT, 'src', 'cli', 'artifact.ts'), join(examples, name), join(OUT, 'characters', `${name}.json`)
     ], { stdio: 'inherit' })
   }
-  writeOutput(join(OUT, 'world.bundle.json'), JSON.stringify(worldBundle(examples)))
+  writeOutput(join(OUT, 'world.bundle.json'), JSON.stringify(worldBundle(examples, { performances: false })))
   writeOutput(join(OUT, 'build.json'), JSON.stringify({ commit: commit(), characters }))
   writeOutput(join(OUT, '.nojekyll'), '')
   console.log(`site: ${OUT} (${characters.length} characters)`)

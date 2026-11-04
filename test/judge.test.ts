@@ -255,3 +255,22 @@ test('labelled answers are scored per label with what was named instead, and can
   assert.deepEqual(choiceProblems({ ...judge, [itemOf('a')]: { choice: 'purple' } }, key).length, 1)
   assert.equal(choiceProblems({}, key).length, 4)
 })
+
+test('choice controls are scored apart from the labelled share', () => {
+  const key = {
+    name: 'p',
+    kind: 'choice' as const,
+    labels: ['idle', 'walk'],
+    items: {
+      'item-1': { id: 'a', label: 'idle' },
+      'item-2': { id: 'b', label: 'walk', control: true },
+      'item-3': { id: 'c', label: 'walk', control: true }
+    }
+  }
+  const score = scoreChoices(key, [
+    { 'item-1': { choice: 'walk' }, 'item-2': { choice: 'walk' }, 'item-3': { choice: 'idle' } },
+    { 'item-1': { choice: 'idle' }, 'item-2': { choice: 'walk' }, 'item-3': { choice: 'walk' } }
+  ])
+  assert.deepEqual([score.asked, score.right, score.controls], [2, 1, { asked: 4, right: 3 }])
+  assert.equal(score.labels.find(l => l.label === 'walk')?.asked, 0)
+})

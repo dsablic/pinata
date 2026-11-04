@@ -3,7 +3,9 @@ import type { Vec3 } from '../math/vec.ts'
 import { legsOf } from '../formats/rig.ts'
 import { assemble, clipScale, hierarchyOf, retargetRotations, unliftedClearance } from './retarget.ts'
 import type { BodyFrame, Hierarchy, RetargetOptions } from './retarget.ts'
-import type { Clip } from './clip.ts'
+import { PERFORMANCE_KINDS } from './clip.ts'
+import { loopedFrames } from './performance.ts'
+import type { Clip, PerformanceKind } from './clip.ts'
 import { turnBetween, turnToLocal } from '../world/yaw.ts'
 
 export type MotionEntry = {
@@ -24,11 +26,13 @@ export type JumpTake = {
   run: number
   apex: number
 }
+export type PerformanceTake = { name: string, kind: PerformanceKind, fps: number, frames: BodyFrame[] }
 export type JumpPhases = { start: number, crouch: number, launch: number, land: number, settle: number }
 export type Candidate = { entry: number, frame: number, feature: number[] }
 export type MotionDatabase = {
   entries: MotionEntry[]
   jumpTakes: JumpTake[]
+  performances: PerformanceTake[]
   candidates: Candidate[]
   scales: number[]
   hierarchy: Hierarchy
@@ -159,13 +163,26 @@ function jumpTakeOf (clip: Clip, options: RetargetOptions, hierarchy: Hierarchy)
   }
 }
 
+type Performed = Clip & { kind: PerformanceKind }
+
+function isPerformance (clip: Clip): clip is Performed {
+  return PERFORMANCE_KINDS.some(kind => kind === clip.kind)
+}
+
+function performanceOf (clip: Performed, options: RetargetOptions): PerformanceTake {
+  const frames = retargetRotations(clip, options)
+  const played = clip.kind === 'idle' ? loopedFrames(frames) : frames
+  return { name: clip.name, kind: clip.kind, fps: clip.fps, frames: played }
+}
+
 export function buildDatabase (clips: Clip[], options: RetargetOptions): MotionDatabase {
   const hierarchy = hierarchyOf(options.rig, options.map)
-  const walking = clips.filter(clip => clip.kind !== 'jump')
+  const walking = clips.filter(clip => clip.kind === undefined)
   const entries = walking.map(clip => entryOf(clip, options, hierarchy))
   const jumpTakes = clips.filter(clip => clip.kind === 'jump').map(clip => jumpTakeOf(clip, options, hierarchy))
+  const performances = clips.filter(isPerformance).map(clip => performanceOf(clip, options))
   const candidates = candidatesOf(entries)
-  return { entries, jumpTakes, candidates, scales: featureSpreads(candidates), hierarchy, options }
+  return { entries, jumpTakes, performances, candidates, scales: featureSpreads(candidates), hierarchy, options }
 }
 
 export function ankleVelocity (entry: MotionEntry, frame: number, leg: number): Vec3 {

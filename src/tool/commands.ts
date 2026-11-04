@@ -140,9 +140,9 @@ export const COMMANDS: Command[] = [
   },
   {
     name: 'render',
-    summary: 'render the skinned idle in eight directions and a walk strip',
-    description: 'Draw a skinned character with motion capture: its idle in eight directions and a walk strip. ' +
-      'Writes idle-directions.png and walk-strip.png.',
+    summary: 'render the skinned idle in eight directions and walk, crouch and attack strips',
+    description: 'Draw a skinned character with motion capture: its idle in eight directions and strips of its ' +
+      'walk, crouch and attack. Writes idle-directions.png, walk-strip.png, crouch-strip.png and attack-strip.png.',
     schema: {
       type: 'object', properties: { dir: DIR, out: OUT }, required: ['dir', 'out'], additionalProperties: false
     },
@@ -153,9 +153,10 @@ export const COMMANDS: Command[] = [
   },
   {
     name: 'export',
-    summary: 'record every animation in eight directions and write a sprite sheet with its JSON',
-    description: 'Record idle, walk, run, turn and jump in eight directions, write the sprite sheet PNG and an ' +
-      'Aseprite-format JSON, and print the export gates. Engine notes do not fail the command.',
+    summary: 'record every animation in eight directions and write a sprite sheet per animation',
+    description: 'Record idle, walk, run, turn, jump, crouch and attack in eight directions, write for each ' +
+      'animation a sprite sheet PNG, an Aseprite-format JSON and an .aseprite file, and print the export gates. ' +
+      'Engine notes do not fail the command.',
     schema: {
       type: 'object', properties: { dir: DIR, out: OUT }, required: ['dir', 'out'], additionalProperties: false
     },

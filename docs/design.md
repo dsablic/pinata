@@ -606,9 +606,13 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 
 ### `clip.ts`
 
-- A clip may carry `kind: 'jump'` (from its entry in `motion/takes.json`, validated against that one value): a jump
-  take, played by the player and never matched while walking. A take entry may also give a `range` of source frames to
-  keep, so a jump take is cut to about 0.3 s before its crouch through its landing settling.
+- A clip may carry `kind` (from its entry in `motion/takes.json`, validated against `jump`, `idle`, `crouch` and
+  `attack`): a take played on command by the player and never matched while walking. Jump takes have their own playing
+  (below); the others are performances: `database.performances`, the retargeted frames of the take, played by
+  `perform(kind)`. Idle could instead have joined matching as the standing entry, but then every character at rest on
+  the page would change; a performed idle leaves the page alone and matching can adopt it later. The site's world bundle
+  leaves the performance clips out, since the page never plays them, and the retargeting is validated against the bones
+  of every clip, whatever their order.
 - A clip stores, per frame, the root position (height above the ground, horizontal from the clip's start), a heading
   (yaw) and every bone's global rotation from rest as a quaternion [w, x, y, z], rounded to four digits to keep the
   committed JSON small.
@@ -796,6 +800,15 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   the clip's clearance and the usual leg bounds, not from a separate drop: the soles are held on the floor by the same
   contact rules as walking, which a separate pelvis drop with the pelvis left at its rest height could not give (the
   feet were 12 cm up and not held).
+- `perform(kind)` plays the first take of that kind from its start (blended in from the current pose like a take
+  switch). It stops the body: the command's speed is set to zero (its heading is kept), so a performance during a walk
+  ends in standing, and a later command with speed, a shove or the ground going away cancels it. The feet are held by
+  the take's contact flags; a one-shot hands back to matching at its last frame (the rest entry, blended), idle wraps at
+  its last frame. It is refused during a jump, a fall or another performance. An idle clip is stored with its first 12
+  frames as an overlap: the loop is the rest, and its last 12 frames are cross-faded toward those first 12, so the
+  loop's end continues into its start in pose and velocity and the cloth is not kicked at the seam (a cut at the
+  best-matching pair alone still gave seams of 3 to 7 usual steps in the cloth). The loop's last frame repeats its first
+  so the wrap interpolates.
 - A jump takes about 1.1 s from command to the end of its landing (the crouch at most 0.4 s, against the dip's
   0.18 s), so a character plans fewer jumps in a given time than with the dip.
 - Known limits: a fall that starts during a take's crouch, or a flight that overruns `arc.seconds`, loses the
@@ -1241,15 +1254,19 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   from the measured extent) and `anchor` (root against pivot: both are the engine's). The gates a file can fix fail:
   `ground` (the skin's feet sit off the ground line: `skin.json`) and `loop` (the cycle's end does not match its
   start: `motion.json` for cloth, `rig.json` for the gait).
-- `ground` is measured in the side views only (idle right and left). There the line under the root is where the feet
-  stand. From the front or back the camera, 14 degrees above the horizon, projects a toe that points at the viewer
-  below the line under the root, so a correct skin misses by perspective, not by drawing. The offset is signed (below
-  the line, or floating above it), each with its own hint, and a view in which no sole pixel is visible fails. The
-  left view is an engine note (`mirroredGround`): it mirrors the right view's sprites, so each foot's sprite is drawn
-  on the other foot's bone, and a rig whose legs are not symmetric at rest (the knight's) puts a foot off the line
-  that no skin can correct, since a skin holds no sprites for the mirrored view.
-- `render` draws the skinned idle in eight directions and the right-facing walk from the recorder (the same drawing
-  as `export`, so what is looked at is what is exported); unskinned characters are drawn by `check`'s stills.
+- `ground` is measured in the idle loop, in every direction, against each foot's own ground point. In a side view the
+  two feet stand at different depths (about a hip width apart along the view axis), and the camera, 14 degrees above the
+  horizon, draws a foot further away higher by the distance times sin(14 degrees) times 27 px per metre (0.25 m is about
+  1.6 px), so the line under the root is where neither foot stands. For each planted foot-frame the foot part's lowest
+  drawn row is compared with the projected row of the foot's sole (the lower of the heel and toe sole points,
+  `solePoints`, projected through the sprite's camera relative to the anchor and rounded to a whole row), and the track
+  passes when at most 5% of its planted foot-frames are more than 1 px off. The offset is signed (below the point, or
+  floating above it), each with its own hint, and a view in which no planted foot has a visible sole pixel fails. The
+  mirrored left view is measured like the others and is not an engine note: it passes for all four characters, where
+  measured against the line under the root it did not.
+- `render` draws the skinned idle in eight directions and the right-facing walk, crouch and attack from the recorder
+  (the same drawing as `export`, so what is looked at is what is exported); unskinned characters are drawn by `check`'s
+  stills.
 - `pinata mcp` is a small JSON-RPC 2.0 server over stdio, newline-delimited, without the SDK: the protocol subset is
   `initialize` (the client's protocol version is echoed when it is `2025-06-18` or `2024-11-05`, otherwise
   `2025-06-18` is offered; `2025-03-26` is not accepted because it requires batch arrays, which are not
@@ -1284,23 +1301,32 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   edge, and the others between (`front-right`, `back-right`, `back`, `back-left`, `left`, `front-left`), at yaws that
   are multiples of 45 degrees from `front`. Each is the centre of one view sector, so every frame of a non-turning
   animation is drawn from the view of its direction (a gate).
-- Behaviours: `idle` is standing at rest, with the cloth settling (the page's player has no breathing; batch C adds
-  a captured idle); `walk` at 1.1 m/s (the page's walking speed); `run` at 3 m/s; `turn` a quarter turn on the spot
-  (two names forward in the direction list: `turn-right` ends facing `back`), from rest to rest; `jump` a standing
-  jump forward on flat ground, from rest to rest, with the longest captured jump take's run and apex as the jump
-  asked of the player (1.05 m, 0.35 m), so the take plays as captured.
-- A looping run is warmed up (48 frames for idle, 144 for walk and run) and then recorded for a window (36, 144, 96
-  frames), all drawn in all eight directions in order. A loop is the span `from..to` of that window. Candidates are
-  the pairs of frames a period apart (idle 12; walk 12 to 72; run 8 to 48) whose planted flags agree in three
-  consecutive frames; each is scored by the root-local joint and cloth positions of those frames. The period is the
-  shortest within 1.5 times the best score (a cape has its own period, so a walk can need two strides); the 40 best
-  starts within one frame of that period are then judged on the drawn pixels: the first with the seam under the
-  median step in every direction, and not exactly zero (a repeated frame is a hitch), wins; with none, the lowest
-  worst ratio. A pose-only cut passed the gate in some directions and missed it in others, because the seam of a good
-  loop is about one usual step: only the pixels say which cut is below it.
-- A one-shot run (turn, jump) is cut from the command to the first frame after which no joint or cloth point moves
-  more than 2 mm for six frames. Twelve frames at rest before the command are drawn and dropped, to prime the
-  painter's state.
+- Behaviours: `idle` is the captured standing take (below), looped; `crouch` and `attack` are captured one-shot takes
+  played on command, from rest to rest; `walk` at 1.1 m/s (the page's walking speed); `run` at 3 m/s; `turn` a quarter
+  turn on the spot (two names forward in the direction list: `turn-right` ends facing `back`), from rest to rest; `jump`
+  a standing jump forward on flat ground, from rest to rest, with the longest captured jump take's run and apex as the
+  jump asked of the player (1.05 m, 0.35 m), so the take plays as captured.
+- A looping run is warmed up (240 frames for idle, 144 for walk and run) and then recorded for a window (four periods
+  and a lead for idle; 144, 96 frames), all drawn in all eight directions in order. A loop is the span `from..to` of
+  that window. Candidates are the pairs of frames a period apart (idle: the take's own period; walk 12 to 72; run 8 to
+  48) whose planted flags agree in three consecutive frames; each is scored by the root-local joint and cloth positions
+  of those frames. The period is the shortest within 1.5 times the best score (a cape has its own period, so a walk can
+  need two strides); the 40 best (for idle, all) starts within one frame of that period are then judged on the drawn
+  pixels: the first with the seam under the median step in every direction, and not a repeated frame (see the loop
+  gate), wins; with none, the lowest worst ratio. A pose-only cut passed the gate in some directions and missed it in
+  others, because the seam of a good loop is about one usual step: only the pixels say which cut is below it.
+- Idle is a captured take (`idle-wait`, subject 137 trial 28, the "normal wait" of the stylized-motion set) played in a
+  loop by the player; the exported loop is one period of that, found like any other loop. The window is one in which
+  both feet stay down in the take (the contact flags) and the player plants them without a step: a window with steps
+  read as walking in a blind panel (5 of 12 answers right), and a step is not periodic anyway, since where the foot
+  lands depends on the state. Other stand-still takes were rejected: subject 82's standing is frozen (no pixel changes,
+  so the loop gate cannot measure it) and subject 141's waiting is a restless look-around that steps. The chosen window
+  moves little, so in one view of the two smallest characters (the back-left view of the rogue and wizard) most steps
+  change no pixel and the loop is reported as not measured; the gate is not loosened for it.
+- A one-shot run (turn, jump, crouch, attack) is cut from the command to the first frame after which no joint or cloth
+  point moves more than 2 mm for six frames. Twelve frames at rest before the command are drawn and dropped, to prime
+  the painter's state. A crouch or attack take that is missing is an error, as for idle: a character without it would
+  otherwise record a standing figure under that name.
 - Frames are drawn on a canvas one and a half times the page's sprite box in each direction, of even width, and then
   cropped, the same for every frame of a character: the page's box clips a wide cape or an axe of the small skins. The
   even width puts the root on a pixel boundary, so the pivot, an integer, is the root exactly (an odd canvas leaves it
@@ -1315,33 +1341,54 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 
 ### `sheet.ts`
 
-- Frames in order of `BEHAVIOURS` and `DIRECTIONS`, no gaps, no trimming: every cell has the character's cell size.
-  A track starts on a new row and wraps to the next when a row is full, so a sheet is at most 4096 px each way (an
-  error otherwise): many engines and GPUs refuse larger textures. The JSON is Aseprite's array format: `frames[]` with
-  `filename` (`walk-right 3`), `frame` (following the wrapping), `rotated`, `trimmed`, `spriteSourceSize`,
-  `sourceSize` and `duration` (ms, 42 or 41 alternating, so a second is 1000 ms at 24 fps) and the extra `travel`;
-  `meta` with `app`, `image`, `format`, `size`, `scale`, `frameTags` (`<animation>-<direction>`, `forward`, over the
-  frames in order), one `slices` entry whose key's `pivot` is the anchor, and `pinata` (character, fps, px per
-  metre, the tags that loop). Readers that know only Aseprite's fields ignore the rest. Frames are written one per
-  line; output is a pure function of the recording, and the PNG is Node's zlib, so files are identical per engine.
+- One sheet per animation: `<name>-<animation>.png` holds the animation's eight directions, in the order of
+  `DIRECTIONS`, no gaps, no trimming: every cell has the character's cell size (the same for all animations, so a game's
+  sprite size does not change with the action). A track starts on a new row and wraps to the next when a row is full, so
+  a sheet is at most 4096 px each way (an error otherwise): many engines and GPUs refuse larger textures, and one sheet
+  per animation keeps every character inside the limit however many animations it has. The JSON is Aseprite's array
+  format: `frames[]` with `filename` (`walk-right 3`), `frame` (following the wrapping), `rotated`, `trimmed`,
+  `spriteSourceSize`, `sourceSize` and `duration` (ms, 42 or 41 alternating, so a second is 1000 ms at 24 fps) and the
+  extra `travel`; `meta` with `app`, `image`, `format`, `size`, `scale`, `frameTags` (`<animation>-<direction>`,
+  `forward`, over the frames in order), one `slices` entry whose key's `pivot` is the anchor, and `pinata` (character,
+  fps, px per metre, the tags that loop). Readers that know only Aseprite's fields ignore the rest. Frames are written
+  one per line; output is a pure function of the recording, and the PNG is Node's zlib, so files are identical per
+  engine.
+- `files.ts` writes three files per animation (`<name>-<animation>`: `.png`, `.json` and `.aseprite`) from that
+  animation's eight tracks. `aseprite.ts` writes the `.aseprite`, the binary format of Aseprite's documentation, without
+  a dependency: RGBA (32 bit), one layer (`pinata`), one cel per frame covering the whole cell at 0,0 and compressed
+  with zlib (bit-exact: the pixels are the recording's RGBA bytes, transparent pixels 0,0,0,0), the frame's duration as
+  in the JSON, a tags chunk with the same names and ranges as `frameTags` (forward, repeat 0), and the anchor as a slice
+  with a pivot, all in the first frame. No palette chunk (not needed in RGBA), no linked cels (a held frame is stored
+  again: simpler, and the zlib size is small), and `travel` and which tags loop stay in the JSON only, since Aseprite
+  has no field for them. A reader in the tests (`test/aseprite-reader.ts`) follows the specification's field list, not
+  the writer, and checks every field that decides what Aseprite shows (header flags, speed, colours, pixel ratio, grid,
+  layer flags, type, blend and opacity, cel opacity and z-index, tag direction and repeat, the slice key's frame)
+  besides the pixels, against expectations the test computes itself.
 
 ### `gates.ts`, `loops.ts`, `report.ts`
 
-- Seamless loop: pixels (colour or transparency) that change between the last frame and the first are at most the
-  median of those changed between consecutive frames of the loop, and not zero: a seam of 0 against a median above 0
-  is a repeated frame, a hitch, and fails; the chooser never picks one. A loop whose median is 0 (idle's identical
-  frames) is not measured, and is reported as such, never as passing.
-- Feet held, measured on the drawn pixels: the lowest opaque pixels of the planted foot's part (the mannequin part
-  from the leg's ankle to its toe, found through the renderer's owner map; the lowest row, and the mean column of
-  the pixels in it) in two consecutive frames of one stance, with the root's `travel` added (the cell is anchored on
-  the root, so the ground moves by minus `travel`), move at most 1 px (the larger axis). A stance is the player's
-  planted flag in both frames. Pairs where the planted flag drops for a single frame between two planted ones are
-  counted as flickers, not measured; pairs where the foot has no visible pixel are counted as hidden. A boot redrawn as
-  the ankle and toe rotate moves its lowest row by several pixels, so this gate is missed (see the plan's results). An
-  earlier measure on the projected skeleton ends held 1 px; it tested the player, not the exported frames.
-- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the standing frames facing right and
-  left, the lowest pixel row of each foot part is within 1 px of the ground line (the pivot's row edge); the other
-  views are not measured, for the reason in the command line section.
+- Seamless loop: pixels (colour or transparency) that change between the last frame and the first are at most the median
+  of those changed between consecutive frames of the loop, and not zero: a seam of 0 against a median above 0 is a
+  repeated frame, a hitch, and fails; the chooser never picks one. The one exception is a captured idle, which holds
+  still between weight shifts: its loop may have a seam of 0 when at least 20% of its steps change no pixel, so the
+  repeat is part of the motion. The chooser and the check apply the same rule, and a walk or run with a repeated seam
+  frame fails. A loop whose median is 0 (most steps change no pixel) is not measured, and is reported as such, never as
+  passing.
+- Feet held (walk, run and idle), measured on the drawn pixels: the lowest opaque pixels of the planted foot's part (the
+  mannequin part from the leg's ankle to its toe, found through the renderer's owner map; the lowest row, and the mean
+  column of the pixels in it) in two consecutive frames of one stance, with the root's `travel` added (the cell is
+  anchored on the root, so the ground moves by minus `travel`), move at most 1 px (the larger axis). A stance is the
+  player's planted flag in both frames. Pairs where the planted flag drops for a single frame between two planted ones
+  are counted as flickers, not measured; pairs where the foot has no visible pixel are counted as hidden. A boot redrawn
+  as the ankle and toe rotate moves its lowest row by several pixels, so this gate is missed (see the plan's results).
+  An earlier measure on the projected skeleton ends held 1 px; it tested the player, not the exported frames.
+- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the idle loop, in every direction, the
+  lowest pixel row of each planted foot part is compared in every frame with the projected row of that foot's own sole
+  point (see the command line section), and the track passes when at most 5% of the planted foot-frames are more than 1
+  px off; the line reports the count and the worst offset. A track in which no foot is planted has its own message (the
+  motion, not the skin, is at fault), apart from one in which no planted foot has a visible sole pixel. A captured idle
+  puts the feet at different depths and shifts weight, so neither one frame's feet nor the line under the root says
+  where the character stands.
 - Facing: the view sector the painter used for every frame of idle, walk, run and jump is the direction's. Turns
   change sector on the way and are not checked. Border: no opaque pixel on the cell's edge.
 - `npm run export -- <character dir> <out dir>` writes `<name>.png` and `<name>.json`, prints each check (`ok`,

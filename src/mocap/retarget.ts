@@ -49,16 +49,17 @@ export function mergeRetargeting (...maps: Array<Partial<Retargeting>>): Retarge
   return result
 }
 
-export function validateRetargeting (input: unknown, rig: Rig, rest: Pose, clip: Clip): Validated<Retargeting> {
+export function validateRetargeting (input: unknown, rig: Rig, rest: Pose, clips: Clip[]): Validated<Retargeting> {
   const errors: ValidationError[] = []
   check(input, RETARGETING_SCHEMA, '', errors)
   if (errors.length > 0) return { errors }
   const map = input as Retargeting
-  const bones = new Set(clip.bones.map(bone => bone.name))
   for (const kind of ['aim', 'turn'] as const) {
     for (const [joint, bone] of Object.entries(map[kind])) {
       if (rest[joint] === undefined) errors.push({ path: `${kind}.${joint}`, message: 'not a joint of the character' })
-      if (!bones.has(bone)) errors.push({ path: `${kind}.${joint}`, message: `'${bone}' is not a bone of the clip` })
+      for (const clip of clips.filter(own => !own.bones.some(b => b.name === bone))) {
+        errors.push({ path: `${kind}.${joint}`, message: `'${bone}' is not a bone of the clip '${clip.name}'` })
+      }
       if (kind === 'aim' && nextInLimb(rig, joint) === undefined) {
         errors.push({ path: `aim.${joint}`, message: 'an aimed joint needs a next joint in its limb to point at' })
       }

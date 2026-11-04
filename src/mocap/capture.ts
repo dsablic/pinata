@@ -36,7 +36,7 @@ export function captureFor (
   }
   const { style, ...retargeting } = own
   const rest = restPose(character.mannequin)
-  const map = validateRetargeting(mergeRetargeting(base, retargeting), character.rig, rest, clips[0])
+  const map = validateRetargeting(mergeRetargeting(base, retargeting), character.rig, rest, clips)
   errors.push(...map.errors.map(e => ({ ...e, path: `${path}.${e.path}` })))
   const styled = style === undefined ? undefined : validateStyle(style)
   errors.push(...(styled?.errors ?? []).map(e => ({ ...e, path: `${path}.style.${e.path}` })))

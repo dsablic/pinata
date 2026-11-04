@@ -45,6 +45,7 @@
     "export": "node src/cli/export.ts",
     "pinata": "node src/cli/pinata.ts",
     "direction-panel": "node src/cli/direction-panel.ts",
+    "behaviour-panel": "node src/cli/behaviour-panel.ts",
     "mocap": "node src/cli/mocap.ts",
     "skin": "node src/cli/skin.ts",
     "build:web": "node -e \"require('node:fs').rmSync('dist/web', { recursive: true, force: true })\" && tsc -p tsconfig.web.json",

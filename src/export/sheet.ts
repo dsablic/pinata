@@ -1,7 +1,6 @@
 import { sheet } from '../diagnostics/images.ts'
 import { TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
-import { encodePng } from '../png/encode.ts'
 import { FPS } from '../page/cast.ts'
 import type { Recording, Track } from './record.ts'
 
@@ -106,13 +105,4 @@ export function asepriteJson (recording: Recording, imageName: string, size: Pic
   const frames = placementsOf(recording).map(at => `    ${frameJson(recording, at)}`).join(',\n')
   const head = JSON.stringify(meta, null, 2).split('\n').map((line, i) => i === 0 ? line : `  ${line}`).join('\n')
   return `{\n  "frames": [\n${frames}\n  ],\n  "meta": ${head}\n}\n`
-}
-
-export function exportFiles (recording: Recording): Record<string, Uint8Array | string> {
-  const image = sheetOf(recording)
-  const name = recording.name
-  return {
-    [`${name}.png`]: encodePng(image),
-    [`${name}.json`]: asepriteJson(recording, `${name}.png`, image)
-  }
 }

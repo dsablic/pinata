@@ -780,15 +780,15 @@ not run TypeScript under `node_modules`, so an installed package cannot run it.)
 | `pinata new --template <name> <dir>` | A starter package that passes | the six files |
 | `pinata check <dir> [--out <dir>]` | The gates, with hints | `summary.txt`, `metrics.json`, `sheet.png`, `walk.png`, `footprints.png`, `cloth.png` |
 | `pinata skin guide <dir> <out>`, `skin preview <dir> <skin.json> <out> [--clean]`, `skin fit <dir> [<skin.json>]` | The skin's drawing guide, preview and fit flags | `guide.md` and views; `directions.png`, `turntable.png`, `walks.png`; fit prints |
-| `pinata render <dir> <out>` | A skinned character's idle in eight directions and a walk strip, for looking | `idle-directions.png`, `walk-strip.png` |
-| `pinata export <dir> <out>` | Idle, walk, run, turn and jump in eight directions | `<name>.png` (the sprite sheet) and `<name>.json` (Aseprite JSON array format) |
+| `pinata render <dir> <out>` | A skinned character's idle in eight directions and walk, crouch and attack strips, for looking | `idle-directions.png`, `walk-strip.png`, `crouch-strip.png`, `attack-strip.png` |
+| `pinata export <dir> <out>` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch (down, hold, up) and attack (a punch; the knight's sword arm stays stiff, so it reads as a thrust) in eight directions | one sprite sheet per animation, `<name>-<animation>.png`, with `<name>-<animation>.json` (Aseprite JSON array format) and `<name>-<animation>.aseprite` (Aseprite's binary format: one layer, a cel per frame, tags `<animation>-<direction>`, frame durations, the anchor as a slice pivot) |
 
 Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files (the `hint:` line names the file); 2 bad
 arguments, a package that does not load, or a character the command cannot work on (`render` and `export` need a
 `skin.json` and a `retarget.json`). In `export`, lines starting `note` are engine notes: gates that measure the
 engine (planted feet in the drawn frames, the view drawn per direction, the cell border, the anchor) and that no
 character file can fix; they do not change the exit code. `FAIL` lines in `export` are about the character: `ground`
-(measured in the side views) means the skin's feet are drawn below or float above the ground line (`skin.json`),
+(measured on the idle in every direction: more than 5% of the planted foot-frames more than 1 px from their own ground point) means the skin's feet are drawn below or float above the ground line (`skin.json`),
 `loop` means the end of a cycle does not match its start (the cloth in `motion.json`, or the gait in `rig.json`).
 
 `pinata mcp` serves the same commands to an agent over the Model Context Protocol (stdio). In Claude Code the

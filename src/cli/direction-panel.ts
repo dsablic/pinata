@@ -1,12 +1,7 @@
-import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readWorld } from '../diagnostics/page-scenarios.ts'
-import { writeOutput } from '../diagnostics/report.ts'
 import { DIRECTIONS, record, SKINNED_HUMANOIDS, subjectOf } from '../export/record.ts'
-import { buildChoicePacket } from '../judge/choice.ts'
-import type { ChoiceSpec } from '../judge/choice.ts'
-import { decodePng } from '../png/decode.ts'
-import { encodePng } from '../png/encode.ts'
+import { writeChoicePanel } from './choice-panel.ts'
 import { ROOT } from './paths.ts'
 import { worldBundle } from './world-bundle.ts'
 
@@ -28,15 +23,8 @@ const world = readWorld(worldBundle(join(ROOT, 'examples'), { only: SKINNED_HUMA
 const items = SKINNED_HUMANOIDS.flatMap(name => {
   const recording = record(subjectOf(world, name), ['idle'])
   return recording.tracks.map(track => {
-    const image = `frames/${name}-${track.direction}.png`
-    writeOutput(join(OUT, image), encodePng(track.frames[0].image))
-    return { id: `${name}-${track.direction}`, image, label: track.direction }
+    return { id: `${name}-${track.direction}`, image: `frames/${name}-${track.direction}.png`, label: track.direction,
+      picture: track.frames[0].image }
   })
 })
-const spec: ChoiceSpec = { ...SPEC, background: '#c8c8c8', items }
-writeOutput(join(OUT, 'panel.json'), `${JSON.stringify({ ...SPEC, items }, null, 2)}\n`)
-const packet = buildChoicePacket(spec, path => decodePng(readFileSync(join(OUT, path))))
-for (const [file, image] of Object.entries(packet.images)) writeOutput(join(OUT, 'packet', file), encodePng(image))
-writeOutput(join(OUT, 'packet', 'questions.md'), packet.questions)
-writeOutput(join(OUT, 'key.json'), `${JSON.stringify(packet.key, null, 2)}\n`)
-console.log(`${Object.keys(packet.images).length} items in ${join(OUT, 'packet')}; key in ${join(OUT, 'key.json')}`)
+console.log(writeChoicePanel(OUT, SPEC, items))

@@ -91,7 +91,7 @@ for (const name of HUMANOIDS) {
     const { style } = ownRetargeting(name)
     if (style !== undefined) assert.deepEqual(validateStyle(style).errors, [])
     const walk = loadClip('walk')
-    assert.deepEqual(validateRetargeting(map, rig, rest, walk).errors, [])
+    assert.deepEqual(validateRetargeting(map, rig, rest, [walk]).errors, [])
     const recording = retargetedRecording(retargetClip(walk, options), options)
     assert.ok(boneLengthError(recording, { rig, mannequin }, rest) <= LENGTH_TOLERANCE)
   })

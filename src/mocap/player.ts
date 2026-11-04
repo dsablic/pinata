@@ -15,13 +15,15 @@ import type { JumpReach } from './jump.ts'
 import { arcOver, heightAt, jumpHeightOf, legLengthOf, MOST_JUMP_SPEED } from './jump.ts'
 import type { Arc } from './jump.ts'
 import { ankleVelocity, featureOf, featureWeights, HORIZONS } from './database.ts'
-import type { JumpTake, MotionDatabase } from './database.ts'
+import type { JumpTake, MotionDatabase, PerformanceTake } from './database.ts'
+import type { PerformanceKind } from './clip.ts'
 import { assemble, raise } from './retarget.ts'
 import type { BodyFrame } from './retarget.ts'
 
 export type JumpTarget = { x: number, height: number }
 type Flight = { arc: Arc, from: number, elapsed: number, drop: number }
 type Taking = { take: JumpTake, t: number, phase: 'crouch' | 'flight' | 'landing' }
+type Performing = { take: PerformanceTake, t: number }
 type Jump = { target: JumpTarget, crouched: number, flight?: Flight }
 export type Command = { speed: number, heading: number }
 export type BodyTuning = {
@@ -57,6 +59,9 @@ export type Player = {
   jump: (target: JumpTarget) => boolean
   jumping: () => boolean
   cancelJump: () => void
+  perform: (kind: PerformanceKind) => boolean
+  performing: () => boolean
+  cancelPerformance: () => void
 }
 
 const DEFAULT_TUNING: BodyTuning = { speedGain: 3, maxAcceleration: 3, turnGain: 4, drag: 0.03 }
@@ -254,6 +259,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   let standingDrop = 0
   let jump: Jump | undefined
   let taking: Taking | undefined
+  let performing: Performing | undefined
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const groundUnder = (p: Vec3): number => ground(p[0], p[2], p[1])
@@ -274,7 +280,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       body.position = add(body.position, scale(body.velocity, dt))
       return
     }
-    const want = taking === undefined ? wantedVelocity() : [0, 0, 0] as Vec3
+    const want = taking === undefined && performing === undefined ? wantedVelocity() : [0, 0, 0] as Vec3
     const relative = sub(wind, body.velocity)
     let drag = scale([relative[0], 0, relative[2]], tuning.drag * length([relative[0], 0, relative[2]]))
     const most = command.speed > 0 ? WIND_SHARE * tuning.maxAcceleration : 0
@@ -345,9 +351,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   }
 
   const playing = (): BodyFrame => {
-    const frame = taking === undefined
-      ? sampleFrame(entries[entry].frames, t)
-      : sampleFrame(taking.take.frames, taking.t)
+    const frame = performing !== undefined
+      ? sampleFrame(performing.take.frames, performing.t)
+      : taking === undefined ? sampleFrame(entries[entry].frames, t) : sampleFrame(taking.take.frames, taking.t)
     if (blend === undefined) return frame
     const span = BLEND_SECONDS * fps
     const n = frameCount - blend.start + 1
@@ -708,6 +714,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const resume = (): void => {
     startBlend()
     taking = undefined
+    performing = undefined
     entry = restEntry
     t = entries[entry].frames.length - 1
     switched = true
@@ -720,7 +727,29 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     jump = undefined
   }
 
-  const takeStep = (take: JumpTake): number => rate * take.fps / fps
+  const takeStep = (take: { fps: number }): number => rate * take.fps / fps
+
+  const advancePerformance = (): void => {
+    if (performing === undefined) return
+    const last = performing.take.frames.length - 1
+    performing.t += takeStep(performing.take)
+    if (performing.t < last) return
+    if (performing.take.kind === 'idle') performing.t -= last
+    else resume()
+  }
+
+  const cancelPerformance = (): void => {
+    if (performing !== undefined) resume()
+  }
+
+  const perform = (kind: PerformanceKind): boolean => {
+    const take = database.performances.find(own => own.kind === kind)
+    if (take === undefined || performing !== undefined || jump !== undefined || fallSpeed !== undefined) return false
+    command = { ...command, speed: 0 }
+    startBlend()
+    performing = { take, t: 0 }
+    return true
+  }
 
   const takeFor = (target: JumpTarget, arc: Arc): JumpTake => {
     const run = Math.abs(target.x - body.position[0])
@@ -832,11 +861,17 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
 
   return {
     wind,
-    command: next => { command = next },
+    command: next => {
+      command = next
+      if (next.speed > 0) cancelPerformance()
+    },
     height: () => base,
     falling: () => fallSpeed !== undefined,
     jumping: () => jump !== undefined,
     cancelJump,
+    perform,
+    performing: () => performing !== undefined,
+    cancelPerformance,
     jump: target => {
       const arc = jump === undefined && fallSpeed === undefined ? arcTo(target) : undefined
       if (arc === undefined) return false
@@ -853,6 +888,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       return true
     },
     push: impulse => {
+      cancelPerformance()
       if (taking?.phase === 'crouch') cancelJump()
       body.velocity = add(body.velocity, [impulse[0], 0, impulse[2]])
     },
@@ -861,13 +897,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       stepBody()
       crouch()
       if (fallSpeed === undefined && base - supportUnderBody() > FALL_START_HEIGHT && feetOverTheDrop()) {
+        cancelPerformance()
         fallSpeed = 0
         landing = undefined
         letGoOfTheGround()
       }
       advanceTake()
+      advancePerformance()
       const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
-      if (taking !== undefined) followBody()
+      if (taking !== undefined || performing !== undefined) followBody()
       else {
         if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
         if (frameCount > 0) advance()
@@ -900,8 +938,8 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
         planted: feet.map(isHeld),
         switched,
         clamped,
-        clip: taking === undefined ? entries[entry].name : taking.take.name,
-        frame: Math.round(taking === undefined ? t : taking.t)
+        clip: performing?.take.name ?? taking?.take.name ?? entries[entry].name,
+        frame: Math.round(performing?.t ?? taking?.t ?? t)
       }
     }
   }

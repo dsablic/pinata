@@ -41,12 +41,11 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
 - **Export:** sprite sheets with JSON frame data, then Aseprite files.
 - **Behaviour library:** idle, crouch and a simple attack beside walk, turn and jump, each with gates, built on the
   [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
-- **Packaging:** `pinata` runs from a checkout only, because Node does not strip types under `node_modules`; batch D
-  compiles a JavaScript bin to `dist/` so `npx pinata` works. Standalone executables, if wanted later, are Node single
+- **Packaging:** `npm run build` compiles a JavaScript bin to `dist/node`, so an installed package runs `npx pinata`
+  and `npx pinata mcp` (checked from a packed tarball). Standalone executables, if wanted later, are Node single
   executable applications built in CI (still V8, so exports match what the tests check); not Bun, whose
   JavaScriptCore computes `Math` differently from Node.
-- **Authoring hints:** the P5 authors' notes (decals for small features, stride guidance, palette budgeting, a
-  reliable edit path for agents).
+- **Authoring hints:** the P5 authors' notes are in the guide and the hints; the exit test is the next check of them.
 
 - **Facing readability (Phase 1, batch A):** the skins' views do not read as their direction: judges named the
   direction right in 46% of answers (three-quarter views read as front or side; the wizard's back views show a white

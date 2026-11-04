@@ -1,15 +1,72 @@
-# Character package authoring reference
+# Character authoring guide
 
-A character package is a directory of six JSON files that describes a stylised pixel-art character as a posable 3D
-mannequin, a palette, a walking rig and a cloth setup. `npm run check` renders the character at 32 px and 48 px,
-animates a walk, simulates cloth, measures a fixed set of gates and writes a report. A package is finished when every
-gate passes.
+A character is a directory of JSON files: six that describe a stylised pixel-art character as a posable 3D mannequin,
+a palette, a walking rig and a cloth setup, and two more (`retarget.json`, `skin.json`) for a drawn, animated,
+exported character. This guide covers one character from first file to exported sprite sheets: the package files, the
+skin you draw, and the commands that check, preview and export it. It needs nothing but this document and the
+`pinata` command or its MCP server.
 
-## Running the check
+## The tools
+
+`pinata` is one command. Run it with `npx pinata <command>` (inside a project that has the package installed) or as
+`pinata <command>`; `pinata help` lists the commands. It needs Node 24 or later.
+
+| Command | Does | Writes |
+|---|---|---|
+| `pinata new --template <biped\|quadruped\|hexapod\|octopod> <dir>` | A starter package that passes `check` | the six files |
+| `pinata check <dir> [--out <dir>]` | The gates on the mannequin, rig and cloth, with hints | `summary.txt`, `metrics.json`, `sheet.png`, `walk.png`, `footprints.png`, `cloth.png` |
+| `pinata skin guide <dir> <out>` | Where each part sits in each of the five views, to draw against | `guide.md` and `front.png`, `frontSide.png`, `side.png`, `backSide.png`, `back.png` |
+| `pinata skin preview <dir> <skin.json> <out> [--clean]` | Validates the skin and draws it | `directions.png`, `turntable.png`, `walks.png`, `summary.txt` |
+| `pinata skin fit <dir> [<skin.json>]` | Flags sprites whose length does not suit their bone | printed lines only |
+| `pinata render <dir> <out>` | A skinned character's idle in eight directions and walk, crouch and attack strips, for looking | `idle-directions.png`, `walk-strip.png`, `crouch-strip.png`, `attack-strip.png` |
+| `pinata export <dir> <out>` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch and attack, each in eight directions | per animation `<name>-<animation>.png` (sprite sheet), `.json` (Aseprite JSON array format: frames, durations, tags `<animation>-<direction>`, the anchor as a slice pivot) and `.aseprite` (Aseprite's binary format) |
+
+Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files (a `hint:` line says which file and what to
+change); 2 bad arguments, a package that does not load, or a character the command cannot work on (`render` and
+`export` need `skin.json` and `retarget.json`). In `export`, lines starting `note` are engine notes: gates that measure
+the engine (planted feet in the drawn frames, the view drawn per direction, the cell border, the anchor) and that no
+character file can fix; they do not change the exit code. `FAIL` lines in `export` are about the character: `ground`
+means the skin's feet are drawn below or above their ground point (`skin.json`, see Drawing the skin), `loop` means
+the end of a cycle does not match its start (the cloth in `motion.json`, or the gait in `rig.json`).
+
+`pinata mcp` serves the same commands to an agent over the Model Context Protocol (stdio, newline-delimited
+JSON-RPC). Register it in a client as the command `npx pinata mcp` (in Claude Code: `claude mcp add pinata -- npx
+pinata mcp`); from a checkout it is `node src/cli/pinata.ts mcp`. It offers:
+
+- one tool per command, `new`, `check`, `skin`, `render` and `export`, with the command's arguments as a JSON object
+  (`dir`, `out`, `template`; `skin` also takes `action` of `guide`, `preview` or `fit`). Unknown arguments and wrong
+  types are refused with an error result naming the argument. Relative paths resolve against the server's working
+  directory, so pass absolute paths. The result is the command's lines, the files it wrote and `exit status: n`;
+  `isError` is true for any non-zero status, a failed gate included: read it and fix the named file, it is not a
+  protocol error. `check` removes only its own report files from `out` and writes nothing outside it;
+- this guide as the resource `pinata://docs/authoring`.
+
+Edit files by writing the whole file with your file-writing tool. Do not patch JSON with `sed` or `awk`: `sed -i`
+differs between macOS and Linux and can fail silently, which costs a run. JSON allows no comments and no trailing
+commas.
+
+## From prompt to export
+
+1. `pinata new --template biped <dir>` (a humanoid with the joint names the motion capture needs: see Skin, motion and
+   export) and change shapes, colours and proportions to the character. For a four-legged character use `quadruped`,
+   and so on (a skinned export is humanoid only).
+2. `pinata check <dir>`. Exit 2: a load error, fix the lines in `summary.txt`. Exit 1: work through the `FAIL` lines
+   and hints from the top. Static gates first: they change the mannequin that the walk gates measure. Then look at
+   `sheet.png` (shape and palette), `walk.png` and `footprints.png` (feet) and `cloth.png` (cape and chains). Repeat
+   until `automated gates: PASS`.
+3. Add `retarget.json` and draw `skin.json` (Skin, motion and export), using `pinata skin guide`, `skin preview` and
+   `skin fit`.
+4. `pinata render <dir> <out>`: look at the idle in eight directions and the walk, crouch and attack strips.
+5. `pinata export <dir> <out>`: fix any `FAIL` line; the sheets are the result.
+
+## `pinata check`
 
 ```
-npm run check -- <character dir> [--out <dir>]
+pinata check <character dir> [--out <dir>]
 ```
+
+It renders the character at 32 px and 48 px, animates a walk, simulates cloth, measures a fixed set of gates and
+writes a report. A package is finished when every gate passes.
 
 | Exit code | Meaning |
 |---|---|
@@ -228,7 +285,7 @@ antennae, wings), which move rigidly with the body, and the gait.
 | `gait` | object | Walk parameters. |
 
 `limbs`, `pelvis`, `upperBody` and `gait` are required. Start a new package with
-`npm run new -- --template <name> <dir>`: it writes a minimal package for the template that passes `check`.
+`pinata new --template <name> <dir>`: it writes a minimal package for the template that passes `check`.
 
 The older format, with `legs` and `arms` lists of `{ side, hip, knee, ankle, toe, phase, bend }` and
 `{ side, shoulder, elbow, wrist, hand, carried }`, still loads (the complete example below and most examples use it);
@@ -300,7 +357,7 @@ gait leaves out.
 | `octopod` | 8 | alternating tetrapod, as the hexapod | 0.6 | forward | `rest` | 0 |
 
 Phases and bends are assigned per side, from the hind leg forward, by the rest hip position (larger z is further
-forward), so the order of the file does not matter. `npm run new` also scales starting gait values by leg length.
+forward), so the order of the file does not matter. `pinata new` also scales starting gait values by leg length.
 
 **Labels.** Hints and gate names call the legs `left` and `right` for two legs, `left front`, `left hind`, ... for
 two per side, and `left 1` .. `left n` (front to back) for three or more per side, followed by the limb name with more
@@ -328,7 +385,7 @@ than four legs. Arms are `left arm`, or `left arm 1` .. `n` front to back when a
   long as the first stance (about a second for a dog), or the rest-pose plants fall inside the steady window and
   distort `rootSpeedError`.
 
-Starting values for a dog 0.6 m tall at the shoulder ([`examples/dog`](../examples/dog)): `strideLength` 0.4,
+Starting values for a dog 0.6 m tall at the shoulder: `strideLength` 0.4,
 `referenceSpeed` 0.35 (also the script speed), `stanceFraction` 0.75, `stepHeight` 0.07, `bobAmplitude` 0.008,
 `footSpacing` 0.18 (the hip distance), `armSwingDegrees` 0, `accelSeconds` 1. A quadruped's joints flex quickly, so
 a low reference speed is what keeps `kneeSpeedDegPerSec` down: the peak grows with speed and barely changes with
@@ -350,10 +407,14 @@ stride. Short legs need a `stepHeight` of at least about 5 cm to leave the 2 cm 
 
 Leg length is hip y minus ankle y in the rest pose. Starting values for two legs: `strideLength` 1.4 x leg length,
 `footSpacing` hip distance, `stepHeight` roughly 0.15 x leg length, `stanceFraction` 0.55, `bobAmplitude` 0.015,
-`armSwingDegrees` 20. For more legs, start from `npm run new` with the matching template, whose gait is scaled from leg
+`armSwingDegrees` 20. A stride much longer than that makes the pelvis drop to keep the feet on the floor (it shows
+as ground penetration, `reachViolations` or a wrong `rootSpeedError`, not as an obvious stride problem), so check
+`strideLength` against the leg length before chasing joints. For more legs, start from `pinata new` with the matching template, whose gait is scaled from leg
 length, or from the dog values above. `stepHeight` and `stanceFraction` trade off: a foot that is lifted too little
 slides at lift-off and touch-down (fix: raise `stepHeight`), and a high `stepHeight` makes the knee flex fast (fix:
-lower `stanceFraction`, or lengthen the stride a little). Walking slower does not reliably lower knee speed.
+lower `stanceFraction`, or lengthen the stride a little: a longer stride, within the ratio to the leg length above,
+often resolves the slide and knee-speed trade-off when neither value alone does). Walking slower does not reliably
+lower knee speed.
 
 ## materials.json
 
@@ -460,8 +521,7 @@ A chain or the cape may carry an optional `render` object, `{ "material": "pink"
 key of `materials` in `style.json` and `radius` is the thickness in metres. The pixel renderer then draws that strand as
 thin capsules, one per link (for the cape, one per grid edge), in a single colour of that ramp; without `render` the
 strand is simulated but not drawn. Rendered strands are not collision parts and are not checked by the static gates;
-`npm run check` draws them into `sheet.png` and `walk.png` (the sheet shows the middle of the first steady walk).
-The library function `clothParts` in [`src/sim/render.ts`](../src/sim/render.ts) turns a recorded frame into those parts.
+`pinata check` draws them into `sheet.png` and `walk.png` (the sheet shows the middle of the first steady walk).
 
 ### wind
 
@@ -497,8 +557,8 @@ drawn as thin capsules) are not part of them: they are thin by design, so `maxTh
 - **outlineGaps.** The camera fits every part, so this gate never fails for a package that loads. If it does, report
   it as a bug rather than changing the character.
 - **maxThinFraction.** A part that is one pixel wide flickers and vanishes. At 32 px a part must be at least 2 px
-  across, which is `height / 16` metres (0.075 m for a 1.2 m character); aim for 3 px (`3 * height / 32`). For a
-  capsule use `2 * radius` (of the thinner end); for a box use the smaller of `width` and `thickness`. Parts with fewer
+  across, which is `height / 16` metres (0.075 m for a 1.2 m character); aim for 3 px (`3 * height / 32`). "Across"
+  is a diameter: a capsule is `2 * radius` (of the thinner end), so 0.075 m across needs a radius of 0.0375 m; for a box use the smaller of `width` and `thickness`. Parts with fewer
   than 4 visible pixels in a view are ignored. A side covered by a part in front is not an edge, so hiding a wide part
   behind another does not make it thin. What fails is a 1-px strip of a part that is still visible past a part in front
   of it (a foot peeking out under a shin in the back view, a hand beside a thigh). The hint names the part and the
@@ -507,9 +567,13 @@ drawn as thin capsules) are not part of them: they are thin by design, so `maxTh
 - **paletteSize.** Every distinct colour counts: ramp colours that appear, decal colours, and the outline colour
   (`selective` mode usually uses fewer). Fix by sharing materials between parts, using one fewer band (this
   removes one colour from every ramp), or using fewer decal colours. Every ramp needs exactly `bands.length + 1`
-  colours, so you cannot drop a single colour from one ramp.
+  colours, so you cannot drop a single colour from one ramp. Budget before drawing: materials x (`bands.length + 1`)
+  plus decal colours plus the outline must be at most 16, so 5 materials of 3 shades and 1 decal colour already fill
+  it; plan materials as a shared set (skin, cloth, metal, leather, one accent) rather than one per part.
 - **maxStrayPixels.** Isolated pixels come from parts smaller than a pixel or mostly hidden behind a neighbour. Make
-  them larger, merge them into a neighbouring part, or draw them as a decal.
+  them larger, merge them into a neighbouring part, or draw them as a decal. A small feature next to larger parts (a
+  beard, an eye, a buckle, a badge) works better as a decal than as a part: a decal is exempt from this gate and
+  from `maxThinFraction`.
 
 ### Locomotion gates
 
@@ -538,10 +602,12 @@ Usual fixes:
   prints both). If it is level, the usual fix is to raise `stepHeight` (start at about 0.15 x leg length; the slide
   happens at lift-off and touch-down when the foot barely leaves the floor). Raising `stepHeight` raises knee speed,
   which a lower `stanceFraction` offsets. Changing `strideLength` is unreliable.
-- **groundPenetrationPx, plantedFrames, unsupportedFrames.** Check that the foot is level, then lower
-  `bobAmplitude` or `stepHeight`.
+- **groundPenetrationPx, plantedFrames, unsupportedFrames.** Check that the foot is level, then check the stride
+  against the leg length (the hint says when it is far over): a long stride drops the pelvis, and shortening
+  `strideLength` (and the script speed with it) is the fix before `bobAmplitude` or `stepHeight`.
 - **partGroundPenetrationPx.** A part (a dragged sword tip, a low hand, a hem) reaches the floor. Raise its joints in
-  the mannequin, or reduce `bobAmplitude` and `armSwingDegrees`.
+  the mannequin, or reduce `bobAmplitude` and `armSwingDegrees`; a stride far over the leg length also drops the
+  pelvis and the parts with it.
 - **reachViolations.** The stride asks the legs to reach too far. Shorten `strideLength`, `footSpacing` (not with
   `lateral: "rest"`, which ignores it: bring the rest feet in instead) or `bobAmplitude`, or lengthen the legs.
 - **kneeLimitViolations.** The value counts joint-frames over all legs. The hint names the joint: if it bends the
@@ -557,7 +623,8 @@ Usual fixes:
   joints of a limb are at the same position.
 - **rootSpeedError.** Feet must plant at least twice inside a steady window. If the window is shorter than 2.5
   cycles, lengthen the `move` segment (or shorten `strideLength`). If the window is already long enough and the value
-  is `Infinity`, the feet never rise above 2 cm, so raise `stepHeight`.
+  is `Infinity`, the feet never rise above 2 cm, so raise `stepHeight`. A window that is long enough with a finite
+  error usually means the stride is too long for the legs (see the gait section): shorten `strideLength`.
 - **unbalancedFrames.** The hint names the worst frame and the feet on the ground. Raise `stanceFraction` so more
   feet are down at once, keep neighbouring legs half a cycle apart, spread the feet wider (`lateral: "rest"` with
   splayed feet), or move heavy parts toward the middle of the legs.
@@ -736,7 +803,7 @@ A 1.2 m robot with a chain antenna, written to pass every gate. Create these six
 }
 ```
 
-Result of `npm run check -- <dir>`:
+Result of `pinata check <dir>`:
 
 ```
 check: bolt (<dir>)
@@ -769,51 +836,112 @@ Things this example shows: the feet are capsules from ankle to toe with the ankl
 `allowThin: true` and is listed in `exclude` because the chain represents it; hands are larger than the forearms and
 the arms hang away from the torso so they are not hidden in side views.
 
-## The `pinata` command and the MCP server
+## Skin, motion and export
 
-`pinata` is one command over everything an author does. It runs from a checkout of the repository:
-`node src/cli/pinata.ts <command>`, `npm run pinata -- <command>`, or `pinata <command>` after `npm link`. (Node does
-not run TypeScript under `node_modules`, so an installed package cannot run it.) `pinata help` lists the commands.
+`render` and `export` animate the character with retargeted motion capture and draw it with a skin you draw, in eight
+directions. They need two more files next to the six, and a humanoid body.
 
-| Command | Does | Writes |
-|---|---|---|
-| `pinata new --template <name> <dir>` | A starter package that passes | the six files |
-| `pinata check <dir> [--out <dir>]` | The gates, with hints | `summary.txt`, `metrics.json`, `sheet.png`, `walk.png`, `footprints.png`, `cloth.png` |
-| `pinata skin guide <dir> <out>`, `skin preview <dir> <skin.json> <out> [--clean]`, `skin fit <dir> [<skin.json>]` | The skin's drawing guide, preview and fit flags | `guide.md` and views; `directions.png`, `turntable.png`, `walks.png`; fit prints |
-| `pinata render <dir> <out>` | A skinned character's idle in eight directions and walk, crouch and attack strips, for looking | `idle-directions.png`, `walk-strip.png`, `crouch-strip.png`, `attack-strip.png` |
-| `pinata export <dir> <out>` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch (down, hold, up) and attack (a punch; the knight's sword arm stays stiff, so it reads as a thrust) in eight directions | one sprite sheet per animation, `<name>-<animation>.png`, with `<name>-<animation>.json` (Aseprite JSON array format) and `<name>-<animation>.aseprite` (Aseprite's binary format: one layer, a cel per frame, tags `<animation>-<direction>`, frame durations, the anchor as a slice pivot) |
+### Humanoid requirements
 
-Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files (the `hint:` line names the file); 2 bad
-arguments, a package that does not load, or a character the command cannot work on (`render` and `export` need a
-`skin.json` and a `retarget.json`). In `export`, lines starting `note` are engine notes: gates that measure the
-engine (planted feet in the drawn frames, the view drawn per direction, the cell border, the anchor) and that no
-character file can fix; they do not change the exit code. `FAIL` lines in `export` are about the character: `ground`
-(measured on the idle in every direction: more than 5% of the planted foot-frames more than 1 px from their own ground point) means the skin's feet are drawn below or float above the ground line (`skin.json`),
-`loop` means the end of a cycle does not match its start (the cloth in `motion.json`, or the gait in `rig.json`).
+The capture drives joints by name, so the mannequin needs `pelvis`, `chest`, `head`, and for each side `hipL`, `kneeL`,
+`ankleL`, `toeL`, `shoulderL`, `elbowL`, `wristL`, `handL` (and the `R` set), with the legs and arms of `rig.json`
+built on them: what `pinata new --template biped` writes. Add the character's own joints (a hat tip, a cape anchor,
+eyes, a plume base) freely; the rig must list them (`upperBody`, `attached`, `carried`).
 
-`pinata mcp` serves the same commands to an agent over the Model Context Protocol (stdio). In Claude Code the
-repository's `.mcp.json` registers it; elsewhere register the command `node <repository>/src/cli/pinata.ts mcp`. The
-server offers:
+### retarget.json
 
-- one tool per command, `new`, `check`, `skin`, `render` and `export`, with the command's arguments as a JSON object
-  (`dir`, `out`, `template`; `skin` also takes `action` of `guide`, `preview` or `fit`). Unknown arguments and wrong
-  types are refused with an error result naming the argument. Relative paths resolve against the server's working
-  directory, so pass absolute paths. The result is the command's lines, the files it wrote and `exit status: n`,
-  then the same status and files as JSON; `isError` is true for any non-zero status. `check` removes only its own
-  report files from `out` and writes nothing outside it;
-- this guide as the resource `pinata://docs/authoring` (`resources/read`).
+```json
+{
+  "hang": { "chest": ["shoulderL", "shoulderR", "head", "capeAnchorL", "capeAnchorR"], "head": ["hatTip", "eyeL", "eyeR"] },
+  "style": { "amplitude": { "hipL": 1.3, "hipR": 1.3, "kneeL": 1.2, "kneeR": 1.2, "shoulderL": 1.8, "shoulderR": 1.8 } }
+}
+```
 
-An agent's loop through the tools: call `new` for a starter; edit the package files; call `check` with an `out`
-directory and read the `FAIL` lines and hints, then the stills in the directory; repeat until it passes; for a skinned
-character, call `render` to look and `export` to write the sheet. A failed gate is a tool result with `isError`
-set, not a protocol error: read it and fix the named file.
+Both fields are optional. `hang` says which joints follow the chest and the head instead of the pelvis: put the
+shoulders, the head and everything on the upper torso (cape anchors, an emblem) under `chest`, and the hat, face, eyes
+and plume under `head`, so they turn with the spine and neck; a joint named nowhere moves rigidly with its parent.
+`style.amplitude` scales a joint's captured movement (1.3 on hips and 1.8 on shoulders livens a stiff walk; below 1
+stiffens); `offset` (fixed degrees `[x, y, z]` per joint), `variation`, `rate` and `stride` (0.5 to 2) are the other
+fields. A wrong joint name is reported with the file and path.
 
-## Working loop
+### Cape and cloth in a skinned character
 
-1. Write the six files: run `npm run new -- --template <biped|quadruped|hexapod|octopod> <dir>` for a starter that
-   passes, or start from an example, and change shapes, colours and proportions.
-2. Run `npm run check -- <dir>`. Exit code 2 means a load error: fix the lines in `summary.txt`.
-3. On exit code 1, work through the `FAIL` lines and their hints from top to bottom. Static gates first: they change
-   the mannequin that the walk gates measure.
-4. Look at `sheet.png` (shape and palette), `walk.png` and `footprints.png` (feet), `cloth.png` (cape and chains).
-5. Re-run until `automated gates: PASS`.
+The cloth is simulated, and the skin draws it by binding sprites to it: make the cape a pair of stand-in parts from a
+top joint to a hem joint (`capeL`: `capeTopL` to `capeHemL`), list both in `motion.json` `exclude`, list the hem joints
+in `bind`, and give the stand-ins sprites in the skin. The sprite is then laid along the cloth's curve as it swings. A
+`loop` FAIL in `export` is usually the cloth: a cape that has not settled when the cycle ends; shorten it or raise its
+material's `damping`.
+
+### Drawing the skin
+
+`pinata skin guide <dir> <out>` writes `guide.md` (for each of five views, every part's joint positions in pixels,
+bone length, width, and which way its top faces) and the five view images. Draw against it, then `skin preview`.
+
+```json
+{
+  "name": "my-knight",
+  "palette": { "o": "#1b1421", "s": "#7b8aa8", "h": "#e0e4d6" },
+  "views": {
+    "front": { "parts": { "forearmR": { "rows": [".hhhhhh.", "sssssss.", ".sssss.."], "pivotA": [2, 1], "pivotB": [6, 1] },
+                          "capeL": { "hidden": true }, "capeR": { "from": "side.capeR" } } },
+    "frontSide": { "parts": {} }, "side": { "parts": {} }, "backSide": { "parts": {} }, "back": { "parts": {} }
+  }
+}
+```
+
+(The example is cut short: every view lists every part.)
+
+- **Views.** `front` faces the viewer, `frontSide` is 45 degrees, `side` faces screen-right, `backSide` is 135 degrees,
+  `back` faces away. The eight directions use these, left-facing ones mirrored: a mirrored view draws each part's
+  counterpart (`...L` and `...R`) flipped, so draw a left and a right sprite as a near and a far one, and a pair
+  whose two sprites cannot suit both bones will compromise.
+- **Parts.** Every mannequin part has a sprite in every view, or `{ "hidden": true }` where it cannot be seen.
+  `{ "from": "view.part" }` (or `"part"` in the same view) copies another sprite, and may add its own `layer`.
+- **Sprites.** `rows` are equal-length strings (at most 64 by 64), one per pixel row; `.` is transparent; any other
+  character must be in `palette`. One sprite pixel is one screen pixel at 48 px tall: never scale.
+- **Two-joint parts** (limbs, cape, sword, foot) are drawn lying along +x from joint A to joint B. `pivotA` is the
+  pixel `[column, row]` (0-based from the top left) that sits on joint A, and `pivotB` the pixel on joint B, on the
+  same row and to its right. Joints are the centres of the rounded ends, so the sprite extends past each pivot by
+  about the end radius. The pivot distance should match "Bone (px)" in `guide.md`. The renderer rotates the sprite to
+  the bone's angle in steps of 22.5 degrees, and the `guide.md` column "Top faces" says where its top row ends up
+  (hanging limbs: the front; a torso: the back; a foot: still the top).
+- **Single-joint parts** (a helmet, a hand, a pauldron: both joints the same) take only `pivotA`, the part's centre,
+  and are drawn upright, not rotated. `"upright": true` on a two-joint part draws it as it stands on screen, with
+  `pivotB` in the same column as `pivotA` and below it.
+- **Layers.** Parts are drawn farther before nearer; `"layer": n` (an integer, higher draws over lower, default 0)
+  overrides that for a part, such as a boot that must show over the other leg.
+- **Palette.** At most 16 colours for the whole skin (one character each, mapped to `"#rrggbb"`, `.` not allowed as a
+  key), shared by all sprites; include one very dark colour. The renderer outlines the silhouette with the darkest
+  colour, draws inner lines where parts overlap and darkens the far limb of each pair, so do not outline the sprites'
+  outer edges yourself. It never blends or creates colours.
+- **Style.** Light comes from the upper left front. At 48 px a torso is about 9 by 12 px: draw clean clusters, one
+  light direction, a few highlights, not detail. Draw limbs so they still read rotated up to 40 degrees. 16 colours are
+  tight: reuse a few ramps.
+- **`skin preview <dir> skin.json <out>`** validates (errors name the path to the problem, `skin: INVALID`, exit 1)
+  and draws `directions.png` (the eight directions), `turntable.png` (32 steps), `walks.png`. Check that every part
+  sits on the body, limbs join at the joints without gaps and the walk reads. `--clean` rotates at 11.25 degrees.
+- **`skin fit <dir>`** prints `n part views outside the drawn-length bounds`; keep it at 0. A line such as
+  `torso front: sprite span 5 (drawn 3 to 6.25), bone projects 8.3 px` says that sprite's pivot distance
+  (`pivotB` column minus `pivotA` column) lets it draw between 3 and 6.25 px, but the bone on screen is 8.3: redraw
+  it with a span near the bone's length (keeping the end caps). A foreshortened part (a sword pointing at the viewer, a
+  foot in the front view) needs a short span there.
+
+### The ground gate
+
+`export` measures the idle loop in every direction: each planted foot's lowest drawn row must be within 1 px of its
+own ground point (the projected sole of the foot capsule), in at most 5% of the planted foot-frames. A failing line is
+`idle-<direction>`; the view is `front` for front and back, `frontSide` for front-left and front-right, `side` for
+left and right, `backSide` for back-left and back-right (`back` for back). The skin fix is in the foot sprites'
+pivots:
+
+1. In the side views, a foot sprite's bottom row should lie about the foot's radius (half its "Width", in guide.md)
+   below its pivot row. Moving `pivotA` and `pivotB` rows down by one (a higher row number) draws the foot one pixel
+   higher; in the front and back views the foot is drawn end-on and a row can move it the other way. Change by one
+   and run `export` again.
+2. A mirrored direction draws the other foot's sprite flipped, so one sprite serves two feet; if fixing one direction
+   breaks its mirror, split the difference or redraw the sprite.
+3. If changing the pivots does not move the foot, another sprite is drawn over its bottom rows (a long robe, the other
+   leg): give the foot sprite a higher `layer`.
+4. A view with no visible foot fails too: draw the feet where the garment leaves them showing, in every view.
+
+A robe or cloak that hides the feet makes the gate measure what shows; raise the hem or let the feet peek out.

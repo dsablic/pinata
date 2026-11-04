@@ -1264,6 +1264,14 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   floating above it), each with its own hint, and a view in which no planted foot has a visible sole pixel fails. The
   mirrored left view is measured like the others and is not an engine note: it passes for all four characters, where
   measured against the line under the root it did not.
+- The idle holds still, so each foot's offset is one constant per direction: a miss is a skin, not noise. Each of the
+  eight 2 px misses of the example skins had an unrounded offset (the foot part's lowest row's lower edge against the
+  projected sole point) of 1.6 to 2.2 px, beyond what the rounding of both rows (0.5 px) can explain, so the measure
+  and its threshold stay and the skins were corrected: a foot sprite's `pivotA` and `pivotB` rows moved by one in the
+  view and foot named by the miss (in the side views a higher row draws the foot higher, in the front and back views,
+  where the foot is end-on, the other way), and the rogue's far foot in the side view given `layer` 1: it was drawn
+  behind the near leg, so its lowest visible row was the leg's and no pivot moved it. A mirrored direction draws the
+  other foot's sprite, so one sprite serves two feet and a fix is checked in both directions.
 - `render` draws the skinned idle in eight directions and the right-facing walk, crouch and attack from the recorder
   (the same drawing as `export`, so what is looked at is what is exported); unskinned characters are drawn by `check`'s
   stills.
@@ -1278,10 +1286,20 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   request at a time accepts this.
 - Logging goes to stderr only. While serving, `console.log`, `info`, `debug`, `dir` and `table` and
   `process.stdout.write` all write to stderr; only the protocol's own writer holds the real stdout.
-- `pinata` runs from a checkout (`node src/cli/pinata.ts`, `npm run pinata --`, or `npm link`, which resolves to the
-  checkout). Node does not strip types under `node_modules`, so an installed package cannot run its `bin`; packaging
-  needs a built JavaScript bin (see the TODO). The repository's `.mcp.json` registers the server for Claude Code
-  with `node src/cli/pinata.ts mcp`.
+- Node does not strip types under `node_modules`, so the installed `bin` is JavaScript: `npm run build` compiles the
+  command's modules with `tsc` (`tsconfig.build.json`, like the web build, with `rewriteRelativeImportExtensions` so
+  the `.ts` import specifiers of the source become `.js`) into `dist/node/`, and `package.json`'s `bin` points at
+  `dist/node/src/cli/pinata.js`. The command imports the proof runners' gate modules (`pocs/`), so `rootDir` is the
+  repository and the output mirrors it (`dist/node/src`, `dist/node/pocs`); it also needs the DOM types, since the
+  page's modules are in its import graph. `dist/node` is separate from `dist/web` so neither build deletes the other.
+- The data the commands read at run time is found from the package, not the working directory: `ROOT`
+  (`src/cli/paths.ts`) is the nearest ancestor with a `package.json`, which is the repository from `src/` and the
+  package directory from `dist/node/src/` alike. The package lists what it needs in `files`: `dist/node`,
+  `motion/clips`, `motion/humanoid.json`, `docs/authoring.md` (the MCP resource) and `site/world.json` (the world
+  config every export builds its one-character world from); starter templates are code, not files. The package stays
+  `private`: it is for `npm install <tarball>` or a checkout, and `npx pinata` finds the installed bin.
+  The repository's own `.mcp.json` registers the server for Claude Code with `node src/cli/pinata.ts mcp`, which
+  needs no build.
 
 ## Export (`src/export/`)
 

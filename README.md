@@ -13,7 +13,7 @@ check its own work.
 ## What works
 
 - **Characters as text:** humanoids, quadrupeds, hexapods, octopods and creatures with general limbs (tails, ears,
-  manes), checked by `npm run check` and started from templates with `npm run new`. See
+  manes), checked by `pinata check` and started from templates with `pinata new`. See
   [`docs/authoring.md`](docs/authoring.md).
 - **Motion:** footstep planning with IK legs on flat ground, ramps and stairs; spring-driven appendages; simulated
   cloth (capes, scarves, chains) with wind and gravity; a joint hierarchy for attached parts.
@@ -32,7 +32,8 @@ check its own work.
     `/plugin install pinata --marketplace dsablic/pinata`, then `/pinata` opens the pane. It needs Node.js 24.
 - **One command and an MCP server:** `pinata new|check|skin|render|export` over the engine, and `pinata mcp`, the
   same commands as MCP tools over stdio with the authoring guide as a resource. The repository's `.mcp.json`
-  registers it for Claude Code. See [`docs/authoring.md`](docs/authoring.md).
+  registers it for Claude Code. See [`docs/authoring.md`](docs/authoring.md), which covers a character from first file
+  to exported sprite sheets.
 - **Checking quality:** every feature is built against gates fixed before the code, and visual quality is judged by
   blind AI judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)).
 
@@ -46,6 +47,19 @@ check its own work.
 
 Requires Node.js 24 or later; TypeScript runs directly through Node's type stripping, with no build step except for
 the browser bundle.
+
+To use the `pinata` command from another project, build and pack it, then install the tarball (the package is
+private, not on the npm registry):
+
+```bash
+npm run build && npm pack --pack-destination /tmp/pinata-pack
+cd my-project && npm install /tmp/pinata-pack/pinata-0.0.0.tgz
+npx pinata new --template biped my-character     # then check, skin, render, export (see docs/authoring.md)
+npx pinata mcp                                   # the MCP server over stdio
+claude mcp add pinata -- npx pinata mcp          # register it in Claude Code, from the project directory
+```
+
+From a checkout, with no build:
 
 ```bash
 npm install

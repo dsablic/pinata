@@ -85,8 +85,10 @@ export function yawOf (direction: Direction): number {
 export function subjectOf (world: ReadWorld, name: string): Subject {
   const i = world.cast.findIndex(member => member.name === name)
   const look = world.looks[i]
-  if (i < 0 || look?.skin === undefined || world.cast[i].capture === undefined) {
-    throw new Error(`${name} needs a skin and motion capture to be recorded`)
+  if (i < 0) throw new Error(`${name} is not in the world`)
+  if (look?.skin === undefined) throw new Error(`${name} has no skin.json: draw one (pinata skin guide) to record it`)
+  if (world.cast[i].capture === undefined) {
+    throw new Error(`${name} has no retarget.json: add one (hang and style, see the guide) to record it`)
   }
   return { name, member: world.cast[i], look: look as Skinned, air: pageEnvironment(world.config) }
 }

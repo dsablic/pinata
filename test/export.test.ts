@@ -14,12 +14,6 @@ import { decodePng } from '../src/png/decode.ts'
 import { readAseprite } from './aseprite-reader.ts'
 
 const MISSED_GATES = ['feet']
-const GROUND_MISSES: Record<string, string[]> = {
-  knight: ['idle-right', 'idle-back-left', 'idle-front-left'],
-  rogue: ['idle-front', 'idle-right'],
-  dwarf: ['idle-front', 'idle-back-left'],
-  wizard: ['idle-back']
-}
 const world = readWorld(worldBundle())
 const recordings = new Map<string, Recording>()
 
@@ -102,13 +96,13 @@ test('a repeated frame at the seam fails, and identical frames are not measured'
 
 for (const name of SKINNED_HUMANOIDS) {
   const title = `${name}: every animation is recorded in eight directions and passes every export gate but the ` +
-    'recorded misses (feet, the mirrored view\'s ground)'
+    'engine\'s feet'
   test(title, () => {
     const recording = recorded(name)
     assert.equal(recording.tracks.length, BEHAVIOURS.length * DIRECTIONS.length)
     const failed = checksOf(recording).filter(check => check.measured && !check.pass)
     const missed = failed.filter(check => !MISSED_GATES.includes(check.gate)).map(check => check.line.split(':')[0])
-    assert.deepEqual(missed, GROUND_MISSES[name] ?? [])
+    assert.deepEqual(missed, [])
     const unmeasured = checksOf(recording).filter(check => !check.measured)
     assert.ok(unmeasured.every(check => check.gate === 'loop' && check.line.startsWith('idle-')), 'only idle loops')
   })

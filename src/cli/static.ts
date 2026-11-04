@@ -93,9 +93,12 @@ function thinPartHint (worst: FrameMetrics, mannequin: Mannequin, name: string, 
   const needed = THIN_PIXELS * mannequin.height / Math.min(...SIZES)
   const lead = `'${name}' (${percent}% of its pixels are 1px wide; ${text})`
   if (across < needed - 1e-9) {
+    const fix = part.shape === 'capsule'
+      ? `raise radiusA and radiusB to at least ${metres(needed / 2)}`
+      : `raise width and thickness to at least ${metres(needed)}`
     return `${lead} is ${across.toFixed(3)} m across and needs at least ${metres(needed)} (${THIN_PIXELS} px at ` +
-      `${Math.min(...SIZES)} px): raise radiusA and radiusB ` +
-      '(or width and thickness), or set allowThin: true if it is meant to be a thin line such as a blade or a cord'
+      `${Math.min(...SIZES)} px); across is a diameter, 2 x radius: ${fix}, or set allowThin: true if ` +
+      'it is meant to be a thin line such as a blade or a cord, or draw a small feature as a decal instead of a part'
   }
   const front = thinOccluders(frame.gbuffer, mannequin, name).slice(0, SHOWN_THIN_PARTS)
   const behind = front.length === 0 ? 'the parts in front of it' : quoted(front)
@@ -130,8 +133,9 @@ function strayHint (worst: FrameMetrics, mannequin: Mannequin): string {
     .map(([name, n]) => `'${name}' (${n})`).join(', ')
   return `${worst.strays.length} isolated pixels at ${describe(worst.frame)}, from part ${top}. These are ` +
     'parts smaller than a pixel or mostly hidden behind a neighbour: make them at least ' +
-    `${metres(THIN_PIXELS * mannequin.height / worst.frame.size)} across, merge them into a neighbouring part, or ` +
-    'draw a deliberate single-pixel feature as a decal.'
+    `${metres(THIN_PIXELS * mannequin.height / worst.frame.size)} across (a diameter, 2 x radius), merge them ` +
+    'into a neighbouring part, or draw a small feature next to a larger part (a beard, an eye, a buckle, a badge) as ' +
+    'a decal, which is exempt from this gate.'
 }
 
 function paletteHint (mannequin: Mannequin, style: Style, count: number): string {
@@ -140,8 +144,10 @@ function paletteHint (mannequin: Mannequin, style: Style, count: number): string
   const ramps = [...uses].map(([name, n]) => `'${name}' (${style.materials[name]?.length ?? 0} colours, ${n} parts)`)
   const decals = new Set(mannequin.decals.flatMap(d => [...d.pattern.join('')]).filter(c => c !== '.')).size
   return `${count} distinct colours over all views. Parts use ${ramps.join(', ')}, plus the outline colour and ` +
-    `${decals} decal colours. Give parts the same material where the look allows it, use one fewer band in ` +
-    'style.json bands (removes one colour from every ramp), or use fewer decal colours.'
+    `${decals} decal colours. The budget is 16: materials x (bands + 1) colours, plus the decal colours, plus the ` +
+    'outline (selective outlines reuse ramp colours), so 5 materials of 3 shades and 1 decal colour already fill ' +
+    'it. Give parts the same material where the look allows it, use one fewer band in style.json bands (removes ' +
+    'one colour from every ramp), or use fewer decal colours.'
 }
 
 function worstBy (items: FrameMetrics[], value: (m: FrameMetrics) => number): FrameMetrics {

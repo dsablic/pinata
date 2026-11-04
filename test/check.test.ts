@@ -57,7 +57,17 @@ test('a thin part fails maxThinFraction with a hint naming the part and the widt
   assert.match(summary, /^FAIL {2}maxThinFraction: /m)
   assert.match(summary, /hint: thin parts at \d+px.*'forearmL'.* is 0\.024 m across and needs at least 0\.075 m/)
   assert.match(summary, /\(2 px at 32 px\)/)
+  assert.match(summary, /radiusA and radiusB to at least 0\.038 m/)
   assert.match(summary, /allowThin/)
+})
+
+test('a stride far over the leg length is named as the cause of a part through the floor', () => {
+  const dir = characterVariant(d => {
+    patchJson(d, 'rig.json', j => { j.gait.strideLength *= 2.2 })
+  })
+  const summary = summaryOf(check(dir))
+  assert.match(summary, /part 'thighL' goes .* through the floor.*stride is 1\.1 m, 2\.3 x the 0\.48 m leg length/)
+  assert.match(summary, /shorten rig\.gait\.strideLength to about 0\.67/)
 })
 
 test('a window with too few plants makes rootSpeedError non-finite and the hint says why', () => {

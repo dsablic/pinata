@@ -320,7 +320,7 @@
           "lLLLLLLkk",
           "LLLLLLkkk",
           "kkkkkkkk."
-        ], "pivotA": [2, 2], "pivotB": [6, 2] },
+        ], "pivotA": [2, 3], "pivotB": [6, 3] },
         "pauldronR": { "rows": [
           "..hhs..",
           ".hhssm.",
@@ -490,7 +490,7 @@
           "tllllllLL",
           "llllllLLL",
           "LLLLLLLL."
-        ], "pivotA": [2, 2], "pivotB": [6, 2] },
+        ], "pivotA": [2, 3], "pivotB": [6, 3] },
         "footL": { "rows": [
           ".lLLLLLL.",
           "llLLLLLLL",
@@ -683,7 +683,7 @@
           "tlllllLL",
           "lllllLLL",
           "LLLLLLL."
-        ], "pivotA": [2, 2], "pivotB": [5, 2] },
+        ], "pivotA": [2, 3], "pivotB": [5, 3] },
         "footL": { "rows": [
           ".lLLLLL.",
           "llLLLLLL",

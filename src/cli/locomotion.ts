@@ -20,6 +20,10 @@ const TILT_METRES = 0.01
 const MAX_UNNAMED_LEGS = 4
 const MIN_BALANCED_LEGS = 5
 const STRAIGHT_REST_DEGREES = 25
+const STRIDE_PER_LEG_LENGTH: Array<{ legs: number, factor: number }> = [
+  { legs: 2, factor: 1.4 }, { legs: 4, factor: 0.85 }, { legs: 6, factor: 0.6 }, { legs: Infinity, factor: 0.5 }
+]
+const LONG_STRIDE_MARGIN = 1.15
 
 type Measure = (geometry: Geometry, recording: LocomotionRecording) => number
 type Worst = { leg: Leg, label: string, frame: number, value: number }
@@ -71,6 +75,23 @@ function at (ctx: Context, frame: number): string {
 function legLength (character: Character, leg: Leg): number {
   const rest = restPose(character.mannequin)
   return rest[leg.hip][1] - rest[leg.ankle][1]
+}
+
+function strideFactor (ctx: Context): number {
+  const legs = legsOf(ctx.character.rig).length
+  return (STRIDE_PER_LEG_LENGTH.find(row => legs <= row.legs) as { factor: number }).factor
+}
+
+function strideAdvice (ctx: Context, leg: Leg): string {
+  const { strideLength } = ctx.character.rig.gait
+  const legs = legsOf(ctx.character.rig).length
+  const factor = strideFactor(ctx)
+  const length = legLength(ctx.character, leg)
+  if (strideLength <= LONG_STRIDE_MARGIN * factor * length) return ''
+  return ` The stride is ${strideLength} m, ${(strideLength / length).toFixed(1)} x the ${length.toFixed(2)} m leg ` +
+    `length (the usual start for ${legs} legs is ${factor} x): a stride that long makes the pelvis drop to keep the ` +
+    `feet on the floor, so shorten rig.gait.strideLength to about ${(factor * length).toFixed(2)} (and lower the ` +
+    'script speed with it) before changing anything else.'
 }
 
 function tiltOf (character: Character, leg: Leg): { ankle: number, toe: number, tilt: number, toeY: number } {
@@ -145,7 +166,7 @@ function groundHint (ctx: Context): string {
   const metresDeep = worst.value * ctx.mpp
   return `the ${worst.label} sole goes ${worst.value.toFixed(2)} px (${metresDeep.toFixed(3)} m) below the floor in ` +
     `${at(ctx, worst.frame)}. ${groundCause(ctx, worst.leg)}Otherwise reduce rig.gait.bobAmplitude ` +
-    `(now ${ctx.character.rig.gait.bobAmplitude}).`
+    `(now ${ctx.character.rig.gait.bobAmplitude}).${strideAdvice(ctx, worst.leg)}`
 }
 
 function nonFootParts (character: Character): Part[] {
@@ -177,7 +198,8 @@ function partGroundHint (ctx: Context): string {
     `${joints} in the mannequin` : `it reaches the floor only while posed: raise its ${joints} in the mannequin, or ` +
     'reduce rig.gait.bobAmplitude and armSwingDegrees'
   return `part '${worst.part.name}' goes ${worst.value.toFixed(2)} px (${(worst.value * ctx.mpp).toFixed(3)} m) ` +
-    `through the floor in ${at(ctx, frame)}; ${where}. Parts other than the feet must stay above y = 0.`
+    `through the floor in ${at(ctx, frame)}; ${where}. Parts other than the feet must stay above y = 0.` +
+    strideAdvice(ctx, legsOf(character.rig)[0])
 }
 
 function reachHint (ctx: Context): string {
@@ -246,7 +268,9 @@ function kneeSpeedHint (ctx: Context): string {
   return `the ${worst.label} ${jointWord(worst.leg, fastest.joint)} flexes at ${worst.value.toFixed(0)} degrees/s in ` +
     `${at(ctx, worst.frame)}, which reads as a pop. ${restBendAdvice(ctx, worst.leg, fastest.joint)}Lower ` +
     `rig.gait.stanceFraction (now ${gait.stanceFraction}, minimum ${stanceFloor(ctx)}; a smaller value gives a ` +
-    `longer, slower swing) or lengthen strideLength (now ${gait.strideLength}). A higher stepHeight (now ` +
+    `longer, slower swing) or lengthen strideLength a little (now ${gait.strideLength}; it often resolves the ` +
+    `trade-off between slide and knee speed, up to about ${strideFactor(ctx)} x the leg length, beyond which the ` +
+    'pelvis drops). A higher stepHeight (now ' +
     `${gait.stepHeight}) raises joint speed, but lowering it can bring back foot slide; walking slower does not ` +
     'reliably help.'
 }
@@ -310,7 +334,8 @@ function rootSpeedHint (ctx: Context): string {
   return `${head}: ${why}. One step cycle at this speed takes ${cycle.toFixed(2)} s (stride ` +
     `${stride(gait, bad.w.speed).toFixed(2)} m), and the window needs at least two plants per foot: make this ` +
     `'move' segment longer (at least ${(accel + 2.5 * cycle).toFixed(1)} s in total: accelSeconds ${accel} plus 2.5 ` +
-    `cycles), or reduce rig.gait.strideLength (now ${gait.strideLength}).`
+    `cycles), or reduce rig.gait.strideLength (now ${gait.strideLength}).` +
+    (seconds >= 2.5 * cycle ? strideAdvice(ctx, legsOf(ctx.character.rig)[0]) : '')
 }
 
 function geometryOf (ctx: Context): Geometry {

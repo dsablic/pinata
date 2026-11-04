@@ -13,10 +13,12 @@ const HELD_BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run']
 const ENGINE_GATES: Gate[] = ['feet', 'facing', 'border', 'anchor']
 const LOOP_HINT = 'the end of the cycle does not match its start: with a cape or chains, shorten or stiffen the ' +
   'cloth in motion.json; without cloth, the gait in rig.json (stride, step height) sets the cycle'
-const BELOW_HINT = 'skin.json: the feet are drawn below the ground line; raise the foot sprites\' pivot rows so the ' +
-  'sole ends at the foot joint'
-const ABOVE_HINT = 'skin.json: the feet float above the ground line; lower the foot sprites\' pivot rows so the ' +
-  'sole reaches the foot joint'
+const MOVE_HINT = 'change that view\'s foot sprite pivotA and pivotB rows by one together and run again (in the ' +
+  'side views a higher row draws the foot higher; in the front and back views the foot is drawn end-on and a row ' +
+  'can move it the other way); a mirrored direction uses the other foot\'s sprite; if the sole does not move, ' +
+  'another sprite is drawn over the foot, so give the foot sprite a higher "layer"'
+const BELOW_HINT = `skin.json: a foot is drawn below its ground point; ${MOVE_HINT}`
+const ABOVE_HINT = `skin.json: a foot floats above its ground point; ${MOVE_HINT}`
 const NONE_PLANTED_HINT = 'the behaviour never plants a foot, so the ground line cannot be measured; this is ' +
   'the motion, not the skin'
 const HIDDEN_HINT = 'skin.json: no foot sprite is visible in this view; draw the feet in every view'

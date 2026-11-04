@@ -35,8 +35,10 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
 - **Export:** sprite sheets with JSON frame data, then Aseprite files.
 - **Behaviour library:** idle, crouch and a simple attack beside walk, turn and jump, each with gates, built on the
   [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
-- **Packaging (Phase 1 follow-up):** `pinata` runs from a checkout only, because Node does not strip types under
-  `node_modules`; an installed package needs a built JavaScript bin.
+- **Packaging:** `pinata` runs from a checkout only, because Node does not strip types under `node_modules`; batch D
+  compiles a JavaScript bin to `dist/` so `npx pinata` works. Standalone executables, if wanted later, are Node single
+  executable applications built in CI (still V8, so exports match what the tests check); not Bun, whose
+  JavaScriptCore computes `Math` differently from Node.
 - **Authoring hints:** the P5 authors' notes (decals for small features, stride guidance, palette budgeting, a
   reliable edit path for agents).
 

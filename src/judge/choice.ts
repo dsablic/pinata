@@ -167,7 +167,8 @@ export function formatChoiceScore (key: ChoiceKey, score: ChoiceScore): string {
       const wrong = Object.entries(l.named).map(([name, n]) => `${name} ${n}`).join(', ')
       return `${l.label}: ${l.right}/${l.asked} right${wrong === '' ? '' : `; named instead: ${wrong}`}`
     }),
-    `correct in ${score.right}/${score.asked} answers (${percent(score.share)}), cant_tell and missing answers counted as wrong`,
+    `correct in ${score.right}/${score.asked} answers (${percent(score.share)}), ` +
+      'cant_tell and missing answers counted as wrong',
     ...(score.missing.length > 0 ? [`missing answers: ${score.missing.join(', ')}`] : [])
   ].join('\n')
 }

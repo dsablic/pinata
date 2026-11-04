@@ -9,13 +9,13 @@ batch either passes them or says exactly what failed.
 
 ## Design
 
-- **`npm run verify`.** One command runs, in order and every step even after one fails: `typecheck`, `test`, the style lint, the
-  example gates, the site build and the browser suite (orphaned headless Chrome cleaned up first), and the
-  byte-identical checks: `rendering-panel` and the `gates` output compared with stored baselines. It prints one line
-  per step (pass, fail, changed) and a summary; it exits non-zero when any step fails or any output changed.
-  `npm run verify -- --accept <step>` stores the current output as the step's new baseline when a change is meant,
-  and prints what changed, so a meant change is a deliberate, visible act. Baselines are hashes and line files kept
-  out of the repository (they depend on the machine's engine), under `reports/baselines/`.
+- **`npm run verify`.** One command runs, in order and every step even after one fails: `typecheck`, `test`, the style
+  lint, the example gates, the site build and the browser suite (orphaned headless Chrome cleaned up first), and the
+  byte-identical checks: `rendering-panel` and the `gates` output compared with stored baselines. It prints one line per
+  step (pass, fail, changed) and a summary; it exits non-zero when any step fails or any output changed. `npm run verify
+  -- --accept <step>` stores the current output as the step's new baseline when a change is meant, and prints what
+  changed, so a meant change is a deliberate, visible act. Baselines are hashes and line files kept out of the
+  repository (they depend on the machine's engine), under `reports/baselines/`.
 - **Style lint (`npm run lint`).** Code: no comments, lines within 120 columns. Documents: lines within 120 columns
   outside tables and code blocks, relative links that resolve, no dates or journal phrasing in `docs/` outside
   `docs/plans/done/` (a short list: "now", "no longer", "was changed", "at first", "first version", dates). Each

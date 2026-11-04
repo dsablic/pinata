@@ -29,7 +29,8 @@ artefacts, in [`docs/plans/done/`](plans/done).
 [Plan](plans/2026-11-04-phase-1-tool.md), gates fixed: an agent, from a prompt, produces an eight-direction
 character that walks, idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. Batches:
 A recorder and export, B one command line and the MCP server, C behaviours and Aseprite, D authoring and the exit
-test.
+test. Batch A (recorder, sheet and JSON export, the loop, feet, direction-packet and round-trip gates) is built;
+the direction panel waits for its judges.
 
 - **Interfaces:** `pinata check`, `pinata render` and `pinata export` as one CLI, and an MCP server wrapping them.
 - **Export:** sprite sheets with JSON frame data, then Aseprite files.
@@ -37,6 +38,11 @@ test.
   [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
 - **Authoring hints:** the P5 authors' notes (decals for small features, stride guidance, palette budgeting, a
   reliable edit path for agents).
+
+- **Facing readability (Phase 1, batch A):** the skins' views do not read as their direction: judges named the
+  direction right in 46% of answers (three-quarter views read as front or side; the wizard's back views show a white
+  patch at the head that reads as a face, so back reads as front). Also open from batch A: the feet-held gate on drawn
+  pixels (slides of 1 to 5 px as the boot is redrawn) and the rogue's boots drawn below the ground line.
 
 ## Open, from earlier work
 

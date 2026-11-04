@@ -81,6 +81,12 @@ function tallest (pose: Pose): number {
   return Math.max(...Object.values(pose).map(p => p[1]))
 }
 
+export function jointsOf (body: Pose, root: RootState): Pose {
+  const joints: Pose = {}
+  for (const [name, p] of Object.entries(body)) joints[name] = toWorld(p, root)
+  return joints
+}
+
 function headingTo (from: number, to: number): number {
   return to >= from ? EAST : WEST
 }
@@ -137,8 +143,7 @@ export function createWalker (options: WalkerOptions): Walker {
     const position: Vec3 = [local.position[0] + dx, local.position[1] + dy, local.position[2]]
     const root: RootState = { ...local, position }
     const body: Pose = { ...rest, ...pose }
-    const joints: Pose = {}
-    for (const [name, p] of Object.entries(body)) joints[name] = toWorld(p, root)
+    const joints = jointsOf(body, root)
     const feet = legs.map((leg, k): Foot => {
       const soles = solePoints(joints, leg, mannequin).map((p): [number, number] => [p[0], p[1]])
       return { planted: planted[k] ?? false, soles }

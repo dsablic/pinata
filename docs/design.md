@@ -197,6 +197,9 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   height, with the pose lowered to match: the cloth substeps follow the root, so a falling body moves smoothly
   through them instead of jumping a whole frame's fall at once (which pushed cloth through it).
 - With `measure: true` every step's foot gaps in CSS pixels are kept (`samples`, `null` where nothing is under a foot).
+- A character's sprite is drawn by `paintSprite` (`sprite.ts`: the sprite box, the page's camera, the painter state
+  kept between frames), which the exporter calls as well, so an exported frame is the page's drawing and nothing
+  else. The cast's secondary motion comes from `pageSecondary`, the same settings for the page and the recorder.
 - A sprite is anchored at the surface under the character, so a foot on that surface is drawn on its top edge
   exactly; while falling it is anchored at the body's base. Each character renders into its own sprite box, 1.6 times
   its height square (`SPRITE_BOX_IN_CHARACTER_HEIGHTS`), with its feet line at 85% of the box
@@ -1203,6 +1206,87 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - `from` reuses another sprite, by part name in the same view or as `view.part`; the copy keeps its own `layer`.
   Chains of references are followed; a missing or circular reference is an error.
 
+## Export (`src/export/`)
+
+### `record.ts`
+
+- A recording is made with the pieces the page uses: the character's own player (motion matching and jump takes), its
+  secondary motion in the page's cloth settings and calm air, and the page's painter, on flat ground at height 0,
+  24 fps, 27 sprite px per metre (`pageCamera`). One recorded run is drawn in all eight directions.
+- Each behaviour is run once, heading east, and the other seven directions are that run turned about the vertical
+  axis through the root (joints, cloth curves and yaw), then drawn. The alternative, running the player once per
+  yaw, gives eight different runs: loops of different lengths per direction, and the player only jumps along x. One
+  run gives every direction the same frame count, the same stance phases and a loop cut that is common, which an
+  engine switching direction in mid-animation needs. Gravity is vertical and the air calm, so a turned run is what the
+  physics would give. Each direction has its own painter state (hysteresis of angles, lengths, anchors and the view
+  sector), fed with the frames in order from the start of the run.
+- Directions are named by where the character faces on screen: `front` is toward the camera, `right` toward the right
+  edge, and the others between (`front-right`, `back-right`, `back`, `back-left`, `left`, `front-left`), at yaws that
+  are multiples of 45 degrees from `front`. Each is the centre of one view sector, so every frame of a non-turning
+  animation is drawn from the view of its direction (a gate).
+- Behaviours: `idle` is standing at rest, with the cloth settling (the page's player has no breathing; batch C adds
+  a captured idle); `walk` at 1.1 m/s (the page's walking speed); `run` at 3 m/s; `turn` a quarter turn on the spot
+  (two names forward in the direction list: `turn-right` ends facing `back`), from rest to rest; `jump` a standing
+  jump forward on flat ground, from rest to rest, with the longest captured jump take's run and apex as the jump
+  asked of the player (1.05 m, 0.35 m), so the take plays as captured.
+- A looping run is warmed up (48 frames for idle, 144 for walk and run) and then recorded for a window (36, 144, 96
+  frames), all drawn in all eight directions in order. A loop is the span `from..to` of that window. Candidates are
+  the pairs of frames a period apart (idle 12; walk 12 to 72; run 8 to 48) whose planted flags agree in three
+  consecutive frames; each is scored by the root-local joint and cloth positions of those frames. The period is the
+  shortest within 1.5 times the best score (a cape has its own period, so a walk can need two strides); the 40 best
+  starts within one frame of that period are then judged on the drawn pixels: the first with the seam under the
+  median step in every direction, and not exactly zero (a repeated frame is a hitch), wins; with none, the lowest
+  worst ratio. A pose-only cut passed the gate in some directions and missed it in others, because the seam of a good
+  loop is about one usual step: only the pixels say which cut is below it.
+- A one-shot run (turn, jump) is cut from the command to the first frame after which no joint or cloth point moves
+  more than 2 mm for six frames. Twelve frames at rest before the command are drawn and dropped, to prime the
+  painter's state.
+- Frames are drawn on a canvas one and a half times the page's sprite box in each direction, of even width, and then
+  cropped, the same for every frame of a character: the page's box clips a wide cape or an axe of the small skins. The
+  even width puts the root on a pixel boundary, so the pivot, an integer, is the root exactly (an odd canvas leaves it
+  half a pixel off); as a result a frame can differ from the page's own by the half pixel its odd-width box samples
+  at. The cell is the union of the opaque pixels over all animations and directions, symmetric about the root
+  column, plus one pixel; the pivot is the ground point under the root (the root's column, the row edge below the
+  feet), and the cell keeps the root's exact projection beside it for the anchor gate.
+- The anchor is the ground point under the root for every frame, so a jump rises inside the cell. Root motion is not
+  in the frames: each frame carries `travel`, the screen movement of the root from the previous frame in px (0 for the
+  first frame of a one-shot; for a loop's first frame the movement from the frame before it in the run), which an
+  engine adds to the sprite's position.
+
+### `sheet.ts`
+
+- Frames in order of `BEHAVIOURS` and `DIRECTIONS`, no gaps, no trimming: every cell has the character's cell size.
+  A track starts on a new row and wraps to the next when a row is full, so a sheet is at most 4096 px each way (an
+  error otherwise): many engines and GPUs refuse larger textures. The JSON is Aseprite's array format: `frames[]` with
+  `filename` (`walk-right 3`), `frame` (following the wrapping), `rotated`, `trimmed`, `spriteSourceSize`,
+  `sourceSize` and `duration` (ms, 42 or 41 alternating, so a second is 1000 ms at 24 fps) and the extra `travel`;
+  `meta` with `app`, `image`, `format`, `size`, `scale`, `frameTags` (`<animation>-<direction>`, `forward`, over the
+  frames in order), one `slices` entry whose key's `pivot` is the anchor, and `pinata` (character, fps, px per
+  metre, the tags that loop). Readers that know only Aseprite's fields ignore the rest. Frames are written one per
+  line; output is a pure function of the recording, and the PNG is Node's zlib, so files are identical per engine.
+
+### `gates.ts`, `loops.ts`, `report.ts`
+
+- Seamless loop: pixels (colour or transparency) that change between the last frame and the first are at most the
+  median of those changed between consecutive frames of the loop, and not zero: a seam of 0 against a median above 0
+  is a repeated frame, a hitch, and fails; the chooser never picks one. A loop whose median is 0 (idle's identical
+  frames) is not measured, and is reported as such, never as passing.
+- Feet held, measured on the drawn pixels: the lowest opaque pixels of the planted foot's part (the mannequin part
+  from the leg's ankle to its toe, found through the renderer's owner map; the lowest row, and the mean column of
+  the pixels in it) in two consecutive frames of one stance, with the root's `travel` added (the cell is anchored on
+  the root, so the ground moves by minus `travel`), move at most 1 px (the larger axis). A stance is the player's
+  planted flag in both frames. Pairs where the planted flag drops for a single frame between two planted ones are
+  counted as flickers, not measured; pairs where the foot has no visible pixel are counted as hidden. A boot redrawn as
+  the ankle and toe rotate moves its lowest row by several pixels, so this gate is missed (see the plan's results). An
+  earlier measure on the projected skeleton ends held 1 px; it tested the player, not the exported frames.
+- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the standing frames facing front and
+  right, the lowest pixel row of each foot part is within 1 px of the ground line (the pivot's row edge).
+- Facing: the view sector the painter used for every frame of idle, walk, run and jump is the direction's. Turns
+  change sector on the way and are not checked. Border: no opaque pixel on the cell's edge.
+- `npm run export -- <character dir> <out dir>` writes `<name>.png` and `<name>.json`, prints each check (`ok`,
+  `FAIL`, or `n/a` for not measured) and exits 1 when a measured one fails. The character's directory name is its
+  name; the config (environment, dress) is the world's (`site/world.json`).
+
 ## Judge panels (`src/judge/`)
 
 ### Packets (`packet.ts`)
@@ -1213,6 +1297,16 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   key that maps them back must be kept out of the judges' folder.
 - Each image is trimmed to its opaque bounding box, both stand on one baseline and sit centred in equal cells.
   `layout: 'stacked'` puts the left image on top, for wide strips.
+
+### Labelled panels (`choice.ts`)
+
+- A pairwise panel cannot ask which of eight directions an image shows, so a panel whose spec says `"kind":
+  "choice"` and has `labels` and `items` (`{ id, image, label }`) instead of `pairs` is a labelled panel: one image per item, shuffled by the seed under
+  neutral names, and the key gives each item's true label. A judge answers `{ "choice": <label> }` or `cant_tell`;
+  `cant_tell`, a wrong label and a missing answer are all wrong (the number asked stays the full count), so the share correct counts every answer. The score lists, per label,
+  how often it was right and what was named instead. There are no control pairs: chance is one in the number of
+  labels, and the confusions show bias. Images are not trimmed, so the cell's size and baseline are kept.
+  `npm run judge -- build` and `score` pick the kind from the spec's `kind` and the key's.
 
 ### Scores (`score.ts`)
 

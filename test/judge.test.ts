@@ -6,6 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../src/image.ts'
 import type { Image } from '../src/image.ts'
+import {
+  buildChoicePacket, choiceProblems, isChoiceSpec, scoreChoices, validateChoiceSpec
+} from '../src/judge/choice.ts'
+import type { ChoiceAnswers, ChoiceSpec } from '../src/judge/choice.ts'
 import { buildPacket, pairImage, validatePanelSpec } from '../src/judge/packet.ts'
 import type { PanelSpec } from '../src/judge/packet.ts'
 import { answerProblems, scorePanel } from '../src/judge/score.ts'
@@ -186,4 +190,68 @@ test('a stacked panel puts the left image on top and says so', () => {
   const spec = validatePanelSpec({ name: 'n', seed: 's', question: 'q', layout: 'stacked', pairs })
   assert.deepEqual(spec.errors, [])
   assert.deepEqual(validatePanelSpec({ ...spec.value, layout: 'diagonal' }).errors.map(e => e.path), ['layout'])
+})
+
+const FACES: ChoiceSpec = {
+  kind: 'choice',
+  name: 'facing',
+  seed: 'f1',
+  question: 'Which colour is the block?',
+  labels: ['red', 'blue', 'green'],
+  scale: 2,
+  background: '#c8c8c8',
+  items: [
+    { id: 'a', image: 'red', label: 'red' },
+    { id: 'b', image: 'blue', label: 'blue' },
+    { id: 'c', image: 'green', label: 'green' },
+    { id: 'd', image: 'red', label: 'red' }
+  ]
+}
+
+test('a labelled packet hides the answers behind neutral names and a key', () => {
+  const packet = buildChoicePacket(FACES, name => IMAGES[name])
+  assert.deepEqual(Object.keys(packet.images), ['item-01.png', 'item-02.png', 'item-03.png', 'item-04.png'])
+  const shown = Object.entries(packet.key.items).map(([item, entry]) => {
+    const image = packet.images[`${item}.png`]
+    const colours = new Set<number>()
+    for (let y = 0; y < image.height; y++) for (let x = 0; x < image.width; x++) colours.add(getPixel(image, x, y))
+    return `${entry.label}:${colours.has(RED)}${colours.has(BLUE)}${colours.has(GREEN)}`
+  }).sort()
+  assert.deepEqual(shown, ['blue:falsetruefalse', 'green:falsefalsetrue', 'red:truefalsefalse', 'red:truefalsefalse'])
+  assert.match(packet.questions, /Choose one of: red, blue, green, cant_tell/)
+  assert.doesNotMatch(packet.questions, /facing/)
+})
+
+test('a spec routes to labelled panels only by its kind', () => {
+  assert.equal(isChoiceSpec(FACES), true)
+  assert.equal(isChoiceSpec({ ...FACES, kind: undefined }), false)
+  assert.ok(validateChoiceSpec({ ...FACES, kind: undefined }).errors.some(e => e.path === 'kind'))
+})
+
+test('a labelled spec needs known labels and unique ids', () => {
+  const bad = { ...FACES, items: [{ id: 'a', image: 'red', label: 'purple' }, { id: 'a', image: 'red', label: 'red' }] }
+  const messages = validateChoiceSpec(bad).errors.map(e => e.message)
+  assert.ok(messages.some(m => m.includes("'purple' is not one of the labels")))
+  assert.ok(messages.some(m => m.includes("id 'a' is used twice")))
+  assert.ok(validateChoiceSpec({ ...FACES, labels: ['red', 'cant_tell'] }).errors.length > 0)
+})
+
+test('labelled answers are scored per label with what was named instead, and cant_tell counts as wrong', () => {
+  const key = buildChoicePacket(FACES, name => IMAGES[name]).key
+  const itemOf = (id: string): string => Object.keys(key.items).find(item => key.items[item].id === id) as string
+  const judge: ChoiceAnswers = {
+    [itemOf('a')]: { choice: 'red' }, [itemOf('d')]: { choice: 'blue' },
+    [itemOf('b')]: { choice: 'blue' }, [itemOf('c')]: { choice: 'cant_tell' }
+  }
+  const score = scoreChoices(key, [judge])
+  assert.equal(score.right, 2)
+  assert.equal(score.asked, 4)
+  assert.deepEqual(score.labels.find(l => l.label === 'red')?.named, { blue: 1 })
+  assert.deepEqual(score.labels.find(l => l.label === 'green')?.named, { cant_tell: 1 })
+  const missing = scoreChoices(key, [{ [itemOf('a')]: { choice: 'red' } }])
+  assert.equal(missing.asked, 4)
+  assert.equal(missing.right, 1)
+  assert.equal(missing.missing.length, 3)
+  assert.deepEqual(choiceProblems({ ...judge, [itemOf('a')]: { choice: 'purple' } }, key).length, 1)
+  assert.equal(choiceProblems({}, key).length, 4)
 })

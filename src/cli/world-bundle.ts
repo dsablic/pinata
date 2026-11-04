@@ -2,11 +2,14 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './paths.ts'
 
-export type BundleOptions = { jumpTakes?: boolean }
+export type BundleOptions = { jumpTakes?: boolean, only?: string[] }
 
-export function worldBundle (examples = join(ROOT, 'examples'), { jumpTakes = true }: BundleOptions = {}): unknown {
+export function worldBundle (
+  examples = join(ROOT, 'examples'), { jumpTakes = true, only }: BundleOptions = {}
+): unknown {
   const read = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'))
-  const config = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
+  const world = read(join(ROOT, 'site', 'world.json')) as { cast: string[] }
+  const config = only === undefined ? world : { ...world, cast: only }
   const cast = config.cast.map(name => {
     const dir = join(examples, name)
     return {

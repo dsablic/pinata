@@ -2,14 +2,20 @@ import { mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from 'node
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { writeOutput } from '../diagnostics/report.ts'
 import { formatErrors, isRecord } from '../formats/validate.ts'
+import {
+  buildChoicePacket, choiceProblems, formatChoiceScore, isChoiceKey, isChoiceSpec, scoreChoices, validateChoiceSpec
+} from '../judge/choice.ts'
+import type { ChoiceAnswers, ChoiceKey, ChoiceSpec } from '../judge/choice.ts'
 import { buildPacket, validatePanelSpec } from '../judge/packet.ts'
-import type { PanelKey } from '../judge/packet.ts'
+import type { PanelKey, PanelSpec } from '../judge/packet.ts'
 import { answerProblems, formatScore, scorePanel } from '../judge/score.ts'
 import type { JudgeAnswers } from '../judge/score.ts'
+import type { Image } from '../image.ts'
 import { decodePng } from '../png/decode.ts'
 import { encodePng } from '../png/encode.ts'
 
 const USAGE = 'usage: npm run judge -- build <panel.json> <packet dir> <key.json>\n' +
+  '       (a panel with "items" and "labels" instead of "pairs" asks which label each image has)\n' +
   '       npm run judge -- score <key.json> <judge answers.json>...'
 
 function readJson (path: string): unknown {
@@ -33,12 +39,16 @@ function build (specPath: string, packetDir: string, keyPath: string): number {
     console.error(`the key '${key}' must not be inside the packet folder '${packet}': judges would see it`)
     return 2
   }
-  const validated = validatePanelSpec(readJson(spec))
+  const input = readJson(spec)
+  const validated = isChoiceSpec(input) ? validateChoiceSpec(input) : validatePanelSpec(input)
   if (validated.value === undefined) {
     console.error(formatErrors(specPath, validated.errors))
     return 2
   }
-  const built = buildPacket(validated.value, path => decodePng(readFileSync(resolve(dirname(spec), path))))
+  const load = (path: string): Image => decodePng(readFileSync(resolve(dirname(spec), path)))
+  const built = isChoiceSpec(input)
+    ? buildChoicePacket(validated.value as ChoiceSpec, load)
+    : buildPacket(validated.value as PanelSpec, load)
   for (const name of readdirSync(packet)) if (PACKET_FILE.test(name)) rmSync(join(packet, name))
   for (const [name, image] of Object.entries(built.images)) writeOutput(join(packet, name), encodePng(image))
   writeOutput(join(packet, 'questions.md'), built.questions)
@@ -57,20 +67,26 @@ function score (keyPath: string, answerPaths: string[]): number {
     console.error(`${keyPath}: not a panel key written by 'npm run judge -- build'`)
     return 2
   }
+  const choice = isChoiceKey(read)
   const key = read as PanelKey
-  const judges: JudgeAnswers[] = []
+  const problemsOf = (answers: unknown): string[] => {
+    return choice ? choiceProblems(answers, read as ChoiceKey) : answerProblems(answers, key)
+  }
+  const judges: unknown[] = []
   let broken = false
   for (const path of answerPaths) {
     const answers = readJson(path)
-    const problems = answerProblems(answers, key)
+    const problems = problemsOf(answers)
     if (problems.length > 0) {
       console.error(`${path}:\n  ${problems.join('\n  ')}`)
       broken = true
     }
-    judges.push(answers as JudgeAnswers)
+    judges.push(answers)
   }
   if (broken) return 2
-  console.log(formatScore(key, scorePanel(key, judges)))
+  console.log(choice
+    ? formatChoiceScore(read as ChoiceKey, scoreChoices(read as ChoiceKey, judges as ChoiceAnswers[]))
+    : formatScore(key, scorePanel(key, judges as JudgeAnswers[])))
   return 0
 }
 

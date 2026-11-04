@@ -7,11 +7,8 @@ import { DEFAULT_JUMP_KIND } from '../mocap/jump.ts'
 import type { JumpKind } from '../mocap/jump.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
-import { makeCamera } from '../raster/camera.ts'
-import type { Camera } from '../raster/camera.ts'
-import { renderSkinnedLayers } from '../style/skins.ts'
-import type { DrawnPart } from '../style/skins.ts'
-import type { Image } from '../image.ts'
+import { freshPainting, pageCamera, paintSprite, spriteBox } from './sprite.ts'
+import type { Painting, Skinned, Sprite } from './sprite.ts'
 import type { Hints } from './dom.ts'
 import { surfaceGraph } from './graph.ts'
 import type { Node } from './graph.ts'
@@ -41,7 +38,8 @@ export type CastOptions = {
   footprints?: boolean
   painter?: 'strip' | 'rotate'
 }
-export type Sprite = { image: Image, camera: Camera, owner?: Int16Array, parts?: DrawnPart[], sector?: number }
+export { pageCamera, spriteReach } from './sprite.ts'
+export type { Sprite } from './sprite.ts'
 export type Drawable = { name: string, x: number, y: number, sprite: () => Sprite, saying?: string }
 export type Moving = {
   name: string
@@ -85,7 +83,6 @@ export type Cast<K> = {
   visits: () => Array<Visit<K>>
 }
 
-type Skinned = Look & { skin: NonNullable<Look['skin']> }
 type Standing<K> = { key: K, from: number, height: number }
 type Saying = { text: string, until: number }
 type Character<K> = {
@@ -104,19 +101,12 @@ type Character<K> = {
   activity?: Activity
   interest?: string
   saying?: Saying
-  view: { sector?: number }
-  angles: Map<string, number>
-  lengths: Map<string, number>
-  order: string[]
-  anchors: Map<string, [number, number]>
+  painting: Painting
   sprite?: Sprite & { frame: WalkerFrame }
 }
 
 export const FPS = 24
 export const MOST_STEPS_PER_FRAME = 3
-const CAMERA_ELEVATION_DEGREES = 8
-const SPRITE_BOX_IN_CHARACTER_HEIGHTS = 1.6
-const FEET_LINE_SHARE_OF_BOX = 0.85
 const MARGIN_FROM_SURFACE_ENDS = 0.3
 const MOVED = 1e-3
 const KEPT_SAMPLES = 8000
@@ -141,7 +131,15 @@ export function pageEnvironment (config: WorldConfig, wind = 0): Pick<CastOption
   }
 }
 
-function raisedRoot (frame: WalkerFrame): [RootState, Pose] {
+export function pageSecondary (
+  member: CastMember, options: Pick<CastOptions, 'environment' | 'springSubsteps'>
+): Secondary {
+  return createSecondary(member, {
+    ...PAGE_CLOTH, fps: FPS, springSubsteps: options.springSubsteps, environment: () => options.environment
+  })
+}
+
+export function raisedRoot (frame: Pick<WalkerFrame, 'base' | 'root' | 'body'>): [RootState, Pose] {
   const lift = frame.base - frame.root.position[1]
   const [x, y, z] = frame.root.position
   const body: Pose = {}
@@ -159,40 +157,23 @@ export function anchorHeight (frame: WalkerFrame): number {
   return under.height
 }
 
-export function spriteReach (pixelsPerMetre: number): number {
-  return SPRITE_BOX_IN_CHARACTER_HEIGHTS * 2 * pixelsPerMetre
-}
-
-export function pageCamera (spritePerMetre: number): Camera {
-  return makeCamera({
-    azimuthDeg: 0, elevationDeg: CAMERA_ELEVATION_DEGREES, targetHeightPx: spritePerMetre, modelHeight: 1, margin: 0
-  })
-}
-
 export function createCast<K> (options: CastOptions): Cast<K> {
   const { cast, looks, pixelsPerMetre } = options
   const next = random(options.seed)
   const spritePerMetre = pixelsPerMetre / options.scale
-  const camera = pageCamera(spritePerMetre)
   const characters: Array<Character<K>> = looks
     .flatMap((look, i) => {
       const database = cast[i].capture
       if (look.skin === undefined || database === undefined) return []
       const fresh = {
-        view: {},
-        angles: new Map<string, number>(),
-        lengths: new Map<string, number>(),
-        order: [],
-        anchors: new Map<string, [number, number]>(),
+        painting: freshPainting(),
         visited: new Set<K>(),
         sameSince: 0,
         placedAgain: 0,
         steps: 0,
         ticks: 0
       }
-      const secondary = createSecondary(cast[i], {
-        ...PAGE_CLOTH, fps: FPS, springSubsteps: options.springSubsteps, environment: () => options.environment
-      })
+      const secondary = pageSecondary(cast[i], options)
       return [{ name: cast[i].name, look: look as Skinned, database, secondary, ...fresh }]
     })
     .slice(0, options.count)
@@ -277,25 +258,11 @@ export function createCast<K> (options: CastOptions): Cast<K> {
   }
   const spriteOf = (c: Character<K>, frame: WalkerFrame): Sprite => {
     if (c.sprite?.frame === frame) return c.sprite
-    const { mannequin, skin } = c.look.skin
-    const height = Math.max(...Object.values(mannequin.joints).map(p => p[1]))
-    const size = Math.ceil(SPRITE_BOX_IN_CHARACTER_HEIGHTS * height * spritePerMetre)
-    const box: Camera = { ...camera, width: size, height: size, baseline: Math.round(size * FEET_LINE_SHARE_OF_BOX) }
     const [x, , z] = frame.root.position
-    const y = anchorHeight(frame)
-    const pose: Pose = {}
-    for (const [name, p] of Object.entries(frame.joints)) pose[name] = [p[0] - x, p[1] - y, p[2] - z]
-    const curves = Object.fromEntries(Object.entries(c.secondary.curves())
-      .map(([joint, points]) => [joint, points.map((p): Vec3 => [p[0] - x, p[1] - y, p[2] - z])]))
-    const painted = options.painter === 'rotate'
-      ? { angles: c.angles, lengths: c.lengths, anchors: c.anchors }
-      : { painter: 'strip' as const, order: c.order, angles: c.angles, lengths: c.lengths, anchors: c.anchors }
-    const { image, owner, parts, sector } = renderSkinnedLayers({
-      mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: frame.root.yaw, view: c.view,
-      ...painted, curves, footprints: options.footprints === true
-    })
-    const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
-    c.sprite = { image, camera: box, frame, ...layers }
+    const anchor: Vec3 = [x, anchorHeight(frame), z]
+    const placed = { joints: frame.joints, curves: c.secondary.curves(), anchor, yaw: frame.root.yaw }
+    const sprite = paintSprite(c.look, c.painting, spriteBox(c.look, spritePerMetre), placed, options)
+    c.sprite = { ...sprite, frame }
     return c.sprite
   }
 

@@ -56,3 +56,13 @@ question.
 
 Decide the pass rule (for example "a picked in at least 50% of picks, controls neutral in at least 2/3") in the plan
 before running the panel, as for every other gate.
+
+## Labelled panels
+
+To ask which of several labels an image has (for example the direction a character faces), give the spec
+`"kind": "choice"`, `labels` and `items` instead of `pairs`, each item
+`{ "id": "knight-front", "image": "frames/knight-front.png", "label": "front" }`. `build` writes one image per item
+and a key with the true labels; each judge answers `{ "choice": <label> }` or `cant_tell`; `score` prints, per label,
+how many answers were right and what was named instead, and the share of correct answers over all of them
+(`cant_tell` and missing answers count as wrong). `npm run direction-panel` builds the facing panel of the exported
+idle frames of the four skinned humanoids into `reports/export-panel/`.

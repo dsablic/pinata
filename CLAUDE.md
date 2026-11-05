@@ -28,6 +28,8 @@
 - Visual quality is judged by blind judge panels run with `npm run judge -- run` (see
   [`docs/judging.md`](docs/judging.md)): fresh agents, neutral names, both orders, controls; gates count every
   answer, can't-tell included.
+- New gates are declared with `declareGate` (`src/checks/gate-spec.ts`): what they observe, their reference frame, their
+  threshold, and a failing and a passing hand-made case; `npm test` runs every declared case.
 - New npm packages only through the npm-safe-install scan.
 
 ## Commits

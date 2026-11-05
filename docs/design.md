@@ -1418,6 +1418,21 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   character file can fix fails. The character's directory name is its
   name; the config (environment, dress) is the world's (`site/world.json`).
 
+### Gate specs (`src/checks/gate-spec.ts`, `test/export-gate-specs.ts`)
+
+- A gate is declared as data: what it observes (drawn pixels, joints, painter state or files), its reference frame, its
+  threshold, and lists of bad and good cases. A case builds a small recording and reads the named gate's `pass` and
+  `measured` from `checksOf`, so it exercises the gate as the report emits it, including which tracks it applies to
+  (no facing check on turns, ground on idle only, loop only on loops, idle's still pauses), not a copy of its
+  comparison. A bad case must fail (or be unmeasured, where it says so); a good case must pass, and a track a gate is
+  not applied to passes it. Cases include the exact threshold (passes) and just beyond it (fails), so a `<=` turned
+  into `<` breaks one.
+- The declarations and the shared fixtures (`test/export-fixtures.ts`) live in the tests; `test/gate-specs.test.ts`
+  requires every name in `GATES` to be declared once with both kinds of case, the report to emit every one of them, and
+  every case to give its expected verdict. Cases are chosen to break under a wrong frame (root travel ignored, the line
+  under the root instead of each foot's own ground point) or a flipped comparison, not to restate the threshold. A
+  registry without a framework is enough because a case is a closure.
+
 ## Judge panels (`src/judge/`)
 
 ### Packets (`packet.ts`)

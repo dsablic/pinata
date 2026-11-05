@@ -69,3 +69,22 @@ batch either passes them or says exactly what failed.
   allow rule scoped to it. `npm run judge -- isolation` (a haiku judge asked to read a canary file one
   level above its folder and a file inside it) printed "the file in the folder was read; the file one level above was
   not read" and exit status 0.
+- **C (gate specs).** The six export gates (feet, facing, border, ground, anchor, loop) are declared in
+  `test/export-gate-specs.ts` with their frame, threshold and cases, and `test/gate-specs.test.ts` runs them. Each case
+  builds a small recording and reads the gate's verdict from `checksOf`. Each comparison, routing rule and frame was
+  flipped by hand, the cases run, and the flip reverted; every flip broke at least one case. The existing outputs stayed
+  byte-identical (`gates` and `rendering-panel` the same as baseline).
+  - feet: `report.ts` `<=` to `>` broke seven cases; `<=` to `<` broke the exact 1 px case; the sign of the root travel
+    on x, on y, and dropping the wrap-around pair each broke their own case.
+  - facing: `=== 0` to `!== 0` and inverting the sector comparison broke all the view cases; removing the turn
+    exemption broke the turn case.
+  - border: `=== 0` to `!== 0` broke every case; skipping a side row, swapping height and width at the bottom edge, and
+    using the height for the right edge each broke the non-square edge cases.
+  - anchor: `<=` to `>` broke all cases; `<=` to `<` broke the exact 0.5 px case; dropping `abs` on x broke the left
+    case; dropping the y axis broke the above-the-pivot case.
+  - ground: `<=` to `>` broke seven cases; `<=` to `<` broke one of twenty off; `>` to `>=` on the 1 px band broke
+    the exactly-1-px cases; the line under the root instead of each foot's own point broke the pair of cases that differ
+    in that frame; ground for every behaviour broke the walk case.
+  - loop: `<=` to `>` and `<=` to `<` on the seam broke the seam cases; inverting the repeated-seam rule broke four
+    cases; `median > 0` to `>= 0` broke the unmeasured case; loop for every track broke the non-loop case; idle no
+    longer setting `holding` broke the idle case.

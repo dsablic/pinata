@@ -3,15 +3,14 @@ import assert from 'node:assert/strict'
 import { worldBundle } from '../src/cli/world-bundle.ts'
 import { readWorld } from '../src/diagnostics/page-scenarios.ts'
 import { groundOf, heldOf } from '../src/export/gates.ts'
-import { measured, seamless, seamOf } from '../src/export/loops.ts'
 import { BEHAVIOURS, DIRECTIONS, record, SKINNED_HUMANOIDS, subjectOf } from '../src/export/record.ts'
 import type { Frame, Recording, Track } from '../src/export/record.ts'
 import { checksOf } from '../src/export/report.ts'
 import { exportFiles } from '../src/export/files.ts'
 import { MOST_SHEET_PX } from '../src/export/sheet.ts'
-import { createImage, setPixel } from '../src/image.ts'
 import { decodePng } from '../src/png/decode.ts'
 import { readAseprite } from './aseprite-reader.ts'
+import { frameWith, mixedGroundFrames, trackOf } from './export-fixtures.ts'
 
 const MISSED_GATES = ['feet']
 const world = readWorld(worldBundle())
@@ -23,37 +22,9 @@ function recorded (name: string): Recording {
   return kept
 }
 
-function frameWith (foot: { x: number, y: number }, travel: [number, number]): Frame {
-  const image = createImage(4, 4)
-  return { image, sector: 2, travel, feet: [{ planted: true, sole: foot, level: 0 }] }
-}
-
-test('a planted sole that slides against the root motion is caught, one that is held is not', () => {
-  const at = (x: number, travel: number): Frame => frameWith({ x, y: 0 }, [travel, 0])
-  const held = [at(5, 0), at(3.5, 1.5), at(2, 1.5)]
-  const sliding = [at(5, 0), at(4, 0), at(3, 0)]
-  const track = (frames: Frame[]): Track => ({ behaviour: 'walk', direction: 'right', loop: false, frames })
-  assert.ok(heldOf(track(held)).worst < 1e-9)
-  assert.equal(heldOf(track(sliding)).worst, 1)
-  assert.equal(heldOf(track(sliding)).pairs, 2)
-})
-
-test('the ground gate counts planted foot-frames off the line and ignores lifted feet', () => {
-  const at = (rows: Array<number | 'lifted'>): Frame => ({
-    image: createImage(4, 4),
-    sector: 2,
-    travel: [0, 0],
-    feet: rows.map(row => row === 'lifted'
-      ? { planted: false, sole: { x: 0, y: -9 }, level: 0 }
-      : { planted: true, sole: { x: 0, y: row - 1 }, level: 0 })
-  })
-  const frames = [at([0, 1]), at([-1, 'lifted']), at([3, -2]), at([0, 0])]
-  const ground = groundOf({ behaviour: 'idle', direction: 'right', loop: true, frames })
+test('the ground counts planted foot-frames, ignores lifted feet and reports the worst row', () => {
+  const ground = groundOf(trackOf(mixedGroundFrames(), { behaviour: 'idle', loop: true }))
   assert.deepEqual(ground, { planted: 7, seen: 7, off: 2, worst: 3 })
-  const nearer: Frame = { ...at([0]), feet: [{ planted: true, sole: { x: 0, y: 2 }, level: 2.6 }] }
-  assert.equal(groundOf({ behaviour: 'idle', direction: 'right', loop: true, frames: [nearer] }).off, 0)
-  const none = groundOf({ behaviour: 'idle', direction: 'right', loop: true, frames: [at(['lifted'])] })
-  assert.deepEqual([none.planted, none.worst], [0, undefined])
 })
 
 test('a one-frame planted flicker and a hidden foot are counted, not skipped silently', () => {
@@ -67,31 +38,6 @@ test('a one-frame planted flicker and a hidden foot are counted, not skipped sil
   assert.equal(held.flickers, 1)
   assert.equal(held.hidden, 2)
   assert.equal(held.pairs, 0)
-})
-
-test('a loop whose last frame differs from the first by more than a usual step is not seamless', () => {
-  const bar = (length: number): ReturnType<typeof createImage> => {
-    const image = createImage(8, 1)
-    for (let x = 0; x < length; x++) setPixel(image, x, 0, 1)
-    return image
-  }
-  assert.equal(seamless(seamOf([bar(1), bar(2), bar(3), bar(4), bar(5)])), false)
-  assert.equal(seamless(seamOf([bar(1), bar(2), bar(3), bar(2)])), true)
-})
-
-test('a repeated frame at the seam fails, and identical frames are not measured', () => {
-  const bar = (length: number): ReturnType<typeof createImage> => {
-    const image = createImage(8, 1)
-    for (let x = 0; x < length; x++) setPixel(image, x, 0, 1)
-    return image
-  }
-  assert.equal(seamless(seamOf([bar(1), bar(2), bar(3), bar(1)])), false)
-  const held = [bar(1), bar(2), bar(2), bar(3), bar(1), bar(1)]
-  assert.equal(seamless(seamOf(held, true)), true)
-  assert.equal(seamless(seamOf(held)), false)
-  assert.equal(seamless(seamOf([1, 2, 3, 4, 5, 5, 6, 7, 8, 7, 1].map(bar), true)), false)
-  assert.equal(measured(seamOf([bar(2), bar(2), bar(2)])), false)
-  assert.equal(seamless(seamOf([bar(2), bar(2), bar(2)])), false)
 })
 
 for (const name of SKINNED_HUMANOIDS) {

@@ -6,7 +6,8 @@ import { measured, seamless, seamOf } from './loops.ts'
 import type { Behaviour, Recording, Track } from './record.ts'
 import { tagOf } from './sheet.ts'
 
-export type Gate = 'loop' | 'feet' | 'facing' | 'border' | 'ground' | 'anchor'
+export const GATES = ['loop', 'feet', 'facing', 'border', 'ground', 'anchor'] as const
+export type Gate = typeof GATES[number]
 export type Check = { gate: Gate, line: string, pass: boolean, measured: boolean, hint?: string }
 
 const HELD_BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run']

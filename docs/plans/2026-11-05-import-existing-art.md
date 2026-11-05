@@ -21,6 +21,12 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
   and lists them; the author (an agent) draws them, guided by `check`. Views the source lacks (the three-quarter
   views of a four-direction set) are drawn by the author from the neighbouring views; `import` starts each from the
   nearer cardinal view and says so.
+- **Art from people or from image models alike.** Image-model output is rarely clean pixel art: it is upscaled off
+  the pixel grid, anti-aliased, noisy in colour, on an opaque or checkered background, and its views of one character
+  disagree. `import` normalises every input the same way and reports what it did: the background removed, the pixel
+  grid found and the image reduced to one pixel per art pixel, the palette reduced to the art's colours (a stated
+  limit), stray pixels cleaned. Views that disagree (proportions, colours, details) are reported, not silently
+  merged; the author redraws them over the view guides.
 - **The skins path, not a mesh warp.** Imported art becomes part sprites in the existing renderer, so the export,
   every gate, `check`, `review` and the MCP server work unchanged. The image-and-points mesh warp stays a separate
   plan.
@@ -38,12 +44,13 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
 | Motion against hand animation | a blind pairwise panel, same art: Piñata's walk strip against the LPC hand-animated walk strip, per character and direction, both orders, with controls; Piñata's walk is preferred or tied in at least 40% of answers | the first measure of motion alone; 40% means close to hand animation, not better |
 | A fresh agent imports | a fresh agent with only the guide and the MCP server imports one LPC character to a passing export within 10 `check` runs | as the exit test |
 | From one view | a fresh agent given only the front standing frame of an LPC character reaches a passing export and the direction gates (idle 90%) | the views drawn over the guides |
+| Image-model input | an image-model character (CC0, upscaled off-grid, with a background) is normalised to its pixel grid and palette and imported to a passing export; on a clean sprite deliberately upscaled 3x with blur and a background, normalisation recovers the original exactly or within 1% of its pixels | the same tool for both sources |
 | Existing outputs | byte-identical | import adds a path |
 
 ## Batches
 
-- **A. Import:** points, the cut, the rig fit, the hidden-area list, the view guides, the round-trip gate, on two LPC
-  characters and one CC0 character. Review.
+- **A. Import:** normalisation, points, the cut, the rig fit, the hidden-area list, the view guides, the round-trip
+  gate, on two LPC characters, one CC0 character and one image-model character. Review.
 - **B. Animate:** hidden areas and missing views drawn, a cape, the export gates and the direction gates. Review.
 - **C. Judged:** the pairwise panel against the LPC hand-animated walks; the fresh-agent import, from all views and
   from one view. Review.

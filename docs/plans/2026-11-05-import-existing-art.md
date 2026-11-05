@@ -55,8 +55,7 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
 ## Batches
 
 - **A. Import:** normalisation, points, the cut, the rig fit, the hidden-area list, the view guides, the round-trip
-  gate, on two LPC characters, one CC0 character, one image-model character and one
-  illustration. Review.
+  gate, on two LPC characters, one CC0 character, one image-model character and one illustration. Review.
 - **B. Animate:** hidden areas and missing views drawn, a cape, the export gates and the direction gates. Review.
 - **C. Judged:** the pairwise panel against the LPC hand-animated walks; the fresh-agent import, from all views and
   from one view. Review.

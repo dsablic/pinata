@@ -116,12 +116,14 @@ function groupDifference (skin: Skin, view: ViewName, other: ViewName, parts: st
   }, 0)
 }
 
+function apartBetween (skin: Skin, view: ViewName, other: ViewName, parts: string[]): number {
+  return Math.min(groupDifference(skin, view, other, parts, false), groupDifference(skin, view, other, parts, true))
+}
+
 function compared (skin: Skin, view: ViewName, other: ViewName, region: string, parts: string[]): Finding[] {
   const gaps = absent(skin, [view, other], parts)
   if (gaps.length > 0) return gaps
-  const apart = Math.min(
-    groupDifference(skin, view, other, parts, false), groupDifference(skin, view, other, parts, true)
-  )
+  const apart = apartBetween(skin, view, other, parts)
   if (apart >= THREE_QUARTER_MIN) return []
   const message = `the ${region} differs from the ${other} view, or from it mirrored, by ${apart} px ` +
     `(at least ${THREE_QUARTER_MIN} needed): draw ${DIRECTION_CUES[view]}`
@@ -189,6 +191,13 @@ export function backFaceFindings (skin: Skin, regions: Regions): Measurement {
   return { findings: BACK_VIEWS.flatMap(view => carriedFace(skin, view, regions, face)) }
 }
 
+function carriedColours (skin: Skin, view: ViewName, regions: Regions, face: Set<string>): number {
+  return regions.face.reduce((sum, part) => {
+    const own = pixelsOf(spriteOf(skin, view, part), skin.palette)
+    return sum + [...own.values()].filter(colour => face.has(colour)).length
+  }, 0)
+}
+
 function asymmetry (sprite: SkinPart, palette: Skin['palette']): number {
   const pixels = pixelsOf(sprite, palette)
   const columns = [...pixels.keys()].map(key => Number(key.split(',')[0]))
@@ -210,4 +219,39 @@ export function profileFindings (skin: Skin, regions: Regions): Measurement {
   const message = `the head is left-right symmetric (${apart} px differ from its mirror, at least ` +
     `${PROFILE_MIN} needed): draw ${DIRECTION_CUES.side}`
   return { findings: [{ view: 'side', part: listed(regions.face), message }] }
+}
+
+function neighbouring (view: ViewName, other: ViewName): boolean {
+  const near = (a: ViewName, b: ViewName): boolean => (NEIGHBOURS as Partial<Record<ViewName, ViewName[]>>)[a]
+    ?.includes(b) ?? false
+  return near(view, other) || near(other, view)
+}
+
+function sideMeasure (skin: Skin, regions: Regions): string | undefined {
+  if (regions.face.length === 0 || absent(skin, ['side'], regions.face).length > 0) return undefined
+  const apart = regions.face.reduce((sum, part) => sum + asymmetry(spriteOf(skin, 'side', part)!, skin.palette), 0)
+  return `its head differs from its own mirror by ${apart} px, the minimum is ${PROFILE_MIN}`
+}
+
+function backMeasure (skin: Skin, regions: Regions, view: ViewName): string | undefined {
+  if (regions.face.length === 0 || absent(skin, ['front', 'side', view], regions.face).length > 0) return undefined
+  const face = faceColours(skin, regions)
+  if (face.size === 0) return undefined
+  return `its head carries ${carriedColours(skin, view, regions, face)} px in colours only the front face uses, ` +
+    `at most ${BACK_SLIVER} allowed`
+}
+
+function neighbourMeasure (skin: Skin, regions: Regions, view: ViewName, named: ViewName): string | undefined {
+  const groups = Object.entries({ head: regions.face, torso: regions.torso }).filter(([, parts]) => parts.length > 0)
+  const said = groups.filter(([, parts]) => absent(skin, [view, named], parts).length === 0).map(([region, parts]) => {
+    return `its ${region} differs from the ${named} ${region} by ${apartBetween(skin, view, named, parts)} px`
+  })
+  return said.length === 0 ? undefined : `${said.join(', ')}, the minimum is ${THREE_QUARTER_MIN}`
+}
+
+export function misreadMeasure (skin: Skin, regions: Regions, view: ViewName, named: ViewName): string | undefined {
+  if (view === named) return undefined
+  if (neighbouring(view, named)) return neighbourMeasure(skin, regions, view, named)
+  if (BACK_VIEWS.includes(view) && !BACK_VIEWS.includes(named)) return backMeasure(skin, regions, view)
+  return view === 'side' ? sideMeasure(skin, regions) : undefined
 }

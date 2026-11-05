@@ -381,3 +381,49 @@ on each, so the checks do not predict readability.
 
 The examples were not redrawn: `npm run verify` was not run (another batch was running), and no example failed a check
 in batch B beyond the two redrawn.
+
+### Calibration: hand-drawn eight-direction sprites
+
+The control of batch A has four directions only. This one asks the same three judges to name eight directions on
+hand-drawn eight-direction pixel art, from one standing frame: the same choice panel (`kind: "choice"`, the eight
+labels and the question of `directionBase`), run through `npm run judge -- run`, reported and not gated.
+
+- **Sources, all by hormelz on itch.io, licence read on each page.** "8 Directional 2D Businessman Character"
+  (`hormelz.itch.io/8-directional-2d-businessman-character`, asset licence Creative Commons Zero v1.0 Universal;
+  the `Idle.zip` download, 256 px cells, the figure 56 to 60 px tall) and "8-directional-char", a girl sample
+  (`hormelz.itch.io/8-directional-char`, CC0 on its page; the `GirlSampleReadyIdle` strips, the figure 106 to 117 px
+  tall). Other leads were not usable: "RPG characters 8 directions 16x16" (di3goalmeida) and the OpenGameArt "8d
+  run/walk & idle" sheet (8 px) are far below the size, the di3goalmeida 64 px pack carries no licence row (personal
+  and commercial use, no redistribution), OpenGameArt's Puny Characters (CC0) are 16 px chibi figures whose
+  eight rows could not be told apart by eye, and OpenGameArt's "Hero character sprite sheet" (CC0, 40 by 64) draws
+  front, side and back with a three-quarter walk only. The downloads sit outside the repository.
+- **Panels.** Each character: its eight directions, two frames of the idle each (the first and a later one), so 16
+  items and 48 answers. The frames are cropped to one common box per character and scaled so that the figure is about
+  as large on screen as our items (the businessman at scale 6, the girl, twice as tall, at scale 3).
+- **Directions checked by looking.** The businessman's files `dir1` to `dir8` run front-left, left, back-left, back,
+  back-right, right, front-right, front: the profiles face the left and right edges, the back view shows no face,
+  the front shows the tie, and the three-quarter views sit between in turn. The two back diagonals differ by a few
+  pixels, so the order between them rests on the sequence. The girl's files are named for the direction she
+  moves (`Down`, `DownRight`, ...); with her hair over the face and a high camera, the front and the back diagonals
+  cannot be told from her frames, and the judges' answers were rotated by one step against her names (her `UpLeft`
+  named back 6 of 6, `UpRight` named right 4 of 6), which fits names in screen-and-world space and not in our labels.
+  Her labels are therefore not verified, and her result is reported but left out of the score.
+
+| Measure | Businessman | Girl (labels not verified) |
+|---|---|---|
+| Answers right | 39 of 48, 81% (by judge: see below) | 16 of 48, 33% |
+| Cost | $0.141 | $0.152 |
+
+Businessman, share right per direction (6 answers each, two frames and three judges): front 6, right 6, back 6,
+left 6, front-left 6, back-right 4 (named back-left 2), back-left 3 (named back-right 2, back 1), front-right 2
+(named front-left 3, front 1). The cardinal views and the front-left read in every answer (24 of 24 and 6 of 6); the
+other three diagonals read in 9 of 18. At 2 of 3 per direction, front-right and back-left fail.
+
+What it means for the 90% gate: on the one character whose directions could be verified, drawn by a person for eight
+directions, the judges name 81% of single idle frames, below 90% and failing the "no direction left behind" gate in
+two directions. The misses are the same kind as in our characters (three-quarter views named as the neighbouring
+three-quarter view or the near cardinal view), so the gate asks for more than the judges give on art made by a person.
+The fresh agents' characters (60% idle) are 21 points below this control, not 30 below the gate; with the
+four-direction LPC control (85% on cardinal views) the evidence is that about 80 to 85% is what these judges reach on
+good hand-drawn art, and 90% with every direction at 2 of 3 is not shown to be within reach. One character from one
+author is a thin base: the result bounds the gate, it does not set it. The gate stays as fixed.

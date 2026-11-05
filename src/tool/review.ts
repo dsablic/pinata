@@ -1,5 +1,6 @@
 import { join, resolve } from 'node:path'
 import { choicePanel, writePanel } from '../cli/choice-panel.ts'
+import { loadCharacter } from '../formats/character.ts'
 import { directionBase, directionItems } from '../export/direction-panel.ts'
 import { DIRECTION_CUES } from '../export/direction-cues.ts'
 import { viewOf } from '../export/directions.ts'
@@ -13,6 +14,8 @@ import { lintPanel } from '../judge/lint.ts'
 import { describeCost, describeOutcome, MODELS, runJudges } from '../judge/runner.ts'
 import type { Ask } from '../judge/runner.ts'
 import { withJudgeDir } from '../judge/sandbox.ts'
+import { measurerFor } from './direction-checks.ts'
+import type { Measurer } from './direction-checks.ts'
 import { messageOf } from './io.ts'
 import type { Invoke, Io } from './io.ts'
 import { subjectFor } from './subject.ts'
@@ -54,11 +57,15 @@ function onlyBehaviour (key: ChoiceKey, behaviour: Behaviour): ChoiceKey {
   return { ...key, items: Object.fromEntries(kept) }
 }
 
-function misread (label: LabelScore): string {
-  const named = Object.entries(label.named).map(([name, n]) => `${name} ${n}`).join(', ')
+function misread (label: LabelScore, measure: Measurer): string {
+  const named = Object.entries(label.named).filter(([name]) => name !== label.label).map(([name, n]) => {
+    return { said: `named ${name} ${n} ${n === 1 ? 'time' : 'times'}`, found: measure(label.label, name) }
+  })
+  const text = named.map(({ said, found }) => found === undefined ? said : `${said}: ${found}`).join('; ')
   const view = viewOf(label.label as Direction)
-  return `  ${label.label}: ${label.right} of ${label.asked} right, named ${named}. Draw the ${view} view with ` +
-    DIRECTION_CUES[view]
+  const measured = named.some(({ found }) => found !== undefined)
+  const cue = measured ? '' : ` Draw the ${view} view with ${DIRECTION_CUES[view]}`
+  return `  ${label.label}: ${label.right} of ${label.asked} right; ${text}.${cue}`
 }
 
 function passes (score: ChoiceScore, least: number): boolean {
@@ -66,14 +73,19 @@ function passes (score: ChoiceScore, least: number): boolean {
   return score.share >= least && each
 }
 
-function section (behaviour: Behaviour, score: ChoiceScore, least: number): string[] {
+function section (behaviour: Behaviour, score: ChoiceScore, least: number, measure: Measurer): string[] {
   const wrong = score.labels.filter(label => label.right < label.asked).sort((a, b) => a.right - b.right)
   const gate = `gate: ${percent(least)}, each direction at least ${DIRECTION_RIGHT.right} of ${DIRECTION_RIGHT.of}`
   return [
     `${behaviour}: ${score.right} of ${score.asked} right, ${percent(score.share)} (${gate}): ` +
       `${passes(score, least) ? 'PASS' : 'FAIL'}`,
-    ...wrong.map(misread)
+    ...wrong.map(label => misread(label, measure))
   ]
+}
+
+function measurerOf (dir: string): Measurer {
+  const loaded = loadCharacter(dir)
+  return loaded.value === undefined || loaded.errors.length > 0 ? () => undefined : measurerFor(loaded.value)
 }
 
 type Recorder = typeof recordSubject
@@ -111,7 +123,8 @@ export async function runReview (
       const score = scoreChoices(onlyBehaviour(panel.packet.key, behaviour), answers)
       return { behaviour, score, least: behaviour === 'idle' ? IDLE_SHARE : WALK_SHARE }
     })
-    const lines = scored.flatMap(({ behaviour, score, least }) => section(behaviour, score, least))
+    const measure = measurerOf(args.dir)
+    const lines = scored.flatMap(({ behaviour, score, least }) => section(behaviour, score, least, measure))
     lines.forEach(line => io.out(line))
     return scored.every(({ score, least }) => passes(score, least)) ? 0 : 1
   } catch (err) {

@@ -48,6 +48,10 @@ function filesOf (dir: string, slots: string[]): Record<string, string> {
   return found
 }
 
+function structured (result: any): { status: number, files: string[] } {
+  return JSON.parse(result.content[1].text)
+}
+
 function toolCall (name: string, args: object, id = 1): object {
   return { jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } }
 }
@@ -177,9 +181,8 @@ test('every tool prints the same lines, writes the same files and returns the sa
       const { result } = reply
       const said = `${label}: ${run.stdout}${run.stderr}`
       if (scenario.status !== undefined) assert.equal(run.status, scenario.status, said)
-      assert.equal(result.structuredContent.status, run.status, label)
+      assert.equal(structured(result).status, run.status, label)
       assert.equal(result.isError, run.status !== 0, label)
-      assert.deepEqual(JSON.parse(result.content[1].text), result.structuredContent, label)
       const slots = [cliSlot.out, cliSlot.copy, toolSlot.out, toolSlot.copy]
       assert.deepEqual(printed(toolLines(result.content[0].text).join('\n'), slots),
         printed(run.stdout + run.stderr, slots), label)
@@ -198,11 +201,21 @@ test('a tool result lists only what the command wrote, and refusals list nothing
   writeFileSync(join(dir, 'old', 'big.bin'), 'x')
   await withServer(async call => {
     const guide = await call(toolCall('skin', { action: 'guide', dir: ROGUE, out: dir }))
-    const files: string[] = guide.result.structuredContent.files
+    const files: string[] = structured(guide.result).files
     assert.ok(files.includes('guide.md') && !files.includes('keep.txt') && !files.some(f => f.startsWith('old')))
     const refused = await call(toolCall('new', { template: 'biped', dir }))
-    assert.equal(refused.result.structuredContent.status, 2)
-    assert.deepEqual(refused.result.structuredContent.files, [])
+    assert.equal(structured(refused.result).status, 2)
+    assert.deepEqual(structured(refused.result).files, [])
+  })
+})
+
+test('a passing check puts its notes and verdict in the text result a client shows', async () => {
+  await withServer(async call => {
+    const { result } = await call(toolCall('check', { dir: CHARACTER_OK, out: scratchDir('pinata-note-') }))
+    assert.equal(result.isError, false)
+    assert.equal(result.structuredContent, undefined)
+    assert.match(result.content[0].text, /idle foot gate skipped/)
+    assert.match(result.content[0].text, /PASS/)
   })
 })
 
@@ -220,7 +233,7 @@ test('unknown arguments and wrong types are tool errors naming the argument', as
     const ask = async (name: string, args: object): Promise<string> => {
       const reply = await call(toolCall(name, args))
       assert.equal(reply.result.isError, true)
-      assert.equal(reply.result.structuredContent.status, 2)
+      assert.equal(structured(reply.result).status, 2)
       return reply.result.content[0].text
     }
     const preview = { action: 'preview', dir: ROGUE, out: '/tmp/x', clean: 'true' }

@@ -10,7 +10,7 @@ import { loadCharacter } from '../src/formats/character.ts'
 import { createImage, setPixel } from '../src/image.ts'
 import { decodePng } from '../src/png/decode.ts'
 import type { Ask } from '../src/judge/runner.ts'
-import { DIRECTION_CHECKS, directionChecks } from '../src/tool/direction-checks.ts'
+import { DIRECTION_CHECKS, directionChecks, measurerFor } from '../src/tool/direction-checks.ts'
 import { bufferIo, pinataInvoke } from '../src/tool/io.ts'
 import { NO_SCORE, runReview } from '../src/tool/review.ts'
 import { runSkin } from '../src/tool/skin.ts'
@@ -166,8 +166,8 @@ test('review with every answer right passes, and a misread names its direction, 
   const text = lines.join('\n')
   assert.equal(status, 1)
   assert.match(text, /idle: 20 of 24 right, 83%/)
-  assert.match(text, /front-right: 1 of 3 right, named front 2\. Draw the frontSide view with the face shifted/)
-  assert.match(text, /back-right: 1 of 3 right, named back-left 2\. Draw the backSide view/)
+  assert.match(text, /front-right: 1 of 3 right; named front 2 times: its head differs from the front head by \d+ px/)
+  assert.match(text, /back-right: 1 of 3 right; named back-left 2 times\. Draw the backSide view/)
   assert.match(text, /cost: \$0\.030 for 3 judges/)
   const clean = bufferIo()
   const again = join(scratchDir('pinata-review-'), 'review')
@@ -186,6 +186,22 @@ test('review --walk scores the walk frames apart from the idle frames', async ()
   assert.equal(status, 1)
   assert.match(text, /idle: 24 of 24 right, 100%[^\n]*PASS/)
   assert.match(text, /walk: 12 of 24 right, 50%[^\n]*FAIL/)
+})
+
+test('a misread names the structural measure between the true view and the named one', () => {
+  const equalHead = characterWithViews({ backSide: { head: completeViews({}).back!.head } })
+  const measure = measurerFor(loadCharacter(equalHead).value!)
+  assert.match(measure('back-right', 'back')!, /^its head differs from the back head by 0 px, its torso .*is 8$/)
+  assert.match(measure('back-right', 'front')!, /^its head carries \d+ px in colours only the front face uses/)
+  assert.match(measure('right', 'front-right')!, /^its head differs from the frontSide head by \d+ px/)
+  assert.equal(measure('back-right', 'back-left'), undefined)
+  assert.equal(measure('back-right', 'cant_tell'), undefined)
+})
+
+test('a misread side view names its head\'s difference from its own mirror', () => {
+  const symmetric = characterWithViews({ side: { head: ['.hhhhh.', 'hhhhhhh', 'hhhhhhh', 'hhhhhhh', '.hhhhh.'] } })
+  const measure = measurerFor(loadCharacter(symmetric).value!)
+  assert.equal(measure('right', 'front'), 'its head differs from its own mirror by 0 px, the minimum is 4')
 })
 
 test('review refuses a missing directory argument', async () => {

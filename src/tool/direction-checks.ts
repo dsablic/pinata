@@ -1,8 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { backFaceFindings, profileFindings, regionsOf, threeQuarterFindings } from '../export/direction-cues.ts'
+import {
+  backFaceFindings, misreadMeasure, profileFindings, regionsOf, threeQuarterFindings
+} from '../export/direction-cues.ts'
 import type { Measurement, Regions } from '../export/direction-cues.ts'
 import type { Character } from '../formats/character.ts'
+import { DIRECTIONS, viewOf } from '../export/directions.ts'
+import type { Direction as Facing } from '../export/directions.ts'
 import { validateSkin } from '../formats/skin.ts'
 import type { Skin } from '../formats/skin.ts'
 import type { DeclaredGate } from '../checks/gate-spec.ts'
@@ -73,4 +77,19 @@ export function directionChecks (character: Character): DirectionChecks {
     })
   }
   return { checks, notes }
+}
+
+export type Measurer = (label: string, named: string) => string | undefined
+
+const isDirection = (label: string): label is Facing => (DIRECTIONS as readonly string[]).includes(label)
+
+export function measurerFor (character: Character): Measurer {
+  const skin = skinOf(character.dir)
+  const regions = typeof skin === 'object' ? regionsOf(character.mannequin, character.rig) : undefined
+  if (typeof skin !== 'object' || regions === undefined) return () => undefined
+  return (label, named) => {
+    return isDirection(label) && isDirection(named)
+      ? misreadMeasure(skin, regions, viewOf(label), viewOf(named))
+      : undefined
+  }
 }

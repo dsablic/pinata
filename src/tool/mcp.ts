@@ -79,8 +79,7 @@ function resultOf (lines: string[], status: number, files: string[]): unknown {
     `exit status: ${status}`].join('\n')
   return {
     isError: status !== 0,
-    content: [{ type: 'text', text: prose }, { type: 'text', text: JSON.stringify(structured) }],
-    structuredContent: structured
+    content: [{ type: 'text', text: prose }, { type: 'text', text: JSON.stringify(structured) }]
   }
 }
 

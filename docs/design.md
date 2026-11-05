@@ -1295,7 +1295,10 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   (`additionalProperties: false`): an unknown name, a wrong type or a value outside an enum is an error result naming
   the argument, never ignored (`clean: "true"` is not `false`).
 - A tool result has two text blocks, the command's lines with the files written and `exit status: n`, then the
-  same `status` and `files` as JSON, which is also `structuredContent`. `isError` is true for any non-zero status,
+  same `status` and `files` as JSON. It has no `structuredContent`: a client that finds one shows it and leaves the
+  text blocks out, so a passing `check` or `review` reached the author as `{"status":0,"files":[...]}` alone, without
+  its not-measured notes, PASS lines or per-direction findings. A failing result (`isError`) was shown whole, which hid
+  the cause. `isError` is true for any non-zero status,
   and argument errors have the same shape with status 2. The files listed are those the command wrote: the entries of
   the output directory that are new or changed, and everything inside a new subdirectory; a directory that was
   already there is not walked (an output directory may hold anything), and a refusal (status 2) lists nothing. Every
@@ -1661,7 +1664,14 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   asks three judges through `runJudges` in a fresh folder, as `npm run judge -- run` does. Its item ids and the panel
   name share no word of three letters with each other, which the lint requires. It scores idle and walk
   apart, from the same key, so a share is never mixed between the two frames. A direction is reported when any
-  judge got it wrong, worst first, with the true view's cue. Exit 0 means every gate of the plan's table was met
+  judge got it wrong, worst first. Each line says, for every wrong name, what it was named and how often and the
+  structural measure that relates the true view to the named one (`misreadMeasure` in `direction-cues.ts`, the same
+  counts the checks use): a three-quarter view against its neighbouring cardinal view (the head's and the torso's
+  differing pixels against the minimum of 8), a back view named a front one (the head's pixels in colours only the
+  front face uses against the limit of 3), a side view (its head's difference from its mirror against the minimum of
+  4). A line in which no wrong name has a measure (the mirrored three-quarter view, a can't-tell, an unreadable
+  skin) keeps the true view's generic cue, so no misread is reported without something to draw from.
+  Exit 0 means every gate of the plan's table was met
   (idle at least 90% and each direction at least 2 of 3; walk at least 80% with `--walk`), 1 a gate missed,
   2 a refusal, 3 a judge that did not answer: no score exists then, and 1 would read as a measured miss. The cost
   of every judge, a failed one included (`describeCost` of the runner, with the judges and models taken from the

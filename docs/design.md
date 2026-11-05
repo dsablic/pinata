@@ -1593,6 +1593,13 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   how often it was right and what was named instead. There are no control pairs: chance is one in the number of
   labels, and the confusions show bias. Images are not trimmed, so the cell's size and baseline are kept.
   `npm run judge -- build` and `score` pick the kind from the spec's `kind` and the key's.
+- The direction panel (`npm run direction-panel`, `src/cli/direction-panel.ts`) shows two frames of each of the four
+  skinned humanoids per direction as separate items: the first idle frame and the walk frame with the feet furthest
+  apart (`widestStride`, `src/export/stride.ts`: the largest distance between two feet's lowest visible pixels, drawn
+  footprint when a foot is hidden, frames with a foot not drawn skipped, the earliest frame on a tie), so the walk
+  item is the stride's widest point, where the legs and the body's turn are most visible. Every frame goes to every
+  judge, so a judge sees each character in each direction twice (idle, walk); elimination between the two frames
+  can only raise the score, and the idle and walk shares are read apart by item id.
 
 ### Runner and lint (`runner.ts`, `claude.ts`, `answers.ts`, `lint.ts`)
 

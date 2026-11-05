@@ -89,6 +89,6 @@ how many answers were right and what was named instead, and the share of correct
 (`cant_tell` and missing answers count as wrong). An item with `"control": true` is a known case that is scored
 apart (`score` prints the controls' accuracy and leaves them out of the share and the labels' counts).
 `npm run direction-panel` builds the facing panel of the exported
-idle frames of the four skinned humanoids into `reports/export-panel/`; `npm run behaviour-panel` builds the
-action panel (idle, crouch and attack strips, with walk and jump strips as controls) into
+idle and mid-stride walk frames of the four skinned humanoids into `reports/export-panel/`; `npm run behaviour-panel`
+builds the action panel (idle, crouch and attack strips, with walk and jump strips as controls) into
 `reports/behaviour-panel/`.

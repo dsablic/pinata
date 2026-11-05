@@ -1458,6 +1458,29 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   first frame of a one-shot; for a loop's first frame the movement from the frame before it in the run), which an
   engine adds to the sprite's position.
 
+### `measure.ts` and `npm run motion-measure`
+
+- Measurement only: nothing here changes an export. `src/motion/measure.ts` holds the pure functions over a series of
+  samples (joints, heading, planted flags); `src/export/measure.ts` builds the series from a raw clip, a retargeted
+  clip and the recorded take; `src/cli/motion-measure.ts` prints the tables.
+- Torso pitch is the angle of pelvis to chest (and to head) from vertical along the heading, forward positive, averaged
+  per cycle (touchdown of the first leg to its next). The raw clip's neck is the end of `thorax` and its head the start
+  of `head`. The rig's chest is rigid with the pelvis, so the retargeted chest pitch is the pelvis's pitch and the
+  spine's bend reaches the head only.
+- The side view is the same two joints through the export camera. It is reported exact and snapped to whole pixels,
+  because the torso is about 13 px long and one pixel of snap is about 4 degrees.
+- A step runs from one foot's touchdown to the other foot's; its length is the forward distance between the two
+  ankles' touchdown positions and its duration the frames between them. The gap of a cycle is the difference of its
+  two steps over their mean. Raw and retargeted clip contacts flicker, so a gap of fewer than 3 frames inside a stance
+  is closed and a stance shorter than 3 frames dropped; the player's flags are only gap-closed, since the dwarf's run
+  has genuine one-frame stances. Gaps are only reported for steady gaits (walk, walk-2, run): starts, stops and turns
+  are not even by nature.
+- Idle travel is the peak-to-peak of a joint's height over one loop period (the take's period after the style rate),
+  averaged over the periods of the recorded window, as a share of the mannequin's height. Weight shift is the
+  pelvis's position along the line between the ankles (0 over the left foot, 1 over the right), peak-to-peak over the
+  window.
+- The attack's striking hand is the one that travels furthest in the take.
+
 ### `sheet.ts`
 
 - One sheet per animation: `<name>-<animation>.png` holds the animation's eight directions, in the order of

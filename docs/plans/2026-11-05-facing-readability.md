@@ -280,3 +280,104 @@ Built for any character, not the examples.
   2 of 3; back 2 of 3). Cost $0.095 (opus $0.067, sonnet $0.027, haiku $0.002), 25 s.
 - **Guide.** The skin section has the direction checklist and how to use preview, check and review.
 - **MCP.** Commands may be asynchronous; the server answers requests concurrently and ends after the last reply.
+
+### Batch C: fresh agents
+
+Setup as in the Phase 1 plan's batch F: `npm run build` and `npm pack` from HEAD (148 files), a fresh directory per
+author with the tarball installed, `docs/authoring.md` copied in, `.mcp.json` with `npx pinata mcp`, the exit test's
+three prompts unchanged, `claude -p` on sonnet with the judge runner's isolation, tools `Read`, `Write`, `Edit` and
+the six pinata MCP tools (`new`, `check`, `skin`, `render`, `export`, `review`), the three started together, the
+absolute path of `authoring.md` in the instruction, plus "Make every direction read clearly: use skin preview, check
+and review. You may run review at most 3 times." One launch (a first launch with the older wording of the path was
+stopped within seconds and started again clean). Directories: `scratchpad/facing-c/{smith,assassin,ranger}/`.
+
+| Author | `check` runs | `export` runs | `review` runs (idle share) | Final `check` and `export` re-run by hand | Cost, time |
+|---|---|---|---|---|---|
+| smith | 6 (2nd and 3rd failed `idleFootMisses` 8, the 2nd also `threeQuarterViewFindings` 1) | 1 | 3: 71%, 71%, 63% | `check` exit 0; `export` exit 0, no `FAIL`, 16 engine notes, 0 not measured; `check` notes `backViewFaceFindings` not measured (the front face has no colour of its own) | $1.03, 8.4 min, 59 turns; reviews $0.24 |
+| assassin | 5 (1st before any skin; 2nd failed `idleFootMisses` 4 and `threeQuarterViewFindings` 3) | 1 | 3: 71%, 79%, 79% | `check` exit 0 (138 s); `export` exit 0, no `FAIL`, 16 engine notes, 0 not measured | $0.84, 16.6 min, 52 turns; reviews $0.22 |
+| ranger | 6 (2nd and 3rd failed `idleFootMisses` 7, the 2nd also `threeQuarterViewFindings` 3) | 1 | 3: 46%, 75%, 79% | `check` exit 0, no not-measured note; `export` exit 0, no `FAIL`, 15 engine notes, 4 not measured (loop n/a) | $1.25, 14.6 min, 71 turns; reviews $0.22 |
+
+Every author exported with every gate passing and a cloth cape or cloak, and every author stopped with the review gate
+missed (its own last review: 63%, 79% and 79% against 90%), having used all three reviews. Authors' costs $3.12,
+reviews $0.68. The `export` count fell to 1 for each (batch F: 1, 2 and 4). The authors read `idle-directions.png` 3
+(smith), 1 (assassin) and 5 (ranger) times.
+
+#### Judged panel
+
+`npm run direction-panel` gained arguments for this: `--seed`, `--out` and `<name>=<character dir>` for any
+character (no arguments: the four examples, unchanged; the regenerated example panel differs from the batch A files
+only in the redrawn knight and wizard back-side views). The panel is the three characters' eight idle and eight walk
+frames (48 items), seed `facing-c` (the reviews use `review`), the direction question, every item shown to opus,
+sonnet and haiku through `npm run judge -- run`. Cost $0.46 (opus $0.334, sonnet $0.123, haiku $0.007). By judge, of
+48: opus 42, sonnet 29, haiku 19.
+
+| Gate | Threshold | Result | Outcome |
+|---|---|---|---|
+| Idle share | 90% | 43 of 72, 60% (smith 10 of 24, assassin 16, ranger 17) | missed |
+| Walk share | 80% | 47 of 72, 65% (smith 15 of 24, assassin 18, ranger 14) | missed |
+| No direction left behind (idle, at least 2 of 3 per direction and character) | 24 of 24 cells | 15 of 24 cells (smith 3 of 8, assassin 6, ranger 6) | missed |
+| Calibration control | reported | 85% on cardinal views (batch A) | not repeated |
+
+Batch C is missed. Cells under 2 of 3 on idle frames: smith front-right 1, back-right 1, back-left 1, left 1,
+front-left 0; assassin back-left 0, left 1; ranger front-right 1, front-left 1. On walk frames: smith front-right 1,
+right 1, left 1; assassin right 1; ranger front-right 1, back-right 1, front-left 0. Per direction over the three
+characters (of 9, idle / walk): front 7 / 8, front-right 5 / 5, right 7 / 5, back-right 5 / 6, back 7 / 7, back-left
+3 / 6, left 5 / 5, front-left 4 / 5.
+
+Confusions (rows true direction, entries are what the nine answers named; idle):
+
+- smith: front named front-right 1; front-right named front 1 and front-left 1; right named back 1; back-right named
+  back 2; back named back-right 1; back-left named back 2; left named right 1 and front-left 1; front-left named
+  front-right 1, back-right 1, left 1.
+- assassin: right named front-right 1; back-right, back and back-left each had one can't-tell; back-left named front
+  1 and back 1 (0 right); left named right 1 and front-left 1.
+- ranger: front named front-left 1; front-right named right 2; back-right named right 1; back-left named left 1;
+  front-left named left 2.
+- walk, the larger cells: smith right named front-right 2, left named front-right 1 and front-left 1; assassin right
+  named front-right 2; ranger front-right named right 2, back-right named front-right 1 and right 1, front-left named
+  left 3.
+
+Pattern: three-quarter views named as their neighbours (front-left as left, front-right as right, back-left as
+back), side views named as the three-quarter view, the cardinal views mostly right.
+
+#### Structural checks against the judges
+
+All three characters pass every `check` gate at the end (the final check exits 0), yet the judges misread directions
+on each, so the checks do not predict readability.
+
+- Passing checks, still misread: smith's back-right, back-left, front-right, left and front-left (the head and torso
+  differ from the neighbours by at least 8 px, the check's floor, and the views are still named as the neighbours);
+  assassin's back-left (0 of 3) and left; ranger's front-right and front-left (named right and left).
+- The checks did act on real defects early: `threeQuarterViewFindings` failed once for each author (a back-side head
+  0 px from the back view, a front-side torso 0 px and 4 px from the front view) and the authors redrew those views.
+  Zero or near-zero difference is caught; a difference of 8 px is not a view a judge reads.
+- `backViewFaceFindings` did not measure for smith and ranger on their first checks ("the front face has no colour of
+  its own"): the beard and the hood leave no face colour to look for. No back view of any character was named front by
+  more than one answer, so no back-face defect went unmeasured and misread.
+- `sideProfileFindings` passed for all three; side views were right in 5 to 7 of 9 idle answers, misread as the
+  neighbouring three-quarter view.
+- What neither the checks nor the author could see: the ranger's first review (46%) named the front view as left,
+  because the face sat behind the hood; `check` had passed it. The first reviews and the panel agree in order of
+  character but not in size: smith 71% / 63% in review, 42% in the panel; assassin 79% and 67%; ranger 79% and 71%.
+  The reviews' scores are a little high, since the authors drew against them.
+
+#### Friction from the logs
+
+- On exit 0 the MCP client shows only the structured `{"status":0,"files":[...]}`: the prose of a passing `check`
+  (the "not measured" notes, "automated gates: PASS") and of a passing `review` is not in the result. A failing call
+  shows its prose. The authors never saw the not-measured notes on a pass; the final summary of the smith says `check`
+  passed "including the three-quarter, back-view and side-profile checks" though one was not measured.
+- Every author used its 3 reviews and ended with the gate missed: the review names the misread directions and the
+  cue to draw, but a result of 1 of 3 on a view gave no measure of how far the view is from readable, and the changes
+  between reviews did not move the score (assassin 79% twice, smith 71%, 71%, 63%).
+- The review's cue text is the same for every character; the authors repeatedly reported the cues were the ones
+  they had already drawn ("the review keeps asking for a more strongly shifted face").
+- `check` on the assassin took 138 s in the final re-run (ranger 39 s, smith 7 s), because of the cape's cloth
+  simulation.
+- The assassin's name stayed `biped-starter`; the first `check` of two authors ran on the starter body and failed
+  its gates (thin parts, ground penetration, foot slide) as the guide says it may.
+- One `Edit` failed on a skin row string that did not match (assassin).
+- Each review costs $0.07 to $0.09 and 20 to 30 s; three per author were not enough to reach 90%.
+
+The examples were not redrawn: `npm run verify` was not run (another batch was running), and no example failed a check
+in batch B beyond the two redrawn.

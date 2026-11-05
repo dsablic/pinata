@@ -10,7 +10,7 @@ import type { MotionDatabase, PerformanceTake } from '../mocap/database.ts'
 import { DEFAULT_JUMP_KIND, jumpOf } from '../mocap/jump.ts'
 import type { JumpReach } from '../mocap/jump.ts'
 import { createPlayer } from '../mocap/player.ts'
-import type { Player } from '../mocap/player.ts'
+import type { Player, PlayerFrame } from '../mocap/player.ts'
 import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import { FPS, pageEnvironment, pageSecondary, raisedRoot } from '../page/cast.ts'
@@ -61,7 +61,7 @@ const MOST_CANDIDATES = 40
 const STILL_METRES = 0.002
 const STILL_FRAMES = 6
 const MOST_ONE_SHOT_FRAMES = 240
-type Looping = {
+export type Looping = {
   warm: number
   window: number
   lengths: [number, number]
@@ -97,7 +97,7 @@ export function subjectOf (world: ReadWorld, name: string): Subject {
   return { name, member: world.cast[i], look: look as Skinned, air: pageEnvironment(world.config) }
 }
 
-type Stepper = { player: Player, step: () => Moment }
+export type Stepper = { player: Player, step: () => Moment, played: () => PlayerFrame }
 
 function standingJump (database: MotionDatabase): { run: number, reach: JumpReach } {
   const take = database.jumpTakes.reduce((best, t) => t.run > best.run ? t : best)
@@ -105,16 +105,18 @@ function standingJump (database: MotionDatabase): { run: number, reach: JumpReac
   return { run: take.run, reach: { ...jumpOf(rig, rest, DEFAULT_JUMP_KIND), clearance: take.apex } }
 }
 
-function stepper (subject: Subject): Stepper {
+export function stepper (subject: Subject): Stepper {
   const { member } = subject
   const database = member.capture!
   const jump = standingJump(database).reach
   const player = createPlayer({ database, fps: FPS, ground: () => 0, jump }, { position: [0, 0, 0], yaw: EAST })
   const secondary = pageSecondary(member, subject.air)
   let count = 0
+  let last: PlayerFrame | undefined
   const step = (): Moment => {
     count++
-    const { root, pose, transforms, planted } = player.step()
+    last = player.step()
+    const { root, pose, transforms, planted } = last
     const body: Pose = { ...database.options.rest, ...pose }
     const joints = jointsOf(body, root)
     const [raised, lowered] = raisedRoot({ base: player.height(), root, body })
@@ -122,7 +124,7 @@ function stepper (subject: Subject): Stepper {
     const position: Vec3 = [root.position[0], 0, root.position[2]]
     return { joints, curves: secondary.curves(), position, yaw: root.yaw, planted }
   }
-  return { player, step }
+  return { player, step, played: () => last as PlayerFrame }
 }
 
 function stepsOf (s: Stepper, count: number): Moment[] {
@@ -258,11 +260,11 @@ function idleLooping (subject: Subject): Looping {
   return { warm: IDLE_WARM, window, lengths: [period, period], speed: 0, candidates: window, holding: true }
 }
 
-function loopingOf (subject: Subject, behaviour: Behaviour): Looping | undefined {
+export function loopingOf (subject: Subject, behaviour: Behaviour): Looping | undefined {
   return behaviour === 'idle' ? idleLooping(subject) : LOOPS[behaviour]
 }
 
-function looping (s: Stepper, subject: Subject, behaviour: Behaviour): Take {
+export function looping (s: Stepper, subject: Subject, behaviour: Behaviour): Take {
   const { warm, window, speed } = loopingOf(subject, behaviour) as Looping
   s.player.command({ speed, heading: EAST })
   if (behaviour === 'idle') s.player.perform('idle')

@@ -14,7 +14,9 @@ is drawn in its direction's view, so the misses are in what the views show, not 
 - **Direction cues in the skins.** The views are redrawn with the cues game artists use: back views show hair, hood,
   helmet back or cape and no face or beard; three-quarter views show the face shifted toward the facing side, one
   eye or the far eye smaller, the nose or visor past the head's outline, the near shoulder and arm larger, the cape
-  falling to the far side; side views show a profile with the nose, the toes pointing forward. Claude draws them.
+  falling to the far side; side views show a profile with the nose, the toes pointing forward. Piñata is a general
+  tool, so the cues are taught and checked by the tool for any author's character, not drawn into the examples by
+  hand: the batch A diagnosis on the examples shows which cues the checks must cover.
 - **Engine cues, only where the skins cannot carry them,** for example the body's yaw in a three-quarter view or the
   order of near and far parts. Each is a meant output change, accepted and named.
 - **Authoring.** The guide's skin section gets the direction cues as a short checklist, and `pinata check` or
@@ -24,7 +26,7 @@ is drawn in its direction's view, so the misses are in what the views show, not 
 
 | Gate | Threshold | Notes |
 |---|---|---|
-| Every direction | the Phase 1 gate: a blind panel of the eight idle frames per example character names each direction correctly in at least 90% of answers | three judges, every frame to every judge, the judge runner |
+| Every direction | the Phase 1 gate: a blind panel of the eight idle frames per character names each direction correctly in at least 90% of answers | three judges, every frame to every judge, the judge runner; batch C judges the fresh agents' characters |
 | No direction left behind | each of the eight directions at least 2 of 3 answers right on every character | |
 | Walks read too | the same panel on a mid-stride walk frame at least 80% | a walk frame carries motion cues and occlusion |
 | Calibration control | reported, not gated: the LPC frames' score in the same form | tells whether 90% is within reach of art made by people |
@@ -34,11 +36,16 @@ is drawn in its direction's view, so the misses are in what the views show, not 
 ## Batches
 
 - **A. Diagnosis:** the larger panel through the judge runner, the confusion matrix, the LPC control. Review.
-- **B. Redraw:** the back and three-quarter views of the four examples first, then the side views where the matrix
-  says so; the panel after each character; engine cues only if the matrix shows a cue the skins cannot carry.
-  Review.
-- **C. Authoring:** the checklist in the guide, the eight-frame preview, a fresh agent's skin through the panel.
-  Review.
+- **B. Direction checks in the tool,** for any character, not the examples: an eight-direction sheet in `pinata skin
+  preview`; structural checks in `pinata check` that need no judge (a three-quarter view's head and torso differ from
+  both neighbouring cardinal views by more than a mirror or a few pixels; a back view's head carries none of the front
+  view's face colours; a side view's head is not left-right symmetric), each a declared gate with failing and
+  passing cases; `pinata review` (and the MCP tool), which runs the blind direction panel on the author's own
+  character through the judge runner and names the misread directions with their confusions; the direction
+  checklist in the guide. Review.
+- **C. The tool's test:** fresh agents with only the guide and the MCP server draw the exit test's three characters,
+  using the checks and `review`; their characters, not the examples, are judged against the gates above (fresh seed).
+  The examples are redrawn only as far as the new checks fail them. Review.
 
 ## Results
 

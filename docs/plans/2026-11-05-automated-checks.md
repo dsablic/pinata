@@ -24,11 +24,11 @@ batch either passes them or says exactly what failed.
   through `pinata export`, exiting non-zero if any author gate fails.
 - **Judge runner (`npm run judge -- run <panel.json> <dir>`).** Builds the packet, lints it (a neutral name: no word
   of an item id, file name or the question's options; at least one control for pairwise panels; strips in the
-  stacked layout; the key outside the packet), starts three fresh judges with `claude -p` on three models (largest,
-  middle, smallest), each with only the packet folder readable and the instruction to answer in JSON on stdout,
-  validates every answer (all items, allowed choices, ratings), retries a judge once on a malformed answer, saves the
-  answers and prints the score. Judges' answers are parsed from their output, never from files they were asked to
-  write.
+  stacked layout, measured on the composed images), starts three fresh judges with `claude -p` on three models
+  (largest, middle, smallest), each with only a temporary copy of the packet's files readable, outside the repository,
+  and the instruction to answer in JSON on stdout, validates every answer (all items, allowed choices, ratings),
+  retries a judge once on a malformed answer, saves the answers and prints the score. Judges' answers are parsed from
+  their output, never from files they were asked to write.
 - **Gate specs with controls.** A gate is declared with what it observes (drawn pixels, joints, files), its
   reference frame, its threshold, and a known-bad and a known-good case: small hand-made inputs on which it must fail
   and pass. The test suite runs every gate's cases, so a gate that cannot fail, or measures the wrong frame, fails
@@ -51,3 +51,21 @@ batch either passes them or says exactly what failed.
 - **B. Judge runner:** `judge run`, the packet lint, the runner gate on a small test panel. Review.
 - **C. Gate specs:** the declaration, the export gates moved to it with their cases, the gate-cases gate; CLAUDE.md
   rules. Review.
+
+## Results
+
+- **A (verify, lint, examples).** `verify` caught each of the four planted defects (a failing test, a changed page
+  pixel, a line over 120 columns, a dead link), naming the step and the file, and the unchanged tree passed. A full
+  run takes about 8-20 minutes. One browser flake appeared in a full run and passed on rerun; `verify` prints how
+  a failing step ended (exit status, signal or error) and reruns the browser suite once for the two leftover-browser
+  failures.
+- **B (judge runner).** A real two-pair panel (a walk strip against a skating strip, with a control of the same
+  strip twice, stacked) ran end to end with no manual step: three judges, 17 s in all, about $0.14 in total, and
+  the score printed. A panel whose name contained an item id, and a side-by-side panel of strips, were refused with
+  exit 2 naming the problem; a panel with no control is refused by the spec check before the lint is reached.
+  The tests cover each lint refusal, answer extraction (plain, fenced, prose around it, example objects) and
+  validation with an injected fake judge, including the retry and the clear failure.
+  An unscoped `Read` let a judge read `../key.json`; judges run in a temporary copy of the packet files, with the
+  allow rule scoped to it. `npm run judge -- isolation` (a haiku judge asked to read a canary file one
+  level above its folder and a file inside it) printed "the file in the folder was read; the file one level above was
+  not read" and exit status 0.

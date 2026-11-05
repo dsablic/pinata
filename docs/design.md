@@ -1441,6 +1441,46 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   labels, and the confusions show bias. Images are not trimmed, so the cell's size and baseline are kept.
   `npm run judge -- build` and `score` pick the kind from the spec's `kind` and the key's.
 
+### Runner and lint (`runner.ts`, `claude.ts`, `answers.ts`, `lint.ts`)
+
+- The judges are `claude -p` processes, one per model alias (`opus`, `sonnet`, `haiku`: largest, middle, smallest),
+  run in parallel. Before they start, only the packet's files (`questions.md` and the item images) are copied into
+  `packet/` inside a fresh `mkdtemp` directory under the real path of `os.tmpdir()`, whose name is `judge-` and random
+  characters and carries nothing of the panel. Every judge runs there and the directory is deleted afterwards. The
+  copy is outside any git repository, so the harness's git context does not reach the judge, and the key, the spec
+  and the source images are not on any path it can read. A check that the copy holds exactly the packet's files runs
+  before the judges start.
+- Each judge gets `--tools Read` (no other tool exists for it) and `--allowedTools "Read(//<real path>/**)"`, the
+  absolute form of a path rule, so the one allowed read is scoped to its own folder: an unscoped `Read` let a judge
+  read `../key.json`. `--permission-mode dontAsk` refuses everything else, `--add-dir .` adds nothing beyond the
+  folder, `--strict-mcp-config` has no servers, `--setting-sources ""` loads no user, project or local settings,
+  and `--disable-slash-commands` and `--no-session-persistence` apply, plus `CLAUDE_CODE_DISABLE_CLAUDE_MDS` and
+  `CLAUDE_CODE_DISABLE_AUTO_MEMORY` so neither CLAUDE.md files nor the user's memory reach the judge: without them
+  the memory index was in a judge's context. `--bare` is not used because it needs an API key and not the logged-in
+  account. What stays is the harness's generic context (the account's email); it says nothing about the panel, and
+  the prompt is self-contained.
+- `npm run judge -- isolation` is the smoke check of that scoping: a canary file one level above the judge's folder
+  and a file inside it, a haiku judge asked to read both. It passes when the judge reads the inside file and not the
+  canary. It spawns a real judge, so it is run by hand when the arguments or the CLI change, not in `npm test`.
+- The reply is parsed from the JSON on stdout (`result`, `duration_ms`, `total_cost_usd`), never from files the judge
+  was asked to write; the child's streams are decoded as UTF-8 so a multi-byte character is never split between
+  chunks. The answer is the last JSON object in the reply (found by balanced braces outside strings, so fenced and
+  bare objects are both found) whose keys are all the panel's items: a later object is a correction, and an example
+  object in the prose, or the `{"choice": ...}` inside the answer of a one-item panel, is never taken.
+- An answer is validated with the panel's own checks (every item, allowed choices, ratings when asked). A malformed or
+  incomplete answer is asked again once, in a fresh session with the same prompt; two failures fail that judge with
+  the problems, and the others still finish and have their answers saved. A timeout or a crash is not retried: it
+  would cost the full wait again. Ten minutes is a judge's total budget over its attempts: each attempt is given
+  what is left. A failed judge still reports the cost and time it used.
+- A run owns its folder: the packet folder is emptied and stale `judge-*.json` files are deleted before anything is
+  built, so a failed judge never leaves an answer from an earlier run to be mistaken for its own.
+- The lint runs before anything is asked. The name check compares lower-cased words of three letters or more, minus a
+  short stop list, and counts two words as the same when they are equal or share their first four letters
+  (`Knights` and `knight`), so a panel name cannot hint at an item to a judge who sees the packet's files or reasons
+  from the question. The width check measures the composed images judges will see, for every panel kind: an image
+  wider than three times its height is refused, because a viewer shrinks it and the detail is lost; the source sizes
+  say nothing about that once images are scaled, stacked or placed side by side.
+
 ### Scores (`score.ts`)
 
 - A judge is consistent on a pair when they picked the same image (not cant_tell) in both orders.
@@ -1461,6 +1501,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 
 ### Judge (`judge.ts`)
 
+- Commands: `build`, `score`, `run` (build, lint, three judges, score), `lint` and `isolation`. `run` exits 2 on a
+  refused panel and 1 when a judge failed.
 - The key is refused when it would land inside the packet folder after following symlinks, compared without case on
   macOS and Windows, so judges can never see it.
 

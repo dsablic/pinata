@@ -29,19 +29,41 @@ question.
    left image above the right one for wide strips; `background` defaults to `#c8c8c8`. Change `seed` for a
    new round to get a new order.
 
-2. **Build the packet**, with the key outside it:
+2. **Run the panel**:
+
+   ```
+   npm run judge -- run panel.json out/
+   ```
+
+   It builds the packet into `out/packet/` (`item-01.png`, ... and `questions.md`: each pair twice, sides swapped,
+   shuffled by the seed; images trimmed to their opaque area, on one baseline, scaled up together) and the key into
+   `out/key.json`, outside the packet. It lints the packet and refuses to run (exit 2, naming the problem) when the
+   panel name shares a word of three letters or more (or the first four letters of a longer word: `Knights` and
+   `knight`) with an item id, an image file name or (labelled panels) a label, when a pairwise panel has no control, or
+   when a packet image is wider than three times its height (for wide strips use the `stacked` layout);
+   `npm run judge -- lint panel.json` runs the same checks alone. It empties `out/packet/` and deletes stale
+   `out/judge-*.json` first, copies the packet's files into a fresh temporary folder outside the repository, and
+   starts three fresh judges there in parallel with `claude -p`, on `opus`, `sonnet` and `haiku`, each with only the
+   Read tool, allowed only inside that folder (the folder is deleted afterwards), validates each answer against the
+   panel, asks a judge once more (a fresh session) when its answer is malformed or incomplete, saves the answers
+   as `out/judge-<model>.json`, and prints each judge's time and cost, then the score (as in step 4). A judge that
+   stays malformed or times out fails the run (exit 1), naming the problems and its time and cost; no score is
+   printed. A judge has ten minutes in all, across its two attempts.
+
+   `npm run judge -- isolation` checks that a judge cannot read outside its folder: it asks a haiku judge to read a
+   file one level above the folder and one inside it, and passes when only the inside one is read. It runs a real
+   judge, so run it by hand when the judge's arguments or the CLI change; it is not part of `npm test`.
+
+3. **By hand, when the runner cannot be used.** Build the packet with the key outside it:
 
    ```
    npm run judge -- build panel.json packet/ key.json
    ```
 
-   `packet/` gets `item-01.png`, ... (each pair twice, sides swapped, shuffled by the seed) and `questions.md`.
-   Images are trimmed to their opaque area, stand on one baseline and keep their pixel sizes, scaled up together.
-
-3. **Ask three fresh judges** (new agents with no other context), each given only the `packet/` folder and told to
+   then ask three fresh judges (new agents with no other context), each given only the `packet/` folder and told to
    follow `questions.md`. Save each judge's JSON answer as its own file. Keep the wording identical across rounds.
 
-4. **Score:**
+4. **Score** (the runner does this itself; by hand):
 
    ```
    npm run judge -- score key.json judge1.json judge2.json judge3.json

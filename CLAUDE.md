@@ -25,8 +25,9 @@
   their baselines. A meant output change is accepted with `npm run verify -- --accept <step>` and named in the plan's
   results. `--only` and `--skip` are for speed while working.
 - After each batch, an independent review told to assume the code is wrong; fix what it finds.
-- Visual quality is judged by blind judge panels (`npm run judge`, see [`docs/judging.md`](docs/judging.md)): fresh
-  agents, neutral names, both orders, controls; gates count every answer, can't-tell included.
+- Visual quality is judged by blind judge panels run with `npm run judge -- run` (see
+  [`docs/judging.md`](docs/judging.md)): fresh agents, neutral names, both orders, controls; gates count every
+  answer, can't-tell included.
 - New npm packages only through the npm-safe-install scan.
 
 ## Commits

@@ -12,6 +12,11 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
   [image-and-points](2026-10-30-image-points.md) model). Output: a character folder (rig fitted to the points,
   retarget, a five-view `skin.json` whose part sprites are cut from the image along the bones). The points can be
   proposed by an agent and corrected; the cut is deterministic given the points.
+- **One view is enough.** The usual input is a single image (a front or side view, from a CC set or an image
+  model). `import` fits the rig to it and renders a view guide for each of the five views: the fitted rig posed at
+  rest in that view, each part's region at its projected place and size, filled with the source part's colours. The
+  AI author paints each missing view over its guide instead of inventing it; the direction checks and `pinata
+  review` catch views that do not read.
 - **Hidden areas.** A cut leaves holes (the torso under the arm, the far leg behind the near one). `import` marks them
   and lists them; the author (an agent) draws them, guided by `check`. Views the source lacks (the three-quarter
   views of a four-direction set) are drawn by the author from the neighbouring views; `import` starts each from the
@@ -32,14 +37,16 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
 | Directions | the facing-readability gates on the imported characters (idle 90%, each direction 2 of 3, walk 80%) | the views the source lacks are included |
 | Motion against hand animation | a blind pairwise panel, same art: Piñata's walk strip against the LPC hand-animated walk strip, per character and direction, both orders, with controls; Piñata's walk is preferred or tied in at least 40% of answers | the first measure of motion alone; 40% means close to hand animation, not better |
 | A fresh agent imports | a fresh agent with only the guide and the MCP server imports one LPC character to a passing export within 10 `check` runs | as the exit test |
+| From one view | a fresh agent given only the front standing frame of an LPC character reaches a passing export and the direction gates (idle 90%) | the views drawn over the guides |
 | Existing outputs | byte-identical | import adds a path |
 
 ## Batches
 
-- **A. Import:** points, the cut, the rig fit, the hidden-area list, the round-trip gate, on two LPC characters and
-  one CC0 character. Review.
+- **A. Import:** points, the cut, the rig fit, the hidden-area list, the view guides, the round-trip gate, on two LPC
+  characters and one CC0 character. Review.
 - **B. Animate:** hidden areas and missing views drawn, a cape, the export gates and the direction gates. Review.
-- **C. Judged:** the pairwise panel against the LPC hand-animated walks; the fresh-agent import. Review.
+- **C. Judged:** the pairwise panel against the LPC hand-animated walks; the fresh-agent import, from all views and
+  from one view. Review.
 
 Order: after [facing readability](2026-11-05-facing-readability.md) batch B, so imported characters meet the
 direction checks.

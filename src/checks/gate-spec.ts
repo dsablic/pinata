@@ -1,10 +1,12 @@
 import type { Gate } from '../export/report.ts'
 
+export const AUTHORING_GATES = ['pivot'] as const
+export type DeclaredGate = Gate | typeof AUTHORING_GATES[number]
 export type Observes = 'drawn pixels' | 'joints' | 'painter state' | 'files'
 export type Verdict = { pass: boolean, measured: boolean }
 export type GateCase = { name: string, run: () => Verdict, measured?: boolean }
 export type GateSpec = {
-  gate: Gate
+  gate: DeclaredGate
   observes: Observes
   frame: string
   threshold: string
@@ -12,7 +14,7 @@ export type GateSpec = {
   good: GateCase[]
 }
 
-const registry = new Map<Gate, GateSpec>()
+const registry = new Map<DeclaredGate, GateSpec>()
 
 export function declareGate (spec: GateSpec): void {
   if (registry.has(spec.gate)) throw new Error(`gate ${spec.gate} is declared twice`)

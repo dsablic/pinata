@@ -46,7 +46,7 @@ const MOTION_FIELDS = [
 
 type Errors = ValidationError[]
 
-function tag (file: string, errors: Errors): Errors {
+export function tag (file: string, errors: Errors): Errors {
   return errors.map(e => ({ path: `${file}: ${displayPath(e.path)}`, message: e.message }))
 }
 
@@ -58,7 +58,7 @@ function fileError (file: string, message: string): ValidationError {
   return tag(file, [{ path: '', message }])[0]
 }
 
-function readJson (dir: string, file: string, errors: Errors): unknown {
+export function readJson (dir: string, file: string, errors: Errors): unknown {
   try {
     return JSON.parse(readFileSync(join(dir, file), 'utf8'))
   } catch (err) {

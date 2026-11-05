@@ -17,7 +17,7 @@ export type Painting = {
   anchors: Map<string, [number, number]>
 }
 export type Placed = { joints: Pose, curves: Record<string, Vec3[]>, anchor: Vec3, yaw: number }
-export type PaintOptions = { painter?: 'strip' | 'rotate', footprints?: boolean }
+export type PaintOptions = { painter?: 'strip' | 'rotate', footprints?: boolean, feet?: readonly string[] }
 
 const CAMERA_ELEVATION_DEGREES = 8
 const SPRITE_BOX_IN_CHARACTER_HEIGHTS = 1.6
@@ -69,7 +69,8 @@ export function paintSprite (
     : { painter: 'strip' as const, order, angles, lengths, anchors }
   const { image, owner, parts, sector } = renderSkinnedLayers({
     mannequin, pose: { ...mannequin.joints, ...pose }, skin, camera: box, yaw: placed.yaw, view: painting.view,
-    ...painted, curves, footprints: options.footprints === true
+    ...painted, curves, footprints: options.footprints === true,
+    ...(options.feet === undefined ? {} : { feet: options.feet })
   })
   const layers = { parts, ...(owner === undefined ? {} : { owner }), ...(sector === undefined ? {} : { sector }) }
   return { image, camera: box, ...layers }

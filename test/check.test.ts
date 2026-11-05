@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { CHARACTER_INVALID, CHARACTER_OK, characterVariant, patchJson, scratchDir } from './formats-fixtures.ts'
 
@@ -289,6 +289,46 @@ test('a one-view skin fails check with the five-view form instead of an internal
   assert.equal(run.status, 1, run.stdout + run.stderr)
   assert.match(summaryOf(run), /^FAIL {2}idleFootMisses: NaN <= 0/m)
   assert.match(summaryOf(run), /the idle could not be recorded: .*skin\.json is the one-view form.*"views": \{/)
+})
+
+test('a pivot outside its sprite is a skin.json error naming the part and the sprite size, not a NaN', () => {
+  let size = ''
+  const outside = characterVariant(dir => {
+    patchJson(dir, 'skin.json', json => {
+      const foot = json.views.side.parts.footL
+      size = `${foot.rows[0].length}x${foot.rows.length}`
+      foot.pivotA = [2, foot.rows.length]
+      foot.pivotB = [6, foot.rows.length]
+    })
+  }, ROGUE)
+  const run = check(outside)
+  assert.equal(run.status, 2, run.stdout + run.stderr)
+  const named = `^skin\\.json: views\\.side\\.parts\\.footL\\.pivotA: .* is outside the ${size} sprite`
+  assert.match(run.stderr, new RegExp(named, 'm'))
+  assert.match(summaryOf(run), /automated gates: ERROR/)
+  assert.doesNotMatch(run.stdout + run.stderr + summaryOf(run), /NaN/)
+})
+
+test('a skin.json that is not JSON is a skin.json error like the other files, not a stack trace', () => {
+  const broken = characterVariant(dir => writeFileSync(join(dir, 'skin.json'), '{ "views": '), ROGUE)
+  const run = check(broken)
+  assert.equal(run.status, 2, run.stdout + run.stderr)
+  assert.match(run.stderr, /^skin\.json: \(root\): invalid JSON: /m)
+  assert.doesNotMatch(run.stderr, /\n\s+at /)
+  assert.match(summaryOf(run), /automated gates: ERROR/)
+})
+
+test('a skin.json error fails check even where retarget.json is missing, and a good one does not', () => {
+  const without = (edit: (dir: string) => void): string => characterVariant(dir => {
+    rmSync(join(dir, 'retarget.json'))
+    edit(dir)
+  }, ROGUE)
+  const bad = check(without(dir => patchJson(dir, 'skin.json', json => { delete json.views.side.parts.footL.rows })))
+  assert.equal(bad.status, 2, bad.stdout + bad.stderr)
+  assert.match(bad.stderr, /^skin\.json: views\.side\.parts\.footL/m)
+  const good = check(without(() => undefined))
+  assert.notEqual(good.status, 2, good.stdout + good.stderr)
+  assert.match(summaryOf(good), /idle foot gate skipped/)
 })
 
 test('a character without a skin says which gates only export runs', () => {

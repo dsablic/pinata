@@ -303,6 +303,5 @@ function laidDown (part: SkinPart, path: string, errors: ValidationError[]): Ski
   const width = rows[0].length
   const turned = Array.from({ length: width }, (_, y) => rows.map(row => row[width - 1 - y]).join(''))
   const turn = (p: [number, number]): [number, number] => [p[1], width - 1 - p[0]]
-  const { upright, ...rest } = part
-  return { ...rest, rows: turned, pivotA: turn(pivotA), pivotB: turn(pivotB) }
+  return { ...part, rows: turned, pivotA: turn(pivotA), pivotB: turn(pivotB) }
 }

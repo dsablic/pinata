@@ -15,9 +15,9 @@ const HELD_BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run']
 const ENGINE_GATES: Gate[] = ['feet', 'facing', 'border', 'anchor']
 const LOOP_HINT = 'the cycle\'s end does not match its start: with cloth, shorten or stiffen it in motion.json; ' +
   'without, the gait in rig.json (stride, step height)'
-const MOVE_HINT = 'in that view move the foot sprites\' pivotA and pivotB rows by one, both together (a higher row ' +
-  'draws the foot higher in the side views, and may move it the other way in the front and back views); a view\'s ' +
-  'two directions share its two foot sprites, swapped: check both'
+const MOVE_HINT = 'in that view move the foot sprites\' pivotA and pivotB rows by one, both together: one row ' +
+  'more draws the foot exactly one pixel higher in every view, one row less one pixel lower; a view\'s two ' +
+  'directions share its two foot sprites, swapped: check both'
 const BELOW_HINT = `skin.json: a foot is drawn below its ground point; ${MOVE_HINT}`
 const ABOVE_HINT = `skin.json: a foot floats above its ground point; ${MOVE_HINT}`
 const NONE_PLANTED_HINT = 'the behaviour never plants a foot, so the ground line cannot be measured; this is ' +

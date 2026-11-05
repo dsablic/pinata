@@ -26,3 +26,7 @@ export function expectedSector (direction: Direction): number {
 export function viewOf (direction: Direction): ViewName {
   return chosenView(direction).view
 }
+
+export function isMirrored (direction: Direction): boolean {
+  return chosenView(direction).mirror
+}

@@ -54,8 +54,10 @@ macOS and Linux and can fail silently). JSON allows no comments and no trailing 
 2. A cape, cloak or scarf is cloth: declare it in `motion.json` (`cape`, `chains`, `bind`; see Cape and cloth in a
    skinned character) before drawing anything. The skin only draws what the simulation moves; a cape drawn as an
    ordinary skin part, or coloured into the torso, never swings.
-3. `pinata check <dir>`. Exit 2: a load error, fix the lines in `summary.txt`. Exit 1: work through the `FAIL` lines
-   and hints from the top. Static gates first: they change the mannequin that the walk gates measure. Then look at
+3. `pinata check <dir>`. Exit 2: a load error, fix the lines in `summary.txt`. A `skin.json` that does not read
+   (not JSON, the wrong form, a pivot outside its sprite) is a load error too, printed as `skin.json: ...` lines,
+   whether or not `retarget.json` exists yet. Exit 1: work through the `FAIL` lines and hints from the top.
+   Static gates first: they change the mannequin that the walk gates measure. Then look at
    `sheet.png` (shape and palette), `walk.png` and `footprints.png` (feet) and `cloth.png` (cape and chains). Repeat
    until `automated gates: PASS`. Once `skin.json` and `retarget.json` exist, `check` also draws the idle in eight
    directions and fails `idleFootMisses` for the `export` gates `ground` and `drawn`; only `export` runs the others.
@@ -871,8 +873,9 @@ A cape is cloth: `motion.json` simulates it and the skin draws it by binding spr
 2. `motion.json`: `cape` (see cape above), both stand-ins in `exclude` and the hem joints in `bind`.
 3. `skin.json`: a sprite for each stand-in in every view, laid along the cloth's curve as it swings.
 
-A `loop` FAIL in `export` is usually the cloth: a cape that has not settled when the cycle ends; shorten it or raise
-its material's `damping`.
+A `loop` FAIL in `export` on a caped character is the cape's drawn edge changing by many pixels a frame: the cut's
+seam then exceeds the median of those steps. No cloth setting is sure to remove it. A change to `length`, `columns` or
+`damping` moves the cut, so change one thing, export again, and read the seam numbers.
 
 ### Drawing the skin
 
@@ -906,7 +909,7 @@ bone length, width, and which way its top faces) and the five view images. Draw 
   same row and to its right. Joints are the centres of the rounded ends, so the sprite extends past each pivot by
   about the end radius. The pivot distance should match "Bone (px)" in `guide.md`. The renderer rotates the sprite to
   the bone's angle in steps of 22.5 degrees, and the `guide.md` column "Top faces" says where its top row ends up
-  (hanging limbs: the front; a torso: the back; a foot: still the top).
+  (hanging limbs: the front; a torso: the back; a foot: still the top, or "as drawn" in the front and back views).
 - **Single-joint parts** (a helmet, a hand, a pauldron: both joints the same) take only `pivotA`, the part's centre,
   and are drawn upright, not rotated. `"upright": true` on a two-joint part draws it as it stands on screen, with
   `pivotB` in the same column as `pivotA` and below it.
@@ -942,10 +945,15 @@ back-right, `back` for back.
   foot capsule, projected from the ground), in at most 5% of the planted foot-frames. What is drawn over the foot
   does not count. Fix it in the foot sprites' pivots:
 
-1. In the side views, a foot sprite's bottom row should lie about the foot's radius (half its "Width", in `guide.md`)
-   below its pivot row. Moving the `pivotA` and `pivotB` rows down by one (a higher row number) draws the foot one
-   pixel higher; in the front and back views the foot is drawn end-on and a row can move it the other way. Change by
-   one and run again.
+1. A foot sprite's `pivotA` and `pivotB` rows set its height. Measured on the idle's frames, in every view and for
+   both feet: one row more draws the foot's lowest row exactly one pixel higher, one row less exactly one pixel lower,
+   and the other foot does not move. The sprite's bottom row (the last with an opaque pixel) is the sole and stands
+   `bottom row - pivot row` pixels below the ankle, so aim the sole at the ground. Read the failing line's `below` or
+   `above` and move both rows by about that many. An `upright` sprite's rows are the file's own rows, along its bone,
+   and move it the same way. The rule needs room: a pivot on the sprite's first or last row cannot move past it, so add
+   a transparent row. A foot is the capsule from a leg's ankle to its toe in `rig.json`. In the `front` and `back`
+   views, where the foot is seen end-on, it is drawn as it is in the file (an `upright` sprite stands up), not turned.
+   In the `frontSide`, `side` and `backSide` views it is turned with its bone.
 2. A view's two directions share its two foot sprites, swapped: one direction draws `footL` for the far foot and
    `footR` for the near one, the other the reverse. When one direction passes and its mirror fails, move the sprite of
    the failing foot by one row and read both directions' lines again; the two feet stand at different pitches, so aim

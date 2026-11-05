@@ -29,6 +29,7 @@ import type { RootState } from '../motion/script.ts'
 import { pageCamera } from '../page/cast.ts'
 import { fitFlags, formatFlag } from '../style/fit.ts'
 import { renderSkinned } from '../style/skins.ts'
+import { footNames, isEndOnView } from '../style/feet.ts'
 import { stylize } from '../style/stylize.ts'
 import { ROOT } from '../cli/paths.ts'
 import { messageOf } from './io.ts'
@@ -91,6 +92,7 @@ function boxAcross (camera: Camera, pose: Pose, part: Extract<Part, { shape: 'bo
 
 function guide (character: Character, out: string, io: Io): void {
   const rest = restPose(character.mannequin)
+  const feet = footNames(character.mannequin, character.rig)
   const lines: string[] = [`# ${character.name}: drawing guide`, '',
     `Each view at ${HEIGHT_PX} px tall, the camera ${ELEVATION_DEG} degrees above the horizon. Positions are pixels ` +
     'from the top-left of the view image; "top faces" is where a two-joint sprite\'s top row ends up on screen in ' +
@@ -122,7 +124,8 @@ function guide (character: Character, out: string, io: Io): void {
       const dx = b.x - a.x
       const dy = b.y - a.y
       const bone = Math.hypot(dx, dy)
-      const top = bone < 0.5 ? 'end-on (draw a compact blob)' : compass(dy, -dx)
+      const endOn = bone < 0.5 ? 'end-on (draw a compact blob)' : compass(dy, -dx)
+      const top = isEndOnView(view) && feet.includes(part.name) ? 'as drawn (a foot is not turned here)' : endOn
       const cells = [part.name, `${part.a} -> ${part.b}`, at(a), at(b), bone.toFixed(1), width, top]
       lines.push(`| ${cells.join(' | ')} |`)
     }

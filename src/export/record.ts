@@ -16,6 +16,7 @@ import { FPS, pageEnvironment, pageSecondary, raisedRoot } from '../page/cast.ts
 import type { CastOptions } from '../page/cast.ts'
 import { clonePainting, freshPainting, paintSprite, spriteBox } from '../page/sprite.ts'
 import type { Painting, Skinned, Sprite } from '../page/sprite.ts'
+import { footNames, legFootParts } from '../style/feet.ts'
 import { jointsOf } from '../page/walker.ts'
 import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
@@ -297,10 +298,8 @@ function turned (m: Moment, by: number): Moment {
   return { ...m, joints, curves, yaw: m.yaw + by }
 }
 
-function footParts (subject: Subject, leg: Leg): string[] {
-  return subject.member.mannequin.parts.filter(part => {
-    return part.shape === 'capsule' && part.a === leg.ankle && part.b === leg.toe
-  }).map(part => part.name)
+export function footParts (subject: Subject, leg: Leg): string[] {
+  return legFootParts(subject.member.mannequin, leg)
 }
 
 function lowestOf (pixels: Iterable<number>, box: Camera): Sole | undefined {
@@ -374,7 +373,8 @@ function drawFrame (
   const by = yawOf(direction) - EAST
   const m = turned(frames[k], by)
   const placed = { joints: m.joints, curves: m.curves, anchor: m.position, yaw: m.yaw }
-  const sprite = paintSprite(subject.look, painting, box, placed, { painter: 'strip', footprints: grounded })
+  const feet = footNames(subject.member.mannequin, subject.member.rig)
+  const sprite = paintSprite(subject.look, painting, box, placed, { painter: 'strip', footprints: grounded, feet })
   const travel = k === 0 ? [0, 0] as [number, number] : travelOf(box, frames[k - 1].position, m.position, by)
   return { image: sprite.image, sector: sprite.sector, travel, feet: feetOf(subject, m, sprite, box) }
 }
@@ -408,7 +408,7 @@ function drawerOf (subject: Subject, frames: Moment[], box: Camera, grounded: bo
   }
 }
 
-function canvasOf (subject: Subject): Camera {
+export function canvasOf (subject: Subject): Camera {
   const box = spriteBox(subject.look, SPRITE_PER_METRE)
   const room = Math.ceil(box.width * CANVAS_ROOM)
   const width = box.width + 2 * room

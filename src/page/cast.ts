@@ -7,6 +7,7 @@ import { DEFAULT_JUMP_KIND } from '../mocap/jump.ts'
 import type { JumpKind } from '../mocap/jump.ts'
 import type { Pose } from '../motion/pose.ts'
 import type { RootState } from '../motion/script.ts'
+import { footNames } from '../style/feet.ts'
 import { freshPainting, pageCamera, paintSprite, spriteBox } from './sprite.ts'
 import type { Painting, Skinned, Sprite } from './sprite.ts'
 import type { Hints } from './dom.ts'
@@ -88,6 +89,7 @@ type Saying = { text: string, until: number }
 type Character<K> = {
   name: string
   look: Skinned
+  feet: string[]
   database: MotionDatabase
   walker?: Walker
   secondary: Secondary
@@ -174,7 +176,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
         ticks: 0
       }
       const secondary = pageSecondary(cast[i], options)
-      return [{ name: cast[i].name, look: look as Skinned, database, secondary, ...fresh }]
+      const feet = footNames(cast[i].mannequin, cast[i].rig)
+      return [{ name: cast[i].name, look: look as Skinned, feet, database, secondary, ...fresh }]
     })
     .slice(0, options.count)
   const heightOf = (c: Character<K>): number => Math.max(...Object.values(c.database.options.rest).map(p => p[1]))
@@ -261,7 +264,8 @@ export function createCast<K> (options: CastOptions): Cast<K> {
     const [x, , z] = frame.root.position
     const anchor: Vec3 = [x, anchorHeight(frame), z]
     const placed = { joints: frame.joints, curves: c.secondary.curves(), anchor, yaw: frame.root.yaw }
-    const sprite = paintSprite(c.look, c.painting, spriteBox(c.look, spritePerMetre), placed, options)
+    const box = spriteBox(c.look, spritePerMetre)
+    const sprite = paintSprite(c.look, c.painting, box, placed, { ...options, feet: c.feet })
     c.sprite = { ...sprite, frame }
     return c.sprite
   }

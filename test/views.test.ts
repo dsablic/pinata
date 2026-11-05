@@ -123,7 +123,7 @@ test('eight-direction sprites may be drawn upright, reuse another sprite, and se
   const read = validateSkin(skin)
   assert.deepEqual(read.errors, [])
   const front = read.value!.views!.front.parts.thighR
-  assert.deepEqual(front, { rows: [b + d + f, a + c + e], pivotA: [0, 1], pivotB: [2, 1] })
+  assert.deepEqual(front, { rows: [b + d + f, a + c + e], pivotA: [0, 1], pivotB: [2, 1], upright: true })
   assert.deepEqual(read.value!.views!.back.parts.thighR, { ...front, layer: 2 })
   assert.deepEqual(read.value!.views!.back.parts.thighL, front)
   const loop = structuredClone(base)

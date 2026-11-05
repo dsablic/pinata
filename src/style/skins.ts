@@ -13,6 +13,7 @@ import type { Rotated } from './rotsprite.ts'
 import { drawOrder } from './order.ts'
 import { turnBetween, turnToWorld } from '../world/yaw.ts'
 import { endOf, paintStrip } from './strip.ts'
+import { endOnAngle, isEndOnView, soleDrop } from './feet.ts'
 
 export type SkinnedOptions = {
   mannequin: Mannequin
@@ -25,6 +26,7 @@ export type SkinnedOptions = {
   anchors?: Map<string, [number, number]>
   curves?: Record<string, Vec3[]>
   footprints?: boolean
+  feet?: readonly string[]
   painter?: 'strip'
   order?: string[]
   yaw?: number
@@ -134,12 +136,28 @@ function snapped (o: SkinnedOptions, at: Vec3, key: string): Snapped {
 }
 
 function turned (
-  o: SkinnedOptions, name: string, a: Snapped, b: Screen, length: number, rest: number
+  o: SkinnedOptions, name: string, a: Snapped, b: Screen, length: number, rest: number, endOn: number | undefined
 ): Array<[number, number]> {
-  const angle = snapAbout(Math.atan2(b.y - a.y, b.x - a.x), rest, o.angles?.get(name))
+  const angle = endOn ?? snapAbout(Math.atan2(b.y - a.y, b.x - a.x), rest, o.angles?.get(name))
   o.angles?.set(name, angle)
   const { cos, sin } = exactTrig(angle)
   return [a.pixel, [a.pixel[0] + cos * Math.max(1, length), a.pixel[1] + sin * Math.max(1, length)]]
+}
+
+type Footing = { endOn: number | undefined, drop: number }
+
+function footingOf (
+  o: SkinnedOptions, part: Part, length: number | undefined, shown: Shown, choice: ViewChoice | undefined
+): Footing {
+  const { sprite, unmirrored } = shown
+  const none = { endOn: undefined, drop: 0 }
+  if (length === undefined || sprite === undefined || !o.feet?.includes(part.name)) return none
+  const endOn = choice !== undefined && isEndOnView(choice.view) ? endOnAngle(sprite) : undefined
+  return { endOn, drop: sprite.upright === true ? 0 : soleDrop(unmirrored ?? sprite) }
+}
+
+function lowered (points: Array<[number, number]> | undefined, drop: number): Array<[number, number]> | undefined {
+  return points?.map(([x, y]) => [x, y + drop])
 }
 
 type Snapped = Screen & { pixel: [number, number] }
@@ -156,7 +174,8 @@ function stripPlacements (o: SkinnedOptions): Placement[] {
   const found: Placement[] = []
   for (const part of o.mannequin.parts) {
     const single = part.a === part.b
-    const { sprite, span } = spriteFor(o, part.name, single, choice)
+    const shown = spriteFor(o, part.name, single, choice)
+    const { sprite, span } = shown
     if (sprite === undefined || sprite.hidden === true || sprite.rows === undefined || sprite.pivotA === undefined) {
       continue
     }
@@ -165,23 +184,26 @@ function stripPlacements (o: SkinnedOptions): Placement[] {
     const length = single ? undefined : steadyLength(arcLength(o, part, a, b), o.lengths?.get(part.name))
     if (length !== undefined) o.lengths?.set(part.name, length)
     const curve = single ? undefined : o.curves?.[part.b]
-    const points = single || length === undefined
+    const { endOn, drop } = footingOf(o, part, length, shown, choice)
+    const laid = endOn === undefined ? length : span
+    const points = single || laid === undefined
       ? undefined
       : curve === undefined
-        ? turned(o, part.name, a, b, length, restAngle(o, part, choice))
+        ? lowered(turned(o, part.name, a, b, laid, restAngle(o, part, choice), endOn), drop)
         : curve.map((at, k) => snapped(o, at, `${part.b}#${k}`).pixel)
+    const level = choice?.mirror === true ? -drop : drop
     found.push({
       name: part.name,
       joints: [part.a, part.b],
       ...(sprite.layer === undefined ? {} : { layer: sprite.layer }),
       rows: sprite.rows,
-      pivot: sprite.pivotA,
+      pivot: [sprite.pivotA[0], sprite.pivotA[1] + level],
       anchor: a.pixel,
       angle: 0,
       depth: (a.depth + b.depth) / 2,
-      ...(points === undefined || length === undefined
+      ...(points === undefined || laid === undefined
         ? {}
-        : { points, lay: layOf(length, a, b, curve, points) }),
+        : { points, lay: layOf(laid, a, b, curve, points) }),
       drawn: span
     })
   }

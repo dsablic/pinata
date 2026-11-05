@@ -987,6 +987,35 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   seen from the front) has a rest angle from a very short projected vector, as its raw angle does.
 - A part's kept angle belongs to the view sector it was snapped in: when the sector changes the kept angles are
   dropped, so the hysteresis band never holds an angle that is off the new view's rest grid.
+- Feet (`feet.ts`, strip painter only): a foot is a part of a leg's ankle-to-toe capsule, taken from the rig
+  (`footNames`: `legsOf(rig)`, then the mannequin's capsule parts from `leg.ankle` to `leg.toe`). The painter is given
+  the names as an option, by the page's cast and by the recording. A rule from geometry (a part ending at the lowest
+  joint of the rest pose) was tried first: it caught shins and tarsi wherever the ankle is level with the toe and broke
+  when a joint lay below the toes, so shins are drawn as any other part. Two rules make a foot sprite's pivot rows
+  exact, a row more drawing the foot one pixel higher in every view. They came from measuring, for every example and
+  exit-test skin, view and foot, the lowest drawn row of the idle after moving the pivot rows by one: 59 of 282 moves
+  did not move the sole by one pixel in the stated direction (front 31 of 40, back 20 of 40, the tilted views 8 of 136,
+  the side view none), the guide's "may move it the other way in the front and back views".
+  - Levelled sole: the sprite is turned about the pixel of its sole row (the last row with an opaque pixel) under the
+    ankle, and that point is set `sole row - pivot row` pixels below the ankle on the screen's vertical. A pivot row
+    was a distance along the rotated bone's normal, `cos(tilt)` pixels of height: on a foot tilted 17 degrees the
+    lowest row of the sloped sole is a corner pixel that a move of 0.96 px leaves where it was in about one move in
+    twenty (no rotation of a raster is exact under a shift that is not a whole pixel). The point the sprite turns
+    about moves by `drop * sin(tilt)` sideways against the old rule, 0 to 1 px for the example feet. The mirrored
+    sprite (flipped rows) takes the drop from the unflipped one, up or down accordingly. Not for `upright` sprites,
+    whose pivot rows run along the bone. Used in the side and the two three-quarter views, where the foot is turned
+    with its bone.
+  - End-on views: in the front and back views the foot is seen end-on, its bone projects to a 0.5 to 2.3 px vector of
+    arbitrary angle (a smith's back feet were drawn at 135 and 0 degrees, one upside down), and rotating about the rest
+    angle only fixed that angle. The view decides, not the length: a length threshold flipped feet between turned and
+    as authored 12 to 38 times in a walk take. In these views the foot is drawn as authored, unturned (an `upright`
+    sprite stood up at 90 degrees), at the sprite's own span instead of the short projected length (a foot sole inside
+    a squeezed bone span moved 0.73 px a row), and placed by the sole rule. The front and back views are never
+    mirrored, so there is no mirrored form. In the front and back views a foot keeps one angle through walk and run (no
+    change in any of the ten skins). With levelling alone every example is exact and the upright smith feet are not
+    (4 of 104 moves); with the end-on rule alone the tilted views stay inexact. The rule is for feet: applied to
+    every part it redrew the wizard's hat tip as a flat blob. The page's rotating painter (the `skin` command) is not
+    changed: its sheets stay as they were.
 - Draw order (`drawOrder`): layer first, then farther before nearer, but two parts keep last frame's order unless
   their depths differ by more than 3 cm, so parts at nearly the same depth do not swap back and forth. Level parts
   keep the mannequin's order, the later drawn above: authoring order is the structure (helmet after head, face after
@@ -1231,12 +1260,19 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   side, the back three-quarter view, and the back. Left-facing directions mirror them.
 - Eight-direction parts may be `upright`: a two-joint sprite drawn standing, joint A at the top and B straight
   below it. The reader turns it to lie along +x from A to B, its top row being the left of travel: the upright
-  sprite's right-hand column becomes the top row.
+  sprite's right-hand column becomes the top row. The loaded sprite keeps `upright: true`: the strip painter draws an
+  end-on foot (below) at the angle that stands the sprite up.
 - A skin file of the wrong form gets an error that gives the form expected with a tiny example: the five-view form
   (`"views": { "front": { "parts": { ... } }, ... }`) for a one-view file given where eight directions are needed
   (`export` refuses a one-view skin by naming it), the one-view form for a `view` that is not `side-right`, the views
   put at the top level or in a part, a view without `parts`, a part that is not an object, rows and pivots that are
   not arrays (`[2, 5]`). A first exit-test author, without the guide, met these one at a time.
+- A pivot outside its sprite is an error from the reader naming the part, the pivot and the sprite size. `check` reads
+  `skin.json` itself whenever the file exists, before it records, with the character loader's own JSON reader, so a
+  file that is not JSON, of the wrong form or with a pivot outside its sprite is a load error (exit 2, `skin.json:
+  <path>: <message>` lines, as for the other files) and not a stack trace or the idle foot gate's `NaN` line. It does
+  not wait for `retarget.json`: a skin that cannot be read is an author failure whether or not the gate could run, and
+  the idle foot gate stays skipped until both files exist.
 - `layer` draws parts on a higher layer over lower ones whatever their depth (default 0).
 - `from` reuses another sprite, by part name in the same view or as `view.part`; the copy keeps its own `layer`.
   Chains of references are followed; a missing or circular reference is an error.
@@ -1373,6 +1409,16 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   the span. The offset does not spare planted feet: a planted foot's own difference is spread over the stance, so a foot
   slides by up to its share of the difference per frame; the feet gate is measured before and after in the plan's batch
   E results.
+- A caped character's seam is the open part of the loop gate. Closing leaves the pose-space step at the seam equal
+  to the interior steps (15.8 against 15.7 mm over all points, the assassin's first caped walk), but in pixels the seam
+  step is 1.4 times the interior mean (226 against 159 changed pixels, `right`; 1.25 times with the cape hidden: the
+  seam step more often shifts the whole figure by a pixel, 31% of seam pairs against 13% of interior ones). The
+  gate's bound is the median step, and a cape's steps vary from 70 to 300 px, so a closed cut passes one direction
+  in about three and the chooser needs all eight. Measured and ruled out: the painter's state (three laps of the
+  closed cycle draw the same seam every lap), a cloth that has not settled (its distance to one cycle later has no
+  trend over the window), the cloth's own period (the gait's mismatch, 25 to 45 mm, is the larger part), the cloth's
+  damping (2.4 to 16: three to four of eight directions still fail), and more candidates (400 instead of 40: the
+  same walk fails the same five directions). No principled change is recorded; the guide says so.
 - The candidates share the frames before their start, which closing leaves as recorded, so those frames are drawn
   once per direction and the painter's state (the hysteresis of angles, lengths, anchors, the order and the view
   sector) is copied at each frame passed. A candidate is drawn from a copy of the state at its start, over its span
@@ -1478,6 +1524,16 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   share two sprites, swapped, so no pivots satisfied the four feet.
   Angle steps are taken about the part's rest angle (the painter, below). Anchor rounding was measured: rounding
   instead of flooring left the seven skins worse (the hysteresis band is for a floor), so it stays a floor.
+- Pivot response (`pivots.ts`, a declared authoring gate, run on the examples by `test/pivots.test.ts`): for each foot
+  sprite of each view, the pivot rows moved by one in each direction, the lowest drawn row of both feet in the idle's
+  frames of each direction of that view moves by exactly one pixel, up for a row more, for the foot using that sprite
+  (the counterpart in a mirrored direction) and not at all for the other. The feet are the rig's: for each leg, the
+  capsule parts from its ankle to its toe (`footNames`, shared with the painter and the recording), not a name test.
+  Each move is made on a copy of the skin that replaces the one sprite with a shifted clone, so pivot arrays shared by
+  sprites (a `from` copy) never move together and the skin is left as it was. A foot with no room to move its rows by
+  one (a pivot on the sprite's edge row, which would leave the sprite) is returned as blocked, and the example test
+  fails on any: an author pads the sprite with a transparent row. The hint of `ground` states the rule. The six
+  exit-test skins pass the same measurement outside the repository (they are not fixtures).
 - Drawn: for each view of the idle (front, frontSide, side, backSide, back), each foot must have a visible pixel (the
   renderer's owner map, so not one that is covered) in at least one frame of at least one of that view's directions.
   In a side view mirroring swaps near and far, so each foot is near in one of its two directions; front and back have

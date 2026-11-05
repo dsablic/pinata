@@ -226,8 +226,9 @@
         ".LLl...",
         "LLLLLl.",
         "lLLLLLL",
-        ".llllll"
-      ], "pivotA": [2, 2], "pivotB": [5, 2] },
+        ".llllll",
+        "......."
+      ], "pivotA": [2, 3], "pivotB": [5, 3] },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",

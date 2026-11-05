@@ -1,7 +1,9 @@
 import { existsSync, rmSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { formatCharacterErrors, loadCharacter } from '../formats/character.ts'
+import { formatCharacterErrors, loadCharacter, readJson, tag } from '../formats/character.ts'
 import type { Character } from '../formats/character.ts'
+import { checkSkin, validateSkin } from '../formats/skin.ts'
+import type { ValidationError } from '../formats/validate.ts'
 import { simulateCharacter } from '../motion/character.ts'
 import { record } from '../export/record.ts'
 import { GROUND_PX } from '../export/gates.ts'
@@ -78,8 +80,20 @@ function clearReport (out: string): void {
   }
 }
 
+const SKIN_FILE = 'skin.json'
+const RETARGET_FILE = 'retarget.json'
+
 function isSkinned (dir: string): boolean {
-  return ['skin.json', 'retarget.json'].every(file => existsSync(join(dir, file)))
+  return [SKIN_FILE, RETARGET_FILE].every(file => existsSync(join(dir, file)))
+}
+
+function skinErrors (character: Character): string {
+  if (!existsSync(join(character.dir, SKIN_FILE))) return ''
+  const errors: ValidationError[] = []
+  const input = readJson(character.dir, SKIN_FILE, errors)
+  const read = input === undefined ? undefined : validateSkin(input)
+  const crossed = read?.value === undefined ? [] : checkSkin(read.value, character.mannequin)
+  return formatCharacterErrors([...errors, ...tag(SKIN_FILE, [...(read?.errors ?? []), ...crossed])])
 }
 
 function idleCheck (dir: string): Check {
@@ -154,6 +168,11 @@ export function runCheck (argv: string[], io: Io, invoke: Invoke): number {
     const loaded = loadCharacter(args.dir)
     if (loaded.value === undefined || loaded.errors.length > 0) {
       writeError(args, formatCharacterErrors(loaded.errors), io)
+      return 2
+    }
+    const skin = skinErrors(loaded.value)
+    if (skin !== '') {
+      writeError(args, skin, io)
       return 2
     }
     return analyse(loaded.value, args.out, io)

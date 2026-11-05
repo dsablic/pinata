@@ -1,12 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { caseFailures, declareGate, declaredGates } from '../src/checks/gate-spec.ts'
+import { AUTHORING_GATES, caseFailures, declareGate, declaredGates } from '../src/checks/gate-spec.ts'
 import { checksOf, GATES } from '../src/export/report.ts'
 import { feetFrame, planted, recordingOf, trackOf } from './export-fixtures.ts'
 import './export-gate-specs.ts'
+import './pivot-gate-specs.ts'
 
-test('every export gate is declared with a failing and a passing case', () => {
-  assert.deepEqual(declaredGates().map(spec => spec.gate).sort(), [...GATES].sort())
+test('every export gate and every authoring gate is declared with a failing and a passing case', () => {
+  assert.deepEqual(declaredGates().map(spec => spec.gate).sort(), [...GATES, ...AUTHORING_GATES].sort())
   for (const spec of declaredGates()) {
     assert.ok(spec.frame !== '' && spec.threshold !== '', `${spec.gate} names its frame and threshold`)
     assert.ok(spec.bad.length > 0 && spec.good.length > 0, `${spec.gate} has both kinds of case`)

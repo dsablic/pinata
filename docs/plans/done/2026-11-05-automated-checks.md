@@ -88,3 +88,6 @@ batch either passes them or says exactly what failed.
   - loop: `<=` to `>` and `<=` to `<` on the seam broke the seam cases; inverting the repeated-seam rule broke four
     cases; `median > 0` to `>= 0` broke the unmeasured case; loop for every track broke the non-loop case; idle no
     longer setting `holding` broke the idle case.
+- **Judge runner gate, real panel.** The Phase 1 exit test's panel (three characters' idle frames matched to their
+  prompts) ran through `npm run judge -- run` end to end with no manual step: three judges, 9 of 9 right, about $0.06.
+  Every gate of this plan is met.

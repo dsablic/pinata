@@ -26,7 +26,7 @@ artefacts, in [`docs/plans/done/`](plans/done).
 
 ## Next: automated checks, then the Phase 1 exit test
 
-[Plan](plans/2026-11-05-automated-checks.md), gates fixed: `npm run verify` (every check and the byte-identical
+[Plan](plans/done/2026-11-05-automated-checks.md), gates fixed: `npm run verify` (every check and the byte-identical
 baselines in one command), a style lint, every example through its gates, a judge runner that starts the judges
 itself, and gates declared with failing and passing cases. Then Phase 1's exit test.
 

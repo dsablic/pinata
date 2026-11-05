@@ -79,6 +79,17 @@ question.
 Decide the pass rule (for example "a picked in at least 50% of picks, controls neutral in at least 2/3") in the plan
 before running the panel, as for every other gate.
 
+## Rubric panels
+
+To rate animations on a rubric, give the spec `"kind": "rubric"` and `items` (`{ id, a, b, control }`, with `b` and
+`control` optional): a pair is rated both orders, one above the other; an item with only `a` is one animation rated
+alone. Images are strips read left to right, then top to bottom. A judge rates every dimension (fluidity, weight,
+anticipation, secondary, environment, readability, appeal) 1 to 5 with the anchors in `questions.md`, and for a pair
+says which it would ship. `score` prints, per pair and dimension, the mean ratings and how often `a` was above,
+below or level with `b`, and per single animation its mean ratings; a control (`a` and `b` the same animation)
+gives the rubric's stability as its mean rating difference. `npm run benchmark -- build` writes the animation
+benchmark's validation panel; `npm run benchmark -- gate <key> <answers>...` reads its gate from the judges' answers.
+
 ## Labelled panels
 
 To ask which of several labels an image has (for example the direction a character faces), give the spec

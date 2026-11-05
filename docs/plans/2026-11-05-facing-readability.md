@@ -227,3 +227,56 @@ Wizard, walk (rows: true direction; columns: named direction):
 | back-left | 1 | . | . | . | . | 2 | . | . | . |
 | left | . | . | . | . | . | . | 3 | . | . |
 | front-left | . | 1 | . | . | . | . | . | 2 | . |
+
+### Batch B: direction checks in the tool
+
+Built for any character, not the examples.
+
+- **Preview.** `pinata skin preview` (and the MCP `skin` tool) writes `idle-directions.png`: the eight idle frames as
+  export draws them, labelled, enlarged 6x with nearest-neighbour.
+- **Checks in `pinata check`,** each a declared authoring gate with failing and passing cases
+  (`test/direction-gate-specs.ts`), each naming the view, the part and the cue to draw. Defined and reasoned in
+  [`design.md`](../design.md), "Direction checks".
+
+| Gate | Definition | Threshold and reason |
+|---|---|---|
+| `threeQuarterViewFindings` | head parts (parts whose joints all lie above the shoulders) and torso parts of `frontSide` against `front` and `side`, of `backSide` against `back` and `side`, each also against the neighbour mirrored; sprite pixels aligned on `pivotA`, compared in colour | at least 8 differing pixels per region (the smaller of neighbour and mirror): two 2-pixel eyes moved one column, the least change that shows a shifted face or a smaller far eye |
+| `backViewFaceFindings` | colours of the front one-joint head sprites that are not on the outline ring of any head part and not in the rear half of the side one-joint head sprites; counted in the `back` and `backSide` head parts | at most 3 px: fewer than a 2 by 2 eye |
+| `sideProfileFindings` | `side` head sprites against their own mirror about the centre of their opaque bounding box | at least 4 differing pixels: a nose two pixels tall present on one side and absent on the other |
+
+- **Which examples fail which checks** (`pinata check`, a new author failure for each, so `npm run examples` reports
+  them):
+  - the head region is every part whose joints all lie above the shoulders, hoods, hats, scarves and plumes included.
+    With it the knight's `threeQuarterViewFindings` passes, because the plume differs in every view and the sum
+    over the head's parts reaches 8 while the backSide helmet is still 0 px from the back helmet; the wizard's
+    `backViewFaceFindings` failed on the hat band and the rogue's on the neck scarf until face colours were taken
+    from the one-joint head parts only and the outline ring of every head part was excluded (design.md);
+  - wizard: `threeQuarterViewFindings` (backSide robe is 0 px from the back robe: a plain column in both);
+  - rogue and dwarf pass all three. Neither back-face nor profile check fails any example: the wizard's white
+    patch and the dwarf's orange patch use colours the hair or the rear half of their side heads also use, and no colour
+    rule separates a beard from white hair, so those are for `review`. The front-right misreads (a visor or face
+    centred, a three-quarter head 8 or more pixels from the front head) are also not caught: 8 px is what a cue needs,
+    not what a judge needs, and `review` measures the latter.
+- **Skin edits made for these checks.**
+  - `examples/knight/skin.json`, `backSide` helmet: redrawn as a back three-quarter view, the dome shifted a pixel
+    toward the facing side so its near side is wider, a dark seam off the centre line and a cheek guard edge on the
+    near side; no face.
+  - `examples/wizard/skin.json`, `backSide` robe: redrawn as a back three-quarter view, a dark back seam off the
+    centre toward the far side and the far side darkened a step, so the near side reads wider; no beard (the head
+    already had none).
+  - Neither changes the rendering panel or the gates baselines (both steps report the baseline unchanged), so
+    nothing was accepted.
+- **Thresholds.** The thresholds (8, 3 and 4 px) were set during the build, from the size of the smallest cue and
+  before any fresh character was judged. Batch C, which judges characters that fresh agents draw, is their test.
+- **Not measured, never passed.** A check that cannot measure emits no gate and `check` lists it as not measured
+  with the reason; a missing sprite or `pivotA` in a compared view is a finding.
+- **`pinata review`** (and the MCP tool `review`): the blind direction panel on the author's character through the
+  judge runner, three judges, idle frames and with `--walk` the widest-stride walk frames; prints the share right per
+  frame kind against the gate, each misread direction with what it was named, and the cue. Its help and the guide say
+  it costs money. Exit 0 gates met, 1 a gate missed, 3 a judge failed (no score), 2 refused; the cost is
+  printed in every case. Tested with an injected `Ask` and a stubbed recorder, `--walk` included.
+- **Real run:** `pinata review examples/wizard` (idle only): 9 of 24 right, 38% (front-right 0 of 3, named
+  front-left 2 and front 1; right 0 of 3, named left 2; left 0 of 3; back-left 1 of 3; front-left 1 of 3; back-right
+  2 of 3; back 2 of 3). Cost $0.095 (opus $0.067, sonnet $0.027, haiku $0.002), 25 s.
+- **Guide.** The skin section has the direction checklist and how to use preview, check and review.
+- **MCP.** Commands may be asynchronous; the server answers requests concurrently and ends after the last reply.

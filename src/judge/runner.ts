@@ -1,6 +1,5 @@
 import { extractAnswers, problemsWithAnswers } from './answers.ts'
-import type { ChoiceKey } from './choice.ts'
-import type { PanelKey } from './packet.ts'
+import type { AnyKey } from './answers.ts'
 
 export type Reply = { text: string, durationMs: number, costUsd?: number }
 export type Ask = (model: string, prompt: string, cwd: string, timeoutMs: number) => Promise<Reply>
@@ -27,7 +26,7 @@ function spentSoFar (durationMs: number, costUsd: number | undefined, attempts: 
   return { durationMs, ...(costUsd === undefined ? {} : { costUsd }), attempts }
 }
 
-export async function runJudge (ask: Ask, model: string, cwd: string, key: PanelKey | ChoiceKey): Promise<JudgeRun> {
+export async function runJudge (ask: Ask, model: string, cwd: string, key: AnyKey): Promise<JudgeRun> {
   const started = Date.now()
   const items = Object.keys(key.items)
   let [durationMs, attempts] = [0, 0]
@@ -61,7 +60,7 @@ export async function runJudge (ask: Ask, model: string, cwd: string, key: Panel
 }
 
 export async function runJudges (
-  ask: Ask, cwd: string, key: PanelKey | ChoiceKey, models: readonly string[] = MODELS
+  ask: Ask, cwd: string, key: AnyKey, models: readonly string[] = MODELS
 ): Promise<Outcome[]> {
   return Promise.all(models.map(async (model): Promise<Outcome> => {
     try {
@@ -71,4 +70,22 @@ export async function runJudges (
       return { model, failure: err instanceof Error ? err.message : String(err) }
     }
   }))
+}
+
+export function describeOutcome (outcome: Outcome): string {
+  const spent = outcome.run ?? outcome.spent
+  const failed = outcome.run === undefined ? `FAILED: ${outcome.failure}` : ''
+  if (spent === undefined) return `judge ${outcome.model}: ${failed}`
+  const { durationMs, costUsd, attempts } = spent
+  const cost = costUsd === undefined ? 'cost unknown' : `$${costUsd.toFixed(3)}`
+  const used = `${(durationMs / 1000).toFixed(0)} s, ${cost}, ${attempts} attempt${attempts === 1 ? '' : 's'}`
+  return `judge ${outcome.model}: ${failed === '' ? used : `${failed} (${used})`}`
+}
+
+export function describeCost (outcomes: Outcome[]): string {
+  const costs = outcomes.map(outcome => (outcome.run ?? outcome.spent)?.costUsd)
+  const total = costs.reduce((sum: number, cost) => sum + (cost ?? 0), 0)
+  const unknown = costs.filter(cost => cost === undefined).length
+  const gap = unknown === 0 ? '' : `, ${unknown} unknown`
+  return `cost: $${total.toFixed(3)} for ${outcomes.length} judges${gap}`
 }

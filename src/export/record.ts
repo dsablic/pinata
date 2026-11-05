@@ -1,5 +1,6 @@
 import { legsOf } from '../formats/rig.ts'
 import { FIVE_VIEW_FORM } from '../formats/skin.ts'
+import type { Skin } from '../formats/skin.ts'
 import type { Leg } from '../formats/rig.ts'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
@@ -74,6 +75,11 @@ const IDLE_PERIODS = 4
 const LOOPS: Partial<Record<Behaviour, Looping>> = {
   walk: { ...GAIT, window: 144, lengths: [12, 72], speed: WALK_SPEED },
   run: { ...GAIT, window: 96, lengths: [8, 48], speed: RUN_SPEED }
+}
+
+export function withSkin (subject: Subject, skin: Skin): Subject {
+  const { mannequin } = subject.look.skin
+  return { ...subject, look: { ...subject.look, skin: { mannequin, skin } } }
 }
 
 export function subjectOf (world: ReadWorld, name: string): Subject {

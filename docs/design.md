@@ -1571,6 +1571,91 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   under the root instead of each foot's own ground point) or a flipped comparison, not to restate the threshold. A
   registry without a framework is enough because a case is a closure.
 
+### Direction checks (`src/export/direction-cues.ts`, `src/tool/direction-checks.ts`, `test/direction-gate-specs.ts`)
+
+- Three authoring gates in `pinata check`, declared in the gate-spec registry with failing and passing cases:
+  `threeQuarterViewFindings`, `backViewFaceFindings` and `sideProfileFindings`. Each counts findings (threshold 0) and
+  its hint names the view, the part and the cue to draw (`DIRECTION_CUES`, one sentence per view, also used by
+  `review`). They run on any skinned character whose skin has the five views and whose rig has an arm; they need no
+  judge and no recording, so a run costs milliseconds.
+- They measure the skin's sprites, not the drawn frames: the sprites are what the author draws, so a finding names a
+  sprite to redraw, and a drawn frame mixes in the engine's pose, mirroring and occlusion. Two sprites are compared
+  aligned on `pivotA`, pixel by pixel in colour (a palette character is its colour, a transparent pixel is a value);
+  a mirror is the engine's own `mirrored`, so the comparison against the mirrored neighbour is the left-facing view
+  the engine would draw.
+- Regions come from the mannequin, not from part names. Parts that touch a limb joint of the rig, or lie wider than
+  the shoulders, are not body (arms, legs, mantles and carried weapons). Of the rest, the head is every part whose
+  joints all lie at or above the highest shoulder, one-joint parts and two-joint parts alike (a head, a helmet, a
+  beard, a hood, a hat, a plume, a neck scarf); the torso is a part whose middle lies between the pelvis and the
+  shoulders. The head's one-joint parts are its `features`: the blobs whose colours are the face's own. A rig without
+  arms has no shoulders to place the head against and gets no direction checks.
+- Nothing measured is never a pass. A check that cannot measure (a rig without arms, a skin that is invalid, unreadable
+  or has one view, a rig with no head part, a front face with no colour of its own) emits no gate; `check` lists
+  `direction checks not measured: <reason>` or `<gate> not measured: <reason>` in its header instead, because a gate
+  value of 0 reads as a pass. A sprite missing from a compared view, or one with no `pivotA` (a `hidden` sprite counts
+  as empty), is a finding ("has no sprite with a pivotA"), because comparing against nothing would count every pixel
+  as different or none as different.
+- Three-quarter views: the head parts and the torso parts of `frontSide` are compared with `front` and with `side`,
+  those of `backSide` with `back` and `side`, each also with the neighbour mirrored. The measure is the pixels that
+  differ, summed over a region's parts, the smaller of the neighbour and its mirror; a region needs at least 8. A
+  cue is a feature moved or resized: an eye two pixels tall that shifts one column changes 4 pixels, and a shifted
+  face moves two eyes, so 8 is the least change that can show a face shifted toward the facing side or a far eye
+  smaller than the near one. Below it the view is the neighbour by a stray pixel or two, and the judges named such
+  views as the neighbour. Summing over the parts lets a part that differs in every view (a plume) cover a main part
+  that does not; requiring the largest part to differ alone fails a hat that is rightly the same in every view, so
+  the sum stands and `review` is the check for that case.
+- Back views: the face colours are the colours the front view's features use that appear neither on the outline
+  ring of any front head part (a pixel with a transparent or outside 4-neighbour: the hair, the hood, the helmet's
+  rim, the edge of a hat or a scarf, which are those parts' own colours) nor in the rear half of the side view's
+  features (the columns left of `pivotA`: the back of the head, which every view shares). What remains is what only
+  the face uses. A `back` or `backSide` head part (a hood included) may carry at most 3 pixels of those colours,
+  fewer than a 2 by 2 eye or any other feature. The measure is blind to a face drawn in a colour that the hair also
+  uses (a white beard on white hair), because no colour rule can tell the two; `review` is the check for that.
+- Facing: a skin's side views are drawn facing right. The one-view form is `side-right`, and the view chooser draws
+  `side`, `frontSide` and `backSide` unmirrored for a right-facing direction and mirrors them for a left-facing one.
+  The rear half of the head is therefore the columns left of `pivotA`, with no need to read a facing from the skin.
+- Side views: each head part of `side` is compared with its own mirror about the centre of its opaque bounding box
+  (the first plus the last opaque column, an odd or an even width handled exactly), in colour; at least 4 pixels must
+  differ, a nose two pixels tall present on the facing side and absent on the other (2 + 2). The pivot plays no part,
+  so moving `pivotA` cannot make a symmetric head pass. A head that is its own mirror is a front face drawn narrow; a
+  one-pixel nose is below what a judge sees.
+- The gate names in the registry (`threeQuarterViews`, `backViewFace`, `sideProfile`) are those of the declared
+  specs; each check in `DIRECTION_CHECKS` carries its declared name beside the name it reports, and a test keeps the
+  two lists equal.
+- Thresholds come from the size of the smallest cue, not from the examples; the batch results name the examples that
+  fail them. The gates can fail an example: `npm run examples` then reports an author failure, and the check is not
+  loosened.
+
+### Direction sheet and review (`src/tool/direction-sheet.ts`, `src/tool/review.ts`)
+
+- `skin preview` writes `idle-directions.png`: the first idle frame of each direction as `record` draws it (the
+  frames the exporter and the judges use, with the previewed skin put in place of the character's file), each under a
+  label in a 3 by 5 pixel font (`src/diagnostics/pixel-text.ts`), enlarged 6 times with nearest-neighbour on the
+  judges' grey. It is written only with a five-view skin and a `retarget.json`; the summary says why when it is not.
+  `directions.png` is unchanged. The MCP `skin` tool lists the new file among those written.
+- `review` builds the direction panel of `src/export/direction-panel.ts` (the question, labels and items the
+  `direction-panel` script uses, so one wording serves both) from the author's character, lints it, writes it, and
+  asks three judges through `runJudges` in a fresh folder, as `npm run judge -- run` does. Its item ids and the panel
+  name share no word of three letters with each other, which the lint requires. It scores idle and walk
+  apart, from the same key, so a share is never mixed between the two frames. A direction is reported when any
+  judge got it wrong, worst first, with the true view's cue. Exit 0 means every gate of the plan's table was met
+  (idle at least 90% and each direction at least 2 of 3; walk at least 80% with `--walk`), 1 a gate missed,
+  2 a refusal, 3 a judge that did not answer: no score exists then, and 1 would read as a measured miss. The cost
+  of every judge, a failed one included (`describeCost` of the runner, with the judges and models taken from the
+  runner's `MODELS`), is printed in every case, because a failed run still spent money. `review` takes the recorder as
+  a parameter so a test can stub it: the real walk recording of a skinned character takes over a minute. The tests
+  cover the idle and walk scoring apart, the exit codes and the cost line with a stubbed recorder and an injected
+  `Ask`; nothing in them calls a judge.
+- The command's `run` may return a promise, so the MCP server answers requests asynchronously: a long review does
+  not hold up a ping, replies may arrive out of order (they carry their ids), as JSON-RPC allows, and the server ends
+  only after every pending reply has settled. A reply that cannot be written (a closed pipe) is logged, not thrown, a
+  handler that rejects is logged and does not hold the server, and a settled reply leaves the pending set. The agreement
+  test compares the synchronous commands only; `serve` takes the responder as a parameter so a test can hold one reply
+  back and see the other arrive first.
+- The `claude` judge processes and their temporary folders are tracked (`askClaude`, `withJudgeDir`); on SIGINT,
+  SIGTERM or exit the processes are killed and the folders removed, so an interrupted server or `review` leaves
+  neither behind.
+
 ## Judge panels (`src/judge/`)
 
 ### Packets (`packet.ts`)
@@ -1600,6 +1685,24 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   item is the stride's widest point, where the legs and the body's turn are most visible. Every frame goes to every
   judge, so a judge sees each character in each direction twice (idle, walk); elimination between the two frames
   can only raise the score, and the idle and walk shares are read apart by item id.
+
+### Rubric panels (`rubric.ts`)
+
+- A panel whose spec says `"kind": "rubric"` has `items` (`{ id, a, b?, control? }`): an item with `a` and `b` is a
+  pair of animations, shown in both orders one above the other; an item with `a` alone is one animation, rated alone
+  and shown once. A control has `a` and `b` and is a reference against itself.
+- Each image is a strip: frames in time order, left to right and then top to bottom, so a judge sees the motion as
+  frames. The questions text says so, with the frame rate, and gives a one-line anchor for every level of every
+  dimension (`DIMENSIONS`: fluidity, weight, anticipation, secondary, environment, readability, appeal). A judge
+  rates each dimension 1 to 5 for each animation and, for a pair, says which it would ship (`top`, `bottom`,
+  `cant_tell`). Ratings are whole numbers and every dimension is required, as in the pairwise kind's rating.
+- The score is per dimension: the mean rating of `a` and of `b` over both orders and all judges, and how often `a`
+  was rated above, below or level with `b`. Ties count against both, so a judge that cannot see a difference lowers
+  the share. A pair's mean rating difference is the mean over dimensions of the absolute difference between the two
+  means; the controls' mean of that is the rubric's stability. Position bias cancels because `a` is on top in
+  one order and at the bottom in the other.
+- The kind is routed by `isRubricSpec` and `isRubricKey` in `answers.ts`, `lint.ts` and `src/cli/judge.ts`; the other
+  kinds are untouched. The lint also asks for a control item.
 
 ### Runner and lint (`runner.ts`, `claude.ts`, `answers.ts`, `lint.ts`)
 
@@ -1647,6 +1750,76 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - A judge leaves a pair unseparated (neutral) when they answered cant_tell in both orders, or picked the same side,
   and so a different image, in each. Controls are scored by the share of neutral judges.
 - `leftShare` is the share of picks for the left image over all pairs: 0.5 means no position bias.
+
+## Animation benchmark (`src/benchmark/`, `src/cli/benchmark*.ts`)
+
+- **Fetching** (`itch.ts`, `benchmark-fetch.ts`): the itch.io references are free downloads, and a script can take
+  them: the game page gives a token, a POST to `download_url` gives the download page, a POST to each upload's
+  `file/<id>` gives a temporary storage URL. Every request has a timeout (30 seconds for a page, ten minutes for a
+  file). Redirects are followed by hand, https only, and the itch.io cookies are sent only to `itch.io` and its
+  subdomains, so a signed storage URL on another host never receives them. A download is refused when its
+  `content-length` is over the 200 MB cap, and again while streaming, so a missing or false length cannot fill memory.
+  Only a 429 or a 5xx is retried, after a growing pause; any other status, a timeout or a network error fails at once.
+  The upload list is read per `upload` element, so an id is never paired with another element's name; a downloaded
+  file name is reduced to safe characters and must resolve to a direct child of the target folder (`..` and empty
+  names are refused). The folder for the references is refused when it is inside the repository (real paths, so a
+  symlink does not hide it), and unknown options are refused.
+- **Archives** (`archive.ts`). The contents are listed first (`unzip -l`, `tar -tvf`; the listing is refused when it
+  cannot be read) and the archive is refused above 500 MB unpacked or 20 000 entries, or with an absolute or `..`
+  entry; only then is it extracted, with `unzip` or `tar` (which reads RAR) into a folder per reference outside the
+  repository; nothing from inside is run. The tree is walked with `lstat`: a symlink is never followed, it is skipped
+  and reported. A failed unpack is recorded for that reference in the manifest (`failed`, with the reason) and the
+  other references go on. Files that are macOS resource forks (`._*`, `__MACOSX/`) or fail to decode as PNG are
+  skipped and reported. The script exits 1 when a reference failed or has no files.
+- **Manifest.** Each page, author, licence, the licence text on the page (the `License` or `Asset license` row of the
+  page's information table, never a mention in the description) and whether it names the stated licence (`CC0` or
+  `Creative Commons Zero`), how the files were obtained (`script`, `by hand` when the archive was placed in the
+  folder, `existing` for the LPC layers copied from the calibration control), each file's size and SHA-256, and the
+  skipped files with their reasons. A reference that cannot be fetched is placed by hand in
+  `<folder>/<id>/archive/` and the script unpacks and verifies it.
+- **Timing.** The reference sheets carry no frame durations, so every reference plays at a stated default of 12 frames
+  a second, which is also the common rate. Piñata's export carries durations (24 frames a second); its right-facing
+  tag is resampled in time to 12 a second. A clip shows at most 16 frames, cropped to the union of its frames'
+  opaque pixels so the motion inside the cell is kept, and is laid out four frames to a row so a pair stays within the
+  judge lint's width limit. Characters are compared at their native pixel size: the references' and Piñata's
+  characters are within a few pixels of the same height, and no resampling touches the pixels.
+- **GIFs** (`gif.ts`): a small encoder for what is needed: one global palette (a channel step doubles until the
+  colours fit 256), LZW with table reset, looping, one delay for all frames (centiseconds, so 12 a second plays at
+  12.5).
+- **Degraded copies** (`degrade.ts`, `library.ts`), each changing one dimension and nothing else: the canvas size,
+  frame count and rate are the reference's (the library refuses a copy that differs), and the duration is equal. The
+  clips show frames at equal steps, so a frame held for several steps is repeated in the strip, and the questions text
+  says a repeated frame stays on screen for that many steps.
+  - Fluidity: frame `i` is replaced by frame `i - i % 2`: every second pose is dropped and the one before it is
+    shown for two steps.
+  - Environment: the feet region is the lowest four pixel rows counted up from the lowest opaque row over all frames
+    (found from the sprite, not from a share of the canvas), with every opaque pixel in them. It shifts sideways by
+    `min(i, n - i, most)` pixels towards the side with more room (most is four, at most half the frames, and at most
+    the room), so the offset is a triangle that starts at 0 and ends one pixel from 0: a back-and-forth slide with no
+    pop at the loop, nothing growing and no pixel leaving the canvas. A clip with no room is refused.
+  - Anticipation: the strike is the neighbouring pair with the largest share of changed pixels, the wind-up is the
+    frames before the later of the pair, capped at half the clip. They are removed and the strike frame is held for
+    their steps, so the clip is as long as before and starts in the strike pose. Holds elsewhere stay.
+  - Secondary motion: for the LPC walks, the cape layers are held at the first walk frame, cropped to the reference's
+    box so the canvas is the same. The caped warrior, the huntress and the wizard are single sprites without a
+    separable cape or hair, so their secondary motion cannot be degraded.
+  - A one-frame clip is refused by each.
+- **Dimensions scored in isolation.** A reference that lacks a dimension (no cape or hair that moves, no jump) still
+  gets the dimension rated: Piñata's animation is rated alone with the anchors (a single-animation rubric item), rated
+  against a degraded copy of itself (the cape frozen to its rest pose, the holds removed), which also shows whether
+  judges see the dimension on Piñata's art, and measured against a physical expectation (the cape's lag behind the
+  body, settle time after a stop, overshoot, foot slide).
+- **Validation gate** (`gate.ts`): per degraded dimension, the share of answers rating the reference above its
+  degraded copy on that dimension, over all pairs of that dimension, both orders and all judges; 80% keeps the
+  dimension. The pair id's prefix before `--` names the dimension. An answer not given, or invalid, is counted as not
+  above: the denominator is the answers asked for (the pair's images times the judges), never the answers received.
+  `benchmark gate` checks each judge's file with the rubric's answer check, reports its problems, and keeps only the
+  valid entries. It exits 0 when every tested dimension is kept and the controls are stable, 1 when a dimension is
+  dropped or the controls are unstable, and 2 for a malformed file or bad arguments; no answers print as `n/a`.
+- **Controls** (`rubric.ts`): a control shows one animation twice (`b` must equal `a`), so the two copies should be
+  rated alike. The measure is `|top - bottom|` per control answer and dimension, averaged: pooling both orders into a
+  mean for `a` and one for `b` before subtracting would cancel a judge who always rates the top higher, which is the
+  bias the controls exist to expose. A control with an answer missing is unstable.
 
 ## Images and PNG (`src/image.ts`, `src/png/`)
 

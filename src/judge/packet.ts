@@ -84,7 +84,7 @@ export function validatePanelSpec (input: unknown): Validated<PanelSpec> {
   return { value: { ...DEFAULTS, ...structuredClone(input) } as PanelSpec, errors }
 }
 
-function trimToOpaque (image: Image): Image {
+export function trimToOpaque (image: Image): Image {
   let [left, top, right, bottom] = [image.width, image.height, -1, -1]
   for (let y = 0; y < image.height; y++) {
     for (let x = 0; x < image.width; x++) {

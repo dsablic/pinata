@@ -84,7 +84,7 @@ function resultOf (lines: string[], status: number, files: string[]): unknown {
   }
 }
 
-function toolResult (command: Command, args: Args): unknown {
+async function toolResult (command: Command, args: Args): Promise<unknown> {
   const wrong = invalidArguments(command, args)
   const argv = wrong === undefined ? command.argv(args) : wrong
   if (typeof argv === 'string') return resultOf([argv, command.usage(pinataInvoke)], 2, [])
@@ -94,7 +94,7 @@ function toolResult (command: Command, args: Args): unknown {
   const before = topLevel(dir)
   let status: number
   try {
-    status = command.run(argv, io, pinataInvoke)
+    status = await command.run(argv, io, pinataInvoke)
   } catch (err) {
     lines.push(messageOf(err))
     status = 2
@@ -102,7 +102,7 @@ function toolResult (command: Command, args: Args): unknown {
   return resultOf(lines, status, status === 2 ? [] : writtenSince(dir, before))
 }
 
-function callTool (params: unknown): unknown | Failure {
+function callTool (params: unknown): Failure | Promise<unknown> {
   if (!isRecord(params) || typeof params.name !== 'string') {
     return { code: INVALID_PARAMS, message: 'tools/call needs a tool name' }
   }
@@ -156,7 +156,7 @@ function initialize (params: unknown): unknown | Failure {
   }
 }
 
-const METHODS: Record<string, (params: unknown) => unknown | Failure> = {
+const METHODS: Record<string, (params: unknown) => unknown | Failure | Promise<unknown>> = {
   initialize,
   ping: () => ({}),
   'tools/list': listTools,
@@ -174,7 +174,7 @@ function failure (id: Id, error: Failure): Reply {
   return { jsonrpc: '2.0', id, error }
 }
 
-export function handle (message: unknown): Reply | undefined {
+export async function handle (message: unknown): Promise<Reply | undefined> {
   if (!isRecord(message) || message.jsonrpc !== '2.0') {
     return failure(null, { code: INVALID_REQUEST, message: 'a message is a JSON-RPC 2.0 object' })
   }
@@ -194,38 +194,55 @@ export function handle (message: unknown): Reply | undefined {
     return failure(id as Id, { code: METHOD_NOT_FOUND, message: `method not found: ${method}` })
   }
   try {
-    const result = known(params)
+    const result = await known(params)
     return isFailure(result) ? failure(id as Id, result) : { jsonrpc: '2.0', id: id as Id, result }
   } catch (err) {
     return failure(id as Id, { code: INTERNAL_ERROR, message: messageOf(err) })
   }
 }
 
-export function respondTo (line: string): Reply | undefined {
+export function respondTo (line: string): Promise<Reply | undefined> {
   let message: unknown
   try {
     message = JSON.parse(line)
   } catch {
-    return failure(null, { code: PARSE_ERROR, message: 'parse error: a message is one line of JSON' })
+    return Promise.resolve(failure(null, { code: PARSE_ERROR, message: 'parse error: a message is one line of JSON' }))
   }
   return handle(message)
 }
 
 export function claimStdout (): (text: string) => void {
   const protocol = process.stdout.write.bind(process.stdout)
+  process.stdout.on('error', err => console.error(`pinata mcp: stdout failed: ${messageOf(err)}`))
   const toStderr = (...parts: unknown[]): void => console.error(...parts)
   Object.assign(console, { log: toStderr, info: toStderr, debug: toStderr, dir: toStderr, table: toStderr })
   process.stdout.write = process.stderr.write.bind(process.stderr) as typeof process.stdout.write
   return text => void protocol(text)
 }
 
-export function serve (input: Readable, write: (text: string) => void, log: (line: string) => void): Promise<void> {
+function writeReply (reply: Reply | undefined, write: (text: string) => void, log: (line: string) => void): void {
+  if (reply === undefined) return
+  try {
+    write(`${JSON.stringify(reply)}\n`)
+  } catch (err) {
+    log(`pinata mcp: could not write the reply to ${String(reply.id)}: ${messageOf(err)}`)
+  }
+}
+
+type Responder = (line: string) => Promise<Reply | undefined>
+
+export function serve (
+  input: Readable, write: (text: string) => void, log: (line: string) => void, respond: Responder = respondTo
+): Promise<void> {
   const lines = createInterface({ input })
+  const pending = new Set<Promise<void>>()
   lines.on('line', line => {
     if (line.trim() === '') return
-    const reply = respondTo(line)
-    if (reply !== undefined) write(`${JSON.stringify(reply)}\n`)
+    const settled: Promise<void> = respond(line)
+      .then(reply => writeReply(reply, write, log), err => log(`pinata mcp: ${messageOf(err)}`))
+      .finally(() => pending.delete(settled))
+    pending.add(settled)
   })
   log('pinata mcp: serving on stdio')
-  return new Promise(done => lines.on('close', done))
+  return new Promise(done => lines.on('close', () => void Promise.allSettled(pending).then(() => done())))
 }

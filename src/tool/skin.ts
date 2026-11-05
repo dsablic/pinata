@@ -31,7 +31,10 @@ import { fitFlags, formatFlag } from '../style/fit.ts'
 import { renderSkinned } from '../style/skins.ts'
 import { footNames, isEndOnView } from '../style/feet.ts'
 import { stylize } from '../style/stylize.ts'
+import { withSkin } from '../export/record.ts'
 import { ROOT } from '../cli/paths.ts'
+import { subjectFor } from './subject.ts'
+import { idleDirectionsSheet } from './direction-sheet.ts'
 import { messageOf } from './io.ts'
 import type { Invoke, Io } from './io.ts'
 
@@ -163,6 +166,19 @@ function capturedWalk (character: Character, dir: string, yaw: number, frames: n
   return recorded
 }
 
+function idleSheetNote (dir: string, skin: Skin, out: string): string {
+  const note = 'idle-directions.png'
+  if (skin.views === undefined) return `${note}: not written (a one-view skin has no eight directions)`
+  if (!existsSync(join(dir, 'retarget.json'))) return `${note}: not written (no retarget.json)`
+  try {
+    writeOutput(join(out, note), encodePng(idleDirectionsSheet(withSkin(subjectFor(dir), skin))))
+  } catch (err) {
+    return `${note}: not written (${messageOf(err)})`
+  }
+  return `${note}: the first idle frame of each of the eight directions as export draws them, labelled, ` +
+    'enlarged 6x with nearest-neighbour: what a judge sees'
+}
+
 function preview (character: Character, dir: string, skinFile: string, out: string, clean: boolean, io: Io): number {
   const read = validateSkin(JSON.parse(readFileSync(skinFile, 'utf8')))
   const crossed = read.value === undefined ? [] : checkSkin(read.value, character.mannequin)
@@ -199,12 +215,14 @@ function preview (character: Character, dir: string, skinFile: string, out: stri
     return row(walk.map(w => draw(w.pose, w.yaw, state, angles)))
   })
   if (strips.length > 0) writeOutput(join(out, 'walks.png'), encodePng(sheet(strips, big)))
+  const idle = idleSheetNote(dir, skin, out)
   const summary = [
     `skin: ${skin.name} VALID (${skin.views === undefined ? 'one view' : 'eight directions'}, ${rotation} rotation)`,
     `colours: ${Object.keys(skin.palette).length} of 16`,
     `turntable flicker: ${(100 * flickerFraction(spun)).toFixed(2)}% (32 steps of 11.25 degrees)`,
     'images: directions.png (facing the viewer, then turning to its left in 45-degree steps), turntable.png, ' +
-      (strips.length > 0 ? 'walks.png (one row per direction)' : 'no walks (no retarget.json)')
+      (strips.length > 0 ? 'walks.png (one row per direction)' : 'no walks (no retarget.json)'),
+    idle
   ].join('\n')
   writeOutput(join(out, 'summary.txt'), `${summary}\n`)
   io.out(summary)

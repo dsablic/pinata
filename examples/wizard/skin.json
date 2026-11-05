@@ -244,11 +244,11 @@
           "mmmmmmmmmmmmmmgmmmm...........",
           "mmmmmmmmmmmmmmgmmmm...........",
           "mmmmmmmmmmmmmmgmmmm...........",
-          "mmmmmmmmmmmmmmgmmmm...........",
-          "mmmmmmmmmmmmmmgmmmm...........",
-          "mlllllllllllllgllll...........",
-          ".lllllllllllllglll............",
-          "..llllllllllllGll............."
+          "bbbbbbbbbbbbbbGbbbb...........",
+          "bbbbbbbbbbbbbbGbbbb...........",
+          "bmmmmmmmmmmmmmGmmmm...........",
+          ".mmmmmmmmmmmmmGmmm............",
+          "..mmmmmmmmmmmmGmm............."
         ], "pivotA": [3, 6], "pivotB": [26, 6] },
         "head": { "rows": [
           "wwwwwwwsk",

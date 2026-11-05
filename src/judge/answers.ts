@@ -2,6 +2,8 @@ import { isRecord } from '../formats/validate.ts'
 import { choiceProblems, isChoiceKey } from './choice.ts'
 import type { ChoiceKey } from './choice.ts'
 import type { PanelKey } from './packet.ts'
+import { isRubricKey, rubricProblems } from './rubric.ts'
+import type { RubricKey } from './rubric.ts'
 import { answerProblems } from './score.ts'
 
 function balancedObjects (text: string): string[] {
@@ -42,6 +44,9 @@ export function extractAnswers (text: string, items: readonly string[]): Record<
   return balancedObjects(text).map(parsed).filter(v => v !== undefined).filter(isPanelAnswer).at(-1)
 }
 
-export function problemsWithAnswers (answers: unknown, key: PanelKey | ChoiceKey): string[] {
+export type AnyKey = PanelKey | ChoiceKey | RubricKey
+
+export function problemsWithAnswers (answers: unknown, key: AnyKey): string[] {
+  if (isRubricKey(key)) return rubricProblems(answers, key)
   return isChoiceKey(key) ? choiceProblems(answers, key) : answerProblems(answers, key)
 }

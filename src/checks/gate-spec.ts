@@ -1,6 +1,6 @@
 import type { Gate } from '../export/report.ts'
 
-export const AUTHORING_GATES = ['pivot'] as const
+export const AUTHORING_GATES = ['pivot', 'threeQuarterViews', 'backViewFace', 'sideProfile'] as const
 export type DeclaredGate = Gate | typeof AUTHORING_GATES[number]
 export type Observes = 'drawn pixels' | 'joints' | 'painter state' | 'files'
 export type Verdict = { pass: boolean, measured: boolean }

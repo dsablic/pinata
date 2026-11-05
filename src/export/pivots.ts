@@ -5,7 +5,7 @@ import { footNames } from '../style/feet.ts'
 import { counterpart } from '../style/views.ts'
 import { DIRECTIONS, isMirrored, viewOf } from './directions.ts'
 import type { Direction } from './directions.ts'
-import { canvasOf, drawTake, footParts } from './record.ts'
+import { canvasOf, drawTake, footParts, withSkin } from './record.ts'
 import type { Moment, Subject } from './record.ts'
 
 export type Move = {
@@ -44,10 +44,10 @@ function moved (sprite: SkinPart, delta: number): SkinPart {
 }
 
 export function withSprite (subject: Subject, view: ViewName, part: string, sprite: SkinPart): Subject {
-  const { skin, mannequin } = subject.look.skin
+  const { skin } = subject.look.skin
   const views = skin.views!
   const edited = { ...views, [view]: { parts: { ...views[view].parts, [part]: sprite } } }
-  return { ...subject, look: { ...subject.look, skin: { mannequin, skin: { ...skin, views: edited } } } }
+  return withSkin(subject, { ...skin, views: edited })
 }
 
 function lowestRows (subject: Subject, frames: Moment[], direction: Direction): Array<Array<number | undefined>> {

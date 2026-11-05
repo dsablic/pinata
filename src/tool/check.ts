@@ -16,6 +16,7 @@ import { contactSheet, renderStatic, staticChecks } from '../cli/static.ts'
 import { clothOnionSkin, footprints, walkStrip, withSettledCloth } from '../cli/stills.ts'
 import { formatSummary, runChecks } from '../cli/summary.ts'
 import type { Check } from '../cli/summary.ts'
+import { directionChecks } from './direction-checks.ts'
 import { messageOf } from './io.ts'
 import type { Invoke, Io } from './io.ts'
 import { subjectFor } from './subject.ts'
@@ -128,17 +129,20 @@ function analyse (character: Character, out: string, io: Io): number {
   writeOutput(join(out, 'walk.png'), encodePng(walkStrip(character, recording, cloth ? run.recording : undefined)))
   writeOutput(join(out, 'footprints.png'), encodePng(footprints(character, recording)))
   if (cloth) writeOutput(join(out, 'cloth.png'), encodePng(clothOnionSkin(character, recording, run.recording)))
+  const direction = directionChecks(character)
   const checks: Check[] = [
     ...staticChecks(character.mannequin, character.style, frames),
     ...locomotionChecks(character, recording),
     ...(cloth ? clothChecks(character, run) : []),
-    ...(skinned ? [idleCheck(character.dir)] : [])
+    ...(skinned ? [idleCheck(character.dir)] : []),
+    ...direction.checks
   ]
   const results = runChecks(checks)
   const seconds = (performance.now() - started) / 1000
   const skipped = [
     ...(cloth ? [] : ['no cloth: cloth gates skipped']),
-    ...(skinned ? [] : ['no skin.json and retarget.json: idle foot gate skipped'])
+    ...(skinned ? [] : ['no skin.json and retarget.json: idle foot gate skipped']),
+    ...direction.notes
   ]
   const header = [
     `check: ${character.name} (${character.dir})${skipped.length === 0 ? '' : ` [${skipped.join('; ')}]`}`,

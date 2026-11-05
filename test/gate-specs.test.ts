@@ -4,6 +4,7 @@ import { AUTHORING_GATES, caseFailures, declareGate, declaredGates } from '../sr
 import { checksOf, GATES } from '../src/export/report.ts'
 import { feetFrame, planted, recordingOf, trackOf } from './export-fixtures.ts'
 import './export-gate-specs.ts'
+import './direction-gate-specs.ts'
 import './pivot-gate-specs.ts'
 
 test('every export gate and every authoring gate is declared with a failing and a passing case', () => {

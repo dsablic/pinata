@@ -269,7 +269,7 @@ test('a notification gets no reply, and a missing argument is a tool error namin
 test('the tools list has one tool per command and the authoring guide is a resource', async () => {
   await withServer(async call => {
     const tools = (await call({ jsonrpc: '2.0', id: 1, method: 'tools/list' })).result.tools
-    assert.deepEqual(tools.map((t: { name: string }) => t.name), ['new', 'check', 'skin', 'render', 'export'])
+    assert.deepEqual(tools.map((t: { name: string }) => t.name), ['new', 'check', 'skin', 'render', 'export', 'review'])
     for (const tool of tools) assert.equal(tool.inputSchema.type, 'object')
     const listed = (await call({ jsonrpc: '2.0', id: 2, method: 'resources/list' })).result.resources
     const read = await call({ jsonrpc: '2.0', id: 3, method: 'resources/read', params: { uri: listed[0].uri } })

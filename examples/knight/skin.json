@@ -568,20 +568,20 @@
     "backSide": {
       "parts": {
         "helmet": { "rows": [
-          "....whhssm....",
-          "..whhhsssmmm..",
-          ".whhssssssmmd.",
-          ".hhsssssssmmd.",
-          "hhssssssssmmdd",
-          "hssssssssssmdd",
-          "hsssssssssmmdd",
-          "hsssssssssmmdd",
-          "hmmmmmmmmmmmdd",
-          "hssssssssssmdd",
-          ".hsssssssmmdd.",
-          ".msssssssmmdd.",
-          "..mmsssmmmdd..",
-          "...mmmmmddd..."
+          ".....whhssm.....",
+          "...whhhsssmmm...",
+          "..whhssssssmmd..",
+          "..hhssssssdmmd..",
+          ".hhsssssssdmmdd.",
+          ".hssssssssdsmdd.",
+          ".hssssssssdmmddd",
+          ".hssssssssdmmddd",
+          ".hmmmmmmmmdmmddd",
+          ".hssssssssdsmddd",
+          "..hsssssssdmdd..",
+          "..msssssssdmdd..",
+          "...mmsssmmmdd...",
+          "....mmmmmddd...."
         ], "pivotA": [7, 7] },
         "plume": { "rows": [
           "..........RRcc",

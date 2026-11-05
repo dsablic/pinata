@@ -54,6 +54,8 @@
     "check": "node src/cli/check.ts",
     "new": "node src/cli/new.ts",
     "judge": "node src/cli/judge.ts",
+    "benchmark-fetch": "node src/cli/benchmark-fetch.ts",
+    "benchmark": "node src/cli/benchmark.ts",
     "export": "node src/cli/export.ts",
     "pinata": "node src/cli/pinata.ts",
     "direction-panel": "node src/cli/direction-panel.ts",

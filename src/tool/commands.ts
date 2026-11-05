@@ -5,6 +5,7 @@ import { exportUsage, runExport } from './export.ts'
 import type { Invoke, Io } from './io.ts'
 import { newUsage, runNew } from './new.ts'
 import { renderUsage, runRender } from './render.ts'
+import { reviewUsage, runReview } from './review.ts'
 import { runSkin, skinUsage } from './skin.ts'
 
 export type Args = Record<string, unknown>
@@ -23,7 +24,7 @@ export type Command = {
   argv: (args: Args) => string[] | string
   output: (args: Args) => string | undefined
   usage: (invoke: Invoke) => string
-  run: (argv: string[], io: Io, invoke: Invoke) => number
+  run: (argv: string[], io: Io, invoke: Invoke) => number | Promise<number>
 }
 
 const PATHS = 'relative paths resolve against the server\'s working directory'
@@ -117,7 +118,8 @@ export const COMMANDS: Command[] = [
     name: 'skin',
     summary: 'draw guides, preview and fit-check skins',
     description: 'Skin tools. action guide: per-view drawing guide (needs out). action preview: render the skin in ' +
-      'eight directions, a turntable and walks (needs out; skin defaults to <dir>/skin.json). action fit: list part ' +
+      'eight directions, a turntable and walks, and idle-directions.png, the eight idle frames labelled (needs ' +
+      'out; skin defaults to <dir>/skin.json). action fit: list part ' +
       'views whose drawn length is off (prints only).',
     schema: {
       type: 'object',
@@ -170,6 +172,34 @@ export const COMMANDS: Command[] = [
     output: args => text(args, 'out'),
     usage: exportUsage,
     run: runExport
+  },
+  {
+    name: 'review',
+    summary: 'ask blind AI judges which way each idle frame faces (costs money)',
+    description: 'Run the blind direction panel on the character: three judges (the claude CLI on opus, sonnet and ' +
+      'haiku) name the direction of each of the eight idle frames, and optionally of the widest-stride walk frame ' +
+      'in each direction. Prints the share right, each misread direction with what it was named, and the cue to ' +
+      'draw. It costs money (the cost of every judge is printed, also when one fails) and takes minutes: run ' +
+      'check and skin preview first. Exit status 0 every gate met, 1 a gate missed, 2 refused, 3 a judge failed so ' +
+      'no score is given. Needs the claude CLI. Writes the panel and key to <dir>/report/review.',
+    schema: {
+      type: 'object',
+      properties: {
+        dir: DIR,
+        walk: { type: 'boolean', description: 'also judge the walk frames (about doubles the cost)' },
+        out: { ...OUT, description: `the panel directory (default: <dir>/report/review); ${PATHS}` }
+      },
+      required: ['dir'],
+      additionalProperties: false
+    },
+    argv: args => required(args, ['dir']) ?? [
+      text(args, 'dir') as string,
+      ...(args.walk === true ? ['--walk'] : []),
+      ...(text(args, 'out') === undefined ? [] : ['--out', text(args, 'out') as string])
+    ],
+    output: args => resolve(text(args, 'out') ?? join(text(args, 'dir') ?? '.', 'report', 'review')),
+    usage: reviewUsage,
+    run: (argv, io, invoke) => runReview(argv, io, invoke)
   }
 ]
 

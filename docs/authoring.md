@@ -16,14 +16,16 @@ skin you draw, and the commands that check, preview and export it. It needs noth
 | `pinata new --template <biped\|quadruped\|hexapod\|octopod> <dir>` | A starter package that passes `check` | the six files |
 | `pinata check <dir> [--out <dir>]` | The gates on the mannequin, rig and cloth, with hints | `summary.txt`, `metrics.json`, `sheet.png`, `walk.png`, `footprints.png`, `cloth.png` |
 | `pinata skin guide <dir> <out>` | Where each part sits in each of the five views, to draw against | `guide.md` and `front.png`, `frontSide.png`, `side.png`, `backSide.png`, `back.png` |
-| `pinata skin preview <dir> <skin.json> <out> [--clean]` | Validates the skin and draws it | `directions.png`, `turntable.png`, `walks.png`, `summary.txt` |
+| `pinata skin preview <dir> <skin.json> <out> [--clean]` | Validates the skin and draws it, and the eight idle frames labelled as a judge sees them | `directions.png`, `idle-directions.png`, `turntable.png`, `walks.png`, `summary.txt` |
 | `pinata skin fit <dir> [<skin.json>]` | Flags sprites whose length does not suit their bone | printed lines only |
 | `pinata render <dir> <out>` | A skinned character's idle in eight directions and walk, crouch and attack strips, for looking | `idle-directions.png`, `walk-strip.png`, `crouch-strip.png`, `attack-strip.png` |
+| `pinata review <dir> [--walk] [--out <dir>]` | Three blind AI judges name the direction of each idle frame (and walk frames with `--walk`); prints what was misread and the cue to draw. **Costs money; every judge's cost is printed**, needs the `claude` CLI | the panel and key in `<dir>/report/review` |
 | `pinata export <dir> <out> [--full]` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch and attack, each in eight directions | per animation `<name>-<animation>.png` (sprite sheet), `.json` (Aseprite JSON array format: frames, durations, tags `<animation>-<direction>`, the anchor as a slice pivot) and `.aseprite` (Aseprite's binary format) |
 
 Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files (a `hint:` line says which file and what to
 change); 2 bad arguments, a package that does not load, or a character the command cannot work on (`render` and
-`export` need `skin.json` and `retarget.json`).
+`export` need `skin.json` and `retarget.json`). `review` uses 0 for every gate met, 1 for a gate missed, 2 for a
+refusal and 3 when a judge failed, so no score is given; the cost is printed in every case.
 
 `export` prints every `FAIL` line with its hint (a repeated hint is `as above`), then the passing and the engine-note
 checks as counts per gate; `--full` (`full: true` over MCP) lists every track. `note` lines are engine notes: gates that
@@ -36,8 +38,9 @@ of a cycle does not match its start (the cloth in `motion.json`, or the gait in 
 JSON-RPC). Register it in a client as the command `npx pinata mcp` (in Claude Code: `claude mcp add pinata -- npx
 pinata mcp`); from a checkout it is `node src/cli/pinata.ts mcp`. It offers:
 
-- one tool per command, `new`, `check`, `skin`, `render` and `export`, with the command's arguments as a JSON object
-  (`dir`, `out`, `template`, `full`; `skin` also takes `action` of `guide`, `preview` or `fit`). Unknown arguments and
+- one tool per command, `new`, `check`, `skin`, `render`, `export` and `review`, with the command's arguments as a
+  JSON object (`dir`, `out`, `template`, `full`, `walk`; `skin` also takes `action` of `guide`, `preview` or `fit`).
+  Unknown arguments and
   wrong types are refused with an error result naming the argument. Relative paths resolve against the server's working
   directory, so pass absolute paths. The result is the command's lines, the files it wrote and `exit status: n`;
   `isError` is true for any non-zero status, a failed gate included: read it and fix the named file;
@@ -924,6 +927,26 @@ bone length, width, and which way its top faces) and the five view images. Draw 
 - **`skin preview <dir> skin.json <out>`** validates (errors name the path to the problem, `skin: INVALID`, exit 1)
   and draws `directions.png` (the eight directions), `turntable.png` (32 steps), `walks.png`. Check that every part
   sits on the body, limbs join at the joints without gaps and the walk reads. `--clean` rotates at 11.25 degrees.
+- **Direction checklist.** A sprite must read its direction from one frame, so each view carries the cues game
+  artists use:
+  - *back*: the back of the head only (hair, hood, helmet back or cape): no face, no eyes, no beard or white patch;
+  - *three-quarter* (`frontSide`, `backSide`): the face shifted toward the facing side, the far eye smaller or half
+    hidden, the nose or visor past the head's outline, the near shoulder and arm larger, a cape falling to the far
+    side; a `backSide` view shows no face but is not the `back` view with a cape moved;
+  - *side*: a profile, not a front face squeezed narrow: the nose past the outline, one eye, the toes forward.
+
+  Use three tools in this order. `skin preview` writes `idle-directions.png`, the eight idle frames as export draws
+  them, labelled and enlarged with nearest-neighbour: look at it as a judge would, one frame at a time. `pinata check`
+  fails `threeQuarterViewFindings` (a three-quarter head or torso within 7 px of a neighbouring cardinal view or its
+  mirror), `backViewFaceFindings` (more than 3 px in colours only the front face uses, in a back view's head) and
+  `sideProfileFindings` (a side head that is its own mirror, within 3 px), each naming the view, the part and the cue
+  to draw; a sprite missing from a compared view is itself a finding. A check that could measure nothing is not a
+  pass: `check` lists it in the header as not measured, with the reason (a rig without arms, a one-view skin, a head
+  with no face colours of its own). Side views are drawn facing right. These need no judge and are necessary, not
+  sufficient. `pinata review` then asks three blind judges to name each idle frame; it prints the share right
+  (90% is the aim, each direction at least 2 of 3), each misread direction with what it was named, and the cue to
+  draw. `review` costs money (it prints each judge's cost; `--walk`
+  about doubles it) and takes minutes, so run it once the checks pass, not after every edit.
 - **`skin fit <dir>`** prints `n part views outside the drawn-length bounds`; keep it at 0. A line such as
   `torso front: sprite span 5 (drawn 3 to 6.25), bone projects 8.3 px` says that sprite's pivot distance
   (`pivotB` column minus `pivotA` column) lets it draw between 3 and 6.25 px, but the bone on screen is 8.3: redraw

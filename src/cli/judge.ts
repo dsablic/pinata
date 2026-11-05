@@ -7,14 +7,19 @@ import {
 } from '../judge/choice.ts'
 import type { ChoiceAnswers, ChoiceKey, ChoicePacket, ChoiceSpec } from '../judge/choice.ts'
 import { problemsWithAnswers } from '../judge/answers.ts'
+import type { AnyKey } from '../judge/answers.ts'
 import { askClaude } from '../judge/claude.ts'
 import { keyInsidePacket, lintPanel, strayFiles } from '../judge/lint.ts'
 import { buildPacket, validatePanelSpec } from '../judge/packet.ts'
 import type { Packet, PanelKey, PanelSpec } from '../judge/packet.ts'
 import { checkIsolation } from '../judge/isolation.ts'
-import { runJudges } from '../judge/runner.ts'
+import { describeOutcome, runJudges } from '../judge/runner.ts'
 import { withJudgeDir } from '../judge/sandbox.ts'
 import type { Outcome } from '../judge/runner.ts'
+import {
+  buildRubricPacket, formatRubricScore, isRubricKey, isRubricSpec, scoreRubric, validateRubricSpec
+} from '../judge/rubric.ts'
+import type { RubricAnswers, RubricPacket, RubricSpec } from '../judge/rubric.ts'
 import { formatScore, scorePanel } from '../judge/score.ts'
 import type { JudgeAnswers } from '../judge/score.ts'
 import type { Image } from '../image.ts'
@@ -35,33 +40,36 @@ function readJson (path: string): unknown {
 const PACKET_FILE = /^(item-\d+\.png|questions\.md)$/
 const JUDGE_FILE = /^judge-.*\.json$/
 
-type Loaded = { spec: ChoiceSpec | PanelSpec, kind: 'choice' | 'pairwise', load: (path: string) => Image }
+type Spec = ChoiceSpec | PanelSpec | RubricSpec
+type Built = Packet | ChoicePacket | RubricPacket
+type Loaded = { spec: Spec, kind: 'choice' | 'pairwise' | 'rubric', load: (path: string) => Image }
 
 function readSpec (specPath: string): Loaded | undefined {
   const input = readJson(specPath)
-  const choice = isChoiceSpec(input)
-  const validated = choice ? validateChoiceSpec(input) : validatePanelSpec(input)
+  const kind = isChoiceSpec(input) ? 'choice' : isRubricSpec(input) ? 'rubric' : 'pairwise'
+  const validated = { choice: validateChoiceSpec, rubric: validateRubricSpec, pairwise: validatePanelSpec }[kind](input)
   if (validated.value === undefined) {
     console.error(formatErrors(specPath, validated.errors))
     return undefined
   }
   const load = (path: string): Image => decodePng(readFileSync(resolve(dirname(specPath), path)))
-  return { spec: validated.value, kind: choice ? 'choice' : 'pairwise', load }
+  return { spec: validated.value, kind, load }
 }
 
-function compose (loaded: Loaded): Packet | ChoicePacket {
+function compose (loaded: Loaded): Built {
+  if (loaded.kind === 'rubric') return buildRubricPacket(loaded.spec as RubricSpec, loaded.load)
   return loaded.kind === 'choice'
     ? buildChoicePacket(loaded.spec as ChoiceSpec, loaded.load)
     : buildPacket(loaded.spec as PanelSpec, loaded.load)
 }
 
-function lint (loaded: Loaded, built: Packet | ChoicePacket): boolean {
+function lint (loaded: Loaded, built: Built): boolean {
   const problems = lintPanel(loaded.spec, built.images)
   for (const problem of problems) console.error(`lint: ${problem}`)
   return problems.length === 0
 }
 
-function writePacket (built: Packet | ChoicePacket, packet: string, key: string): number {
+function writePacket (built: Built, packet: string, key: string): number {
   for (const name of readdirSync(packet)) if (PACKET_FILE.test(name)) rmSync(join(packet, name))
   for (const [name, image] of Object.entries(built.images)) writeOutput(join(packet, name), encodePng(image))
   writeOutput(join(packet, 'questions.md'), built.questions)
@@ -91,6 +99,7 @@ function lintCommand (specPath: string): number {
 }
 
 function scoreText (read: Record<string, unknown>, judges: unknown[]): string {
+  if (isRubricKey(read)) return formatRubricScore(read, scoreRubric(read, judges as RubricAnswers[]))
   if (isChoiceKey(read)) return formatChoiceScore(read, scoreChoices(read, judges as ChoiceAnswers[]))
   const key = read as PanelKey
   return formatScore(key, scorePanel(key, judges as JudgeAnswers[]))
@@ -114,7 +123,7 @@ function score (keyPath: string, answerPaths: string[]): number {
   let broken = false
   for (const path of answerPaths) {
     const answers = readJson(path)
-    const problems = problemsWithAnswers(answers, read as PanelKey | ChoiceKey)
+    const problems = problemsWithAnswers(answers, read as AnyKey)
     if (problems.length > 0) {
       console.error(`${path}:\n  ${problems.join('\n  ')}`)
       broken = true
@@ -124,16 +133,6 @@ function score (keyPath: string, answerPaths: string[]): number {
   if (broken) return 2
   console.log(scoreText(read, judges))
   return 0
-}
-
-function describe (outcome: Outcome): string {
-  const spent = outcome.run ?? outcome.spent
-  const failed = outcome.run === undefined ? `FAILED: ${outcome.failure}` : ''
-  if (spent === undefined) return `judge ${outcome.model}: ${failed}`
-  const { durationMs, costUsd, attempts } = spent
-  const cost = costUsd === undefined ? 'cost unknown' : `$${costUsd.toFixed(3)}`
-  const used = `${(durationMs / 1000).toFixed(0)} s, ${cost}, ${attempts} attempt${attempts === 1 ? '' : 's'}`
-  return `judge ${outcome.model}: ${failed === '' ? used : `${failed} (${used})`}`
 }
 
 function resetRunDir (dir: string, packet: string): void {
@@ -146,7 +145,7 @@ async function askInFreshFolder (packet: string, names: string[], read: Record<s
   return withJudgeDir(packet, names, async judgeDir => {
     const stray = strayFiles(judgeDir, names)
     if (stray.length > 0) throw new Error(`the judges' folder differs from the packet's files: ${stray.join(', ')}`)
-    return runJudges(askClaude, judgeDir, read as PanelKey | ChoiceKey)
+    return runJudges(askClaude, judgeDir, read as AnyKey)
   })
 }
 
@@ -164,7 +163,7 @@ async function run (specPath: string, dirPath: string): Promise<number> {
   const names = [...Object.keys(built.images), 'questions.md']
   const outcomes = await askInFreshFolder(packet, names, read)
   for (const outcome of outcomes) {
-    console.log(describe(outcome))
+    console.log(describeOutcome(outcome))
     if (outcome.run === undefined) continue
     const answers = JSON.stringify(outcome.run.answers, null, 2)
     writeOutput(join(dir, `judge-${outcome.model}.json`), `${answers}\n`)

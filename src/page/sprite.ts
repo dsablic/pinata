@@ -37,6 +37,16 @@ export function freshPainting (): Painting {
   return { view: {}, angles: new Map(), lengths: new Map(), order: [], anchors: new Map() }
 }
 
+export function clonePainting (painting: Painting): Painting {
+  return {
+    view: { ...painting.view },
+    angles: new Map(painting.angles),
+    lengths: new Map(painting.lengths),
+    order: [...painting.order],
+    anchors: new Map([...painting.anchors].map(([name, [x, y]]): [string, [number, number]] => [name, [x, y]]))
+  }
+}
+
 export function spriteBox (look: Skinned, spritePerMetre: number): Camera {
   const height = Math.max(...Object.values(look.skin.mannequin.joints).map(p => p[1]))
   const size = Math.ceil(SPRITE_BOX_IN_CHARACTER_HEIGHTS * height * spritePerMetre)

@@ -114,3 +114,28 @@ test('checkSkin needs pivotB to lie to the right of pivotA on the same row for t
   delete missing.parts.arm.pivotB
   assert.deepEqual(crossErrors(missing).map(e => e.path), ['parts.arm.pivotB'])
 })
+
+function message (input: unknown, at: string): string {
+  return validateSkin(input).errors.filter(e => e.path === at).map(e => e.message).join(' | ')
+}
+
+test('a misplaced form names the form expected, with a tiny example', () => {
+  const { palette } = valid()
+  const sprite = { rows: ['ab'], pivotA: [0, 0] }
+  const loose = { name: 'n', palette, front: { parts: { arm: sprite } } }
+  assert.match(message(loose, 'front'), /front goes inside 'views'.*"views": \{ "front": \{ "parts": \{ "torso"/)
+  const beside = { ...valid(), front: { parts: {} }, side: { parts: {} } }
+  assert.match(message(beside, 'front'), /front, side go inside 'views'/)
+  const next = { ...valid(), views: valid().parts, front: { parts: {} } }
+  assert.match(message(next, 'views'), /sprites inside views\.<view>\.parts/)
+  const viewsInPart = { ...valid(), parts: { arm: { front: sprite } } }
+  assert.match(message(viewsInPart, 'parts.arm'), /one sprite, not a set of views.*"views": \{ "front"/)
+  const unwrapped = { name: 'n', palette, views: { front: { arm: sprite } } }
+  assert.match(message(unwrapped, 'views.front'), /"front": \{ "parts": \{ "torso": \{ "rows"/)
+  const both = { ...valid(), views: {} }
+  assert.match(message(both, 'views'), /sprites inside views\.<view>\.parts.*"views": \{ "front"/)
+  const bare = { ...valid(), parts: { arm: 'ab' } }
+  assert.match(message(bare, 'parts.arm'), /\{ "rows": \["bb", "bb"\].*\{ "hidden": true \}/)
+  const object = { ...valid(), parts: { arm: { rows: ['ab'], pivotA: { x: 0, y: 0 } } } }
+  assert.match(message(object, 'parts.arm.pivotA'), /such as \[2, 5\]/)
+})

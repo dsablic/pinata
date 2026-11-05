@@ -1,7 +1,8 @@
 import { declareGate } from '../src/checks/gate-spec.ts'
 import type { Verdict } from '../src/checks/gate-spec.ts'
-import { expectedSector } from '../src/export/record.ts'
-import type { Cell, Direction, Frame, Track } from '../src/export/record.ts'
+import { expectedSector } from '../src/export/directions.ts'
+import type { Direction } from '../src/export/directions.ts'
+import type { Cell, Foot, Frame, Track } from '../src/export/record.ts'
 import type { Gate } from '../src/export/report.ts'
 import {
   bar, CELL, feetFrame, frameOf, LIFTED, markedAt, mixedGroundFrames, planted, recordingOf, soleAt, soleDown,
@@ -13,6 +14,7 @@ const feet = via('feet')
 const facing = via('facing')
 const border = via('border')
 const ground = via('ground')
+const drawn = via('drawn')
 const loop = via('loop')
 const anchor = (root: [number, number]): Verdict => verdictOf(recordingOf([], { ...CELL, root } as Cell), 'anchor')
 
@@ -130,10 +132,19 @@ declareGate({
   ]
 })
 
+const undrawn: Foot = { planted: true, sole: undefined, drawn: undefined, level: 0 }
+const robed: Foot = { planted: true, sole: undefined, drawn: { x: 0, y: 0 }, level: 0 }
+const idleIn = (direction: Direction, ...feet: Foot[][]): Track => {
+  return trackOf(feet.map(own => feetFrame(own)), { behaviour: 'idle', loop: true, direction })
+}
+const seen = (...tracks: Track[]): Verdict => verdictOf(recordingOf(tracks), 'drawn')
+
 declareGate({
   gate: 'ground',
   observes: 'drawn pixels',
-  frame: 'each planted foot\'s own projected ground point, in cell pixels; idle only',
+  frame: 'each planted foot\'s own ground point, in cell pixels, from the anchor its ankle is drawn at; the foot ' +
+    'part\'s own pixels in the exported drawing, covered or not, and a planted foot must show a visible pixel in ' +
+    'one of its planted frames; idle only',
   threshold: 'at most 5% of planted foot-frames more than 1 px from their own ground point',
   bad: [
     {
@@ -146,9 +157,14 @@ declareGate({
       name: 'a sole on the line under the root while its own ground point is 3 rows higher',
       run: () => ground(idling([feetFrame([planted(-1, 3)])]))
     },
+    { name: 'a planted foot with no drawn pixels', run: () => ground(idling([feetFrame([undrawn])])) },
     {
-      name: 'a planted foot with no visible sole',
-      run: () => ground(idling([feetFrame([{ planted: true, sole: undefined, level: 0 }])]))
+      name: 'a foot hidden behind the other foot in every frame, its footprint on its ground point',
+      run: () => ground(idling([feetFrame([planted(0), robed]), feetFrame([planted(0), robed])]))
+    },
+    {
+      name: 'a foot with no visible pixel in its planted frames, only in a frame where it is lifted',
+      run: () => ground(idling([feetFrame([robed]), feetFrame([LIFTED])]))
     }
   ],
   good: [
@@ -160,9 +176,47 @@ declareGate({
       run: () => ground(idling([feetFrame([planted(2, 2.6)])]))
     },
     {
+      name: 'a foot partly covered by the other foot in one frame, drawn on its ground point',
+      run: () => ground(idling([feetFrame([planted(0), robed]), feetFrame([planted(0), planted(0)])]))
+    },
+    {
       name: 'a walk with feet far off the line, which is not measured',
       run: () => ground(walking([feetFrame([planted(9)])]))
     }
+  ]
+})
+
+declareGate({
+  gate: 'drawn',
+  observes: 'drawn pixels',
+  frame: 'the visible pixels of each foot part in the idle frames of each view\'s directions (left and right share ' +
+    'the side view, front-left and front-right the front-side view, and so on); idle only',
+  threshold: 'each foot has a visible pixel in at least one frame of at least one direction of every view',
+  bad: [
+    {
+      name: 'the second foot with no pixels in any frame of either side direction',
+      run: () => seen(idleIn('right', [planted(0), undrawn]), idleIn('left', [planted(0), undrawn]))
+    },
+    {
+      name: 'a foot covered by a robe in every frame of both side directions',
+      run: () => seen(idleIn('right', [planted(0), robed], [planted(0), robed]), idleIn('left', [planted(0), robed]))
+    },
+    {
+      name: 'a foot hidden in the only direction of the back view',
+      run: () => seen(idleIn('back', [planted(0), robed]))
+    }
+  ],
+  good: [
+    {
+      name: 'each foot covered in one side direction and visible in the other',
+      run: () => seen(idleIn('right', [planted(0), robed]), idleIn('left', [robed, planted(0)]))
+    },
+    {
+      name: 'a foot visible in one frame only',
+      run: () => seen(idleIn('right', [planted(0), robed], [planted(0), planted(0)]))
+    },
+    { name: 'both feet visible in the front view', run: () => seen(idleIn('front', [planted(0), planted(0)])) },
+    { name: 'a walk with a hidden foot, which is not checked', run: () => seen(trackOf([feetFrame([robed])])) }
   ]
 })
 

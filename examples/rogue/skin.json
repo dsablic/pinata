@@ -507,7 +507,7 @@
         "LLLLLl.",
         "lLLLLLL",
         ".llllll"
-      ], "pivotA": [2, 2], "pivotB": [5, 2] },
+      ], "pivotA": [2, 2], "pivotB": [5, 2], "layer": 1 },
       "thighR": { "rows": [
         ".lllllllllll..",
         "lLLLLLLLLLLLl.",
@@ -668,7 +668,7 @@
         "lLLLl",
         "lLLLl",
         ".lll."
-      ], "pivotA": [2, 2], "pivotB": [3, 2] },
+      ], "pivotA": [2, 2], "pivotB": [3, 2], "layer": 1 },
       "shoulderL": { "rows": [
         ".mCCm.",
         "mCCmmc",

@@ -158,9 +158,15 @@ export const COMMANDS: Command[] = [
       'animation a sprite sheet PNG, an Aseprite-format JSON and an .aseprite file, and print the export gates. ' +
       'Engine notes do not fail the command.',
     schema: {
-      type: 'object', properties: { dir: DIR, out: OUT }, required: ['dir', 'out'], additionalProperties: false
+      type: 'object',
+      properties: { dir: DIR, out: OUT, full: { type: 'boolean', description: 'list every track, not counts' } },
+      required: ['dir', 'out'],
+      additionalProperties: false
     },
-    argv: args => pair(args, ['dir', 'out']),
+    argv: args => {
+      const paths = pair(args, ['dir', 'out'])
+      return typeof paths === 'string' || args.full !== true ? paths : [...paths, '--full']
+    },
     output: args => text(args, 'out'),
     usage: exportUsage,
     run: runExport

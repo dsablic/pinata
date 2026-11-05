@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { readWorld } from '../diagnostics/page-scenarios.ts'
-import { DIRECTIONS, record, SKINNED_HUMANOIDS, subjectOf } from '../export/record.ts'
+import { DIRECTIONS } from '../export/directions.ts'
+import { record, SKINNED_HUMANOIDS, subjectOf } from '../export/record.ts'
 import { writeChoicePanel } from './choice-panel.ts'
 import { ROOT } from './paths.ts'
 import { worldBundle } from './world-bundle.ts'

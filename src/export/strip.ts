@@ -1,6 +1,7 @@
 import { sheet } from '../diagnostics/images.ts'
 import type { Image } from '../image.ts'
-import type { Behaviour, Direction, Track } from './record.ts'
+import type { Direction } from './directions.ts'
+import type { Behaviour, Track } from './record.ts'
 
 export type StripLook = { scale: number, gap: number, background: number }
 

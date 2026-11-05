@@ -1,5 +1,6 @@
-import { expectedSector } from '../src/export/record.ts'
-import type { Cell, Direction, Foot, Frame, Recording, Track } from '../src/export/record.ts'
+import { expectedSector } from '../src/export/directions.ts'
+import type { Direction } from '../src/export/directions.ts'
+import type { Cell, Foot, Frame, Recording, Track } from '../src/export/record.ts'
 import { checksOf } from '../src/export/report.ts'
 import type { Gate } from '../src/export/report.ts'
 import type { Verdict } from '../src/checks/gate-spec.ts'
@@ -10,7 +11,8 @@ export const CELL: Cell = { width: 4, height: 4, pivot: [2, 2], root: [2, 2] }
 
 export function frameWith (foot: { x: number, y: number }, travel: [number, number]): Frame {
   const image = createImage(4, 4)
-  return { image, sector: expectedSector('right'), travel, feet: [{ planted: true, sole: foot, level: 0 }] }
+  const feet = [{ planted: true, sole: foot, drawn: foot, level: 0 }]
+  return { image, sector: expectedSector('right'), travel, feet }
 }
 
 export function feetFrame (feet: Foot[]): Frame {
@@ -39,10 +41,10 @@ export function soleDown (y: number, travel: number): Frame {
 }
 
 export function planted (y: number, level = 0): Foot {
-  return { planted: true, sole: { x: 0, y }, level }
+  return { planted: true, sole: { x: 0, y }, drawn: { x: 0, y }, level }
 }
 
-export const LIFTED: Foot = { planted: false, sole: { x: 0, y: -9 }, level: 0 }
+export const LIFTED: Foot = { planted: false, sole: { x: 0, y: -9 }, drawn: { x: 0, y: -9 }, level: 0 }
 
 export function mixedGroundFrames (): Frame[] {
   return [

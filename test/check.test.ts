@@ -5,6 +5,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { CHARACTER_INVALID, CHARACTER_OK, characterVariant, patchJson, scratchDir } from './formats-fixtures.ts'
 
+const ROGUE = new URL('../examples/rogue', import.meta.url).pathname
+
 const dog = new URL('../examples/dog', import.meta.url).pathname
 const cli = new URL('../src/cli/check.ts', import.meta.url).pathname
 
@@ -239,4 +241,59 @@ test('a knee-speed failure on a bent leg does not ask for more bend', () => {
   const summary = summaryOf(run)
   assert.match(summary, /^FAIL {2}kneeSpeedDegPerSec: /m)
   assert.doesNotMatch(summary, /bent only/)
+})
+
+test('a skinned character gets the idle foot gate, and feet hidden in a view fail it with a hint', () => {
+  const passing = check(ROGUE)
+  assert.equal(passing.status, 0, passing.stdout + passing.stderr)
+  assert.match(summaryOf(passing), /^PASS {2}idleFootMisses: 0 <= 0/m)
+  const hidden = characterVariant(dir => {
+    patchJson(dir, 'skin.json', json => {
+      json.views.side.parts.footL = { hidden: true }
+      json.views.side.parts.footR = { hidden: true }
+    })
+  }, ROGUE)
+  const failing = check(hidden)
+  assert.equal(failing.status, 1, failing.stdout + failing.stderr)
+  const summary = summaryOf(failing)
+  assert.match(summary, /^FAIL {2}idleFootMisses: 3 <= 0/m)
+  assert.match(summary, /idle-right \(view side\): feet 1 and 2 planted with no visible pixel/)
+  assert.match(summary, /idle-left \(view side\): feet 1 and 2 planted with no visible pixel/)
+  assert.match(summary, /idle \(view side\): feet 1 and 2 not seen in any frame of right and left/)
+  assert.match(summary, /hint: .*a foot sprite of this view is hidden, empty or covered in every frame/)
+})
+
+test('one foot sprite hidden in a side view fails the ground gate in the direction where it is the far foot', () => {
+  const hidden = characterVariant(dir => {
+    patchJson(dir, 'skin.json', json => {
+      json.views.side.parts.footL = { hidden: true }
+    })
+  }, ROGUE)
+  const failing = check(hidden)
+  assert.equal(failing.status, 1, failing.stdout + failing.stderr)
+  const summary = summaryOf(failing)
+  assert.match(summary, /^FAIL {2}idleFootMisses: [12] <= 0/m)
+  assert.match(summary, /idle-(left|right) \(view side\): foot [12] planted with no visible pixel/)
+  assert.doesNotMatch(summary, /not seen in any frame/)
+})
+
+test('a one-view skin fails check with the five-view form instead of an internal error', () => {
+  const oneView = characterVariant(dir => {
+    patchJson(dir, 'skin.json', json => {
+      const { name, palette, views } = json
+      for (const key of Object.keys(json)) delete json[key]
+      Object.assign(json, { name, view: 'side-right', palette, parts: views.side.parts })
+    })
+  }, ROGUE)
+  const run = check(oneView)
+  assert.equal(run.status, 1, run.stdout + run.stderr)
+  assert.match(summaryOf(run), /^FAIL {2}idleFootMisses: NaN <= 0/m)
+  assert.match(summaryOf(run), /the idle could not be recorded: .*skin\.json is the one-view form.*"views": \{/)
+})
+
+test('a character without a skin says which gates only export runs', () => {
+  const summary = summaryOf(check(CHARACTER_OK))
+  assert.match(summary, /no skin\.json and retarget\.json: idle foot gate skipped/)
+  assert.match(summary, /only export runs: loop, feet, facing, border and anchor, and the idle foot gate/)
+  assert.doesNotMatch(summary, /idleFootMisses/)
 })

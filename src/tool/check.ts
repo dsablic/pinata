@@ -1,8 +1,11 @@
-import { rmSync, statSync } from 'node:fs'
+import { existsSync, rmSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { formatCharacterErrors, loadCharacter } from '../formats/character.ts'
 import type { Character } from '../formats/character.ts'
 import { simulateCharacter } from '../motion/character.ts'
+import { record } from '../export/record.ts'
+import { GROUND_PX } from '../export/gates.ts'
+import { checksOf, failedGates } from '../export/report.ts'
 import { encodePng } from '../png/encode.ts'
 import { writeOutput } from '../diagnostics/report.ts'
 import { clothChecks, hasCloth } from '../cli/cloth.ts'
@@ -13,8 +16,11 @@ import { formatSummary, runChecks } from '../cli/summary.ts'
 import type { Check } from '../cli/summary.ts'
 import { messageOf } from './io.ts'
 import type { Invoke, Io } from './io.ts'
+import { subjectFor } from './subject.ts'
 
 export const checkUsage = (invoke: Invoke): string => `usage: ${invoke('check')} <character dir> [--out <dir>]`
+const IDLE_GATES = ['ground', 'drawn']
+const ONLY_EXPORT = 'loop, feet, facing, border and anchor'
 const OUTPUTS = ['summary.txt', 'metrics.json', 'sheet.png', 'walk.png', 'footprints.png', 'cloth.png']
 
 type Args = { dir: string, out: string }
@@ -72,6 +78,28 @@ function clearReport (out: string): void {
   }
 }
 
+function isSkinned (dir: string): boolean {
+  return ['skin.json', 'retarget.json'].every(file => existsSync(join(dir, file)))
+}
+
+function idleCheck (dir: string): Check {
+  const rationale = `idle, eight directions: every foot drawn, within ${GROUND_PX} px of its ground point`
+  const gate = (value: number): Check['gate'] => {
+    return { name: 'idleFootMisses', value, op: '<=', threshold: 0, rationale }
+  }
+  try {
+    const checks = checksOf(record(subjectFor(dir), ['idle']))
+    const misses = failedGates(checks).filter(own => IDLE_GATES.includes(own.gate))
+    const hints = [...new Set(misses.flatMap(own => own.hint === undefined ? [] : [own.hint]))]
+    return {
+      gate: gate(misses.length),
+      hint: () => `${misses.map(own => own.line).join('; ')}. ${hints.join(' ')}`
+    }
+  } catch (err) {
+    return { gate: gate(NaN), hint: () => `the idle could not be recorded: ${messageOf(err)}` }
+  }
+}
+
 function analyse (character: Character, out: string, io: Io): number {
   const started = performance.now()
   const frames = renderStatic(character.mannequin, character.style)
@@ -80,6 +108,7 @@ function analyse (character: Character, out: string, io: Io): number {
   })
   const recording = locomotionRecording(character, run)
   const cloth = hasCloth(character)
+  const skinned = isSkinned(character.dir)
   const shown = cloth ? renderStatic(withSettledCloth(character, recording, run.recording), character.style) : frames
   writeOutput(join(out, 'sheet.png'), encodePng(contactSheet(shown)))
   writeOutput(join(out, 'walk.png'), encodePng(walkStrip(character, recording, cloth ? run.recording : undefined)))
@@ -88,11 +117,19 @@ function analyse (character: Character, out: string, io: Io): number {
   const checks: Check[] = [
     ...staticChecks(character.mannequin, character.style, frames),
     ...locomotionChecks(character, recording),
-    ...(cloth ? clothChecks(character, run) : [])
+    ...(cloth ? clothChecks(character, run) : []),
+    ...(skinned ? [idleCheck(character.dir)] : [])
   ]
   const results = runChecks(checks)
   const seconds = (performance.now() - started) / 1000
-  const header = `check: ${character.name} (${character.dir})${cloth ? '' : ' [no cloth: cloth gates skipped]'}`
+  const skipped = [
+    ...(cloth ? [] : ['no cloth: cloth gates skipped']),
+    ...(skinned ? [] : ['no skin.json and retarget.json: idle foot gate skipped'])
+  ]
+  const header = [
+    `check: ${character.name} (${character.dir})${skipped.length === 0 ? '' : ` [${skipped.join('; ')}]`}`,
+    `only export runs: ${ONLY_EXPORT}${skinned ? '' : ', and the idle foot gate'}, over every animation`
+  ].join('\n')
   const summary = formatSummary(header, results)
   writeOutput(join(out, 'summary.txt'), `${summary}\n`)
   const metricsReport = { gates: results, timing: { seconds, ...run.timing } }

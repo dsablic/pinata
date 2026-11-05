@@ -211,7 +211,7 @@
         "shinL": { "rows": [".SSSFFFFFF.", "SsssFFFFFFF", "ssssFFFFFFF", "ssssfffffFF", "ssssfffffff", ".sssffffff."], "pivotA": [2, 3], "pivotB": [8, 3] },
         "shinR": { "rows": [".SSSFFFFFF.", "SsssFFFFFFF", "ssssFFFFFFF", "ssssfffffFF", "ssssfffffff", ".sssffffff."], "pivotA": [2, 3], "pivotB": [8, 3] },
         "footL": { "rows": [".fff.....", "ffffff...", "fffffffF.", "FFFFFFFFF", "FFFFFFFFF"], "pivotA": [2, 2], "pivotB": [6, 2] },
-        "footR": { "rows": [".fff.....", "ffffff...", "fffffffF.", "FFFFFFFFF", "FFFFFFFFF"], "pivotA": [2, 2], "pivotB": [6, 2] },
+        "footR": { "rows": [".fff.....", "ffffff...", "fffffffF.", "FFFFFFFFF", "FFFFFFFFF"], "pivotA": [2, 3], "pivotB": [6, 3] },
         "shoulderL": { "rows": ["..ggff..", ".gggfff.", "gggffffF", "gffffffF", "fffffFFF", ".FFFFFF."], "pivotA": [4, 3] },
         "shoulderR": { "rows": ["..ggff..", ".gggfff.", "gggffffF", "gffffffF", "fffffFFF", ".FFFFFF."], "pivotA": [4, 3] },
         "upperArmL": { "rows": [".LLLLLLLLL..", "LLLLLLLLLLL.", "llllllllllLL", "lllllllllll.", ".lllllllll.."], "pivotA": [2, 2], "pivotB": [9, 2] },

@@ -3,14 +3,15 @@ import assert from 'node:assert/strict'
 import { worldBundle } from '../src/cli/world-bundle.ts'
 import { readWorld } from '../src/diagnostics/page-scenarios.ts'
 import { groundOf, heldOf } from '../src/export/gates.ts'
-import { BEHAVIOURS, DIRECTIONS, record, SKINNED_HUMANOIDS, subjectOf } from '../src/export/record.ts'
-import type { Frame, Recording, Track } from '../src/export/record.ts'
-import { checksOf } from '../src/export/report.ts'
+import { DIRECTIONS } from '../src/export/directions.ts'
+import { BEHAVIOURS, record, SKINNED_HUMANOIDS, subjectOf } from '../src/export/record.ts'
+import type { Foot, Frame, Recording, Track } from '../src/export/record.ts'
+import { checksOf, failedGates, reportOf } from '../src/export/report.ts'
 import { exportFiles } from '../src/export/files.ts'
 import { MOST_SHEET_PX } from '../src/export/sheet.ts'
 import { decodePng } from '../src/png/decode.ts'
 import { readAseprite } from './aseprite-reader.ts'
-import { frameWith, mixedGroundFrames, trackOf } from './export-fixtures.ts'
+import { bar, feetFrame, frameWith, mixedGroundFrames, planted, recordingOf, trackOf } from './export-fixtures.ts'
 
 const MISSED_GATES = ['feet']
 const world = readWorld(worldBundle())
@@ -24,13 +25,13 @@ function recorded (name: string): Recording {
 
 test('the ground counts planted foot-frames, ignores lifted feet and reports the worst row', () => {
   const ground = groundOf(trackOf(mixedGroundFrames(), { behaviour: 'idle', loop: true }))
-  assert.deepEqual(ground, { planted: 7, seen: 7, off: 2, worst: 3 })
+  assert.deepEqual(ground, { planted: 7, seen: 7, off: 2, worst: 3, hidden: [] })
 })
 
 test('a one-frame planted flicker and a hidden foot are counted, not skipped silently', () => {
   const planted = (on: boolean, visible = true): Frame => {
     const frame = frameWith({ x: 0, y: 0 }, [0, 0])
-    frame.feet[0] = { planted: on, sole: visible ? { x: 0, y: 0 } : undefined, level: 0 }
+    frame.feet[0] = { planted: on, sole: visible ? { x: 0, y: 0 } : undefined, drawn: undefined, level: 0 }
     return frame
   }
   const frames = [planted(true), planted(false), planted(true), planted(true, false), planted(true)]
@@ -38,6 +39,58 @@ test('a one-frame planted flicker and a hidden foot are counted, not skipped sil
   assert.equal(held.flickers, 1)
   assert.equal(held.hidden, 2)
   assert.equal(held.pairs, 0)
+})
+
+const COMPACT_BUDGET = 4000
+const WIDTH = 120
+
+function idleTrack (direction: typeof DIRECTIONS[number], feet: Foot[]): Track {
+  return trackOf([feetFrame(feet), feetFrame(feet)], { behaviour: 'idle', direction, loop: true })
+}
+
+test('the compact report gives one FAIL line per gate with every failing track, and each hint once', () => {
+  const tracks = DIRECTIONS.map((direction, i) => idleTrack(direction, [planted(i % 2 === 0 ? 6 : -7)]))
+  const checks = checksOf(recordingOf(tracks))
+  const failed = failedGates(checks)
+  assert.equal(failed.length, DIRECTIONS.length)
+  const compact = reportOf('case', checks)
+  const grounds = compact.split('\n').filter(line => line.startsWith('ground FAIL'))
+  assert.equal(grounds.length, 1)
+  assert.match(compact, /^ground FAIL idle-front 2\/2 7px below; idle-front-right 2\/2 6px above; /m)
+  for (const check of failed) assert.ok(compact.includes(check.short as string), check.line)
+  for (const hint of new Set(failed.map(check => check.hint))) assert.equal(compact.split(`hint: ${hint}`).length, 2)
+  assert.match(compact, /^ok {3}.*border 8/m)
+  assert.doesNotMatch(compact, /^ok {3}idle-/m)
+  assert.doesNotMatch(compact, /more .* lines/)
+})
+
+test('the full report lists every check, the failing ones with their own hint', () => {
+  const tracks = DIRECTIONS.map(direction => idleTrack(direction, [planted(6)]))
+  const full = reportOf('case', checksOf(recordingOf(tracks)), true)
+  const lines = full.split('\n')
+  assert.equal(lines.filter(line => /^FAIL idle-.* \(view .*\): 2 of 2/.test(line)).length, DIRECTIONS.length)
+  assert.equal(lines.filter(line => line.startsWith('      hint: ')).length, DIRECTIONS.length)
+  assert.match(full, /^ok {3}idle-right: 0 pixels on the cell border/m)
+})
+
+test('every track of every animation failing several gates stays within the compact budget, with no cap', () => {
+  const looping = ['idle', 'walk', 'run']
+  const hiddenFoot: Foot = { ...planted(6), sole: undefined }
+  const tracks = BEHAVIOURS.flatMap(behaviour => DIRECTIONS.map((direction, i) => {
+    const feet = i % 2 === 0 ? [planted(6), hiddenFoot] : [planted(i % 4 === 1 ? 6 : -7), planted(6)]
+    const frames = [1, 2, 3, 4, 5].map(length => ({ ...feetFrame(feet), image: bar(length) }))
+    return trackOf(frames, { behaviour, direction, loop: looping.includes(behaviour) })
+  }))
+  assert.equal(tracks.length, 56)
+  const checks = checksOf(recordingOf(tracks))
+  const failed = failedGates(checks)
+  for (const gate of ['loop', 'ground', 'drawn']) assert.ok(failed.some(check => check.gate === gate), gate)
+  const compact = reportOf('case', checks)
+  assert.ok(compact.length <= COMPACT_BUDGET, `${compact.length} characters`)
+  const listed = compact.split('\n').filter(line => !line.includes('hint: '))
+  assert.ok(listed.every(line => line.length <= WIDTH), 'a failing-track line is wider than 120 columns')
+  for (const check of failed) assert.ok(compact.includes(check.short as string), check.line)
+  assert.doesNotMatch(compact, /more .* lines/)
 })
 
 for (const name of SKINNED_HUMANOIDS) {

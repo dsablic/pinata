@@ -64,6 +64,10 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
   and wizard's cloth flicker; one knight foot sprite misses the fit check (a mirrored view draws it on the other
   foot's bone). A take ends in the take's small landing whatever the height, and a fall starting during a take's
   crouch loses the procedural reach-down and dip.
+- **The knight's cape flicker** ([Phase 1 plan](plans/2026-11-04-phase-1-tool.md), batch E results): the drawn-cloth
+  flicker gate of the page is missed for the knight (1.50 and 2.13 against at most 1 %); the cape's own flicker is
+  unchanged by the painter's rest-relative steps, and the gate's difference of two runs' worst frames moves with
+  frame alignment. Open: the cape's flicker.
 - **P7 skins** ([plan](plans/2026-10-31-p7-skins.md)): the size gate (per-size skins) and the human review.
 - **Image and points** ([plan](plans/2026-10-30-image-points.md)): batches B and C, the point-driven workflow (an
   image plus arbitrary points, no fixed body parts).

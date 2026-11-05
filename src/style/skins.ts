@@ -11,6 +11,7 @@ import { chooseView, counterpart, facingAngle, fitted, mirrored, spanOf } from '
 import type { ViewChoice } from './views.ts'
 import type { Rotated } from './rotsprite.ts'
 import { drawOrder } from './order.ts'
+import { turnBetween, turnToWorld } from '../world/yaw.ts'
 import { endOf, paintStrip } from './strip.ts'
 
 export type SkinnedOptions = {
@@ -53,10 +54,29 @@ export const ANGLE_STEP = Math.PI / 8
 export const CLEAN_STEP = Math.PI / 16
 const HYSTERESIS = 0.25
 const SNAP = 1e-9
+const SECTOR_ANGLE = Math.PI / 4
+const REST_YAW = Math.PI / 2
 const NEIGHBOURS: Array<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]]
 
 export function snapAngle (radians: number, previous?: number): number {
   return steadyStep(radians, ANGLE_STEP, previous)
+}
+
+export function snapAbout (radians: number, rest: number, previous?: number): number {
+  const kept = previous === undefined ? undefined : turnBetween(rest, previous)
+  return rest + steadyStep(turnBetween(rest, radians), ANGLE_STEP, kept)
+}
+
+function restYaw (o: SkinnedOptions, choice: ViewChoice | undefined): number {
+  if (choice === undefined || o.yaw === undefined) return REST_YAW
+  return o.yaw - (facingAngle(o.camera, o.yaw) - choice.sector * SECTOR_ANGLE)
+}
+
+function restAngle (o: SkinnedOptions, part: Part, choice: ViewChoice | undefined): number {
+  const yaw = restYaw(o, choice)
+  const at = (joint: string): Screen => project(o.camera, turnToWorld(o.mannequin.joints[joint], yaw))
+  const [a, b] = [at(part.a), at(part.b)]
+  return Math.atan2(b.y - a.y, b.x - a.x)
 }
 
 function exactTrig (angle: number): { cos: number, sin: number } {
@@ -93,7 +113,10 @@ function chosenView (o: SkinnedOptions): ViewChoice | undefined {
   if (o.skin.views === undefined) return undefined
   if (o.yaw === undefined) throw new Error(`skin '${o.skin.name}' has eight directions: pass the character's yaw`)
   const choice = chooseView(facingAngle(o.camera, o.yaw), o.view?.sector)
-  if (o.view !== undefined) o.view.sector = choice.sector
+  if (o.view !== undefined) {
+    if (o.view.sector !== undefined && o.view.sector !== choice.sector) o.angles?.clear()
+    o.view.sector = choice.sector
+  }
   return choice
 }
 
@@ -111,9 +134,9 @@ function snapped (o: SkinnedOptions, at: Vec3, key: string): Snapped {
 }
 
 function turned (
-  o: SkinnedOptions, name: string, a: Snapped, b: Screen, length: number
+  o: SkinnedOptions, name: string, a: Snapped, b: Screen, length: number, rest: number
 ): Array<[number, number]> {
-  const angle = snapAngle(Math.atan2(b.y - a.y, b.x - a.x), o.angles?.get(name))
+  const angle = snapAbout(Math.atan2(b.y - a.y, b.x - a.x), rest, o.angles?.get(name))
   o.angles?.set(name, angle)
   const { cos, sin } = exactTrig(angle)
   return [a.pixel, [a.pixel[0] + cos * Math.max(1, length), a.pixel[1] + sin * Math.max(1, length)]]
@@ -145,7 +168,7 @@ function stripPlacements (o: SkinnedOptions): Placement[] {
     const points = single || length === undefined
       ? undefined
       : curve === undefined
-        ? turned(o, part.name, a, b, length)
+        ? turned(o, part.name, a, b, length, restAngle(o, part, choice))
         : curve.map((at, k) => snapped(o, at, `${part.b}#${k}`).pixel)
     found.push({
       name: part.name,
@@ -184,7 +207,8 @@ function placements (o: SkinnedOptions): Placement[] {
     }
     const raw = Math.atan2(b.y - a.y, b.x - a.x)
     const kept = o.angles?.get(part.name)
-    const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, kept) : snapAngle(raw, kept)
+    const rest = single ? 0 : restAngle(o, part, choice)
+    const angle = single ? 0 : o.rotation === 'clean' ? cleanStep(raw, kept) : snapAbout(raw, rest, kept)
     if (!single) o.angles?.set(part.name, angle)
     const curve = curveFor(o, part.b, single, sprite)
     found.push({

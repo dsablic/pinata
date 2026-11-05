@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { validateSkin } from '../src/formats/skin.ts'
 import { loadCharacter } from '../src/formats/character.ts'
-import { makeCamera } from '../src/raster/camera.ts'
+import { makeCamera, project } from '../src/raster/camera.ts'
 import { restPose } from '../src/motion/pose.ts'
 import type { Pose } from '../src/motion/pose.ts'
 import { toWorld } from '../src/sim/body.ts'
@@ -122,7 +122,7 @@ test('every part touches the parts it shares a joint with, at any yaw', () => {
   }
 })
 
-test('a rigid part turns in steps and reports how far its end lands from a joint another part starts at', () => {
+test('a rigid part reports how far its end lands from a joint another part starts at', () => {
   const pose = turned(90 * DEGREES)
   const angles = new Map<string, number>()
   const { parts } = drawn(pose, 90 * DEGREES, { footprints: true, angles })
@@ -134,6 +134,11 @@ test('a rigid part turns in steps and reports how far its end lands from a joint
   for (const name of ['footL', 'forearmL', 'plume']) {
     assert.equal(byName.get(name)?.missed, undefined, `${name} ends where no other part starts`)
   }
-  assert.ok([...angles.values()].every(a => Math.abs(a / (Math.PI / 8) - Math.round(a / (Math.PI / 8))) < 1e-9))
+  for (const part of symmetric.parts.filter(p => p.a !== p.b)) {
+    const [a, b] = [project(camera, pose[part.a]), project(camera, pose[part.b])]
+    const slope = Math.atan2(b.y - a.y, b.x - a.x)
+    const off = angles.get(part.name)! - slope
+    assert.ok(Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) < 1e-9, `${part.name} is drawn at its rest slope`)
+  }
   assert.equal(drawn(pose, 90 * DEGREES, { angles: new Map() }).parts.find(p => p.name === 'thighL')?.missed, undefined)
 })

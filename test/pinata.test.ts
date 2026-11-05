@@ -4,7 +4,8 @@ import { spawn, spawnSync } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { CHARACTER_INVALID, CHARACTER_OK, characterVariant, scratchDir } from './formats-fixtures.ts'
+import { commandNamed } from '../src/tool/commands.ts'
+import { CHARACTER_INVALID, CHARACTER_OK, characterVariant, patchJson, scratchDir } from './formats-fixtures.ts'
 
 const ROGUE = new URL('../examples/rogue', import.meta.url).pathname
 const PINATA = new URL('../src/cli/pinata.ts', import.meta.url).pathname
@@ -58,10 +59,13 @@ type Scenario = {
   cli: (slot: Slot) => string[]
   status?: number
   written?: (slot: Slot) => string
+  mostCharacters?: number
 }
 
 const KNIGHT_SKIN = new URL('../examples/knight/skin.json', import.meta.url).pathname
 const FILE = new URL('../package.json', import.meta.url).pathname
+
+const MOST_EXPORT_CHARACTERS = 4000
 
 const SCENARIOS: Scenario[] = [
   {
@@ -134,7 +138,8 @@ const SCENARIOS: Scenario[] = [
   {
     tool: 'export',
     args: ({ out }) => ({ dir: ROGUE, out }),
-    cli: ({ out }) => ['export', ROGUE, out]
+    cli: ({ out }) => ['export', ROGUE, out],
+    mostCharacters: MOST_EXPORT_CHARACTERS
   },
   {
     tool: 'export',
@@ -178,6 +183,8 @@ test('every tool prints the same lines, writes the same files and returns the sa
       const slots = [cliSlot.out, cliSlot.copy, toolSlot.out, toolSlot.copy]
       assert.deepEqual(printed(toolLines(result.content[0].text).join('\n'), slots),
         printed(run.stdout + run.stderr, slots), label)
+      const size = result.content.reduce((total: number, block: { text: string }) => total + block.text.length, 0)
+      assert.ok(size <= (scenario.mostCharacters ?? Infinity), `${label}: ${size} characters`)
       const where = scenario.written ?? (slot => slot.out)
       if (run.status !== 2) assert.deepEqual(filesOf(where(toolSlot), slots), filesOf(where(cliSlot), slots), label)
     }
@@ -277,4 +284,25 @@ test('no arguments prints the usage, an unknown command exits 2', () => {
   const unknown = cli('bogus')
   assert.equal(unknown.status, 2)
   assert.match(unknown.stderr, /unknown command 'bogus'/)
+})
+
+test('export of a one-view skin points to the five-view form', () => {
+  const dir = characterVariant(copy => {
+    patchJson(copy, 'skin.json', json => {
+      const { name, palette, views } = json
+      for (const key of Object.keys(json)) delete json[key]
+      Object.assign(json, { name, view: 'side-right', palette, parts: views.side.parts })
+    })
+  }, ROGUE)
+  const run = cli('export', dir, scratchDir('pinata-out-'))
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /one-view form: export draws eight directions and needs the five-view form, "views": \{/)
+})
+
+test('full is a boolean argument that asks export for the full report', () => {
+  const { argv } = commandNamed('export') as NonNullable<ReturnType<typeof commandNamed>>
+  assert.deepEqual(argv({ dir: 'a', out: 'b', full: true }), ['a', 'b', '--full'])
+  assert.deepEqual(argv({ dir: 'a', out: 'b' }), ['a', 'b'])
+  assert.equal(cli('export', ROGUE).status, 2)
+  assert.match(cli('export', ROGUE).stderr, /\[--full\]/)
 })

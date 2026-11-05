@@ -958,12 +958,12 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   starts at its snapped first joint, so parts sharing a joint start at the same pixel. The skin command keeps the
   rotating painters, so its sheets stay as they are; the cast's `painter: 'rotate'` draws the page with them, for
   comparison.
-- A rigid part's strip starts at its snapped first joint and turns in 22.5-degree steps, with the rotating painter's
-  hysteresis, rather than running to its snapped second joint: laid at any angle, a thin part a few degrees off
-  vertical (a hat cone) came out ragged under nearest sampling, and the judges preferred the stepped one. Its end can
-  so land up to about 2 px from the next part's joint on a 10 px bone; the survey counts frames where an end is 2 px
-  or more off a joint another two-joint part starts or ends at (free ends, a sword tip or a hat tip, are not
-  counted), reported only when the caller asks for footprints, so the page does not pay for it.
+- A rigid part's strip starts at its snapped first joint and turns in 22.5-degree steps about the part's rest angle,
+  with the rotating painter's hysteresis, rather than running to its snapped second joint: laid at any angle, a thin
+  part a few degrees off vertical (a hat cone) came out ragged under nearest sampling, and the judges preferred the
+  stepped one. Its end can so land up to about 2 px from the next part's joint on a 10 px bone; the survey counts
+  frames where an end is 2 px or more off a joint another two-joint part starts or ends at (free ends, a sword tip or
+  a hat tip, are not counted), reported only when the caller asks for footprints, so the page does not pay for it.
 - The middle is laid over the bone's projected length, kept between frames until it moves a whole pixel, along the
   polyline from the first point: two snapped ends would otherwise make a 4 px foot 4 to 5.4 px from frame to frame as
   its diagonal crosses pixels. It is held between 0.6 (rounded) and 1.25 of the sprite's drawn length, stopping short
@@ -974,6 +974,19 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   segments overlap inside a fold the later one wins, so a fold is solid. Pixels are mapped back to the sprite and
   sampled nearest. When a part's ends snap to the same pixel (a foot pointing at the camera) it is laid along its
   projected direction, not an arbitrary one.
+- Angle steps about the rest angle (both painters, the page and the export; `snapAbout`): a part's sprite is drawn
+  against the rest pose, so the angle it is drawn at is `rest + step(raw - rest)`, not `step(raw)` with steps from
+  the screen's x axis. The rest angle is the part's joint-to-joint angle in the rest pose, projected through the same
+  camera at the yaw of the view's own sector (the sprites of a view are drawn for that view; a mirrored view is the
+  mirrored pose, so its rest is the pose's), and for a one-view skin at the side. A part held at its rest slope is
+  drawn exactly as authored: a flat planted foot keeps its sole flat, where steps from the x axis tilted it by
+  22.5 degrees for any slope past 11 degrees, and its toe end 1 to 2 px. Parts at rest angles that are multiples of
+  22.5 degrees (the hanging limbs) are drawn as before. `--clean` rotation keeps its own grid, steps of the x axis: its
+  rotations are cached images turned by whole steps (`rotatedBy`), and an angle about a rest angle that is not a
+  multiple of the step is not a whole number of them. An end-on part (a foot
+  seen from the front) has a rest angle from a very short projected vector, as its raw angle does.
+- A part's kept angle belongs to the view sector it was snapped in: when the sector changes the kept angles are
+  dropped, so the hysteresis band never holds an angle that is off the new view's rest grid.
 - Draw order (`drawOrder`): layer first, then farther before nearer, but two parts keep last frame's order unless
   their depths differ by more than 3 cm, so parts at nearly the same depth do not swap back and forth. Level parts
   keep the mannequin's order, the later drawn above: authoring order is the structure (helmet after head, face after
@@ -1219,6 +1232,11 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - Eight-direction parts may be `upright`: a two-joint sprite drawn standing, joint A at the top and B straight
   below it. The reader turns it to lie along +x from A to B, its top row being the left of travel: the upright
   sprite's right-hand column becomes the top row.
+- A skin file of the wrong form gets an error that gives the form expected with a tiny example: the five-view form
+  (`"views": { "front": { "parts": { ... } }, ... }`) for a one-view file given where eight directions are needed
+  (`export` refuses a one-view skin by naming it), the one-view form for a `view` that is not `side-right`, the views
+  put at the top level or in a part, a view without `parts`, a part that is not an object, rows and pivots that are
+  not arrays (`[2, 5]`). A first exit-test author, without the guide, met these one at a time.
 - `layer` draws parts on a higher layer over lower ones whatever their depth (default 0).
 - `from` reuses another sprite, by part name in the same view or as `view.part`; the copy keeps its own `layer`.
   Chains of references are followed; a missing or circular reference is an error.
@@ -1256,26 +1274,25 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   (`engine note`) and do not set exit 1: `feet` (the drawn sole slide in walks and runs: the boot is redrawn as the
   ankle rotates), `facing` (the view drawn against the direction), `border` (pixels on a cell's edge: the cell is cut
   from the measured extent) and `anchor` (root against pivot: both are the engine's). The gates a file can fix fail:
-  `ground` (the skin's feet sit off the ground line: `skin.json`) and `loop` (the cycle's end does not match its
-  start: `motion.json` for cloth, `rig.json` for the gait).
-- `ground` is measured in the idle loop, in every direction, against each foot's own ground point. In a side view the
-  two feet stand at different depths (about a hip width apart along the view axis), and the camera, 14 degrees above the
-  horizon, draws a foot further away higher by the distance times sin(14 degrees) times 27 px per metre (0.25 m is about
-  1.6 px), so the line under the root is where neither foot stands. For each planted foot-frame the foot part's lowest
-  drawn row is compared with the projected row of the foot's sole (the lower of the heel and toe sole points,
-  `solePoints`, projected through the sprite's camera relative to the anchor and rounded to a whole row), and the track
-  passes when at most 5% of its planted foot-frames are more than 1 px off. The offset is signed (below the point, or
-  floating above it), each with its own hint, and a view in which no planted foot has a visible sole pixel fails. The
-  mirrored left view is measured like the others and is not an engine note: it passes for all four characters, where
-  measured against the line under the root it did not.
-- The idle holds still, so each foot's offset is one constant per direction: a miss is a skin, not noise. Each of the
-  eight 2 px misses of the example skins had an unrounded offset (the foot part's lowest row's lower edge against the
-  projected sole point) of 1.6 to 2.2 px, beyond what the rounding of both rows (0.5 px) can explain, so the measure
-  and its threshold stay and the skins were corrected: a foot sprite's `pivotA` and `pivotB` rows moved by one in the
-  view and foot named by the miss (in the side views a higher row draws the foot higher, in the front and back views,
-  where the foot is end-on, the other way), and the rogue's far foot in the side view given `layer` 1: it was drawn
-  behind the near leg, so its lowest visible row was the leg's and no pivot moved it. A mirrored direction draws the
-  other foot's sprite, so one sprite serves two feet and a fix is checked in both directions.
+  `ground` (the skin's feet sit off the ground line: `skin.json`), `drawn` (a foot sprite is hidden, empty or covered
+  in every frame of a view) and `loop` (the cycle's end does not match its start: `motion.json` for cloth, `rig.json`
+  for the gait).
+- `ground` is measured in the idle loop, in every direction, against each foot's own ground point, and `drawn` (every
+  foot seen in each view) beside it; both fail a run and are named in `skin.json`. The measure is in the export section.
+  `check` runs both on the idle of a character that has `skin.json` and `retarget.json` (one gate, `idleFootMisses`,
+  the number of idle directions that fail either, with the failing lines and the hints), because recording the idle
+  alone takes 4 to 8 s, against 3 to 4 s for the rest of `check`:
+  an author who is told only by `export`, which takes 10 to 17 s, finds a skin fault after the whole skin is drawn.
+  The header says which gates only `export` runs (loop, feet, facing, border and anchor, over every animation), and
+  that the idle foot gate was skipped when there is no skin or no `retarget.json`.
+- `export` prints a compact report by default: every `FAIL` line with its hint (a hint already printed is
+  `as above` for the next line), the `n/a` lines, the passing and the engine-note checks as counts per gate, the
+  verdict; `--full` (`full: true` in the tool) lists every track as before. The server's result for an exported
+  character was over 10,000 characters (every passing line of 56 tracks and 21 file paths), a client truncated its
+  middle, and with it the failing lines; the same text on the command line and in the tool keeps the two in agreement.
+  The files are one line, `wrote N files into <out>` (the tool's result lists their names anyway). The result stays
+  under 4,000 characters for the four examples and the exit-test characters (the largest, a skin with four failing
+  tracks, 2,000).
 - `render` draws the skinned idle in eight directions and the right-facing walk, crouch and attack from the recorder
   (the same drawing as `export`, so what is looked at is what is exported); unskinned characters are drawn by `check`'s
   stills.
@@ -1335,8 +1352,35 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   of those frames. The period is the shortest within 1.5 times the best score (a cape has its own period, so a walk can
   need two strides); the 40 best (for idle, all) starts within one frame of that period are then judged on the drawn
   pixels: the first with the seam under the median step in every direction, and not a repeated frame (see the loop
-  gate), wins; with none, the lowest worst ratio. A pose-only cut passed the gate in some directions and missed it in
-  others, because the seam of a good loop is about one usual step: only the pixels say which cut is below it.
+  gate), wins. A pose-only cut passed the gate in some directions and missed it in others, because the seam of a good
+  loop is about one usual step: only the pixels say which cut is below it.
+- When no closed candidate passes, the best closed one (not a repeated frame first, then the lowest worst ratio) is
+  compared on the same pixel measure with the best of the unclosed candidates, judged on one drawing of the raw window,
+  and the better is taken; the closed one keeps a tie. Closing can make a span worse on the pixels (the offset changes
+  where the angle steps fall), so a character whose closed candidates all fail is not left with a cut that the raw
+  window would have done better.
+- A loop is closed in pose space before it is drawn (`closure.ts`). A captured gait is not exactly periodic (the
+  wizard's thigh is at 105.1 degrees at one frame and at 94.5 one period later), and the angle steps of the painter put
+  two such poses on different steps, so the seam shows a difference the take made, not the painter. Each candidate span
+  is closed and drawn, and the pixel judgement above is made on the closed span. The difference between the frame after
+  the last and the first frame, in the root's own frame (yaw and ground position removed), is spread over the span's
+  frames linearly, frame `k` taking `(k - from) / length` of it, for every joint and every cloth point, the root joint's
+  height included. The root's travel and yaw are not touched, so the speed and the heading are the player's. The offset
+  is a position offset in the root's frame, not a rotation: the take holds joint positions, not rotations, the offset
+  over a stride is a few centimetres, and the bone lengths it changes are second order. Cloth is simulated along the
+  recorded frames and not re-simulated: its points get the same linear offset, so the cape meets its own start in
+  position, and the velocity it carries at the seam is changed only by the offset's slope, one span's difference over
+  the span. The offset does not spare planted feet: a planted foot's own difference is spread over the stance, so a foot
+  slides by up to its share of the difference per frame; the feet gate is measured before and after in the plan's batch
+  E results.
+- The candidates share the frames before their start, which closing leaves as recorded, so those frames are drawn
+  once per direction and the painter's state (the hysteresis of angles, lengths, anchors, the order and the view
+  sector) is copied at each frame passed. A candidate is drawn from a copy of the state at its start, over its span
+  only, with the first frame's travel taken from the recorded frame before it: the frames and their travel are those
+  of drawing the closed run from its first frame. Drawing a candidate from the first frame instead took 76 s for the
+  knight's walk with all 40 candidates failing (forced in a scratch run), and 30.5 s this way (the wizard's, 22.0 s);
+  a candidate that fails is dropped as soon as the next is judged, keeping only the best so far, so memory holds one
+  drawn span and the painter copies.
 - Idle is a captured take (`idle-wait`, subject 137 trial 28, the "normal wait" of the stylized-motion set) played in a
   loop by the player; the exported loop is one period of that, found like any other loop. The window is one in which
   both feet stay down in the take (the contact flags) and the player plants them without a step: a window with steps
@@ -1349,6 +1393,13 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   point moves more than 2 mm for six frames. Twelve frames at rest before the command are drawn and dropped, to prime
   the painter's state. A crouch or attack take that is missing is an error, as for idle: a character without it would
   otherwise record a standing figure under that name.
+- Directions, their names, yaws and views (`yawOf`, `viewOf`, `expectedSector`) are in `directions.ts`, which loads the
+  camera and the view chooser and not the page's cast or the world, so the gate modules and the gate unit tests do not
+  load them.
+- A frame carries, per leg, the foot's `sole` (the lowest row of the foot part's visible pixels, from the renderer's
+  owner map, for the held-feet gate), and in an idle track also `drawn` (the lowest row of the foot part's footprint,
+  covered or not) and `level` (the ground point from the world ground, in cell rows): the inputs of `ground`; `sole`
+  is the input of `drawn` (see below). Footprints are recorded for the idle only: `ground` is not measured elsewhere.
 - Frames are drawn on a canvas one and a half times the page's sprite box in each direction, of even width, and then
   cropped, the same for every frame of a character: the page's box clips a wide cape or an axe of the small skins. The
   even width puts the root on a pixel boundary, so the pivot, an integer, is the root exactly (an odd canvas leaves it
@@ -1404,15 +1455,46 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   are counted as flickers, not measured; pairs where the foot has no visible pixel are counted as hidden. A boot redrawn
   as the ankle and toe rotate moves its lowest row by several pixels, so this gate is missed (see the plan's results).
   An earlier measure on the projected skeleton ends held 1 px; it tested the player, not the exported frames.
-- Anchor: the root's exact projection is within 0.5 px of the pivot. Ground: in the idle loop, in every direction, the
-  lowest pixel row of each planted foot part is compared in every frame with the projected row of that foot's own sole
-  point (see the command line section), and the track passes when at most 5% of the planted foot-frames are more than 1
-  px off; the line reports the count and the worst offset. A track in which no foot is planted has its own message (the
-  motion, not the skin, is at fault), apart from one in which no planted foot has a visible sole pixel. A captured idle
-  puts the feet at different depths and shifts weight, so neither one frame's feet nor the line under the root says
-  where the character stands.
+- Anchor: the root's exact projection is within 0.5 px of the pivot.
+- Ground (idle, every direction, planted feet): the foot part's own pixels (its footprint in the exported draw,
+  covered by the other foot or not) against the foot's ground point: the lower of the heel and toe sole points
+  (`solePoints`) projected through the sprite's camera from the world ground, each foot at its own depth. The lowest
+  drawn row's lower edge must be within 1 px of that point rounded to a row, in at most 5% of the planted foot-frames;
+  the line gives the view, the count and the worst distance, signed (below or above), with a hint for each. A planted
+  foot with no visible pixel (the renderer's owner map: not one that is covered) in any frame where it is planted fails
+  the track, measured, with the `layer` hint: a foot that is drawn but hidden behind the other foot, or not drawn,
+  cannot be shown to stand on the ground, and a gate that skipped it would pass a skin for hiding a foot. The position
+  is still measured on the footprint, so a foot partly covered is placed by the sole it has. A track in which no foot is
+  planted has its own message.
+  The reference is absolute (the ground, not the ankle's anchor), so a whole leg drawn 1 px high is caught. The
+  threshold is the one set before the exit test.
+  What the first exit test found (51 of 102 foot-frames, the second foot, 2 to 3 px above, in the left-facing views
+  of all three characters, no pivot able to fix it) was three things in the measure and the painter, on the
+  assassin's idle: the near foot covers the far one (the lowest visible pixel of the far foot is a row above its
+  sole: row -4 against -3), which is why the pixels counted are the footprint; the painter's anchor floor against a
+  rounded projection (the same foot at -1.60 and -2.14 px in the two directions: anchor rows -2 and -3, ground points
+  that both round to 0); and the 22.5-degree steps, which drew the two feet of one idle at different pitches (raw
+  12.6 and 6.8 degrees became 22.5 and 0), a 9 px sprite's toe end moving by up to 1.8 px. A view's two directions
+  share two sprites, swapped, so no pivots satisfied the four feet.
+  Angle steps are taken about the part's rest angle (the painter, below). Anchor rounding was measured: rounding
+  instead of flooring left the seven skins worse (the hysteresis band is for a floor), so it stays a floor.
+- Drawn: for each view of the idle (front, frontSide, side, backSide, back), each foot must have a visible pixel (the
+  renderer's owner map, so not one that is covered) in at least one frame of at least one of that view's directions.
+  In a side view mirroring swaps near and far, so each foot is near in one of its two directions; front and back have
+  one direction, so a foot hidden there fails. A `hidden` or empty sprite, and a foot covered in every frame (a robe),
+  fail; a foot visible in one direction only passes. The first exit test's assassin hid its left foot sprite in the
+  side view to pass `ground`; that view's right-facing direction then has the other foot visible and the left-facing
+  the one hidden, so hiding one foot passes this rule and hiding both fails; `ground` fails the direction in which the
+  hidden sprite is the far foot's, so hiding one foot fails as well.
 - Facing: the view sector the painter used for every frame of idle, walk, run and jump is the direction's. Turns
   change sector on the way and are not checked. Border: no opaque pixel on the cell's edge.
+- The report lists every check with `--full` (`full: true` over MCP). Without it, the compact report has, per gate that
+  fails, one line (`ground FAIL idle-left 51/102 3px above; idle-back-left 51/102 2px above`, wrapped at 120 columns)
+  naming every failing track with its key numbers, and each distinct hint once, after the first line that has it;
+  tracks not measured, passes and engine notes are counted. It has no cap: a cap hides a failing track from the author
+  who has to fix it, and the lines are short enough that all 56 tracks failing every gate that a track can fail
+  (`loop` on 24, `ground` on 8, `drawn` on 5 views) takes under 2,000 characters, against the budget of 4,000 for the
+  failing lines and hints.
 - `npm run export -- <character dir> <out dir>` writes `<name>.png` and `<name>.json`, prints each check (`ok`,
   `FAIL`, `note` for an engine gate that missed, or `n/a` for not measured) and exits 1 when a measured gate that a
   character file can fix fails. The character's directory name is its

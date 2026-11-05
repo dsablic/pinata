@@ -27,6 +27,11 @@ export const TRANSPARENT_CHAR = '.'
 export const MAX_COLOURS = 16
 export const MAX_SPRITE_SIZE = 64
 
+const SPRITE_FORM = '{ "rows": ["bb", "bb"], "pivotA": [0, 0] }'
+export const ONE_VIEW_FORM = `"view": "side-right", "parts": { "torso": ${SPRITE_FORM} }`
+export const FIVE_VIEW_FORM = `"views": { "front": { "parts": { "torso": ${SPRITE_FORM} } }, ` +
+  '"frontSide": { "parts": {} }, "side": { "parts": {} }, "backSide": { "parts": {} }, "back": { "parts": {} } }'
+
 const SKIN_FIELDS = ['name', 'view', 'palette', 'parts', 'views'] as const
 const PART_FIELDS = ['rows', 'pivotA', 'pivotB', 'hidden', 'upright', 'layer', 'from'] as const
 
@@ -38,17 +43,25 @@ export function validateSkin (input: unknown): Validated<Skin> {
   const palette = validatePalette(input.palette, errors)
   if (input.views !== undefined) {
     if (input.view !== undefined || input.parts !== undefined) {
-      errors.push({ path: 'views', message: "an eight-direction skin has 'views' only; drop 'view' and 'parts'" })
+      errors.push({
+        path: 'views',
+        message: `an eight-direction skin has 'views' only, its sprites inside views.<view>.parts; drop 'view' and ` +
+          `'parts': ${FIVE_VIEW_FORM}`
+      })
     }
     if (!isRecord(input.views)) {
-      errors.push({ path: 'views', message: `expected an object with ${VIEWS.join(', ')}` })
+      errors.push({ path: 'views', message: `expected an object with ${VIEWS.join(', ')}: ${FIVE_VIEW_FORM}` })
     } else {
       checkKnownKeys(input.views, VIEWS, 'views', errors)
       const views = structuredClone(input.views) as Record<string, unknown>
       const drawnViews = VIEWS.filter(view => {
         const drawn = views[view]
         if (!isRecord(drawn) || !isRecord(drawn.parts)) {
-          errors.push({ path: `views.${view}`, message: 'expected { parts: { partName: sprite } }' })
+          errors.push({
+            path: `views.${view}`,
+            message: `expected { "parts": { partName: sprite } }, the sprites inside 'parts': ` +
+              `"${view}": { "parts": { "torso": ${SPRITE_FORM} } }`
+          })
           return false
         }
         checkKnownKeys(drawn, ['parts'], `views.${view}`, errors)
@@ -72,11 +85,22 @@ export function validateSkin (input: unknown): Validated<Skin> {
     }
     if (errors.length > 0) return { errors }
   }
-  if (input.view !== 'side-right') {
-    errors.push({ path: 'view', message: "expected 'side-right', or 'views' for an eight-direction skin" })
+  const misplaced = VIEWS.filter(view => input[view] !== undefined)
+  if (misplaced.length > 0) {
+    errors.push({
+      path: misplaced[0],
+      message: `${misplaced.join(', ')} ${misplaced.length === 1 ? 'goes' : 'go'} inside 'views' of an ` +
+        `eight-direction skin, not at the top level: ${FIVE_VIEW_FORM}`
+    })
+  } else if (input.view !== 'side-right') {
+    errors.push({
+      path: 'view',
+      message: `expected 'side-right' for a one-view skin (${ONE_VIEW_FORM}), or 'views' for an ` +
+        `eight-direction skin (${FIVE_VIEW_FORM})`
+    })
   }
   if (!isRecord(input.parts)) {
-    errors.push({ path: 'parts', message: 'expected an object mapping part name to a sprite' })
+    errors.push({ path: 'parts', message: `expected an object mapping part name to a sprite: ${ONE_VIEW_FORM}` })
   } else {
     for (const [name, part] of Object.entries(input.parts)) validatePart(part, `parts.${name}`, palette, errors)
   }
@@ -111,7 +135,15 @@ function validatePalette (palette: unknown, errors: ValidationError[]): Set<stri
 
 function validatePart (part: unknown, path: string, palette: Set<string>, errors: ValidationError[]): void {
   if (!isRecord(part)) {
-    errors.push({ path, message: 'expected an object' })
+    errors.push({ path, message: `expected a sprite object like ${SPRITE_FORM}, or { "hidden": true }` })
+    return
+  }
+  if (VIEWS.some(view => part[view] !== undefined) || isRecord(part.parts)) {
+    errors.push({
+      path,
+      message: `a part is one sprite, not a set of views; views go under 'views' in the eight-direction form: ` +
+        `${FIVE_VIEW_FORM}`
+    })
     return
   }
   checkKnownKeys(part, PART_FIELDS, path, errors)
@@ -136,7 +168,7 @@ type Size = { width: number, height: number } | undefined
 
 function validateRows (rows: unknown, path: string, palette: Set<string>, errors: ValidationError[]): Size {
   if (!Array.isArray(rows) || rows.length === 0 || !rows.every(isNonEmptyString)) {
-    errors.push({ path, message: 'expected a non-empty array of non-empty strings, one per pixel row' })
+    errors.push({ path, message: 'expected a non-empty array of non-empty strings, one per pixel row: ["bb", "b."]' })
     return undefined
   }
   const lines = rows.map(row => [...row])
@@ -175,7 +207,7 @@ function validateRows (rows: unknown, path: string, palette: Set<string>, errors
 function validatePivot (pivot: unknown, path: string, size: Size, errors: ValidationError[]): void {
   const ok = Array.isArray(pivot) && pivot.length === 2 && pivot.every(Number.isInteger)
   if (!ok) {
-    errors.push({ path, message: 'expected [x, y] as integer pixel coordinates in the sprite' })
+    errors.push({ path, message: 'expected [x, y] as integer pixel coordinates in the sprite, such as [2, 5]' })
     return
   }
   if (size === undefined) return

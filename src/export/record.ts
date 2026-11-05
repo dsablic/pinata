@@ -1,4 +1,5 @@
 import { legsOf } from '../formats/rig.ts'
+import { FIVE_VIEW_FORM } from '../formats/skin.ts'
 import type { Leg } from '../formats/rig.ts'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
@@ -13,17 +14,19 @@ import { solePoints } from '../motion/pose.ts'
 import type { Pose } from '../motion/pose.ts'
 import { FPS, pageEnvironment, pageSecondary, raisedRoot } from '../page/cast.ts'
 import type { CastOptions } from '../page/cast.ts'
-import { freshPainting, pageCamera, paintSprite, spriteBox } from '../page/sprite.ts'
-import type { Skinned, Sprite } from '../page/sprite.ts'
+import { clonePainting, freshPainting, paintSprite, spriteBox } from '../page/sprite.ts'
+import type { Painting, Skinned, Sprite } from '../page/sprite.ts'
 import { jointsOf } from '../page/walker.ts'
 import { project } from '../raster/camera.ts'
 import type { Camera } from '../raster/camera.ts'
-import { chooseView, facingAngle } from '../style/views.ts'
-import { changedPixels, medianOf, ratioOf, repeated, seamFrom, steps } from './loops.ts'
+import { DIRECTIONS, SPRITE_PER_METRE, yawOf } from './directions.ts'
+import type { Direction } from './directions.ts'
+import { closed, localPoint } from './closure.ts'
+import { ratioOf, repeated, seamOf } from './loops.ts'
 import type { Seam } from './loops.ts'
 import type { ReadWorld } from '../world/bundle.ts'
 import type { CastMember } from '../world/world.ts'
-import { turnToLocal, turnToWorld } from '../world/yaw.ts'
+import { turnToWorld } from '../world/yaw.ts'
 
 export type Behaviour = PerformanceKind | 'walk' | 'run' | 'turn' | 'jump'
 export type Moment = { joints: Pose, curves: Record<string, Vec3[]>, position: Vec3, yaw: number, planted: boolean[] }
@@ -32,22 +35,16 @@ export type Take = { frames: Moment[], from: number, to: number, loop: boolean }
 export type Air = Pick<CastOptions, 'environment' | 'springSubsteps'>
 export type Subject = { name: string, member: CastMember, look: Skinned, air: Air }
 export type Sole = { x: number, y: number }
-export type Foot = { planted: boolean, sole: Sole | undefined, level: number }
+export type Foot = { planted: boolean, sole: Sole | undefined, drawn: Sole | undefined, level: number }
 export type Frame = { image: Image, sector: number | undefined, travel: [number, number], feet: Foot[] }
 export type Track = { behaviour: Behaviour, direction: Direction, loop: boolean, frames: Frame[] }
 export type Cell = { width: number, height: number, pivot: [number, number], root: [number, number] }
 export type Recording = { name: string, cell: Cell, spritePerMetre: number, tracks: Track[] }
 
-export const SPRITE_PER_METRE = 27
-export const DIRECTIONS = [
-  'front', 'front-right', 'right', 'back-right', 'back', 'back-left', 'left', 'front-left'
-] as const
-export type Direction = typeof DIRECTIONS[number]
 export const SKINNED_HUMANOIDS = ['knight', 'rogue', 'dwarf', 'wizard']
 export const BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run', 'turn', 'jump', 'crouch', 'attack']
 
 const EAST = Math.PI / 2
-const QUARTER = Math.PI / 4
 const WALK_SPEED = 1.1
 const RUN_SPEED = 3
 const TURN_ANGLE = Math.PI / 2
@@ -78,15 +75,15 @@ const LOOPS: Partial<Record<Behaviour, Looping>> = {
   run: { ...GAIT, window: 96, lengths: [8, 48], speed: RUN_SPEED }
 }
 
-export function yawOf (direction: Direction): number {
-  return DIRECTIONS.indexOf(direction) * QUARTER
-}
-
 export function subjectOf (world: ReadWorld, name: string): Subject {
   const i = world.cast.findIndex(member => member.name === name)
   const look = world.looks[i]
   if (i < 0) throw new Error(`${name} is not in the world`)
   if (look?.skin === undefined) throw new Error(`${name} has no skin.json: draw one (pinata skin guide) to record it`)
+  if (look.skin.skin.views === undefined) {
+    throw new Error(`${name}'s skin.json is the one-view form: export draws eight directions and needs the ` +
+      `five-view form, ${FIVE_VIEW_FORM}`)
+  }
   if (world.cast[i].capture === undefined) {
     throw new Error(`${name} has no retarget.json: add one (hang and style, see the guide) to record it`)
   }
@@ -126,8 +123,7 @@ function stepsOf (s: Stepper, count: number): Moment[] {
 }
 
 function wholeLocal (m: Moment): number[] {
-  const root: Vec3 = [m.position[0], 0, m.position[2]]
-  const local = (p: Vec3): Vec3 => turnToLocal([p[0] - root[0], p[1], p[2] - root[2]], m.yaw)
+  const local = (p: Vec3): Vec3 => localPoint(m, p)
   const joints = Object.keys(m.joints).sort().flatMap(name => local(m.joints[name]))
   const curves = Object.keys(m.curves).sort().flatMap(name => m.curves[name].flatMap(local))
   return [...joints, ...curves]
@@ -169,29 +165,59 @@ function period (found: Candidate[]): number {
   return Math.min(...near.map(f => f.length))
 }
 
+type Scored = { c: Candidate, drawn: Frame[][], seams: Seam[] }
+type Drawer = { whole: () => Frame[][], span: (frames: Moment[], span: Span) => Frame[][] }
+
+function worstRatio (seams: Seam[]): number {
+  return Math.max(...seams.map(ratioOf))
+}
+
+function seamsOf (drawn: Frame[][], holding: boolean): Seam[] {
+  return drawn.map(own => seamOf(own.map(frame => frame.image), holding))
+}
+
+function passes ({ seams }: Scored): boolean {
+  return !seams.some(repeated) && worstRatio(seams) <= 1
+}
+
+function beats (a: Scored, b: Scored): boolean {
+  const [repeatedA, repeatedB] = [a.seams.some(repeated), b.seams.some(repeated)]
+  return repeatedA === repeatedB ? worstRatio(a.seams) < worstRatio(b.seams) : repeatedB
+}
+
+function closedScore (frames: Moment[], c: Candidate, drawer: Drawer, holding: boolean): Scored {
+  const span = { from: c.from, to: c.from + c.length }
+  const drawn = drawer.span(closed(frames, span), span)
+  return { c, drawn, seams: seamsOf(drawn, holding) }
+}
+
+function openScore (raw: Frame[][], c: Candidate, holding: boolean): Scored {
+  const drawn = raw.map(own => own.slice(c.from, c.from + c.length))
+  return { c, drawn, seams: seamsOf(drawn, holding) }
+}
+
+function bestOf (scored: Scored[]): Scored {
+  return scored.reduce((best, own) => beats(own, best) ? own : best)
+}
+
 export function loopOf (
   frames: Moment[],
-  images: Image[][],
+  drawer: Drawer,
   { lengths, candidates, holding }: Pick<Looping, 'lengths' | 'candidates' | 'holding'>
-): Span {
+): Frame[][] {
   const found = candidatesOf(frames, lengths)
   const base = period(found)
   const near = found.filter(f => Math.abs(f.length - base) <= PERIOD_SLACK)
     .sort((a, b) => a.miss - b.miss || a.from - b.from).slice(0, candidates)
-  const consecutive = images.map(steps)
-  const seams = (c: Candidate): Seam[] => images.map((own, d) => {
-    const inside = consecutive[d].slice(c.from, c.from + c.length - 1)
-    return seamFrom(inside, changedPixels(own[c.from + c.length - 1], own[c.from]), holding)
-  })
-  const scored = near.map(c => ({ c, seams: seams(c) }))
-  const worst = (seam: Seam[]): number => Math.max(...seam.map(ratioOf))
-  const fresh = scored.filter(({ seams }) => !seams.some(repeated))
-  const usable = fresh.length > 0 ? fresh : scored
-  const passing = usable.filter(({ seams }) => worst(seams) <= 1)
-  const pick = passing.length > 0
-    ? passing[0].c
-    : usable.reduce((a, b) => worst(b.seams) < worst(a.seams) ? b : a).c
-  return { from: pick.from, to: pick.from + pick.length }
+  let best: Scored | undefined
+  for (const c of near) {
+    const own = closedScore(frames, c, drawer, holding)
+    if (passes(own)) return own.drawn
+    if (best === undefined || beats(own, best)) best = own
+  }
+  const raw = drawer.whole()
+  const open = bestOf(near.map(c => openScore(raw, c, holding)))
+  return (beats(open, best!) ? open : best!).drawn
 }
 
 function moved (a: Moment, b: Moment): boolean {
@@ -277,15 +303,11 @@ function footParts (subject: Subject, leg: Leg): string[] {
   }).map(part => part.name)
 }
 
-function soleOf (sprite: Sprite, names: string[], box: Camera): Sole | undefined {
-  const { owner, parts } = sprite
-  if (owner === undefined || parts === undefined) return undefined
-  const mine = new Set(parts.flatMap((part, i) => names.includes(part.name) ? [i] : []))
+function lowestOf (pixels: Iterable<number>, box: Camera): Sole | undefined {
   let lowest = -1
   let sum = 0
   let count = 0
-  for (let i = 0; i < owner.length; i++) {
-    if (!mine.has(owner[i])) continue
+  for (const i of pixels) {
     const y = Math.floor(i / box.width)
     if (y > lowest) {
       lowest = y
@@ -300,14 +322,41 @@ function soleOf (sprite: Sprite, names: string[], box: Camera): Sole | undefined
   return count === 0 ? undefined : { x: sum / count - box.width / 2, y: lowest - box.baseline }
 }
 
-function feetOf (subject: Subject, m: Moment, sprite: Sprite, box: Camera): Foot[] {
+function partIndices (sprite: Sprite, names: string[]): Set<number> {
+  return new Set((sprite.parts ?? []).flatMap((part, i) => names.includes(part.name) ? [i] : []))
+}
+
+function visiblePixels (sprite: Sprite, names: string[]): number[] {
+  const mine = partIndices(sprite, names)
+  const found: number[] = []
+  sprite.owner?.forEach((owner, i) => {
+    if (mine.has(owner)) found.push(i)
+  })
+  return found
+}
+
+function footprintPixels (sprite: Sprite, names: string[]): number[] {
+  return (sprite.parts ?? []).filter(part => names.includes(part.name)).flatMap(part => part.footprint ?? [])
+}
+
+function screenRow (box: Camera, m: Moment, point: Vec3): number {
+  return project(box, [point[0] - m.position[0], point[1] - m.position[1], point[2] - m.position[2]]).y
+}
+
+function groundRow (subject: Subject, m: Moment, leg: Leg, box: Camera): number {
   const { mannequin } = subject.member
+  return Math.max(...solePoints(m.joints, leg, mannequin).map(point => screenRow(box, m, point))) - box.baseline
+}
+
+function feetOf (subject: Subject, m: Moment, sprite: Sprite, box: Camera): Foot[] {
   return legsOf(subject.member.rig).map((leg, k) => {
-    const rows = solePoints(m.joints, leg, mannequin).map(point => {
-      return project(box, [point[0] - m.position[0], point[1] - m.position[1], point[2] - m.position[2]]).y
-    })
-    const level = Math.max(...rows) - box.baseline
-    return { planted: m.planted[k] ?? false, sole: soleOf(sprite, footParts(subject, leg), box), level }
+    const names = footParts(subject, leg)
+    return {
+      planted: m.planted[k] ?? false,
+      sole: lowestOf(visiblePixels(sprite, names), box),
+      drawn: lowestOf(footprintPixels(sprite, names), box),
+      level: groundRow(subject, m, leg, box)
+    }
   })
 }
 
@@ -318,20 +367,45 @@ function travelOf (box: Camera, from: Vec3, to: Vec3, by: number): [number, numb
   return [at.x - origin.x, at.y - origin.y]
 }
 
-export function drawTake (subject: Subject, frames: Moment[], direction: Direction, box: Camera): Frame[] {
+function drawFrame (
+  subject: Subject, frames: Moment[], k: number, direction: Direction, box: Camera, painting: Painting,
+  grounded: boolean
+): Frame {
   const by = yawOf(direction) - EAST
-  const painting = freshPainting()
-  return frames.map((moment, k) => {
-    const m = turned(moment, by)
-    const placed = { joints: m.joints, curves: m.curves, anchor: m.position, yaw: m.yaw }
-    const sprite = paintSprite(subject.look, painting, box, placed, { painter: 'strip' })
-    const travel = k === 0 ? [0, 0] as [number, number] : travelOf(box, frames[k - 1].position, m.position, by)
-    return { image: sprite.image, sector: sprite.sector, travel, feet: feetOf(subject, m, sprite, box) }
-  })
+  const m = turned(frames[k], by)
+  const placed = { joints: m.joints, curves: m.curves, anchor: m.position, yaw: m.yaw }
+  const sprite = paintSprite(subject.look, painting, box, placed, { painter: 'strip', footprints: grounded })
+  const travel = k === 0 ? [0, 0] as [number, number] : travelOf(box, frames[k - 1].position, m.position, by)
+  return { image: sprite.image, sector: sprite.sector, travel, feet: feetOf(subject, m, sprite, box) }
 }
 
-export function expectedSector (direction: Direction): number {
-  return chooseView(facingAngle(pageCamera(SPRITE_PER_METRE), yawOf(direction))).sector
+export function drawTake (
+  subject: Subject, frames: Moment[], direction: Direction, box: Camera, grounded = false
+): Frame[] {
+  const painting = freshPainting()
+  return frames.map((_, k) => drawFrame(subject, frames, k, direction, box, painting, grounded))
+}
+
+function drawerOf (subject: Subject, frames: Moment[], box: Camera, grounded: boolean): Drawer {
+  const lanes = DIRECTIONS.map(direction => {
+    const painting = freshPainting()
+    return { direction, painting, before: [clonePainting(painting)] }
+  })
+  const paintingBefore = (lane: typeof lanes[number], k: number): Painting => {
+    while (lane.before.length <= k) {
+      drawFrame(subject, frames, lane.before.length - 1, lane.direction, box, lane.painting, grounded)
+      lane.before.push(clonePainting(lane.painting))
+    }
+    return clonePainting(lane.before[k])
+  }
+  return {
+    whole: () => DIRECTIONS.map(direction => drawTake(subject, frames, direction, box, grounded)),
+    span: (shut, { from, to }) => lanes.map(lane => {
+      const painting = paintingBefore(lane, from)
+      const span = Array.from({ length: to - from }, (_, k) => from + k)
+      return span.map(k => drawFrame(subject, shut, k, lane.direction, box, painting, grounded))
+    })
+  }
 }
 
 function canvasOf (subject: Subject): Camera {
@@ -389,14 +463,12 @@ export function record (subject: Subject, behaviours: Behaviour[] = BEHAVIOURS):
   const canvas = canvasOf(subject)
   const tracks = behaviours.flatMap(behaviour => {
     const take = takeOf(subject, behaviour)
-    const drawn = DIRECTIONS.map(direction => drawTake(subject, take.frames, direction, canvas))
+    const drawer = drawerOf(subject, take.frames, canvas, behaviour === 'idle')
     const looped = loopingOf(subject, behaviour)
-    const { from, to } = looped === undefined
-      ? take
-      : loopOf(take.frames, drawn.map(frames => frames.map(frame => frame.image)), looped)
-    return DIRECTIONS.map((direction, d): Track => {
-      return { behaviour, direction, loop: take.loop, frames: drawn[d].slice(from, to) }
-    })
+    const drawn = looped === undefined
+      ? drawer.whole().map(own => own.slice(take.from, take.to))
+      : loopOf(take.frames, drawer, looped)
+    return DIRECTIONS.map((direction, d): Track => ({ behaviour, direction, loop: take.loop, frames: drawn[d] }))
   })
   const { cell, tracks: own } = fitted(tracks, canvas)
   return { name: subject.name, cell, spritePerMetre: SPRITE_PER_METRE, tracks: own }

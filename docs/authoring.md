@@ -19,45 +19,50 @@ skin you draw, and the commands that check, preview and export it. It needs noth
 | `pinata skin preview <dir> <skin.json> <out> [--clean]` | Validates the skin and draws it | `directions.png`, `turntable.png`, `walks.png`, `summary.txt` |
 | `pinata skin fit <dir> [<skin.json>]` | Flags sprites whose length does not suit their bone | printed lines only |
 | `pinata render <dir> <out>` | A skinned character's idle in eight directions and walk, crouch and attack strips, for looking | `idle-directions.png`, `walk-strip.png`, `crouch-strip.png`, `attack-strip.png` |
-| `pinata export <dir> <out>` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch and attack, each in eight directions | per animation `<name>-<animation>.png` (sprite sheet), `.json` (Aseprite JSON array format: frames, durations, tags `<animation>-<direction>`, the anchor as a slice pivot) and `.aseprite` (Aseprite's binary format) |
+| `pinata export <dir> <out> [--full]` | Idle (a captured standing take, looped), walk, run, turn, jump, crouch and attack, each in eight directions | per animation `<name>-<animation>.png` (sprite sheet), `.json` (Aseprite JSON array format: frames, durations, tags `<animation>-<direction>`, the anchor as a slice pivot) and `.aseprite` (Aseprite's binary format) |
 
 Exit codes: 0 ok; 1 a gate failed whose fix is in the character's files (a `hint:` line says which file and what to
 change); 2 bad arguments, a package that does not load, or a character the command cannot work on (`render` and
-`export` need `skin.json` and `retarget.json`). In `export`, lines starting `note` are engine notes: gates that measure
-the engine (planted feet in the drawn frames, the view drawn per direction, the cell border, the anchor) and that no
-character file can fix; they do not change the exit code. `FAIL` lines in `export` are about the character: `ground`
-means the skin's feet are drawn below or above their ground point (`skin.json`, see Drawing the skin), `loop` means
-the end of a cycle does not match its start (the cloth in `motion.json`, or the gait in `rig.json`).
+`export` need `skin.json` and `retarget.json`).
+
+`export` prints every `FAIL` line with its hint (a repeated hint is `as above`), then the passing and the engine-note
+checks as counts per gate; `--full` (`full: true` over MCP) lists every track. `note` lines are engine notes: gates that
+measure the engine (planted feet in the drawn frames, the view drawn per direction, the cell border, the anchor), which
+no character file can fix and which do not change the exit code. `FAIL` lines are about the character: `ground` and
+`drawn` mean a foot is drawn off its ground point or not drawn (`skin.json`, see The ground gate), `loop` means the end
+of a cycle does not match its start (the cloth in `motion.json`, or the gait in `rig.json`).
 
 `pinata mcp` serves the same commands to an agent over the Model Context Protocol (stdio, newline-delimited
 JSON-RPC). Register it in a client as the command `npx pinata mcp` (in Claude Code: `claude mcp add pinata -- npx
 pinata mcp`); from a checkout it is `node src/cli/pinata.ts mcp`. It offers:
 
 - one tool per command, `new`, `check`, `skin`, `render` and `export`, with the command's arguments as a JSON object
-  (`dir`, `out`, `template`; `skin` also takes `action` of `guide`, `preview` or `fit`). Unknown arguments and wrong
-  types are refused with an error result naming the argument. Relative paths resolve against the server's working
+  (`dir`, `out`, `template`, `full`; `skin` also takes `action` of `guide`, `preview` or `fit`). Unknown arguments and
+  wrong types are refused with an error result naming the argument. Relative paths resolve against the server's working
   directory, so pass absolute paths. The result is the command's lines, the files it wrote and `exit status: n`;
-  `isError` is true for any non-zero status, a failed gate included: read it and fix the named file, it is not a
-  protocol error. `check` removes only its own report files from `out` and writes nothing outside it;
+  `isError` is true for any non-zero status, a failed gate included: read it and fix the named file;
 - this guide as the resource `pinata://docs/authoring`.
 
-Edit files by writing the whole file with your file-writing tool. Do not patch JSON with `sed` or `awk`: `sed -i`
-differs between macOS and Linux and can fail silently, which costs a run. JSON allows no comments and no trailing
-commas.
+Edit files by writing the whole file with your file-writing tool, not with `sed` or `awk` (`sed -i` differs between
+macOS and Linux and can fail silently). JSON allows no comments and no trailing commas.
 
 ## From prompt to export
 
 1. `pinata new --template biped <dir>` (a humanoid with the joint names the motion capture needs: see Skin, motion and
    export) and change shapes, colours and proportions to the character. For a four-legged character use `quadruped`,
    and so on (a skinned export is humanoid only).
-2. `pinata check <dir>`. Exit 2: a load error, fix the lines in `summary.txt`. Exit 1: work through the `FAIL` lines
+2. A cape, cloak or scarf is cloth: declare it in `motion.json` (`cape`, `chains`, `bind`; see Cape and cloth in a
+   skinned character) before drawing anything. The skin only draws what the simulation moves; a cape drawn as an
+   ordinary skin part, or coloured into the torso, never swings.
+3. `pinata check <dir>`. Exit 2: a load error, fix the lines in `summary.txt`. Exit 1: work through the `FAIL` lines
    and hints from the top. Static gates first: they change the mannequin that the walk gates measure. Then look at
    `sheet.png` (shape and palette), `walk.png` and `footprints.png` (feet) and `cloth.png` (cape and chains). Repeat
-   until `automated gates: PASS`.
-3. Add `retarget.json` and draw `skin.json` (Skin, motion and export), using `pinata skin guide`, `skin preview` and
+   until `automated gates: PASS`. Once `skin.json` and `retarget.json` exist, `check` also draws the idle in eight
+   directions and fails `idleFootMisses` for the `export` gates `ground` and `drawn`; only `export` runs the others.
+4. Add `retarget.json` and draw `skin.json` (Skin, motion and export), using `pinata skin guide`, `skin preview` and
    `skin fit`.
-4. `pinata render <dir> <out>`: look at the idle in eight directions and the walk, crouch and attack strips.
-5. `pinata export <dir> <out>`: fix any `FAIL` line; the sheets are the result.
+5. `pinata render <dir> <out>`: look at the idle in eight directions and the walk, crouch and attack strips.
+6. `pinata export <dir> <out>`: fix any `FAIL` line; the sheets are the result.
 
 ## `pinata check`
 
@@ -68,11 +73,8 @@ pinata check <character dir> [--out <dir>]
 It renders the character at 32 px and 48 px, animates a walk, simulates cloth, measures a fixed set of gates and
 writes a report. A package is finished when every gate passes.
 
-| Exit code | Meaning |
-|---|---|
-| 0 | Package loaded and every gate passed. |
-| 1 | Package loaded, at least one gate failed. |
-| 2 | Package did not load (format or cross-file error), bad arguments (including a file instead of a directory), or an internal error. |
+Exit codes are the command's: 0 every gate passed, 1 a gate failed, 2 the package did not load (format or cross-file
+error), bad arguments (including a file instead of a directory) or an internal error.
 
 The report is written to `<character dir>/report/` (or `--out`). A run takes a few seconds.
 
@@ -94,10 +96,8 @@ Load errors have the form `file: path: message`, for example
 All errors found are listed at once, but cross-file errors (a name that refers to another file, rig coverage, cape
 anchors, `height` against the parts) are only checked after every file is valid on its own, so a second batch of
 errors can appear once the first is fixed. Every JSON object rejects unknown fields
-(`unknown field 'x'; known fields: ...`), so
-spell field names exactly as in this guide. JSON allows no comments and no trailing commas.
-
-The `report/` directory is ignored by version control.
+(`unknown field 'x'; known fields: ...`), so spell field names exactly as in this guide. JSON allows no comments and
+no trailing commas.
 
 ## Coordinates and units
 
@@ -116,8 +116,6 @@ validated: it is an error when it differs by more than 10% from the span between
 the highest part at rest (the message prints both numbers). It scales the model to pixels: the figure is `height`
 metres tall at 32 px and at 48 px, so one pixel is `height / 32` m in the small views and `height / 48` m in the
 large views. The walk gates measure at 48 px.
-
-For a 1.2 m character, one pixel at 32 px is 0.0375 m. Size every feature in pixels, then convert.
 
 ## Package layout
 
@@ -208,10 +206,9 @@ The box length is the distance from `a` to `b`. `a` and `b` must be different jo
   lowest sole point on the floor. The toe joint must be in front (larger z) of the ankle joint. A tilted foot rolls
   while it is planted and makes the slide and ground gates fail.
 - **Knees.** Knees bend forward, or backward for a leg with `bend: "backward"` (the IK solver decides the direction).
-  The rest position of the knee joint only sets the thigh length (hip to knee) and the shin length (knee to ankle);
-  it does not choose which way the knee bends. The two joints of each of these bones (hip and knee, knee and ankle,
-  ankle and toe, shoulder and elbow,
-  elbow and wrist) must not be at the same position: that is a load error.
+  The rest position of the knee joint only sets the thigh length (hip to knee) and the shin length (knee to ankle); it
+  does not choose which way the knee bends. The two joints of a bone (hip and knee, knee and ankle, ankle and toe,
+  shoulder and elbow, elbow and wrist) must not be at the same position: that is a load error.
 - **Floor.** No part other than the feet may reach below y = 0: every capsule needs joint y >= its radius at that end,
   and every box corner must stay above the floor.
 - **Materials.** Each part's `material` must exist in `style.json` `materials`.
@@ -236,9 +233,8 @@ A decal paints a small pixel pattern onto the figure, for eyes, buckles, emblems
 - The anchor must sit on the front surface, within about one pixel (`height / size` m: 0.0375 m at 32 px for a 1.2 m
   character) behind it. An anchor deeper inside a part counts as hidden and the decal never shows. For a part of
   radius `r` centred on the axis, put the anchor `r` in front of the axis.
-- Pixels outside every part are not drawn. Decal pixels are exempt from the stray-pixel gate, so single pixels are
-  allowed here.
-- Every character in a pattern except `.` needs an entry in `decalColors`.
+- Pixels outside every part are not drawn. Decal pixels are exempt from the stray-pixel gate. Every character in a
+  pattern except `.` needs an entry in `decalColors`.
 
 ```json
 { "name": "emblem", "anchor": "emblem", "normal": [0, 0, 1], "pattern": [".r.", "rrr", ".r."] }
@@ -558,8 +554,6 @@ drawn as thin capsules) are not part of them: they are thin by design, so `maxTh
 | `paletteSize` | <= 16 | Distinct colours over all views. |
 | `maxStrayPixels` | <= 2 | Isolated single pixels (not decals) in the worst view. |
 
-- **outlineGaps.** The camera fits every part, so this gate never fails for a package that loads. If it does, report
-  it as a bug rather than changing the character.
 - **maxThinFraction.** A part that is one pixel wide flickers and vanishes. At 32 px a part must be at least 2 px
   across, which is `height / 16` metres (0.075 m for a 1.2 m character); aim for 3 px (`3 * height / 32`). "Across"
   is a diameter: a capsule is `2 * radius` (of the thinner end), so 0.075 m across needs a radius of 0.0375 m; for a box
@@ -633,8 +627,6 @@ Usual fixes:
 - **unbalancedFrames.** The hint names the worst frame and the feet on the ground. Raise `stanceFraction` so more
   feet are down at once, keep neighbouring legs half a cycle apart, spread the feet wider (`lateral: "rest"` with
   splayed feet), or move heavy parts toward the middle of the legs.
-- **appendageBoneLengthError, appendageNonFinite.** These cannot fail for a rig that loads; report a failure with
-  the package.
 - **alternationViolations.** The swing foot does not rise enough to count as a step: raise `stepHeight` well above
   0.02 m and keep `stanceFraction` below 0.7 (with four legs, check the `phase` values against the walk order
   instead; they need `stanceFraction` 0.75 or more).
@@ -872,11 +864,15 @@ fields. A wrong joint name is reported with the file and path.
 
 ### Cape and cloth in a skinned character
 
-The cloth is simulated, and the skin draws it by binding sprites to it: make the cape a pair of stand-in parts from a
-top joint to a hem joint (`capeL`: `capeTopL` to `capeHemL`), list both in `motion.json` `exclude`, list the hem joints
-in `bind`, and give the stand-ins sprites in the skin. The sprite is then laid along the cloth's curve as it swings. A
-`loop` FAIL in `export` is usually the cloth: a cape that has not settled when the cycle ends; shorten it or raise its
-material's `damping`.
+A cape is cloth: `motion.json` simulates it and the skin draws it by binding sprites to the simulation. In order:
+
+1. `mannequin.json`: anchor joints on the upper body (`capeTopL`, `capeTopR`, in `rig.upperBody`), hem joints
+   (`capeHemL`, `capeHemR`) and a stand-in part from top to hem for each side (`capeL`: `capeTopL` to `capeHemL`).
+2. `motion.json`: `cape` (see cape above), both stand-ins in `exclude` and the hem joints in `bind`.
+3. `skin.json`: a sprite for each stand-in in every view, laid along the cloth's curve as it swings.
+
+A `loop` FAIL in `export` is usually the cloth: a cape that has not settled when the cycle ends; shorten it or raise
+its material's `damping`.
 
 ### Drawing the skin
 
@@ -921,8 +917,7 @@ bone length, width, and which way its top faces) and the five view images. Draw 
   colour, draws inner lines where parts overlap and darkens the far limb of each pair, so do not outline the sprites'
   outer edges yourself. It never blends or creates colours.
 - **Style.** Light comes from the upper left front. At 48 px a torso is about 9 by 12 px: draw clean clusters, one
-  light direction, a few highlights, not detail. Draw limbs so they still read rotated up to 40 degrees. 16 colours are
-  tight: reuse a few ramps.
+  light direction, a few highlights. Limbs must still read rotated up to 40 degrees. Reuse a few ramps.
 - **`skin preview <dir> skin.json <out>`** validates (errors name the path to the problem, `skin: INVALID`, exit 1)
   and draws `directions.png` (the eight directions), `turntable.png` (32 steps), `walks.png`. Check that every part
   sits on the body, limbs join at the joints without gaps and the walk reads. `--clean` rotates at 11.25 degrees.
@@ -934,20 +929,24 @@ bone length, width, and which way its top faces) and the five view images. Draw 
 
 ### The ground gate
 
-`export` measures the idle loop in every direction: each planted foot's lowest drawn row must be within 1 px of its
-own ground point (the projected sole of the foot capsule), in at most 5% of the planted foot-frames. A failing line is
-`idle-<direction>`; the view is `front` for front and back, `frontSide` for front-left and front-right, `side` for
-left and right, `backSide` for back-left and back-right (`back` for back). The skin fix is in the foot sprites'
-pivots:
+`export` draws the idle loop in every direction (`check` does too, once the skin and `retarget.json` exist, as
+`idleFootMisses`). Two gates look at the feet; the views are
+`front` for front, `frontSide` for front-left and front-right, `side` for left and right, `backSide` for back-left and
+back-right, `back` for back.
 
-1. In the side views, a foot sprite's bottom row should lie about the foot's radius (half its "Width", in guide.md)
-   below its pivot row. Moving `pivotA` and `pivotB` rows down by one (a higher row number) draws the foot one pixel
-   higher; in the front and back views the foot is drawn end-on and a row can move it the other way. Change by one
-   and run `export` again.
-2. A mirrored direction draws the other foot's sprite flipped, so one sprite serves two feet; if fixing one direction
-   breaks its mirror, split the difference or redraw the sprite.
-3. If changing the pivots does not move the foot, another sprite is drawn over its bottom rows (a long robe, the other
-   leg): give the foot sprite a higher `layer`.
-4. A view with no visible foot fails too: draw the feet where the garment leaves them showing, in every view.
+- `drawn`: in each view, each foot must have a visible pixel in at least one frame of at least one of the view's
+  directions (the side views' two directions swap near and far, so each foot is near in one; front and back have one
+  direction). A `hidden` or empty foot, or one covered in every frame, fails. Draw both feet in all five views; if a
+  garment covers them, give the foot a `layer` above it. Failing line: `idle (view <view>): ...`.
+- `ground`: each planted foot's lowest drawn row must be within 1 px of its own ground point (the sole of the
+  foot capsule, projected from the ground), in at most 5% of the planted foot-frames. What is drawn over the foot
+  does not count. Fix it in the foot sprites' pivots:
 
-A robe or cloak that hides the feet makes the gate measure what shows; raise the hem or let the feet peek out.
+1. In the side views, a foot sprite's bottom row should lie about the foot's radius (half its "Width", in `guide.md`)
+   below its pivot row. Moving the `pivotA` and `pivotB` rows down by one (a higher row number) draws the foot one
+   pixel higher; in the front and back views the foot is drawn end-on and a row can move it the other way. Change by
+   one and run again.
+2. A view's two directions share its two foot sprites, swapped: one direction draws `footL` for the far foot and
+   `footR` for the near one, the other the reverse. When one direction passes and its mirror fails, move the sprite of
+   the failing foot by one row and read both directions' lines again; the two feet stand at different pitches, so aim
+   each sprite between its two feet rather than at one.

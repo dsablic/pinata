@@ -1,6 +1,6 @@
 import { getPixel, TRANSPARENT } from '../image.ts'
-import { expectedSector } from './record.ts'
-import type { Cell, Frame, Sole, Track } from './record.ts'
+import { expectedSector } from './directions.ts'
+import type { Cell, Foot, Frame, Sole, Track } from './record.ts'
 
 export type Held = { pairs: number, flickers: number, hidden: number, worst: number }
 
@@ -58,22 +58,35 @@ export const ANCHOR_PX = 0.5
 
 export const MOST_OFF_GROUND_SHARE = 0.05
 
-export type Ground = { planted: number, seen: number, off: number, worst: number | undefined }
+export type Ground = { planted: number, seen: number, off: number, worst: number, hidden: number[] }
+
+function neverSeen (feet: Foot[][], mustBePlanted: boolean): number[] {
+  const count = Math.max(0, ...feet.map(own => own.length))
+  return Array.from({ length: count }, (_, leg) => leg).filter(leg => {
+    const considered = feet.filter(own => !mustBePlanted || own[leg]?.planted === true)
+    return considered.length > 0 && considered.every(own => own[leg]?.sole === undefined)
+  })
+}
 
 export function groundOf (track: Track): Ground {
-  const ground: Ground = { planted: 0, seen: 0, off: 0, worst: undefined }
+  const hidden = neverSeen(track.frames.map(frame => frame.feet), true)
+  const ground: Ground = { planted: 0, seen: 0, off: 0, worst: 0, hidden }
   for (const { feet } of track.frames) {
     for (const foot of feet) {
       if (!foot.planted) continue
       ground.planted++
-      if (foot.sole === undefined) continue
-      const row = foot.sole.y + 1 - Math.round(foot.level)
+      if (foot.drawn === undefined) continue
+      const gap = foot.drawn.y + 1 - Math.round(foot.level)
       ground.seen++
-      if (Math.abs(row) > GROUND_PX) ground.off++
-      if (ground.worst === undefined || Math.abs(row) > Math.abs(ground.worst)) ground.worst = row
+      if (Math.abs(gap) > GROUND_PX) ground.off++
+      if (Math.abs(gap) > Math.abs(ground.worst)) ground.worst = gap
     }
   }
   return ground
+}
+
+export function unseenLegs (tracks: Track[]): number[] {
+  return neverSeen(tracks.flatMap(track => track.frames.map(frame => frame.feet)), false)
 }
 
 export function anchorOffset (cell: Cell): number {

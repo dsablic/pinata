@@ -97,6 +97,9 @@ Exit: all proof suites pass from the library; cloth is visible in rendered frame
 
 ## Phase 1: minimum viable tool (next)
 
+The exit test is met (third run: three of three authors passed every gate within 10 `check` runs, and the judge panel
+matched all three characters).
+
 1. ~~**Skins v1.**~~ Done through P7: per-part sprites for eight directions with view buckets and pivots, RotSprite
    rotation, skin validation, the fit check, and an AI artist guide alongside [`docs/authoring.md`](authoring.md).
 2. **Interfaces.** `pinata check`, `pinata render` and `pinata export` as a CLI, and an MCP server wrapping them, so

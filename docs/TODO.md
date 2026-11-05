@@ -28,7 +28,8 @@ artefacts, in [`docs/plans/done/`](plans/done).
 
 [Plan](plans/done/2026-11-05-automated-checks.md), gates fixed: `npm run verify` (every check and the byte-identical
 baselines in one command), a style lint, every example through its gates, a judge runner that starts the judges
-itself, and gates declared with failing and passing cases. Then Phase 1's exit test.
+itself, and gates declared with failing and passing cases. Phase 1's exit test is met (third run: three of three
+authors passed, 9 of 9 judge answers right).
 
 ## Phase 1, the minimum viable tool
 
@@ -45,7 +46,7 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
   and `npx pinata mcp` (checked from a packed tarball). Standalone executables, if wanted later, are Node single
   executable applications built in CI (still V8, so exports match what the tests check); not Bun, whose
   JavaScriptCore computes `Math` differently from Node.
-- **Authoring hints:** the P5 authors' notes are in the guide and the hints; the exit test is the next check of them.
+- **Authoring hints:** the P5 authors' notes are in the guide and the hints; the exit test (third run) passed with them.
 
 - **Facing readability (Phase 1, batch A):** the skins' views do not read as their direction: judges named the
   direction right in 46% of answers (three-quarter views read as front or side; the wizard's back views show a white

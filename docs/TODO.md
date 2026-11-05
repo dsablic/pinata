@@ -24,12 +24,24 @@ artefacts, in [`docs/plans/done/`](plans/done).
   [drawn walk frames](plans/done/2026-11-03-drawn-walk-frames.md),
   [game sprite style](plans/done/2026-11-04-game-sprite-style.md)).
 
-## Next: automated checks, then the Phase 1 exit test
+## Next: toward any art, animated well
 
-[Plan](plans/done/2026-11-05-automated-checks.md), gates fixed: `npm run verify` (every check and the byte-identical
-baselines in one command), a style lint, every example through its gates, a judge runner that starts the judges
-itself, and gates declared with failing and passing cases. Phase 1's exit test is met (third run: three of three
-authors passed, 9 of 9 judge answers right).
+The aim: an AI points the tool at character art (one view or several) and the tool helps it reach a fluid,
+game-worthy animation. Quality is fixed in the tool (checks, guidance, renderer), not by hand-tuning the examples.
+In order:
+
+1. [Facing readability](plans/2026-11-05-facing-readability.md): direction checks in `pinata check`, `pinata
+   review` (the direction panel on the author's own character), the eight-direction preview; then fresh agents'
+   characters judged.
+2. [Animation benchmark](plans/2026-11-05-animation-benchmark.md): CC0 hand-animated characters as references, a
+   rubric the judges are shown to apply, measured numbers, a blind review page for a human; the scorecard names the
+   weakest dimensions.
+3. [Import existing art](plans/2026-11-05-import-existing-art.md): `pinata import` from one or more views, view
+   guides for the missing ones, judged against hand animation on the same art.
+4. The feel layer (anticipation, squash, timing, holds), aimed at the benchmark's weakest dimensions.
+
+The automated checks ([plan](plans/done/2026-11-05-automated-checks.md)) and Phase 1's exit test (third run: three
+of three authors passed, 9 of 9 judge answers right) are done.
 
 ## Phase 1, the minimum viable tool
 

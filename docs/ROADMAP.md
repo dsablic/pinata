@@ -95,7 +95,7 @@ Turn proof-of-concept code into a coherent library. No new capabilities.
 
 Exit: all proof suites pass from the library; cloth is visible in rendered frames; one command per proof.
 
-## Phase 1: minimum viable tool (next)
+## Phase 1: minimum viable tool (done, v0.7.0)
 
 The exit test is met (third run: three of three authors passed every gate within 10 `check` runs, and the judge panel
 matched all three characters).
@@ -144,7 +144,11 @@ so the bar is settled where it is and human-drawn skins remain the way past it.
 clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics
 and composition rather than the art. That is still a useful product; the import path below makes it work either way.
 
-## Phase 2: depth (after the MVP)
+## Phase 2: depth (in progress)
+
+Under way: facing readability, an animation benchmark against hand-animated CC0 characters, and motion fixes from
+the owner's blind reviews; next, resting idles, game attacks and game jumps, then importing existing art from
+people or image models. Current state in [`TODO.md`](TODO.md).
 
 - **Animation readability.** P4 showed a kinematically correct walk is not automatically readable at 48 px; skins
   helped, but animators also exaggerate contact and passing poses, hold key frames and draw smears. Add an

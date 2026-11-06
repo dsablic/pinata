@@ -24,24 +24,32 @@ artefacts, in [`docs/plans/done/`](plans/done).
   [drawn walk frames](plans/done/2026-11-03-drawn-walk-frames.md),
   [game sprite style](plans/done/2026-11-04-game-sprite-style.md)).
 
-## Next: toward any art, animated well
+## Next: toward any art, animated well (paused)
 
 The aim: an AI points the tool at character art (one view or several) and the tool helps it reach a fluid,
 game-worthy animation. Quality is fixed in the tool (checks, guidance, renderer), not by hand-tuning the examples.
-In order:
+The project owner's blind review page ([motion plan](plans/2026-11-06-motion-from-review.md), round two) is the main
+check of motion quality; the AI judges cannot see motion in strips reliably (benchmark batch A). Where each thread
+stands:
 
 1. [Facing readability](plans/2026-11-05-facing-readability.md): direction checks in `pinata check`, `pinata
-   review` (the direction panel on the author's own character), the eight-direction preview; then fresh agents'
-   characters judged.
-2. [Animation benchmark](plans/2026-11-05-animation-benchmark.md): CC0 hand-animated characters as references, a
-   rubric the judges are shown to apply, measured numbers, a blind review page for a human; the scorecard names the
-   weakest dimensions.
-3. [Import existing art](plans/2026-11-05-import-existing-art.md): `pinata import` from one or more views, view
-   guides for the missing ones, judged against hand animation on the same art.
-4. The feel layer (anticipation, squash, timing, holds), aimed at the benchmark's weakest dimensions.
+   review` with specific cues, the eight-direction preview, done. Fresh agents' characters missed the gates (60% idle,
+   65% walk against 90% and 80%); one hand-drawn eight-direction character scored 81% with the same judges, so the
+   90% gate is not shown to be within reach of hand-drawn art. Three-quarter views carry the misses.
+2. [Animation benchmark](plans/2026-11-05-animation-benchmark.md): batch A done (references, rubric panels, judge
+   validation: every dimension dropped for the pooled panel; opus alone sees all four). Batch B (the scorecard) is
+   open; an opus-only judge would be a new gate fixed before its run.
+3. [Motion from review](plans/2026-11-06-motion-from-review.md): batches A and B done (runs lean forward and loop on
+   one stride, speeds from leg length, breathing idles, attacks per character). Round two of the review missed (1 of
+   8 picked, 3 ties): runs moved to ties, but idles still read lifeless and the new attacks read worse than the
+   punch. **Next:** a plan for resting idles (a chosen resting pose, no fidget that reads as a gesture, cloth that
+   responds), game attacks (anticipation, a fast strike, follow-through, a held end; a cast with its own gesture) and
+   game jumps (higher, a crouch before, a landing after), judged by a third round of the same page.
+4. [Import existing art](plans/2026-11-05-import-existing-art.md): gates fixed, not started; the
+   [ML proposal](proposals/ml-augmentation.md) shapes its inputs (files plus optional providers).
 
 The automated checks ([plan](plans/done/2026-11-05-automated-checks.md)) and Phase 1's exit test (third run: three
-of three authors passed, 9 of 9 judge answers right) are done.
+of three authors passed, 9 of 9 judge answers right; released as v0.7.0) are done.
 
 ## Phase 1, the minimum viable tool
 

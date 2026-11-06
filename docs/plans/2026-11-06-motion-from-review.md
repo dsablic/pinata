@@ -389,3 +389,39 @@ one run (`demo-1200` seed 3) and 0.030 to 0.113 m on the others; the reading fol
 this batch slows on purpose. The test measures the same 0.03 m RMS over the whole minute of walking that its title
 names (all calm runs pooled, weighted by walking time), instead of per run; this loosens the per-run reading and is
 recorded here as such.
+
+### Batch C: review round two
+
+The same blind page, the same eight pairs and references, Piñata's animations exported after batch B, the sides
+shuffled again; rated by the project owner.
+
+| Pair | Round one | Round two | Said about Piñata in round two |
+|---|---|---|---|
+| Idle, warrior against knight | reference | reference | cloth looks dead; "just doesn't look like a resting pose" |
+| Run, warrior against knight | reference | about the same | |
+| Attack, warrior against knight | **Piñata** (punch) | reference | the swing "looks like an old man supporting himself with a stick" |
+| Idle, evil wizard against wizard | reference | reference | "too static, looks like he's picking his nose" |
+| Walk, evil wizard against wizard | **Piñata** | **Piñata** | "looks more like walking, but the style of the other is better" |
+| Attack, evil wizard against wizard | reference | reference | "shouldn't look like punching with two hands" |
+| Run, huntress against wizard | reference | about the same | |
+| Jump, warrior against knight | **Piñata** | about the same | "looks like skipping over a puddle" |
+
+Against the gate: Piñata picked in 1 of 8, with 3 ties (the gate asks 5 of 8): **missed**. Of the four defects of
+round one, the backward lean and the limp were not named again (both runs moved from a loss to a tie); the lifeless
+idle was named again, and the attacks read worse than the punch did.
+
+What round two points at:
+
+- **Idles.** The breathing and weight-shift layer is not enough: the idle take's hand fidget reads as picking the
+  nose, the pose does not read as resting, and the cloth hangs still. An idle needs a chosen resting pose (weight on
+  one leg, arms relaxed or on the weapon) with the breath and shift on top, and cloth that responds to the shift.
+- **Attacks.** The CMU wood-chopping take reads as leaning on a stick, and the composed cast as a two-handed punch.
+  Attacks need anticipation, a fast strike, follow-through and a held end pose; a cast needs a gesture of its own (a
+  staff or hand raised, then thrust, with an effect). Taken motion capture of everyday actions does not read as a
+  game attack.
+- **Jumps.** The knight's jump is small, a skip over a puddle; a game jump is higher, with a crouch before and a
+  landing after.
+- Kept: the runs (ties) and the wizard's walk (preferred, though the reference's drawing style was liked better).
+
+The work is paused here. The next plan starts from these three: resting idles, game attacks, game jumps, judged by
+a third round of the same page.

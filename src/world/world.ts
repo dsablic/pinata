@@ -20,6 +20,7 @@ import { pickActivity } from './config.ts'
 import type { Step, WorldConfig } from './config.ts'
 import { generateTerrain, random } from './terrain.ts'
 import type { Terrain } from './terrain.ts'
+import type { AttackKind } from '../mocap/clip.ts'
 import type { MotionDatabase } from '../mocap/database.ts'
 import { createPlayer } from '../mocap/player.ts'
 import type { Command, Player } from '../mocap/player.ts'
@@ -31,6 +32,7 @@ export type CastMember = {
   name: string
   mannequin: Mannequin
   rig: Rig
+  attack?: AttackKind
   cloth?: Clothing
   capture?: MotionDatabase
 }

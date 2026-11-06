@@ -21,6 +21,12 @@ or `attack` marks a behaviour take that the player plays on command (`perform`),
 (subject 137, a standing take that keeps its feet down, looped), `crouch-squat` (subject 86, a squat down and up) and
 `attack-punch` (subject 141, a punch). An idle take's first 12 frames are the overlap its loop cross-fades into.
 
+A walking take may give `gait` (`walk` or `run`) and `loop: true`: the steady takes (`walk`, `walk-2`, `run`) are
+looped by the player on one symmetric stride, and their speeds over their leg give each character's walk and run speeds
+(Froude similarity). An attack take gives `attack`: `attack-punch` is a punch and `attack-swing` (subject 79, trial 1,
+chopping wood: a two-handed overhead chop from a hold through a recovery to rest) a swing. A thrust or a cast has no
+take here; the database composes one from the idle.
+
 `range` is the first and last source frame (at `sourceFps`) to keep, so a take is cut to its useful part. The `jump-*`
 takes are cut from
 about 0.3 s before the crouch to just after the landing settles.

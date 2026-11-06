@@ -1,1 +1,2 @@
-{ "name": "wizard", "description": "A tall, thin wizard with a pointed hat, long white beard and a long flowing robe." }
+{ "name": "wizard", "description": "A tall, thin wizard with a pointed hat, long white beard and a long flowing robe.",
+  "attack": "cast" }

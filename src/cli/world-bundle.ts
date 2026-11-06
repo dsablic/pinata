@@ -12,8 +12,10 @@ export function worldBundle (
   const config = only === undefined ? world : { ...world, cast: only }
   const cast = config.cast.map(name => {
     const dir = join(examples, name)
+    const { attack } = read(join(dir, 'character.json')) as { attack?: unknown }
     return {
       name,
+      ...(attack === undefined ? {} : { attack }),
       mannequin: read(join(dir, 'mannequin.json')),
       style: read(join(dir, 'style.json')),
       rig: read(join(dir, 'rig.json')),

@@ -5,10 +5,12 @@ import type { Leg } from '../formats/rig.ts'
 import { createImage, getPixel, setPixel, TRANSPARENT } from '../image.ts'
 import type { Image } from '../image.ts'
 import type { Vec3 } from '../math/vec.ts'
-import type { PerformanceKind } from '../mocap/clip.ts'
+import type { Gait, PerformanceKind } from '../mocap/clip.ts'
 import type { MotionDatabase, PerformanceTake } from '../mocap/database.ts'
 import { DEFAULT_JUMP_KIND, jumpOf } from '../mocap/jump.ts'
 import type { JumpReach } from '../mocap/jump.ts'
+import { wholeLapSpeed } from '../mocap/database.ts'
+import { idleLayerOf } from '../mocap/idle.ts'
 import { createPlayer } from '../mocap/player.ts'
 import type { Player, PlayerFrame } from '../mocap/player.ts'
 import { solePoints } from '../motion/pose.ts'
@@ -35,7 +37,7 @@ export type Moment = { joints: Pose, curves: Record<string, Vec3[]>, position: V
 export type Span = { from: number, to: number }
 export type Take = { frames: Moment[], from: number, to: number, loop: boolean }
 export type Air = Pick<CastOptions, 'environment' | 'springSubsteps'>
-export type Subject = { name: string, member: CastMember, look: Skinned, air: Air }
+export type Subject = { name: string, member: CastMember, look: Skinned, air: Air, idleLayer?: boolean }
 export type Sole = { x: number, y: number }
 export type Foot = { planted: boolean, sole: Sole | undefined, drawn: Sole | undefined, level: number }
 export type Frame = { image: Image, sector: number | undefined, travel: [number, number], feet: Foot[] }
@@ -47,8 +49,6 @@ export const SKINNED_HUMANOIDS = ['knight', 'rogue', 'dwarf', 'wizard']
 export const BEHAVIOURS: Behaviour[] = ['idle', 'walk', 'run', 'turn', 'jump', 'crouch', 'attack']
 
 const EAST = Math.PI / 2
-const WALK_SPEED = 1.1
-const RUN_SPEED = 3
 const TURN_ANGLE = Math.PI / 2
 const CANVAS_ROOM = 0.5
 const CELL_MARGIN = 1
@@ -58,6 +58,8 @@ const COMPARED_FRAMES = 3
 const SHORTER_LOOP_SLACK = 1.5
 const PERIOD_SLACK = 1
 const MOST_CANDIDATES = 40
+const LAP_SHIFTS = [0, 1, -1, 2, -2, 3, -3]
+const LAP_SPEED_SLACK = 0.12
 const STILL_METRES = 0.002
 const STILL_FRAMES = 6
 const MOST_ONE_SHOT_FRAMES = 240
@@ -69,12 +71,13 @@ export type Looping = {
   candidates: number
   holding: boolean
 }
+type GaitLooping = Omit<Looping, 'speed'> & { gait: Gait }
 const IDLE_WARM = 240
 const GAIT = { warm: 144, candidates: MOST_CANDIDATES, holding: false }
-const IDLE_PERIODS = 4
-const LOOPS: Partial<Record<Behaviour, Looping>> = {
-  walk: { ...GAIT, window: 144, lengths: [12, 72], speed: WALK_SPEED },
-  run: { ...GAIT, window: 96, lengths: [8, 48], speed: RUN_SPEED }
+const IDLE_PERIODS = 2
+const LOOPS: Partial<Record<Behaviour, GaitLooping>> = {
+  walk: { ...GAIT, window: 144, lengths: [12, 72], gait: 'walk' },
+  run: { ...GAIT, window: 96, lengths: [8, 48], gait: 'run' }
 }
 
 export function withSkin (subject: Subject, skin: Skin): Subject {
@@ -109,7 +112,8 @@ export function stepper (subject: Subject): Stepper {
   const { member } = subject
   const database = member.capture!
   const jump = standingJump(database).reach
-  const player = createPlayer({ database, fps: FPS, ground: () => 0, jump }, { position: [0, 0, 0], yaw: EAST })
+  const settings = { database, fps: FPS, ground: () => 0, jump, idleLayer: subject.idleLayer !== false }
+  const player = createPlayer(settings, { position: [0, 0, 0], yaw: EAST })
   const secondary = pageSecondary(member, subject.air)
   let count = 0
   let last: PlayerFrame | undefined
@@ -185,11 +189,11 @@ function seamsOf (drawn: Frame[][], holding: boolean): Seam[] {
   return drawn.map(own => seamOf(own.map(frame => frame.image), holding))
 }
 
-function passes ({ seams }: Scored): boolean {
+function passes ({ seams }: Pick<Scored, 'seams'>): boolean {
   return !seams.some(repeated) && worstRatio(seams) <= 1
 }
 
-function beats (a: Scored, b: Scored): boolean {
+function beats (a: Pick<Scored, 'seams'>, b: Pick<Scored, 'seams'>): boolean {
   const [repeatedA, repeatedB] = [a.seams.some(repeated), b.seams.some(repeated)]
   return repeatedA === repeatedB ? worstRatio(a.seams) < worstRatio(b.seams) : repeatedB
 }
@@ -253,19 +257,32 @@ function performanceOf (subject: Subject, kind: PerformanceKind): PerformanceTak
 }
 
 function idleLooping (subject: Subject): Looping {
-  const { frames, fps } = performanceOf(subject, 'idle')
+  const take = performanceOf(subject, 'idle')
   const rate = subject.member.capture!.options.style?.rate ?? 1
-  const period = Math.round((frames.length - 1) * FPS / (fps * rate))
+  const laps = subject.idleLayer === false ? 1 : idleLayerOf(take, rate).laps
+  const period = Math.round(laps * (take.frames.length - 1) * FPS / (take.fps * rate))
   const window = IDLE_PERIODS * period + LEAD_FRAMES + COMPARED_FRAMES
   return { warm: IDLE_WARM, window, lengths: [period, period], speed: 0, candidates: window, holding: true }
 }
 
-export function loopingOf (subject: Subject, behaviour: Behaviour): Looping | undefined {
-  return behaviour === 'idle' ? idleLooping(subject) : LOOPS[behaviour]
+export function loopingOf (subject: Subject, behaviour: Behaviour, shift = 0): Looping | undefined {
+  if (behaviour === 'idle') return idleLooping(subject)
+  const own = LOOPS[behaviour]
+  if (own === undefined) return undefined
+  const { gait, ...looping } = own
+  return { ...looping, speed: wholeLapSpeed(subject.member.capture!, gait, FPS, shift) }
 }
 
-export function looping (s: Stepper, subject: Subject, behaviour: Behaviour): Take {
-  const { warm, window, speed } = loopingOf(subject, behaviour) as Looping
+function lapShiftsOf (subject: Subject, behaviour: Behaviour): number[] {
+  const nominal = loopingOf(subject, behaviour)
+  if (nominal === undefined || LOOPS[behaviour] === undefined) return [0]
+  return LAP_SHIFTS.filter(shift => {
+    return Math.abs(loopingOf(subject, behaviour, shift)!.speed / nominal.speed - 1) <= LAP_SPEED_SLACK
+  })
+}
+
+export function looping (s: Stepper, subject: Subject, behaviour: Behaviour, shift = 0): Take {
+  const { warm, window, speed } = loopingOf(subject, behaviour, shift) as Looping
   s.player.command({ speed, heading: EAST })
   if (behaviour === 'idle') s.player.perform('idle')
   stepsOf(s, warm)
@@ -281,9 +298,9 @@ function oneShot (s: Stepper, start: () => void): Take {
   return { frames: [...lead, ...frames], from: lead.length, to: lead.length + frames.length, loop: false }
 }
 
-export function takeOf (subject: Subject, behaviour: Behaviour): Take {
+export function takeOf (subject: Subject, behaviour: Behaviour, shift = 0): Take {
   const s = stepper(subject)
-  if (loopingOf(subject, behaviour) !== undefined) return looping(s, subject, behaviour)
+  if (loopingOf(subject, behaviour) !== undefined) return looping(s, subject, behaviour, shift)
   if (behaviour === 'turn') return oneShot(s, () => s.player.command({ speed: 0, heading: EAST + TURN_ANGLE }))
   if (behaviour === 'crouch' || behaviour === 'attack') {
     performanceOf(subject, behaviour)
@@ -467,15 +484,31 @@ function fitted (tracks: Track[], canvas: Camera): { tracks: Track[], cell: Cell
   return { tracks: own, cell }
 }
 
+type Drawn = { take: Take, drawn: Frame[][], seams: Seam[] }
+
+function drawnAt (subject: Subject, behaviour: Behaviour, canvas: Camera, shift: number): Drawn {
+  const take = takeOf(subject, behaviour, shift)
+  const drawer = drawerOf(subject, take.frames, canvas, behaviour === 'idle')
+  const looped = loopingOf(subject, behaviour, shift)
+  if (looped === undefined) return { take, drawn: drawer.whole().map(own => own.slice(take.from, take.to)), seams: [] }
+  const drawn = loopOf(take.frames, drawer, looped)
+  return { take, drawn, seams: seamsOf(drawn, looped.holding) }
+}
+
+function drawnBest (subject: Subject, behaviour: Behaviour, canvas: Camera): Drawn {
+  let best: Drawn | undefined
+  for (const shift of lapShiftsOf(subject, behaviour)) {
+    const own = drawnAt(subject, behaviour, canvas, shift)
+    if (passes(own)) return own
+    if (best === undefined || beats(own, best)) best = own
+  }
+  return best!
+}
+
 export function record (subject: Subject, behaviours: Behaviour[] = BEHAVIOURS): Recording {
   const canvas = canvasOf(subject)
   const tracks = behaviours.flatMap(behaviour => {
-    const take = takeOf(subject, behaviour)
-    const drawer = drawerOf(subject, take.frames, canvas, behaviour === 'idle')
-    const looped = loopingOf(subject, behaviour)
-    const drawn = looped === undefined
-      ? drawer.whole().map(own => own.slice(take.from, take.to))
-      : loopOf(take.frames, drawer, looped)
+    const { take, drawn } = drawnBest(subject, behaviour, canvas)
     return DIRECTIONS.map((direction, d): Track => ({ behaviour, direction, loop: take.loop, frames: drawn[d] }))
   })
   const { cell, tracks: own } = fitted(tracks, canvas)

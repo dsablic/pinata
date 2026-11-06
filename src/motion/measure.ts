@@ -39,7 +39,8 @@ function filled (flags: boolean[], value: boolean, shortest: number): boolean[] 
   for (let from = 0; from < steady.length;) {
     let to = from
     while (to < steady.length && steady[to] === steady[from]) to++
-    if (steady[from] === value && from > 0 && to < steady.length && to - from < shortest) steady.fill(!value, from, to)
+    const inside = (from > 0 || !value) && to < steady.length
+    if (steady[from] === value && inside && to - from < shortest) steady.fill(!value, from, to)
     from = to
   }
   return steady
@@ -67,20 +68,28 @@ export function touchdowns (samples: Sample[], ankles: string[]): Touchdown[] {
   return plantings(samples).map(({ leg, frame }) => ({ leg, frame, position: samples[frame].joints[ankles[leg]] }))
 }
 
-export function stepsOf (samples: Sample[], ankles: string[], fps: number): Step[] {
+function travelDirection (samples: Sample[], from: number, to: number, pelvis?: string): Vec3 {
+  const yawed = forwardOf(samples[to].yaw)
+  if (pelvis === undefined) return yawed
+  const moved = sub(samples[to].joints[pelvis], samples[from].joints[pelvis])
+  const across = Math.hypot(moved[0], moved[2])
+  return across < 1e-6 ? yawed : [moved[0] / across, 0, moved[2] / across]
+}
+
+export function stepsOf (samples: Sample[], ankles: string[], fps: number, pelvis?: string): Step[] {
   const downs = touchdowns(samples, ankles)
   const steps: Step[] = []
   for (let i = 1; i < downs.length; i++) {
     const [before, now] = [downs[i - 1], downs[i]]
     if (before.leg === now.leg) continue
-    const length = dot(sub(now.position, before.position), forwardOf(samples[now.frame].yaw))
+    const length = dot(sub(now.position, before.position), travelDirection(samples, before.frame, now.frame, pelvis))
     steps.push({ leg: now.leg, length, duration: (now.frame - before.frame) / fps, from: before.frame, to: now.frame })
   }
   return steps
 }
 
 function gapOf (a: number, b: number): number {
-  return Math.abs(a - b) / ((a + b) / 2)
+  return Math.abs(a - b) / Math.abs((a + b) / 2)
 }
 
 export function gapsOf (steps: Step[]): Gap[] {

@@ -5,6 +5,7 @@ import { eulerXyz, fromQuaternion, interpolate, IDENTITY, multiply, toQuaternion
 import type { Matrix } from '../math/matrix.ts'
 import { random } from '../world/terrain.ts'
 import type { BodyFrame } from './retarget.ts'
+import { isSpanKey } from './span.ts'
 
 export type MotionStyle = {
   amplitude?: Record<string, number>
@@ -49,7 +50,7 @@ export function meanRotation (rotations: Matrix[]): Matrix {
 
 export function applyStyle (frames: BodyFrame[], style: MotionStyle): void {
   if (frames.length === 0) return
-  const joints = Object.keys(frames[0].rotations).sort()
+  const joints = Object.keys(frames[0].rotations).filter(key => !isSpanKey(key)).sort()
   const next = random(style.seed ?? 1)
   const spread = (style.variation ?? 0) * DEGREES
   const turns = new Map(joints.map(joint => {

@@ -146,7 +146,8 @@ function analyse (character: Character, out: string, io: Io): number {
   ]
   const header = [
     `check: ${character.name} (${character.dir})${skipped.length === 0 ? '' : ` [${skipped.join('; ')}]`}`,
-    `only export runs: ${ONLY_EXPORT}${skinned ? '' : ', and the idle foot gate'}, over every animation`
+    `only export runs: ${ONLY_EXPORT}${skinned ? '' : ', and the idle foot gate'}, over every animation`,
+    `attack: ${character.attack.attack} (${character.attack.reason})`
   ].join('\n')
   const summary = formatSummary(header, results)
   writeOutput(join(out, 'summary.txt'), `${summary}\n`)

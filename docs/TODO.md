@@ -71,6 +71,10 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
   (0.4-0.9% of frames mid-air from the turn, start and stop clips; about 0.3% of planted feet over 1 px); the
   corrective-step overlap in the turn clips. Super jumps miss their count on the perception layout (too few planned).
   After changing a test page or the demo, run `npm run layouts`.
+- **Count gates per distance travelled:** restate the page's count gates per distance travelled, in a plan with gates
+  fixed first. Characters walk at leg-length speeds, so the fixed 60 s holds fewer trips and the dwarf's jump count
+  (39 of 40) and the page-test layout's super jumps (3 of 4) are missed; see the
+  [motion plan](plans/2026-11-06-motion-from-review.md).
 - **Page motion leftovers:** one pop each for the knight (its sword behind the cape in the back view) and the dwarf
   (its cloak folding within a frame); the wizard's walk and landing judged less natural than before the natural-motion
   work (head turning away for frames, legs tucked under the robe); the rogue's worst flicker window and the dwarf's

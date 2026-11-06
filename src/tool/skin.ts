@@ -153,7 +153,7 @@ function capturedWalk (character: Character, dir: string, yaw: number, frames: n
   const player = createPlayer({ database, fps: FPS, ground: () => 0 }, { position: [0, 0, 0], yaw })
   const recorded: Posed[] = []
   for (let i = 0; i < 4 * FPS + frames; i++) {
-    player.command({ speed: 1.2, heading: yaw })
+    player.command({ speed: database.speeds.walk, heading: yaw })
     const f = player.step()
     if (i < 4 * FPS) continue
     const pose: Pose = {}

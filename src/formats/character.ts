@@ -10,6 +10,8 @@ import { validateMannequin } from './mannequin.ts'
 import type { Mannequin } from './mannequin.ts'
 import { checkCapeAnchors, checkRig, legsOf, limbPath, resolveRig, validateRig } from './rig.ts'
 import type { Rig } from './rig.ts'
+import { attackErrors, attackOf, isAttack } from './attack.ts'
+import type { Attack } from './attack.ts'
 import { validateStyle } from './style.ts'
 import type { Style } from './style.ts'
 import { checkKnownKeys, displayPath, isNonEmptyString, isRecord } from './validate.ts'
@@ -27,6 +29,7 @@ export type Character = {
   rig: Rig
   materials: SimMaterial[]
   scenario: Scenario
+  attack: Attack
 }
 
 const MANIFEST_FILE = 'character.json'
@@ -38,7 +41,7 @@ const DEFAULT_FILES: CharacterFiles = {
   motion: 'motion.json'
 }
 const FILE_KEYS = Object.keys(DEFAULT_FILES) as Array<keyof CharacterFiles>
-const MANIFEST_FIELDS = ['name', 'description', ...FILE_KEYS]
+const MANIFEST_FIELDS = ['name', 'description', 'attack', ...FILE_KEYS]
 const MOTION_FIELDS = [
   'exclude', 'script', 'cape', 'chains', 'bind', 'wind', 'gravity', 'fps', 'substeps', 'particleRadius',
   'durationSeconds'
@@ -105,6 +108,7 @@ function validateManifest (input: unknown, errors: Errors): Record<string, unkno
   if (input.description !== undefined && typeof input.description !== 'string') {
     found.push({ path: 'description', message: 'expected a string' })
   }
+  found.push(...attackErrors(input.attack))
   errors.push(...tag(MANIFEST_FILE, found))
   return input
 }
@@ -159,7 +163,9 @@ function checkWalk (scenario: Scenario): Errors {
   return [{ path: 'script.segments', message }]
 }
 
-function crossChecks (parts: Omit<Character, 'name' | 'description' | 'dir' | 'files'>, files: CharacterFiles): Errors {
+function crossChecks (
+  parts: Omit<Character, 'name' | 'description' | 'dir' | 'files' | 'attack'>, files: CharacterFiles
+): Errors {
   const { mannequin, style, rig, materials, scenario } = parts
   const feet = checkFeet(rig, mannequin)
   const capeErrors = scenario.cape === undefined ? [] : checkCapeAnchors(scenario.cape, rig)
@@ -195,7 +201,8 @@ export function loadCharacter (dir: string): Validated<Character> {
     errors.push(...crossChecks({ mannequin, style, rig, materials, scenario }, files))
     if (errors.length === 0) {
       const description = typeof manifest.description === 'string' ? manifest.description : ''
-      return { value: { name, description, dir, files, mannequin, style, rig, materials, scenario }, errors }
+      const attack = attackOf(rig, mannequin, isAttack(manifest.attack) ? manifest.attack : undefined)
+      return { value: { name, description, dir, files, mannequin, style, rig, materials, scenario, attack }, errors }
     }
   }
   return { errors }

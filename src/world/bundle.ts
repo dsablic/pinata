@@ -11,6 +11,7 @@ import { validateWorldConfig } from './config.ts'
 import type { Dress, WorldConfig } from './config.ts'
 import type { Scenario } from '../formats/sim.ts'
 import type { CastMember } from './world.ts'
+import { attackErrors, attackOf, isAttack } from '../formats/attack.ts'
 import { captureFor, readClips } from '../mocap/capture.ts'
 import type { CaptureData } from '../mocap/capture.ts'
 
@@ -18,6 +19,7 @@ export type WorldBundle = {
   config: unknown
   cast: Array<{
     name: string
+    attack?: unknown
     mannequin: unknown
     style: unknown
     rig: unknown
@@ -49,7 +51,7 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     const style = validateStyle(member.style)
     const rig = validateRig(member.rig)
     errors.push(...mannequin.errors.map(e => at('mannequin', e)), ...style.errors.map(e => at('style', e)),
-      ...rig.errors.map(e => at('rig', e)))
+      ...rig.errors.map(e => at('rig', e)), ...attackErrors(member.attack, `cast[${i}].attack`))
     if (mannequin.value === undefined || style.value === undefined || rig.value === undefined) return
     const resolved = resolveRig(rig.value, mannequin.value)
     errors.push(...checkRig(resolved, mannequin.value).map(e => at('rig', e)))
@@ -73,12 +75,13 @@ export function readWorldBundle (input: unknown): { value?: ReadWorld, errors: V
     const own = capture !== undefined && Object.hasOwn(capture.members, member.name)
       ? capture.members[member.name]
       : undefined
+    const { attack } = attackOf(resolved, mannequin.value, isAttack(member.attack) ? member.attack : undefined)
     const database = own === undefined
       ? undefined
       : captureFor({ rig: resolved, mannequin: look }, clips, capture?.base, own, errors,
-        `capture.members.${member.name}`)
+        `capture.members.${member.name}`, attack)
     const captured = database === undefined ? {} : { capture: database }
-    cast.push({ name: member.name, mannequin: look, rig: resolved, ...clothed, ...captured })
+    cast.push({ name: member.name, mannequin: look, rig: resolved, attack, ...clothed, ...captured })
     const drape = cloth === undefined ? {} : { cloth: cloth.scenario }
     const skin = member.skin === undefined ? undefined : validateSkin(member.skin)
     errors.push(...(skin?.errors ?? []).map(e => at('skin', e)))

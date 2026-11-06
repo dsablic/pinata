@@ -14,16 +14,18 @@ import { turnBetween, turnToLocal, turnToWorld } from '../world/yaw.ts'
 import type { JumpReach } from './jump.ts'
 import { arcOver, heightAt, jumpHeightOf, legLengthOf, MOST_JUMP_SPEED } from './jump.ts'
 import type { Arc } from './jump.ts'
-import { ankleVelocity, featureOf, featureWeights, HORIZONS } from './database.ts'
-import type { JumpTake, MotionDatabase, PerformanceTake } from './database.ts'
+import { ankleVelocity, featureOf, featureWeights, HORIZONS, lapOf, rootAt } from './database.ts'
+import type { Intent, JumpTake, MotionDatabase, PerformanceTake } from './database.ts'
 import type { PerformanceKind } from './clip.ts'
+import { sampleFrame } from './cycle.ts'
+import { idleLayerOf, livenOf } from './idle.ts'
 import { assemble, raise } from './retarget.ts'
 import type { BodyFrame } from './retarget.ts'
 
 export type JumpTarget = { x: number, height: number }
 type Flight = { arc: Arc, from: number, elapsed: number, drop: number }
 type Taking = { take: JumpTake, t: number, phase: 'crouch' | 'flight' | 'landing' }
-type Performing = { take: PerformanceTake, t: number }
+type Performing = { take: PerformanceTake, t: number, lap: number }
 type Jump = { target: JumpTarget, crouched: number, flight?: Flight }
 export type Command = { speed: number, heading: number }
 export type BodyTuning = {
@@ -38,6 +40,7 @@ export type PlayerOptions = {
   ground: (x: number, z: number, from?: number) => number
   tuning?: Partial<BodyTuning>
   jump?: JumpReach
+  idleLayer?: boolean
 }
 export type PlayerFrame = {
   root: RootState
@@ -73,6 +76,8 @@ const STAY_BONUS = 0.15
 const BLEND_SECONDS = 0.2
 const RATE_RANGE: [number, number] = [0.8, 1.25]
 const SYNC = 0.12
+const SLOWING_SPEED = 0.1
+const TURNING_RADIANS = 0.2
 const HOLD_HEIGHT = 0.025
 const SWING_CLEARANCE = 0.03
 const CLEARANCE_SPEED = 0.4
@@ -150,32 +155,6 @@ function isHeld (foot: Foot): boolean {
   return foot.heel !== undefined || foot.toe !== undefined
 }
 
-function sampleFrame (frames: BodyFrame[], t: number): BodyFrame {
-  const i = Math.floor(t)
-  const a = frames[clamp(i, 0, frames.length - 1)]
-  const b = frames[clamp(i + 1, 0, frames.length - 1)]
-  const u = t - i
-  if (u <= 0 || a === b) return a
-  const rotations: Record<string, Matrix> = {}
-  for (const joint of Object.keys(a.rotations)) {
-    rotations[joint] = interpolate(a.rotations[joint], b.rotations[joint], u)
-  }
-  return {
-    rotations,
-    root: {
-      position: add(a.root.position, scale(sub(b.root.position, a.root.position), u)),
-      yaw: a.root.yaw + turnBetween(a.root.yaw, b.root.yaw) * u,
-      velocity: add(a.root.velocity, scale(sub(b.root.velocity, a.root.velocity), u)),
-      angularVelocity: a.root.angularVelocity + (b.root.angularVelocity - a.root.angularVelocity) * u
-    },
-    clearance: {
-      left: a.clearance.left + (b.clearance.left - a.clearance.left) * u,
-      right: a.clearance.right + (b.clearance.right - a.clearance.right) * u
-    },
-    contact: u < 0.5 ? a.contact : b.contact
-  }
-}
-
 function blendFrom (last: BodyFrame, from: BodyFrame, start: number): Blend {
   const turning: Record<string, Matrix> = {}
   for (const joint of Object.keys(last.rotations)) {
@@ -223,6 +202,12 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const { rig, rest, mannequin } = database.options
   const tuning = { ...DEFAULT_TUNING, ...options.tuning }
   const rate = database.options.style?.rate ?? 1
+  const { pace } = database
+  const idle = database.performances.find(take => take.kind === 'idle')
+  const layer = idle === undefined ? undefined : idleLayerOf(idle, rate)
+  const liven = layer === undefined || options.idleLayer === false
+    ? undefined
+    : { layer, apply: livenOf(database.options, hierarchy, layer), phase: 0, weight: 0 }
   const dt = 1 / fps
   const legs = legsOf(rig)
   const mostRise = options.jump?.height ?? jumpHeightOf(legLengthOf(rig, rest))
@@ -263,8 +248,12 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   const feet: Foot[] = legs.map(() => ({ reference: startGround, clearance: 0 }))
 
   const groundUnder = (p: Vec3): number => ground(p[0], p[2], p[1])
+  const heldLevel = (): number | undefined => {
+    const held = feet.filter(isHeld).map(foot => foot.reference)
+    return held.length === 0 ? undefined : Math.max(...held)
+  }
   const groundAcross = (p: Vec3): number => {
-    return jump?.flight === undefined ? ground(p[0], p[2]) : ground(p[0], p[2], jump.target.height)
+    return jump?.flight === undefined ? ground(p[0], p[2], heldLevel()) : ground(p[0], p[2], jump.target.height)
   }
   const heightAboveGround = (p: Vec3): number => p[1] - groundAcross(p)
   const groundRoot = (): Vec3 => [root.position[0], 0, root.position[2]]
@@ -302,7 +291,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const facing = command.speed > 0.05 ? Math.atan2(want[0], want[2]) : command.heading
     const k = tuning.speedGain
     const path = [0, ...HORIZONS].map(h => {
-      const tau = h / fps
+      const tau = h / (fps * pace)
       const drift = scale(sub(body.velocity, want), (1 - Math.exp(-k * tau)) / k)
       const position = add(add(body.position, scale(want, tau)), drift)
       const yaw = facing + turnBetween(facing, body.yaw) * Math.exp(-tuning.turnGain * tau)
@@ -311,17 +300,29 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const playing = entries[entry]
     const i = clamp(Math.round(t), 0, playing.frames.length - 1)
     const velocities = legs.map((_, leg) => ankleVelocity(playing, i, leg))
-    return featureOf(path, body.velocity, playing.ankles[i], velocities)
+    return featureOf(path, scale(body.velocity, 1 / pace), playing.ankles[i], velocities)
   }
 
   const isPlaying = (candidate: { entry: number, frame: number }): boolean => {
-    return candidate.entry === entry && Math.abs(candidate.frame - t) < SAME_FRAME
+    if (candidate.entry !== entry) return false
+    const apart = Math.abs(candidate.frame - t)
+    const lap = entries[entry].frames.length - 1
+    return (entries[entry].travel === undefined ? apart : Math.min(apart, lap - apart)) < SAME_FRAME
   }
 
-  const bestCandidate = (wanted: number[], forced: boolean): number => {
+  const intents = (): Set<Intent> => {
+    const wanted = new Set<Intent>()
+    if (command.speed < length(body.velocity) - SLOWING_SPEED) wanted.add('brake')
+    if (command.speed > length(body.velocity) + SLOWING_SPEED) wanted.add('start')
+    if (Math.abs(turnBetween(body.yaw, command.heading)) > TURNING_RADIANS) wanted.add('turn')
+    return wanted
+  }
+
+  const bestCandidate = (wanted: number[], forced: boolean, meant: Set<Intent>): number => {
     let best = -1
     let bestCost = Infinity
     candidates.forEach((candidate, c) => {
+      if (candidate.intent !== undefined && !meant.has(candidate.intent) && candidate.entry !== entry) return
       let cost = 0
       for (let d = 0; d < wanted.length; d++) {
         const e = (wanted[d] - candidate.feature[d]) / scales[d]
@@ -340,7 +341,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
   }
 
   const search = (forced: boolean): void => {
-    const best = bestCandidate(query(), forced)
+    const wanted = query()
+    const meant = bestCandidate(wanted, forced, intents())
+    const best = meant < 0 ? bestCandidate(wanted, forced, new Set(['brake', 'start', 'turn'])) : meant
     if (best < 0) return
     const chosen = candidates[best]
     if (isPlaying(chosen)) return
@@ -373,20 +376,29 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     root.yaw += turnBetween(root.yaw, body.yaw) * SYNC
   }
 
+  const placeAt = (time: number): BodyFrame['root'] => {
+    const playing = entries[entry]
+    const { frame, lap } = lapOf(playing, time)
+    const sampled = sampleFrame(playing.frames, frame).root
+    const start = rootAt(playing, lap * (playing.frames.length - 1))
+    return { ...sampled, position: add(sampled.position, sub(start.position, playing.frames[0].root.position)) }
+  }
+
   const advance = (): void => {
-    const frames = entries[entry].frames
+    const playing = entries[entry]
+    const frames = playing.frames
     const clipSpeed = length(sampleFrame(frames, t).root.velocity)
     const bodySpeed = length(body.velocity)
-    const stretch = clipSpeed > 0.3 && bodySpeed > 0.1 ? clamp(bodySpeed / clipSpeed, ...RATE_RANGE) : 1
-    const step = rate * stretch
-    const from = sampleFrame(frames, t)
-    const next = Math.min(frames.length - 1, t + step)
-    const to = sampleFrame(frames, next)
-    const delta = turnToLocal(sub(to.root.position, from.root.position), from.root.yaw)
+    const stretch = clipSpeed > 0.3 && bodySpeed > 0.1 ? clamp(bodySpeed / (clipSpeed * pace), ...RATE_RANGE) : 1
+    const step = rate * pace * stretch
+    const from = placeAt(t)
+    const next = playing.travel === undefined ? Math.min(frames.length - 1, t + step) : t + step
+    const to = placeAt(next)
+    const delta = turnToLocal(sub(to.position, from.position), from.yaw)
     root.position = add(root.position, turnToWorld(delta, root.yaw))
-    root.yaw += turnBetween(from.root.yaw, to.root.yaw)
+    root.yaw += turnBetween(from.yaw, to.yaw)
     followBody()
-    t = next
+    t = lapOf(playing, next).frame
   }
 
   const soles = (ankle: Vec3, rotation: Matrix, k: number): Soles => {
@@ -520,8 +532,10 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     }
     if (pinned.length > 0) {
       const moved = soles(ankle, rotation, k)
-      const under = Math.max(0, -heightAboveGround(moved.heel), -heightAboveGround(moved.toe))
-      ankle = [ankle[0], ankle[1] + under, ankle[2]]
+      const [heel, toe] = [heightAboveGround(moved.heel), heightAboveGround(moved.toe)]
+      const flat = pinned.length === 2 || otherHeld
+      const shift = Math.max(0, -heel, -toe) - (flat ? Math.max(0, Math.min(heel, toe)) : 0)
+      ankle = [ankle[0], ankle[1] + shift, ankle[2]]
     }
     return { ankle, rotation }
   }
@@ -711,6 +725,15 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     return jump.flight.drop * (1 - u * u * (3 - 2 * u))
   }
 
+  const livenIdle = (own: NonNullable<typeof liven>, pose: Pose, transforms: Transforms): void => {
+    if (performing?.take.kind === 'idle') {
+      const last = performing.take.frames.length - 1
+      own.phase = ((performing.lap % own.layer.laps) + performing.t / last) / own.layer.laps
+      own.weight = 1
+    } else own.weight = Math.max(0, own.weight - 1 / (BLEND_SECONDS * fps))
+    if (own.weight > 0) own.apply(pose, transforms, own.phase, own.weight)
+  }
+
   const resume = (): void => {
     startBlend()
     taking = undefined
@@ -734,8 +757,11 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const last = performing.take.frames.length - 1
     performing.t += takeStep(performing.take)
     if (performing.t < last) return
-    if (performing.take.kind === 'idle') performing.t -= last
-    else resume()
+    if (performing.take.kind !== 'idle') resume()
+    else {
+      performing.t -= last
+      performing.lap++
+    }
   }
 
   const cancelPerformance = (): void => {
@@ -747,7 +773,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     if (take === undefined || performing !== undefined || jump !== undefined || fallSpeed !== undefined) return false
     command = { ...command, speed: 0 }
     startBlend()
-    performing = { take, t: 0 }
+    performing = { take, t: 0, lap: 0 }
     return true
   }
 
@@ -799,7 +825,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
     const under: Vec3 = [hip[0], hip[1] - REACH_DOWN_SHARE * reach[k], hip[2]]
     const w = taking === undefined ? 1 - Math.exp(-airborne / REACH_DOWN_SECONDS) : 0
     const ankle = placed.ankle.map((v, i) => v + (under[i] - v) * w) as Vec3
-    const lift = jump === undefined ? 0 : liftAboveGround(soles(ankle, placed.rotation, k), 0)
+    const lift = liftAboveGround(soles(ankle, placed.rotation, k), 0)
     const lifted: Vec3 = [ankle[0], ankle[1] + lift, ankle[2]]
     feet[k].last = { ankle: lifted, rotation: placed.rotation }
     return { ...placed, ankle: lifted }
@@ -904,7 +930,9 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       }
       advanceTake()
       advancePerformance()
-      const ending = !entries[entry].endsAtRest && t + rate * RATE_RANGE[1] >= entries[entry].frames.length - 1
+      const own = entries[entry]
+      const runsOut = t + rate * pace * RATE_RANGE[1] >= own.frames.length - 1
+      const ending = !own.endsAtRest && own.travel === undefined && runsOut
       if (taking !== undefined || performing !== undefined) followBody()
       else {
         if (frameCount === 0 || frameCount % SEARCH_EVERY === 0 || ending) search(ending)
@@ -915,6 +943,7 @@ export function createPlayer (options: PlayerOptions, start: { position: Vec3, y
       previousFrame = lastFrame
       lastFrame = frame
       const { pose, transforms } = assemble(frame, database.options, hierarchy)
+      if (liven !== undefined) livenIdle(liven, pose, transforms)
       if (fallSpeed !== undefined) fall()
       airborne = fallSpeed === undefined || fallSpeed < 0 ? 0 : airborne + dt
       const rising = fallSpeed !== undefined && fallSpeed < 0

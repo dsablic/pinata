@@ -1,7 +1,9 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { attackReport, gaitReport, idleReport, rawSamples, retargetedSamples, seriesReport } from '../export/measure.ts'
-import type { Gait, SeriesReport } from '../export/measure.ts'
+import {
+  attackReport, gaitReport, gateRows, idleReport, rawSamples, retargetedSamples, seriesReport
+} from '../export/measure.ts'
+import type { Attack, Gait, Idle, Measured, SeriesReport } from '../export/measure.ts'
 import { SKINNED_HUMANOIDS } from '../export/record.ts'
 import type { Subject } from '../export/record.ts'
 import { validateClip } from '../mocap/clip.ts'
@@ -100,31 +102,49 @@ function handCell (hand: { reach: number, path: number }): string {
   return `${percent(hand.reach, 1)} / ${percent(hand.path, 0)}`
 }
 
-function idleTable (subjects: Subject[]): void {
-  const reports = subjects.map(idleReport)
-  section('idle: travel over one loop period, as a share of body height (%)',
-    ['example', 'period frames', 'chest height', 'chest per second', 'shoulders above pelvis', 'head reach / path'],
-    reports.map((r, i) => [subjects[i].name, `${r.period}`, percent(r.chest, 2), percent(r.chestPerSecond, 2),
-      percent(r.shoulders, 2), `${percent(r.head.reach, 2)} / ${percent(r.head.path, 0)}`]))
-  section('idle: hands (reach from the mean position / path over four periods, % of body height) and weight shift',
+function idleTable (subjects: Subject[], reports: Idle[], control: string): void {
+  section(`idle${control}: travel over one loop period, as a share of body height (%)`,
+    ['example', 'period frames', 'pelvis to chest per breath', 'chest height', 'chest per second',
+      'shoulders above pelvis', 'head reach / path'],
+    reports.map((r, i) => [subjects[i].name, `${r.period}`, percent(r.breath, 2), percent(r.chest, 2),
+      percent(r.chestPerSecond, 2), percent(r.shoulders, 2),
+      `${percent(r.head.reach, 2)} / ${percent(r.head.path, 0)}`]))
+  section(`idle${control}: hands (reach from the mean position / path over two periods, % of body height) and ` +
+    'weight shift',
     ['example', 'left hand', 'right hand', 'weight share range', 'pelvis sway', 'planted share left / right'],
     reports.map((r, i) => [subjects[i].name, ...r.hands.map(hand => handCell(hand)), percent(r.shift.range, 1),
       percent(r.shift.pelvisSway, 2), pair(r.shift.plantedShare)]))
 }
 
-function attackTable (subjects: Subject[]): void {
+function attackTable (subjects: Subject[], reports: Attack[]): void {
   const title = 'attack: the take each example plays, its striking hand, and the hand\'s peak reach forward and ' +
     'height above the pelvis (% of body height)'
-  section(title, ['example', 'take', 'hand', 'reach', 'lift'], subjects.map(subject => {
-    const r = attackReport(subject)
-    return [subject.name, r.take, r.hand, percent(r.reach, 0), percent(r.lift, 0)]
+  section(title, ['example', 'take', 'attack', 'hand', 'reach', 'lift'], reports.map((r, i) => {
+    return [subjects[i].name, r.take, r.attack ?? '-', r.hand, percent(r.reach, 0), percent(r.lift, 0)]
   }))
+}
+
+function gatesTable (measured: Measured[]): void {
+  const rows = measured.flatMap(gateRows)
+  section('gates (docs/plans/2026-11-06-motion-from-review.md)', ['gate', 'example', 'measured', 'result'],
+    rows.map(row => [row.gate, row.example, row.value, row.pass ? 'pass' : 'FAIL']))
+  const failed = rows.filter(row => !row.pass).length
+  console.log(`\n${failed === 0 ? 'every gate passes' : `${failed} of ${rows.length} gate checks fail`}`)
 }
 
 const wanted = process.argv.slice(2)
 const names = wanted.length > 0 ? wanted : SKINNED_HUMANOIDS
 const subjects = names.map(name => subjectFor(join(ROOT, 'examples', name)))
 takesTables(clipsOf(), subjects)
-for (const behaviour of GAITS) gaitTables(behaviour, subjects.map(subject => gaitReport(subject, behaviour)), names)
-idleTable(subjects)
-attackTable(subjects)
+const [walks, runs] = GAITS.map(behaviour => subjects.map(subject => gaitReport(subject, behaviour)))
+gaitTables('walk', walks, names)
+gaitTables('run', runs, names)
+const idles = subjects.map(idleReport)
+const stills = subjects.map(subject => idleReport({ ...subject, idleLayer: false }))
+idleTable(subjects, idles, '')
+idleTable(subjects, stills, ', still control (the idle layer off)')
+const attacks = subjects.map(attackReport)
+attackTable(subjects, attacks)
+gatesTable(subjects.map((subject, i) => ({
+  name: subject.name, walk: walks[i], run: runs[i], idle: idles[i], still: stills[i], attack: attacks[i]
+})))

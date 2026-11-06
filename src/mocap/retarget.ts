@@ -15,6 +15,7 @@ import { hierarchyOrder, parentsOf, placed, transformTo } from '../motion/skelet
 import type { Parents, Transforms } from '../motion/skeleton.ts'
 import { clipPose, lowestFootPoints, SOURCE_FEET } from './clip.ts'
 import type { AsfPose } from './asf.ts'
+import { spanKey } from './span.ts'
 import { applyStyle } from './style.ts'
 import type { MotionStyle } from './style.ts'
 import type { Clip } from './clip.ts'
@@ -24,6 +25,7 @@ export type Retargeting = {
   aim: Record<string, string>
   turn: Record<string, string>
   hang?: Record<string, string[]>
+  span?: Record<string, [string, string]>
 }
 export type RetargetedFrame = { root: RootState, pose: Pose, transforms: Transforms, contact: boolean[] }
 
@@ -34,17 +36,23 @@ const RETARGETING_SCHEMA: Schema = {
   fields: {
     aim: { kind: 'map', of: { kind: 'string' }, note: 'our joint to the source bone its limb bone points along' },
     turn: { kind: 'map', of: { kind: 'string' }, note: 'our joint to the source bone whose turn it copies' },
-    hang: { kind: 'map', of: { kind: 'array', of: { kind: 'string' } }, note: 'a joint to the joints hanging from it' }
+    hang: { kind: 'map', of: { kind: 'array', of: { kind: 'string' } }, note: 'a joint to the joints hanging from it' },
+    span: {
+      kind: 'map',
+      of: { kind: 'array', minItems: 2, of: { kind: 'string' } },
+      note: 'a joint to the first and last source bones of the chain from its parent to it, which it is placed along'
+    }
   },
-  optional: ['hang']
+  optional: ['hang', 'span']
 }
 
 export function mergeRetargeting (...maps: Array<Partial<Retargeting>>): Retargeting {
-  const result: Retargeting = { aim: {}, turn: {}, hang: {} }
+  const result: Retargeting = { aim: {}, turn: {}, hang: {}, span: {} }
   for (const map of maps) {
     Object.assign(result.aim, map.aim)
     Object.assign(result.turn, map.turn)
     Object.assign(result.hang ?? {}, map.hang)
+    Object.assign(result.span ?? {}, map.span)
   }
   return result
 }
@@ -73,7 +81,47 @@ export function validateRetargeting (input: unknown, rig: Rig, rest: Pose, clips
       if (rest[joint] === undefined) errors.push({ path: `hang.${parent}`, message: `'${joint}' is not a joint` })
     }
   }
+  errors.push(...spanErrors(map, rest, clips))
   return errors.length > 0 ? { errors } : { value: map, errors }
+}
+
+function spanErrors (map: Retargeting, rest: Pose, clips: Clip[]): ValidationError[] {
+  const errors: ValidationError[] = []
+  for (const [joint, bones] of Object.entries(map.span ?? {})) {
+    if (rest[joint] === undefined) errors.push({ path: `span.${joint}`, message: 'not a joint of the character' })
+    if (bones.length !== 2) {
+      errors.push({ path: `span.${joint}`, message: 'expected the first and the last source bone, two names' })
+      continue
+    }
+    for (const clip of clips) {
+      const chain = sourceChain(clip.bones, bones)
+      if (chain === undefined) {
+        const message = `'${bones[1]}' is not '${bones[0]}' or below it in the clip '${clip.name}'`
+        errors.push({ path: `span.${joint}`, message })
+      }
+    }
+  }
+  return errors
+}
+
+function sourceChain (bones: Clip['bones'], [first, last]: [string, string]): Clip['bones'] | undefined {
+  const chain: Clip['bones'] = []
+  let bone = bones.find(b => b.name === last)
+  while (bone !== undefined) {
+    chain.unshift(bone)
+    if (bone.name === first) return chain
+    const parent = bone.parent
+    bone = bones.find(b => b.name === parent)
+  }
+  return undefined
+}
+
+export function aimedDirections (options: Pick<RetargetOptions, 'rig' | 'rest' | 'map'>): Record<string, Vec3> {
+  const { rig, rest, map } = options
+  return Object.fromEntries(Object.keys(map.aim).map(joint => {
+    const next = nextInLimb(rig, joint) as string
+    return [joint, normalize(sub(rest[next], rest[joint]))]
+  }))
 }
 
 function nextInLimb (rig: Rig, joint: string): string | undefined {
@@ -101,22 +149,41 @@ export function hierarchyOf (rig: Rig, map: Retargeting): Hierarchy {
   return { parents, order: hierarchyOrder(parents) }
 }
 
-export function legRatio (clip: Clip, options: RetargetOptions): number {
-  const { rig, rest, map } = options
+function leftLeg (rig: Rig): Leg {
   const legs = legsOf(rig)
-  const left = legs.find(leg => leg.side === 'left') ?? legs[0]
-  const sourceLength = left.chain.slice(0, -1).reduce((sum, joint) => {
-    const bone = clip.bones.find(b => b.name === map.aim[joint])
+  return legs.find(leg => leg.side === 'left') ?? legs[0]
+}
+
+export function legLength (options: Pick<RetargetOptions, 'rig' | 'rest'>): number {
+  return chainLength(leftLeg(options.rig).chain, options.rest)
+}
+
+export function sourceLegLength (clip: Clip, options: Pick<RetargetOptions, 'rig' | 'map'>): number {
+  return leftLeg(options.rig).chain.slice(0, -1).reduce((sum, joint) => {
+    const bone = clip.bones.find(b => b.name === options.map.aim[joint])
     if (bone === undefined) throw new Error(`leg joint '${joint}' has no aimed source bone to measure the leg by`)
     return sum + bone.length
   }, 0)
-  return chainLength(left.chain, rest) / sourceLength
+}
+
+export function legRatio (clip: Clip, options: RetargetOptions): number {
+  return legLength(options) / sourceLegLength(clip, options)
+}
+
+type Span = { joint: string, first: string, last: string, rest: Vec3 }
+
+function spansOf (clip: Clip, map: Retargeting): Span[] {
+  return Object.entries(map.span ?? {}).map(([joint, [first, last]]) => {
+    const chain = sourceChain(clip.bones, [first, last]) ?? []
+    const rest = chain.reduce<Vec3>((sum, bone) => add(sum, scale(bone.direction, bone.length)), [0, 0, 0])
+    return { joint, first, last, rest }
+  })
 }
 
 function rotationsFrom (
   source: AsfPose,
   heading: number,
-  directions: Map<string, Vec3>,
+  clip: { directions: Map<string, Vec3>, spans: Span[] },
   options: RetargetOptions
 ): Record<string, Matrix> {
   const { rig, rest, map } = options
@@ -127,7 +194,11 @@ function rotationsFrom (
   for (const [joint, bone] of Object.entries(map.aim)) {
     const next = nextInLimb(rig, joint) as string
     const from = normalize(sub(rest[next], rest[joint]))
-    rotations[joint] = between(from, normalize(apply(local(bone), directions.get(bone) as Vec3)))
+    rotations[joint] = between(from, normalize(apply(local(bone), clip.directions.get(bone) as Vec3)))
+  }
+  for (const span of clip.spans) {
+    const now = apply(unturn, sub(source[span.last].end, source[span.first].start))
+    rotations[spanKey(span.joint)] = between(normalize(span.rest), normalize(now))
   }
   return rotations
 }
@@ -153,6 +224,7 @@ export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFr
   const legs = legsOf(options.rig)
   const ratio = clipScale(clip, options)
   const directions = new Map(clip.bones.map(bone => [bone.name, bone.direction]))
+  const own = { directions, spans: spansOf(clip, options.map) }
   const sources = clip.frames.map(frame => clipPose(clip, frame))
   const floor = lowestFootPoints(sources)
   const frames = clip.frames.map((frame, i): BodyFrame => {
@@ -161,7 +233,7 @@ export function retargetRotations (clip: Clip, options: RetargetOptions): BodyFr
       return ratio * Math.min(...SOURCE_FEET[side].map(name => source[name].end[1] - floor[name]))
     }
     return {
-      rotations: rotationsFrom(source, frame.heading, directions, options),
+      rotations: rotationsFrom(source, frame.heading, own, options),
       root: {
         position: [ratio * frame.root[0], 0, ratio * frame.root[2]],
         yaw: frame.heading,
@@ -181,12 +253,16 @@ export function sideOf (leg: Leg): 'left' | 'right' {
   return leg.side === 'right' ? 'right' : 'left'
 }
 
-export function raise (pose: Pose, transforms: Transforms, joints: string[], lift: number): void {
+export function moveJoints (pose: Pose, transforms: Transforms, joints: string[], by: Vec3): void {
   for (const joint of joints) {
-    pose[joint] = add(pose[joint], [0, lift, 0])
+    pose[joint] = add(pose[joint], by)
     const t = transforms[joint]
-    transforms[joint] = { ...t, translation: add(t.translation, [0, lift, 0]) }
+    transforms[joint] = { ...t, translation: add(t.translation, by) }
   }
+}
+
+export function raise (pose: Pose, transforms: Transforms, joints: string[], lift: number): void {
+  moveJoints(pose, transforms, joints, [0, lift, 0])
 }
 
 function placeJoints (
@@ -198,9 +274,14 @@ function placeJoints (
   const { parents, order } = hierarchy
   const pose: Pose = {}
   const transforms: Transforms = {}
+  const placedFrom = (parent: string, joint: string): Vec3 => {
+    const span = rotations[spanKey(joint)]
+    if (span === undefined) return placed(transforms[parent], rest[joint])
+    return add(pose[parent], apply(span, sub(rest[joint], rest[parent])))
+  }
   for (const joint of order) {
     const parent = parents[joint]
-    const at = parent === undefined ? rest[rig.pelvis] : placed(transforms[parent], rest[joint])
+    const at = parent === undefined ? rest[rig.pelvis] : placedFrom(parent, joint)
     pose[joint] = at
     const rotation = rotations[joint]
     if (rotation !== undefined) transforms[joint] = transformTo(rotation, rest[joint], at)

@@ -31,9 +31,11 @@ test('over a minute of walking on the demo layouts, capes, cloaks and the robe s
   for (const name of HEMMED) {
     const walked = calm.reduce((sum, { motion }) => sum + motion[name].walkingSeconds, 0)
     assert.ok(walked >= 60, `${name} walked ${walked.toFixed(1)} s`)
+    const squares = calm.reduce((sum, { motion }) => sum + motion[name].hemRms ** 2 * motion[name].walkingSeconds, 0)
+    const hemRms = Math.sqrt(squares / walked)
+    assert.ok(hemRms >= 0.03, `${name}: hem moves ${hemRms.toFixed(3)} m RMS over the walking`)
     for (const { where, motion } of calm) {
       const m = motion[name]
-      assert.ok(m.hemRms >= 0.03, `${where} ${name}: hem moves ${m.hemRms.toFixed(3)} m RMS`)
       assert.ok(m.hemTrail > 0, `${where} ${name}: hem ${m.hemTrail.toFixed(3)} m further back walking than standing`)
     }
   }

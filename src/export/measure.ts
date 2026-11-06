@@ -1,7 +1,8 @@
 import { armsOf, legsOf } from '../formats/rig.ts'
 import { dot, sub } from '../math/vec.ts'
 import type { Vec3 } from '../math/vec.ts'
-import type { Clip } from '../mocap/clip.ts'
+import type { AttackKind, Clip } from '../mocap/clip.ts'
+import { idleLayerOf } from '../mocap/idle.ts'
 import { clipPose } from '../mocap/clip.ts'
 import { retargetClip, sideOf } from '../mocap/retarget.ts'
 import type { RetargetOptions } from '../mocap/retarget.ts'
@@ -30,6 +31,7 @@ export type Gait = {
   chestByClip: Record<string, number>
   switches: number
   mixed: { share: number, duration: number, pureDuration: number }
+  gaits: Record<string, number>
 }
 export type SeriesReport = {
   chest: number
@@ -40,6 +42,7 @@ export type SeriesReport = {
 }
 export type Idle = {
   period: number
+  breath: number
   chest: number
   chestPerSecond: number
   shoulders: number
@@ -47,7 +50,14 @@ export type Idle = {
   hands: Array<{ reach: number, path: number }>
   shift: Shift
 }
-export type Attack = { take: string, hand: string, reach: number, lift: number }
+export type Attack = {
+  take: string
+  attack?: AttackKind
+  named?: AttackKind
+  hand: string
+  reach: number
+  lift: number
+}
 
 const CHEST = 'chest'
 const HEAD = 'head'
@@ -83,7 +93,7 @@ export function retargetedSamples (clip: Clip, options: RetargetOptions): Sample
 
 export function seriesReport (samples: Sample[], options: Pick<RetargetOptions, 'rig'>, fps: number): SeriesReport {
   const pelvis = options.rig.pelvis
-  const steps = stepsOf(samples, ankleNames({ member: options }), fps)
+  const steps = stepsOf(samples, ankleNames({ member: options }), fps, pelvis)
   const gaps = gapsOf(steps)
   const worst = (values: number[]): number | undefined => values.length === 0 ? undefined : Math.max(...values)
   const length = worst(gaps.map(gap => gap.length))
@@ -147,7 +157,7 @@ export function gaitReport (subject: Subject, behaviour: Behaviour): Gait {
   const frames = steadySamples(played)
   const pelvis = subject.member.rig.pelvis
   const chest = pitchesOf(frames, pelvis, CHEST)
-  const steps = stepsOf(frames, ankleNames(subject), FPS)
+  const steps = stepsOf(frames, ankleNames(subject), FPS, pelvis)
   const gaps = gapsOf(steps)
   return {
     cycles: cycleMeans(frames, chest).length,
@@ -161,13 +171,26 @@ export function gaitReport (subject: Subject, behaviour: Behaviour): Gait {
     clipShare: share(clips),
     chestByClip: share(clips, chest),
     switches: clips.filter((clip, i) => i > 0 && clip !== clips[i - 1]).length,
-    mixed: mixedSteps(steps, clips)
+    mixed: mixedSteps(steps, clips),
+    gaits: share(clips.map(clip => gaitOf(subject, clip)))
   }
+}
+
+function gaitOf (subject: Subject, clip: string): string {
+  return subject.member.capture!.entries.find(entry => entry.name === clip)?.gait ?? 'none'
 }
 
 function motion (frames: Moment[], joint: string, height: number): { reach: number, path: number } {
   const points = frames.map(frame => frame.joints[joint])
   return { reach: reachOf(points) / height, path: pathOf(points) / height }
+}
+
+function breathFrames (subject: Subject): number {
+  const database = subject.member.capture!
+  const take = database.performances.find(own => own.kind === 'idle')!
+  const rate = database.options.style?.rate ?? 1
+  const { laps, breaths } = idleLayerOf(take, rate)
+  return Math.round(laps * (take.frames.length - 1) * FPS / (take.fps * rate) / breaths)
 }
 
 export function idleReport (subject: Subject): Idle {
@@ -177,10 +200,13 @@ export function idleReport (subject: Subject): Idle {
   const frames = takeOf(subject, 'idle').frames.slice(LEAD_FRAMES)
   const used = windowsOf(frames, period).flat()
   const height = mannequin.height
+  const spine = used.map(frame => Math.hypot(...sub(frame.joints[CHEST], frame.joints[rig.pelvis])))
+  const breath = travelPerWindow(spine, breathFrames(subject)) / height
   const chest = travelPerWindow(used.map(frame => frame.joints[CHEST][1]), period) / height
   const ankles = ankleNames(subject) as [string, string]
   return {
     period,
+    breath,
     chest,
     chestPerSecond: chest * FPS / period,
     shoulders: mean(armsOf(rig).map(arm => {
@@ -206,8 +232,60 @@ export function attackReport (subject: Subject): Attack {
   const forward = offsets.map((offset, i) => dot(offset, forwardOf(frames[i].yaw)))
   return {
     take: take.name,
+    ...(take.attack === undefined ? {} : { attack: take.attack }),
+    ...(subject.member.attack === undefined ? {} : { named: subject.member.attack }),
     hand,
     reach: Math.max(...forward) / mannequin.height,
     lift: Math.max(...offsets.map(offset => offset[1])) / mannequin.height
   }
+}
+
+export type GateRow = { gate: string, example: string, value: string, pass: boolean }
+export type Measured = { name: string, walk: Gait, run: Gait, idle: Idle, still: Idle, attack: Attack }
+
+export const LEAN_DEGREES: [number, number] = [5, 20]
+export const MOST_STRIDE_GAP = 0.1
+export const BREATH_SHARES: [number, number] = [0.003, 0.015]
+export const LEAST_WEIGHT_RANGE = 0.2
+export const LEAST_WALK_SHARE = 0.9
+
+const within = (value: number, [low, high]: [number, number]): boolean => value >= low && value <= high
+const percent = (value: number): string => `${(100 * value).toFixed(1)}%`
+const degrees = (s: Spread): string => `${s.min.toFixed(1)}..${s.max.toFixed(1)}`
+
+function leans (run: Gait): boolean {
+  return [run.chest, run.side, run.pixels].every(s => within(s.min, LEAN_DEGREES) && within(s.max, LEAN_DEGREES))
+}
+
+function even (gait: Gait): boolean {
+  return gait.length.max <= MOST_STRIDE_GAP && gait.duration.max <= MOST_STRIDE_GAP
+}
+
+function breathes (idle: Idle): boolean {
+  return within(idle.breath, BREATH_SHARES) && idle.shift.range >= LEAST_WEIGHT_RANGE
+}
+
+function stillFails (still: Idle): boolean {
+  return !within(still.breath, BREATH_SHARES) && still.shift.range < LEAST_WEIGHT_RANGE
+}
+
+export function gateRows ({ name, walk, run, idle, still, attack }: Measured): GateRow[] {
+  const gaits = (gait: Gait): string => {
+    return `worst cycle: length ${percent(gait.length.max)}, duration ${percent(gait.duration.max)} ` +
+      `(mean ${percent(gait.length.mean)}, ${percent(gait.duration.mean)})`
+  }
+  const idleValue = (own: Idle): string => `breath ${percent(own.breath)}, weight range ${percent(own.shift.range)}`
+  const expected = attack.named ?? 'punch'
+  return [
+    { gate: 'runs lean forward', example: name, pass: leans(run),
+      value: `3D ${degrees(run.chest)}, side ${degrees(run.side)}, pixels ${degrees(run.pixels)}` },
+    { gate: 'no limp, walk', example: name, value: gaits(walk), pass: even(walk) },
+    { gate: 'no limp, run', example: name, value: gaits(run), pass: even(run) },
+    { gate: 'idles breathe', example: name, value: idleValue(idle), pass: breathes(idle) },
+    { gate: 'idles breathe, still control fails', example: name, value: idleValue(still), pass: stillFails(still) },
+    { gate: 'walks walk', example: name, value: `${percent(walk.gaits.walk ?? 0)} of frames`,
+      pass: (walk.gaits.walk ?? 0) >= LEAST_WALK_SHARE },
+    { gate: 'attacks suit', example: name, value: `${attack.take} (${attack.attack ?? '-'}), expected ${expected}`,
+      pass: attack.attack === expected }
+  ]
 }

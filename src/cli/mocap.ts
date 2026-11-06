@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseAmc, parseAsf } from '../mocap/asf.ts'
 import { clipFromAmc } from '../mocap/clip.ts'
-import type { ClipKind } from '../mocap/clip.ts'
+import type { ClipKind, ClipTags } from '../mocap/clip.ts'
 
 type Take = {
   name: string
@@ -11,7 +11,7 @@ type Take = {
   description: string
   kind?: ClipKind
   range?: [number, number]
-}
+} & ClipTags
 type Takes = { database: string, fps: number, sourceFps: number, drop: string[], takes: Take[] }
 
 const BASE = 'http://mocap.cs.cmu.edu/subjects'
@@ -19,12 +19,20 @@ const USAGE = 'usage: node src/cli/mocap.ts fetch <takes.json> <source-dir>\n' +
   '       node src/cli/mocap.ts convert <takes.json> <source-dir> <out-dir>'
 
 function files (take: Take): { asf: string, amc: string } {
-  return { asf: `${take.subject}.asf`, amc: `${take.subject}_${take.trial.padStart(2, '0')}.amc` }
+  const subject = take.subject.padStart(2, '0')
+  return { asf: `${subject}.asf`, amc: `${subject}_${take.trial.padStart(2, '0')}.amc` }
+}
+
+function tagsOf ({ gait, loop, attack }: Take): ClipTags {
+  return { ...(gait === undefined ? {} : { gait }), ...(loop === undefined ? {} : { loop }),
+    ...(attack === undefined ? {} : { attack }) }
 }
 
 async function fetchTakes (takes: Takes, dir: string): Promise<void> {
   mkdirSync(dir, { recursive: true })
-  const names = new Set(takes.takes.flatMap(take => Object.values(files(take)).map(f => `${take.subject}/${f}`)))
+  const names = new Set(takes.takes.flatMap(take => {
+    return Object.values(files(take)).map(f => `${take.subject.padStart(2, '0')}/${f}`)
+  }))
   for (const name of names) {
     const response = await fetch(`${BASE}/${name}`)
     if (!response.ok) throw new Error(`${name}: HTTP ${response.status}`)
@@ -46,6 +54,7 @@ function convert (takes: Takes, dir: string, out: string): void {
       fps: takes.fps,
       drop: takes.drop,
       ...(take.kind === undefined ? {} : { kind: take.kind }),
+      tags: tagsOf(take),
       ...(take.range === undefined ? {} : { range: take.range })
     })
     writeFileSync(join(out, `${take.name}.json`), `${JSON.stringify(clip)}\n`)

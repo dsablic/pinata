@@ -106,10 +106,11 @@ Plan: [page world](plans/2026-10-31-page-world.md).
   player's base), plus a wandering plan over the surface graph. Walls are not physical: walkers stay off them
   because no node spans a wall.
 - Wandering: rest for 0.8-4 s, pick a reachable node weighted by width and a spot in it at least 0.35 m from its ends,
-  then follow the path edge by edge (heading for each edge's `at` at walking speed, 1.1 m/s, east or west), and slow
-  down over the last 0.5 m to the spot. The current node is the one under the root at the surface height under it;
-  off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s plus the time to walk its
-  distance at walking speed gives up and rests.
+  then follow the path edge by edge (heading for each edge's `at` at the character's walking speed,
+  `database.speeds.walk`, east or west: 0.97 m/s for the knight, 0.77 the rogue, 0.67 the dwarf, 1.03 the wizard),
+  and slow down over the last 0.5 m to the spot. The current node is the one under the root at the surface height
+  under it; off course (it landed somewhere else, or was moved) it replans, and a leg taking over 10 s plus the time
+  to walk its distance at walking speed gives up and rests.
 - Activities: `rest`, `wander`, `visit` and `flee`; each start after the first rest is counted (`started`, for the
   liveliness gate), and a restart (`moveTo`) puts a walker back at rest. A walk ends `reached` only when it got to its
   spot; giving up (no path any more, a leg over 10 s, or a page change that removed its place) ends it unreached.
@@ -614,6 +615,9 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   the page would change; a performed idle leaves the page alone and matching can adopt it later. The site's world bundle
   leaves the performance clips out, since the page never plays them, and the retargeting is validated against the bones
   of every clip, whatever their order.
+- A clip may also carry tags from `takes.json`: `gait` (`walk` or `run`, what a walking take shows; the gates count
+  walk takes by it, and the Froude speeds read it), `loop` (a steady take the player loops) and `attack` (`punch`,
+  `swing`, `thrust` or `cast`, what an attack take shows; an attack take without it is a punch).
 - A clip stores, per frame, the root position (height above the ground, horizontal from the clip's start), a heading
   (yaw) and every bone's global rotation from rest as a quaternion [w, x, y, z], rounded to four digits to keep the
   committed JSON small.
@@ -636,6 +640,13 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - Rotations are taken relative to the clip's heading, so the root carries the facing and the body stays body-local.
 - The root path scales by the ratio of the character's left leg (hip to ankle) to the source's, measured from the
   bones the leg joints aim, times the style's stride.
+- `span` places a joint along a chain of source bones instead of rigidly with its parent: the chest sits where
+  the chain from `lowerback` to `thorax` points (the turn from that chain's rest direction to its posed one, applied
+  to the rig's pelvis-to-chest offset), and still turns with `thorax` itself. The rig has one spine segment where the
+  source has three bones; with the chest rigid on the pelvis, the run take's 13 degrees of spine lean reached only
+  the head and the torso leaned 6. The span rotation is stored with the frame's rotations under `<joint>:span`, so
+  sampling, blending, loops and style treat it like any other rotation. The source's rest spine leans back about
+  2 degrees, so every retargeted torso leans about 2 degrees further forward than the raw neck.
 - The body is lifted so the feet stand as far above the ground as the source's, scaled. The lift is a soft minimum
   over the feet (weights fall off over 1 cm): the foot nearer its planted level counts most, and the height does not
   jump as the weight passes from one foot to the other.
@@ -655,6 +666,40 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   8 and 16 frames ahead (a third and two thirds of a second at 24 fps), its velocity, and each ankle's position and
   velocity across the ground. Facing and ankle positions weigh 1.5, ankle velocities 0.75, the rest 1.
 - Each feature is divided by its spread over the candidates, so features in different units weigh alike.
+- A take marked `loop` (a steady walk or run, in `takes.json`) becomes a looping entry. Its cycle is the shortest span
+  of at least 0.5 s whose two ends (and the frames after them) share the contact flags and are within 1.5 times the best
+  pose match: one stride. The span is closed: the rotation difference between its ends is spread over it, the root's yaw
+  drift removed. It is then made symmetric: each frame is the average of itself and the mirror of the frame half a cycle
+  away (left and right limbs swapped by the rig's sides, rotations conjugated by the x flip; aimed joints mirror their
+  direction and re-aim from their own rest direction, since a rig's two legs need not rest alike, as the knight's do
+  not). The cycle is resampled to an even number of frames so the two halves fall on whole frames. The root's steps are
+  averaged the same way (the mirror's sideways component flipped), and so are the heading's offsets within the stride:
+  rotations are stored relative to each frame's heading, and a cycle that kept one heading turned the stance foot under
+  the body. A foot is down where both averaged frames say so, and the flags are then steadied around the loop (gaps and
+  stances under 3 frames removed), since the two frames' flags flicker at different phases. A cycle built from one step
+  and its mirror, without averaging, lands one foot of the walks wrongly, because the walk's flags flicker. The style is
+  applied after, so a one-sided style (the knight's sword arm) stays one-sided. Without the loop, the 33-frame run take
+  could not run on and matching hopped into `run-stop`, a braking take leaning back (batch A of the motion-from-review
+  plan); the hops also made the run limp. The capture's own two steps differ by about 10% in length and duration, so a
+  loop of the take as captured would limp too.
+- The mirror pairs the rig's left and right legs and arms, in their listed order; other sided joints (a horse's ears)
+  are reflected in place, not swapped, and a rig whose legs or arms do not pair loops its cycle unmirrored. Finding
+  and building the cycles about doubles the database's build (the knight's from 0.34 to 0.65 s), which the page
+  pays once per character at start.
+- A looping entry's candidates are all its frames; their path ahead wraps around the cycle, adding the cycle's
+  travel per lap.
+- Candidates carry an intent: the moving frames of a take that starts moving and ends at rest (a stop) are `brake`,
+  those of a take that starts at rest and ends moving (a start) are `start`, and every frame of a take that turns by
+  more than 45 degrees is `turn`. The player offers them only while the
+  command shows that intent (below).
+- `speeds`: the walk and run speeds for the character by Froude similarity, v = sqrt(Fr g L) with L the left leg
+  (hip to ankle). Fr is taken from the looping takes of each gait: v^2 / (g L) with the take's speed and the source's
+  leg (the bones the leg joints aim): 0.14 for the walks (1.09 and 1.02 m/s on a 0.84 m leg), 0.94 for the run
+  (2.78 m/s). Without takes for a gait the reference speeds (walk 1.1, run 3 m/s) stand. `pace` is sqrt(source leg /
+  character leg), the playback rate that makes a retargeted take dynamically similar: the path is scaled by the leg
+  ratio, so time must be scaled by its square root to keep the Froude number, and a take played at that pace moves at
+  the Froude speed. With one walking speed of 1.1 m/s for every character, the rogue's and dwarf's walk takes (0.58
+  and 0.44 m/s once scaled) were too slow and matching reached for the run.
 - A frame is a candidate when the full path ahead of it lies in its clip. A clip that ends standing still (root slower
   than 0.15 m/s over its last quarter second) offers every frame, its path held at the end, so its end can be matched
   as a stop and its last frame held.
@@ -687,6 +732,17 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - The legs can always out-push the wind (drag is capped at 80% of their acceleration). A body told to stand has its
   feet planted: the wind leans it but does not slide it, and it settles three times harder. A standing body that gave
   way to the drag slid downwind for as long as it stood, out of the world on a long stand in a strong wind.
+- Matching offers a candidate with an intent only when the command has it: `brake` while the commanded speed is more
+  than 0.1 m/s below the body's, `start` while it is more than 0.1 m/s above, `turn` while the commanded heading is
+  more than 0.2 rad from the body's. Frames of the take already playing are always offered, so a stop that has begun
+  plays out; when no candidate is left, every intent is offered. On a steady straight walk the player otherwise hopped
+  into `walk-turn-left` every 80 frames and the dwarf into `walk-start` 15 times in six seconds, and each hop made the
+  steps across it uneven.
+- Walking takes play at the database's `pace` (times the style's rate), and the query is put in the take's time:
+  its horizons are `h / (fps pace)` seconds and the body's velocity is divided by the pace. The stretch to the body's
+  speed is around the paced speed.
+- A looping entry wraps at its last frame (the same pose as its first) and moves the root by the cycle's travel per
+  lap; it never runs out, so matching does not have to leave it.
 - Matching runs every 5 frames and whenever a clip runs out. A jump to within 3 frames of the playing frame is not
   taken, and the playing frame's cost is lowered by 0.15, so playback does not jump for nothing.
 - Switches use dead blending: the old motion carries on from its last frame at its own velocity, slowing to a stop over
@@ -699,13 +755,20 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   are held the foot's rotation is frozen.
 - A held foot is pressed down until its lowest held end touches the ground (before the ends are kept from sliding):
   captured contacts sit up to 2.5 cm above the floor, more than a CSS pixel on a page.
+- The ground under a sole is asked from the level of the held feet as well as from the body's. The body's level
+  follows the lowest foot, so a character stepping off a shelf sinks while its trailing foot is still on the shelf, and
+  once the body was a step below the shelf the shelf was out of reach: the held foot lost its ground, was placed on
+  the floor below and dived through the shelf for a frame. A level that is the highest held foot's keeps the surface
+  the foot stands on in reach, and leaves a swinging foot's view unchanged (it sees no rise it cannot climb).
 - A held foot further than 15% of its leg's reach from its animation is pulled off and steps across, rising by 15% of
   the reach; a released foot rejoins its animation over 0.25 s. While no other foot is held the limit is 35%: pulling
   the only foot down while the other swings left both in the air for a few frames every stride whenever the commanded
   speed did not match the clip. A step clears both the ground it left and the ground it
   goes to, the first fading into the second.
 - Ends that stay within 2.1 cm of the ground from one frame to the next do not move across it, held or not; this stops
-  slow sliding between hold and release.
+  slow sliding between hold and release. A foot pinned flat this way (both ends, or one with the other held) keeps
+  its last rotation, so it is pressed down again until its lower end touches the ground: otherwise a heel lifting
+  in the animation raised the whole flat foot, up to the 2.1 cm band, while it counted as planted.
 - A swinging foot keeps its ends 3 cm clear of the ground (real toes clear it by 1 to 3 cm), easing in and out at
   0.4 m/s.
 - A foot's ground reference is the ground under its held end, or, while swinging, the highest ground under its ends
@@ -753,7 +816,8 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   `LANDING_RECOVERY_SECONDS` (1 s) is the time after which a landing is taken as recovered, for the game panel.
 - While falling no foot takes contact from the clip: a foot held on the frame a fall starts stayed planted in mid air.
   The feet reach down instead, easing over 0.15 s to 93% of the leg's reach under each hip, and each foot's last
-  placement follows, so the landing starts from where the feet are drawn.
+  placement follows, so the landing starts from where the feet are drawn. A foot reaching down is kept above the
+  ground under it, as in a jump: a trailing foot eased under the hip went 5 cm through a ledge's corner.
 - Jumps (`jump(target)`, with `jumping()`): the target is a landing x and a surface height. The arc is
   `arcOver(rise, run, clearance)` in `jump.ts`: the apex is `clearance` (10 cm; `options.jump.clearance` overrides it)
   of base height above the target's top (a body's base is its
@@ -812,6 +876,27 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   loop's end continues into its start in pose and velocity and the cloth is not kicked at the seam (a cut at the
   best-matching pair alone still gave seams of 3 to 7 usual steps in the cloth). The loop's last frame repeats its first
   so the wrap interpolates.
+- An idle performance carries a layer (`idle.ts`), the take alone holding the chest rigid and the weight still: the
+  chest and everything hanging from it rise by 1.2% of the body's height at the top of a breath (the shoulders and
+  arms half as much again), and the whole body above the knees moves across, over one foot and then the other, by
+  15% of the distance between the ankles either way; the feet stay held, and the legs reach them by IK. The layer's
+  periods are whole laps of the idle take, so a loop of it still closes: the weight shift takes the number of laps
+  nearest 7 s and the breaths divide it into periods nearest 3.5 s (the 2.1 s take: 6.3 s and 3.15 s). Cloth and
+  hair respond as to any motion. `idleLayer: false` in the player's options turns it off (the gates' still control).
+  The layer stops with the idle: cancelling an idle in mid-shift moves the body back in one frame. The weight shift's
+  amplitude is not what hid the dwarf's foot behind its cloak in the back-right view: at 15%, 10% and 5% the same foot
+  is hidden in every frame and with no shift it is seen, so any shift reorders the cloak and the foot there, and the
+  painter's hysteresis keeps the order. The amplitude is a share of the ankles' distance and fits any character; what
+  a back view must show is the foot over what hangs behind it, which is the skin's `layer` on the foot sprites (the
+  dwarf's `backSide`), as for the wizard's.
+- Attacks: the database keeps the one attack take that suits the character (`buildDatabase(..., attack)`). A captured
+  take with that `attack` is used; for `cast` and `thrust`, which the CMU library does not hold in a form the
+  performance model plays (see below), one is composed from the idle (`attack.ts`): from the idle's own frames, the
+  arms are aimed to key poses and blended with smoothstep: drawn back (0.35 s, held to 0.45 s), struck forward (0.6 s),
+  held (to 0.95 s) and back to the idle (1.5 s), with the torso leaning back 8 degrees on the draw and forward 10 on
+  the strike. A cast moves both arms; a thrust the arm that carries something (else the right). Attack takes are
+  played without the character's style: the style shapes how an arm carries something while walking, and stiffening
+  the knight's sword arm to 35% would undo its swing.
 - A jump takes about 1.1 s from command to the end of its landing (the crouch at most 0.4 s, against the dip's
   0.18 s), so a character plans fewer jumps in a given time than with the dip.
 - Known limits: a fall that starts during a take's crouch, or a flight that overruns `arc.seconds`, loses the
@@ -1220,6 +1305,11 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
 - Each file is validated with its own format's validator, then the files are cross-checked against each other.
 - Every error's path starts with the name of the file that has to change (`file: path`), so a cross-check error
   points at the file the author must edit, not at the file where the problem was noticed.
+- `attack` (optional: `punch`, `swing`, `thrust`, `cast`) names the character's attack; an unknown value is an error
+  that lists the four. Without it the default comes from what the arms carry (`attack.ts`): a part on an arm's
+  `carried` joints whose name says staff, wand, rod or sceptre casts, any other carried part is a weapon and swings,
+  empty hands punch. The rig says what is carried but not what it is, so a staff is told by its name. `check` prints
+  the attack and why, and the world bundle carries the field so the export and the page build the same database.
 
 ### Rigs (`rig.ts`)
 
@@ -1379,25 +1469,36 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   edge, and the others between (`front-right`, `back-right`, `back`, `back-left`, `left`, `front-left`), at yaws that
   are multiples of 45 degrees from `front`. Each is the centre of one view sector, so every frame of a non-turning
   animation is drawn from the view of its direction (a gate).
-- Behaviours: `idle` is the captured standing take (below), looped; `crouch` and `attack` are captured one-shot takes
-  played on command, from rest to rest; `walk` at 1.1 m/s (the page's walking speed); `run` at 3 m/s; `turn` a quarter
+- Behaviours: `idle` is the captured standing take (below), looped; `crouch` and `attack` are one-shot takes
+  played on command, from rest to rest (the attack is the character's own, captured or composed); `walk` and `run`
+  at the character's Froude speeds (`database.speeds`, the page walks at the same), rounded so that one lap of the
+  loop the player plays at that speed takes a whole number of frames (`wholeLapSpeed`: the loops are exact, and a lap
+  of 17.6 frames left no cut that closed); `turn` a quarter
   turn on the spot (two names forward in the direction list: `turn-right` ends facing `back`), from rest to rest; `jump`
   a standing jump forward on flat ground, from rest to rest, with the longest captured jump take's run and apex as the
   jump asked of the player (1.05 m, 0.35 m), so the take plays as captured.
-- A looping run is warmed up (240 frames for idle, 144 for walk and run) and then recorded for a window (four periods
-  and a lead for idle; 144, 96 frames), all drawn in all eight directions in order. A loop is the span `from..to` of
-  that window. Candidates are the pairs of frames a period apart (idle: the take's own period; walk 12 to 72; run 8 to
-  48) whose planted flags agree in three consecutive frames; each is scored by the root-local joint and cloth positions
-  of those frames. The period is the shortest within 1.5 times the best score (a cape has its own period, so a walk can
-  need two strides); the 40 best (for idle, all) starts within one frame of that period are then judged on the drawn
-  pixels: the first with the seam under the median step in every direction, and not a repeated frame (see the loop
-  gate), wins. A pose-only cut passed the gate in some directions and missed it in others, because the seam of a good
-  loop is about one usual step: only the pixels say which cut is below it.
+- A looping run is warmed up (240 frames for idle, 144 for walk and run) and then recorded for a window (two periods and
+  a lead for idle, a period being the idle layer's: three laps of the take for the examples; 144, 96 frames), all drawn
+  in all eight directions in order. A loop is the span `from..to` of that window. Candidates are the pairs of frames a
+  period apart (idle: the layer's period; walk 12 to 72; run 8 to 48) whose planted flags agree in three consecutive
+  frames; each is scored by the root-local joint and cloth positions of those frames. The period is the shortest within
+  1.5 times the best score (a cape has its own period, so a walk can need two strides); the 40 best (for idle, all)
+  starts within one frame of that period are then judged on the drawn pixels: the first with the seam under the median
+  step in every direction, and not a repeated frame (see the loop gate), wins. A pose-only cut passed the gate in some
+  directions and missed it in others, because the seam of a good loop is about one usual step: only the pixels say which
+  cut is below it.
 - When no closed candidate passes, the best closed one (not a repeated frame first, then the lowest worst ratio) is
   compared on the same pixel measure with the best of the unclosed candidates, judged on one drawing of the raw window,
   and the better is taken; the closed one keeps a tie. Closing can make a span worse on the pixels (the offset changes
   where the angle steps fall), so a character whose closed candidates all fail is not left with a cut that the raw
   window would have done better.
+- When no cut of the lap passes in every direction, the walk or run is recorded again at the speed for a lap of one
+  frame more or fewer (`wholeLapSpeed` with a shift: 1, -1, 2, -2, 3, -3, nearest first), as long as the speed is
+  within 12% of the Froude speed, and the first recording whose loop passes is kept (else the best by the same order:
+  not a repeated frame first, then the lowest worst ratio). A different lap puts the stride's steps on different whole
+  frames, so the pixel steps fall differently. A character that passes at the nearest lap, as the knight, the rogue and
+  the wizard do, is recorded as before; the dwarf's walk is 20 frames a lap (0.61 m/s against 0.68). Costs a
+  recording per tried lap, only for a loop that misses.
 - A loop is closed in pose space before it is drawn (`closure.ts`). A captured gait is not exactly periodic (the
   wizard's thigh is at 105.1 degrees at one frame and at 94.5 one period later), and the angle steps of the painter put
   two such poses on different steps, so the seam shows a difference the take made, not the painter. Each candidate span
@@ -1421,7 +1522,11 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   closed cycle draw the same seam every lap), a cloth that has not settled (its distance to one cycle later has no
   trend over the window), the cloth's own period (the gait's mismatch, 25 to 45 mm, is the larger part), the cloth's
   damping (2.4 to 16: three to four of eight directions still fail), and more candidates (400 instead of 40: the
-  same walk fails the same five directions). No principled change is recorded; the guide says so.
+  same walk fails the same five directions). The seam is an ordinary step of the cycle, so a cut passes only if its
+  phase has a small step in all eight views, and a loop of few frames has few phases: the dwarf's walk at the Froude
+  pace is 18 frames a lap (1.6 times the capture's rate) and no cut of it passed, with the cloak removed or frozen as
+  with it (the seam steps are the body's, the cloak does not set them). The recorder therefore also tries the lap in
+  one frame fewer or more (below).
 - The candidates share the frames before their start, which closing leaves as recorded, so those frames are drawn
   once per direction and the painter's state (the hysteresis of angles, lengths, anchors, the order and the view
   sector) is copied at each frame passed. A candidate is drawn from a copy of the state at its start, over its span
@@ -1472,8 +1577,10 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   spine's bend reaches the head only.
 - The side view is the same two joints through the export camera. It is reported exact and snapped to whole pixels,
   because the torso is about 13 px long and one pixel of snap is about 4 degrees.
-- A step runs from one foot's touchdown to the other foot's; its length is the forward distance between the two
-  ankles' touchdown positions and its duration the frames between them. The gap of a cycle is the difference of its
+- A step runs from one foot's touchdown to the other foot's; its length is the distance between the two ankles'
+  touchdown positions along the pelvis's travel between them (the heading where the pelvis did not move) and its
+  duration the frames between them. The root's heading wobbles within a stride, and measured along it a step took
+  in part of the feet's sideways spacing. The gap of a cycle is the difference of its
   two steps over their mean. Raw and retargeted clip contacts flicker, so a gap of fewer than 3 frames inside a stance
   is closed and a stance shorter than 3 frames dropped; the player's flags are only gap-closed, since the dwarf's run
   has genuine one-frame stances. Gaps are only reported for steady gaits (walk, walk-2, run): starts, stops and turns
@@ -1483,6 +1590,18 @@ Plan: [a faster, deterministic harness](plans/done/2026-11-02-page-harness.md).
   pelvis's position along the line between the ankles (0 over the left foot, 1 over the right), peak-to-peak over the
   window.
 - The attack's striking hand is the one that travels furthest in the take.
+- Breath is the peak-to-peak of the pelvis-to-chest distance over each breath period, as a share of the body's
+  height. The take keeps that distance fixed (the spine is one rigid segment, placed along the source's spine by
+  `span`), so only the idle layer moves it; the chest's height relative to the pelvis moved 0.5% to 0.7% with the
+  layer off once the chest followed the spine, and a still control would have passed.
+- The gates of the motion-from-review plan are printed last, per example, pass or fail: the run's chest pitch per
+  cycle within 5 to 20 degrees (3D, side view exact and in pixels: every cycle); stride gaps of walk and run, every
+  cycle at most 10% in length and in duration (the mean is shown too: at 24 fps a run step is 7 or 8 frames, so one
+  frame is 13%); breath within 0.3% to 1.5% and a weight share range of at least 20 points, and the still
+  control (`idleLayer: false`) outside both; walk takes (by `gait`) in at least 90% of the walk's frames; the attack
+  take's kind equal to the character's.
+- Stance flags: a gap shorter than 3 frames at the very start of the window is closed like any other, so a stance
+  the window starts in does not count as a touchdown (it gave the knight's run a 5-frame first step).
 
 ### `sheet.ts`
 

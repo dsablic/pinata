@@ -121,3 +121,10 @@ test('cape anchors outside the pelvis and upperBody are an error in motion.json'
   const lines = errorLines(dir)
   assertHasLine(lines, "motion.json: cape.anchorRight: 'wristR' is an arm joint")
 })
+
+test('attack: an unknown value is named with the choices, a known one is kept with its reason', () => {
+  const wrong = errorLines(characterVariant(d => patchJson(d, 'character.json', j => { j.attack = 'kick' })))
+  assertHasLine(wrong, 'character.json: attack: expected one of punch, swing, thrust, cast')
+  const named = loadCharacter(characterVariant(d => patchJson(d, 'character.json', j => { j.attack = 'thrust' })))
+  assert.deepEqual(named.value?.attack, { attack: 'thrust', reason: 'named in character.json' })
+})

@@ -4,7 +4,7 @@ import { isRecord } from '../formats/validate.ts'
 import type { ValidationError } from '../formats/validate.ts'
 import { restPose } from '../motion/pose.ts'
 import { validateClip } from './clip.ts'
-import type { Clip } from './clip.ts'
+import type { AttackKind, Clip } from './clip.ts'
 import { buildDatabase } from './database.ts'
 import type { MotionDatabase } from './database.ts'
 import { mergeRetargeting, validateRetargeting } from './retarget.ts'
@@ -28,7 +28,8 @@ export function captureFor (
   base: unknown,
   own: unknown,
   errors: ValidationError[],
-  path: string
+  path: string,
+  attack?: AttackKind
 ): MotionDatabase | undefined {
   if (!isRecord(base) || !isRecord(own) || clips.length === 0) {
     errors.push({ path, message: 'expected the shared retargeting, the character\'s own, and at least one clip' })
@@ -42,5 +43,5 @@ export function captureFor (
   errors.push(...(styled?.errors ?? []).map(e => ({ ...e, path: `${path}.style.${e.path}` })))
   if (map.value === undefined || (styled !== undefined && styled.value === undefined)) return undefined
   const { rig, mannequin } = character
-  return buildDatabase(clips, { rig, rest, mannequin, map: map.value, style: styled?.value })
+  return buildDatabase(clips, { rig, rest, mannequin, map: map.value, style: styled?.value }, attack)
 }

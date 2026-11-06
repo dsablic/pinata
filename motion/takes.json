@@ -13,49 +13,60 @@
       "name": "walk-start",
       "subject": "16",
       "trial": "31",
-      "description": "walk (starting from standing)"
+      "description": "walk (starting from standing)",
+      "gait": "walk"
     },
     {
       "name": "walk",
       "subject": "16",
       "trial": "15",
-      "description": "walk"
+      "description": "walk",
+      "gait": "walk",
+      "loop": true
     },
     {
       "name": "walk-2",
       "subject": "16",
       "trial": "16",
-      "description": "walk"
+      "description": "walk",
+      "gait": "walk",
+      "loop": true
     },
     {
       "name": "walk-stop",
       "subject": "16",
       "trial": "33",
-      "description": "slow walk, stop"
+      "description": "slow walk, stop",
+      "gait": "walk"
     },
     {
       "name": "walk-turn-left",
       "subject": "16",
       "trial": "17",
-      "description": "walk, 90-degree left turn"
+      "description": "walk, 90-degree left turn",
+      "gait": "walk"
     },
     {
       "name": "walk-turn-right",
       "subject": "16",
       "trial": "19",
-      "description": "walk, 90-degree right turn"
+      "description": "walk, 90-degree right turn",
+      "gait": "walk"
     },
     {
       "name": "run",
       "subject": "16",
       "trial": "35",
-      "description": "run/jog"
+      "description": "run/jog",
+      "gait": "run",
+      "loop": true
     },
     {
       "name": "run-stop",
       "subject": "16",
       "trial": "57",
-      "description": "run/jog, sudden stop"
+      "description": "run/jog, sudden stop",
+      "gait": "run"
     },
     {
       "name": "turn-in-place",
@@ -127,6 +138,19 @@
       "range": [
         60,
         215
+      ],
+      "attack": "punch"
+    },
+    {
+      "name": "attack-swing",
+      "subject": "79",
+      "trial": "1",
+      "description": "chopping wood",
+      "kind": "attack",
+      "attack": "swing",
+      "range": [
+        200,
+        545
       ]
     }
   ]

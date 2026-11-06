@@ -60,7 +60,6 @@ export type WalkerOptions = {
 
 export const STEP_HEIGHT = 0.2
 export const DROP_LIMIT = 6
-const WALK_SPEED = 1.1
 const SLOWEST_SPEED = 0.35
 const SLOW_WITHIN = 0.5
 const ARRIVED = 0.06
@@ -94,6 +93,7 @@ function headingTo (from: number, to: number): number {
 export function createWalker (options: WalkerOptions): Walker {
   const { database, fps, random } = options
   const { rig, rest, mannequin } = database.options
+  const walkSpeed = database.speeds.walk
   const legs = legsOf(rig)
   const jump = options.jumps === undefined ? undefined : jumpOf(rig, rest, options.jumps)
   const jumping = jump === undefined ? {} : { jump }
@@ -227,7 +227,7 @@ export function createWalker (options: WalkerOptions): Walker {
 
   const approach = (to: number): Move => {
     const distance = Math.abs(to - current.root.position[0])
-    const speed = Math.max(SLOWEST_SPEED, Math.min(WALK_SPEED, WALK_SPEED * distance / SLOW_WITHIN))
+    const speed = Math.max(SLOWEST_SPEED, Math.min(walkSpeed, walkSpeed * distance / SLOW_WITHIN))
     return { speed, target: to }
   }
 
@@ -243,9 +243,9 @@ export function createWalker (options: WalkerOptions): Walker {
       if (replanned === undefined) return undefined
       route = replanned
     }
-    if (time - legStart > LEG_TIMEOUT_SECONDS + legMetres / WALK_SPEED) return undefined
+    if (time - legStart > LEG_TIMEOUT_SECONDS + legMetres / walkSpeed) return undefined
     const edge = route.at(0)
-    if (edge !== undefined && edge.kind !== 'jump') return { speed: WALK_SPEED, target: edge.at }
+    if (edge !== undefined && edge.kind !== 'jump') return { speed: walkSpeed, target: edge.at }
     const to = edge?.at ?? goal.x
     if (Math.abs(to - current.root.position[0]) >= ARRIVED) return approach(to)
     return edge === undefined ? 'arrived' : { jump: edge }
@@ -263,7 +263,7 @@ export function createWalker (options: WalkerOptions): Walker {
   const decide = (): { speed: number, heading: number } => {
     if (player.jumping()) return { speed: 0, heading }
     const node = here()
-    if (node === undefined) return { speed: current.falling ? 0 : WALK_SPEED, heading }
+    if (node === undefined) return { speed: current.falling ? 0 : walkSpeed, heading }
     if (goal === undefined && time >= restUntil) chooseGoal(node)
     if (goal === undefined) return { speed: 0, heading }
     const move = followRoute(node)

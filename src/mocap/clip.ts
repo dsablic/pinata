@@ -18,6 +18,11 @@ export type ClipFrame = {
 export const PERFORMANCE_KINDS = ['idle', 'crouch', 'attack'] as const
 export type PerformanceKind = typeof PERFORMANCE_KINDS[number]
 export type ClipKind = 'jump' | PerformanceKind
+export const GAITS = ['walk', 'run'] as const
+export type Gait = typeof GAITS[number]
+export const ATTACKS = ['punch', 'swing', 'thrust', 'cast'] as const
+export type AttackKind = typeof ATTACKS[number]
+export type ClipTags = { gait?: Gait, loop?: boolean, attack?: AttackKind }
 export type Clip = {
   name: string
   source: string
@@ -25,7 +30,7 @@ export type Clip = {
   fps: number
   bones: ClipBone[]
   frames: ClipFrame[]
-}
+} & ClipTags
 
 export type ConvertOptions = {
   name: string
@@ -33,6 +38,7 @@ export type ConvertOptions = {
   sourceFps: number
   fps: number
   kind?: ClipKind
+  tags?: ClipTags
   drop?: readonly string[]
   range?: [number, number]
 }
@@ -114,7 +120,7 @@ export function clipFromAmc (skeleton: AsfSkeleton, amc: AmcFrame[], options: Co
     }
   })
   const kind = options.kind === undefined ? {} : { kind: options.kind }
-  return { name: options.name, source: options.source, ...kind, fps: options.fps, bones, frames }
+  return { name: options.name, source: options.source, ...kind, ...options.tags, fps: options.fps, bones, frames }
 }
 
 export function clipPose (clip: Clip, frame: ClipFrame): AsfPose {
@@ -137,6 +143,9 @@ const CLIP_SCHEMA: Schema = {
       oneOf: ['jump', ...PERFORMANCE_KINDS],
       note: 'a take with a kind is played on command by the player, never matched while walking'
     },
+    gait: { kind: 'string', oneOf: [...GAITS], note: 'the gait a walking take shows' },
+    loop: { kind: 'boolean', note: 'a steady walking take, whose best cycle the player loops' },
+    attack: { kind: 'string', oneOf: [...ATTACKS], note: 'the attack an attack take shows' },
     fps: { kind: 'number', min: 1, max: 240 },
     bones: {
       kind: 'array',
@@ -166,7 +175,7 @@ const CLIP_SCHEMA: Schema = {
       }
     }
   },
-  optional: ['kind']
+  optional: ['kind', 'gait', 'loop', 'attack']
 }
 
 export function validateClip (input: unknown): Validated<Clip> {

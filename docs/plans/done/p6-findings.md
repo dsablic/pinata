@@ -1,6 +1,6 @@
 # P6 Findings
 
-Gates fixed in [`docs/plans/done/2026-10-30-remaining-proofs.md`](2026-10-30-remaining-proofs.md) before implementation.
+Gates fixed in the remaining-proofs plan before implementation.
 
 ## Setup
 

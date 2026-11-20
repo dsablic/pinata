@@ -1,79 +1,54 @@
 # TODO
 
 Where the project stands and what to do next, written so a fresh session (or another machine) can pick it up.
-Background: [`docs/FINDINGS.md`](FINDINGS.md) (what the proofs established) and [`docs/ROADMAP.md`](ROADMAP.md)
-(the plan). Open plans are in [`docs/plans/`](plans); finished and settled ones, with the proofs' findings and judge
-artefacts, in [`docs/plans/done/`](plans/done).
+Background: [`docs/ROADMAP.md`](ROADMAP.md) (the goal and the order of work) and [`docs/FINDINGS.md`](FINDINGS.md)
+(what the proofs and the finished plans established). Open plans are in [`docs/plans/`](plans).
 
 ## Current state
 
-- The proofs (P1-P6, the skins spike), general limbs, the joint hierarchy, the live runtime (P8: `<pinata-character>`,
-  the hanging piñata, the Claude Code mod) and the world showcase are done; results in [`FINDINGS.md`](FINDINGS.md).
-- Humanoids move by retargeted CMU motion capture with motion matching, feet held on the ground and a light physical
-  body ([motion data](plans/done/2026-10-30-motion-data.md)); jumps play CMU take-off and landing takes
-  ([jump takes](plans/done/2026-11-04-jump-takes.md)). Node and Chrome compute Math functions differently, so the
-  engine is deterministic per engine, not across them.
-- Characters live on an ordinary web page: marked elements are ground and walls, characters walk, drop, jump (super
-  jumps on the demo) and react to the page; capes, cloaks, robes and plumes are simulated cloth drawn in the skins;
-  one strip painter draws every part ([page world](plans/2026-10-31-page-world.md),
-  [natural page motion](plans/done/2026-11-02-natural-page-motion.md),
-  [unified part rendering](plans/done/2026-11-02-unified-part-rendering.md)). Released as v0.6.0.
-- The visual bar is settled where it is: a beat-and-pose stage, hand-drawn walk frames and a restyle of the knight
-  each missed their judge gates against hand-drawn game sprites
-  ([drawn, not pasted](plans/done/2026-11-03-drawn-not-pasted.md),
-  [drawn walk frames](plans/done/2026-11-03-drawn-walk-frames.md),
-  [game sprite style](plans/done/2026-11-04-game-sprite-style.md)).
+- The engine, the authoring loop and the tool work: `pinata new, check, skin, render, export, review` and the MCP
+  server, the live runtime (`<pinata-character>`, the hanging piñata, the Claude Code mod) and the page as the
+  world. Phase 1's exit test is met and released as v0.7.0.
+- Humanoids move by retargeted CMU motion capture with motion matching; jumps play capture takes. Node and Chrome
+  compute Math functions differently, so the engine is deterministic per engine, not across them.
+- Against hand-animated game sprites, in the owner's blind review: the walk is preferred and the runs tie; idles,
+  attacks and the jump lose (1 of 8 picked with 3 ties, against a gate of 5).
+- The visual bar of AI-drawn skins is settled where it is; existing art is the way past it, and the tool cannot
+  import it yet.
 
-## Next: toward any art, animated well (paused)
+## Next: any art, animated well
 
 The aim: an AI points the tool at character art (one view or several) and the tool helps it reach a fluid,
-game-worthy animation. Quality is fixed in the tool (checks, guidance, renderer), not by hand-tuning the examples.
-The project owner's blind review page ([motion plan](plans/2026-11-06-motion-from-review.md), round two) is the main
-check of motion quality; the AI judges cannot see motion in strips reliably (benchmark batch A). Where each thread
-stands:
+game-worthy animation. Quality is fixed in the tool (checks, guidance, renderer, motion library), not by hand-tuning
+the examples. The owner's blind review page is the gate of motion quality; AI judges do not see motion in strips
+reliably. In the roadmap's order:
 
-1. [Facing readability](plans/2026-11-05-facing-readability.md): direction checks in `pinata check`, `pinata
-   review` with specific cues, the eight-direction preview, done. Fresh agents' characters missed the gates (60% idle,
-   65% walk against 90% and 80%); one hand-drawn eight-direction character scored 81% with the same judges, so the
-   90% gate is not shown to be within reach of hand-drawn art. Three-quarter views carry the misses.
-2. [Animation benchmark](plans/2026-11-05-animation-benchmark.md): batch A done (references, rubric panels, judge
-   validation: every dimension dropped for the pooled panel; opus alone sees all four). Batch B (the scorecard) is
-   open; an opus-only judge would be a new gate fixed before its run.
-3. [Motion from review](plans/2026-11-06-motion-from-review.md): batches A and B done (runs lean forward and loop on
-   one stride, speeds from leg length, breathing idles, attacks per character). Round two of the review missed (1 of
-   8 picked, 3 ties): runs moved to ties, but idles still read lifeless and the new attacks read worse than the
-   punch. **Next:** a plan for resting idles (a chosen resting pose, no fidget that reads as a gesture, cloth that
-   responds), game attacks (anticipation, a fast strike, follow-through, a held end; a cast with its own gesture) and
-   game jumps (higher, a crouch before, a landing after), judged by a third round of the same page.
-4. [Import existing art](plans/2026-11-05-import-existing-art.md): gates fixed, not started; the
-   [ML proposal](proposals/ml-augmentation.md) shapes its inputs (files plus optional providers).
+1. **[Import existing art](plans/2026-11-05-import-existing-art.md), batch A:** gates fixed, not started.
+   Normalisation, points, the cut, the rig fit, hidden-area lists and view guides, on LPC, CC0, image-model and
+   illustration inputs; the [ML proposal](proposals/ml-augmentation.md) shapes its inputs (files plus optional
+   providers). The imported LPC characters give the same-art pairs (walk, slash, thrust, cast) for the next review.
+2. **Game feel:** a plan to write, gates first. A pose-to-pose layer with named phases (anticipation, strike,
+   follow-through, hold, recover) for idles, attacks, jumps and reactions; a resting pose under every idle with
+   cloth that answers the breath; holds, stepping on twos and the feel filter as export settings; `check` reading
+   the phases. Judged by round three of the owner's page with the earlier pairs and the same-art pairs, and with
+   enough pairs to tell a change from chance.
+3. **[Animation benchmark](plans/2026-11-05-animation-benchmark.md), batch B:** the scorecard's computed numbers on
+   both sides; a single-model judge would be a new gate fixed before its run. Runs beside 1 and 2.
+4. **Views:** import batches B and C, with view providers tried against the agent. The direction gates were missed
+   by fresh agents' characters (60% idle, 65% walk against 90% and 80%); three-quarter views carry the misses.
+5. **[Image and points](plans/2026-10-30-image-points.md), batches B to D:** `points.json`, the warp renderer and
+   the point helper, for shapes the templates do not cover.
 
-The automated checks ([plan](plans/done/2026-11-05-automated-checks.md)) and Phase 1's exit test (third run: three
-of three authors passed, 9 of 9 judge answers right; released as v0.7.0) are done.
+## Open, parked
 
-## Phase 1, the minimum viable tool
+Recorded, and not worked until an item above or a user of the runtime needs them (see the roadmap's "Parked").
 
-[Plan](plans/2026-11-04-phase-1-tool.md), gates fixed: an agent, from a prompt, produces an eight-direction
-character that walks, idles and jumps, with a cape, skinned, exported as a sprite sheet, passing every gate. Batches:
-A recorder and export, B one command line and the MCP server, C behaviours and Aseprite, D authoring and the exit
-test. Batch A (recorder, sheet and JSON export, the loop, feet, direction-packet and round-trip gates) is built;
-the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
-
-- **Export:** sprite sheets with JSON frame data, then Aseprite files.
-- **Behaviour library:** idle, crouch and a simple attack beside walk, turn and jump, each with gates, built on the
-  [composable behaviours](plans/2026-10-30-composable-behaviours.md) model.
+- **Exports:** the feet-held gate on drawn pixels (slides of 1 to 5 px as the boot is redrawn); the rogue's boots
+  drawn below the ground line; the knight's swing hides the sword behind the body for about eight frames in the side
+  view; staff detection is by part name.
 - **Packaging:** `npm run build` compiles a JavaScript bin to `dist/node`, so an installed package runs `npx pinata`
-  and `npx pinata mcp` (checked from a packed tarball). Standalone executables, if wanted later, are Node single
-  executable applications built in CI (still V8, so exports match what the tests check); not Bun, whose
-  JavaScriptCore computes `Math` differently from Node.
-- **Authoring hints:** the P5 authors' notes are in the guide and the hints; the exit test (third run) passed with them.
-
-- **Facing readability (Phase 1, batch A):** the skins' views do not read as their direction: judges named the
-  direction right in 46% of answers (three-quarter views read as front or side; the wizard's back views show a white
-  patch at the head that reads as a face, so back reads as front). Also open from batch A: the feet-held gate on drawn
-  pixels (slides of 1 to 5 px as the boot is redrawn) and the rogue's boots drawn below the ground line.
-
-## Open, from earlier work
+  and `npx pinata mcp`. Standalone executables, if wanted, are Node single executable applications built in CI; not
+  Bun, whose JavaScriptCore computes `Math` differently from Node.
 
 - **Page world** ([plan](plans/2026-10-31-page-world.md)): the standing gate is missed narrowly on every layout
   (0.4-0.9% of frames mid-air from the turn, start and stop clips; about 0.3% of planted feet over 1 px); the
@@ -81,15 +56,14 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
   After changing a test page or the demo, run `npm run layouts`.
 - **Count gates per distance travelled:** restate the page's count gates per distance travelled, in a plan with gates
   fixed first. Characters walk at leg-length speeds, so the fixed 60 s holds fewer trips and the dwarf's jump count
-  (39 of 40) and the page-test layout's super jumps (3 of 4) are missed; see the
-  [motion plan](plans/2026-11-06-motion-from-review.md).
+  (39 of 40) and the page-test layout's super jumps (3 of 4) are missed.
 - **Page motion leftovers:** one pop each for the knight (its sword behind the cape in the back view) and the dwarf
   (its cloak folding within a frame); the wizard's walk and landing judged less natural than before the natural-motion
   work (head turning away for frames, legs tucked under the robe); the rogue's worst flicker window and the dwarf's
   and wizard's cloth flicker; one knight foot sprite misses the fit check (a mirrored view draws it on the other
   foot's bone). A take ends in the take's small landing whatever the height, and a fall starting during a take's
   crouch loses the procedural reach-down and dip.
-- **The knight's cape flicker** ([Phase 1 plan](plans/2026-11-04-phase-1-tool.md), batch E results): the drawn-cloth
+- **The knight's cape flicker:** the drawn-cloth
   flicker gate of the page is missed for the knight (1.50 and 2.13 against at most 1 %); the cape's own flicker is
   unchanged by the painter's rest-relative steps, and the gate's difference of two runs' worst frames moves with
   frame alignment. Open: the cape's flicker.
@@ -109,6 +83,8 @@ the direction panel missed. Batch B (`pinata` and `pinata mcp`) is built.
 - Drafts kept outside the engine: the knight's hand-drawn walk frames ([`pocs/drawn-walk/`](../pocs/drawn-walk)) and
   its restyled skin ([`pocs/game-sprite-style/`](../pocs/game-sprite-style)); the walk-frames renderer is in the
   history at 2ca4379.
+- Finished plans are removed once their results are in [`FINDINGS.md`](FINDINGS.md); the last commit holding them
+  all is 1c482e4.
 
 ## Smaller items
 
@@ -140,7 +116,8 @@ between the first frame and one cycle later (normal frame-to-frame change is abo
   `--verify` (or `npm run pN:verify`) for the determinism re-run.
 - Fix gates in a plan before building; only tighten them afterwards, and log why; add a control that must fail.
 - After each batch, an independent review told to assume the code is wrong; fix before moving on.
-- Visual quality is judged by blind AI judge panels (fresh agents, neutral names, both orders, controls), not by eye.
+- Ground-truth questions (directions, prompt matching) are judged by blind AI judge panels (fresh agents, neutral
+  names, both orders, controls); motion quality by the owner's blind review page.
 - TypeScript only in the repo; scratch scripts may use anything.
 - Write the name as "Piñata" in prose; keep `pinata` in identifiers, paths and commands.
 - Commit messages: a short subject, the Co-Authored-By trailer, no body unless needed. Push at milestones.

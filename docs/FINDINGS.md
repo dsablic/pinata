@@ -1,6 +1,6 @@
 # Piñata Findings
 
-This document summarises everything the proof-of-concept phase established. Each proof's plan, tuning log, judge
+This document summarises what the proofs and the plans finished since have established. Each proof's findings, judge
 artefacts and raw numbers are linked from its section; this page is the short version.
 
 ## The question
@@ -87,6 +87,52 @@ hand-made sprites) broke down once the candidate was competitive: judges switche
 quality, including between references. The references were modest CC0 sprites, so this shows competitiveness with
 them, not with expert work.
 
+## After the proofs
+
+Results of the plans finished since, each built against gates fixed first. How each piece is built is in
+[`docs/design.md`](design.md).
+
+| Work | Result |
+|---|---|
+| General limbs | Any number of legs with any segment count, arms and spring or oscillator appendages; biped, quadruped, hexapod and octopod templates. A stride over about 0.6 times the hip spacing crosses legs in 3/4 views; short quadruped legs strain the knee-speed gate. |
+| Motion data | Humanoids move by retargeted CMU capture with motion matching, feet held on the ground and a light physical body; jumps play capture take-offs and landings. Node and Chrome compute `Math` differently, so results are deterministic per engine. |
+| Live runtime (P8) and the page as the world | Characters animate live in the browser, on a rope or walking on a page's own elements, within the frame-cost gate. The page's standing, cloth-flicker and count gates are missed narrowly (see [`TODO.md`](TODO.md)). |
+| Natural page motion, unified part rendering | Capes, cloaks and robes are simulated cloth drawn in the skins; one strip painter draws every part; falls dip and absorb. |
+| Phase 1, the minimum viable tool | Met: `pinata new, check, skin, render, export` and an MCP server; sprite sheets, Aseprite JSON and `.aseprite` files in eight directions. On the third run of the exit test three of three fresh agents reached a passing export within 10 `check` runs and judges matched all three to their prompts (9 of 9). |
+| Automated checks | One `npm run verify` over typecheck, tests, lint, examples, the site, the browser suite and the baselines; gates declared with a failing and a passing case. |
+| The visual bar, three attempts | Missed each time against hand-drawn game sprites. A beat-and-pose stage rated 3.06 against 3.48 and read as "made by software" in 46% of answers; hand-drawn walk frames switched cleanly in 81% of switches against a 95% gate (a standing pose resembles no walk frame); a restyled knight was picked in 50% against a two-thirds gate. Judges named limbs rotated or slid rather than redrawn, and no contact, passing or squash poses. |
+| Facing readability | Direction checks in `pinata check`, `pinata review` and an eight-direction preview are built. Fresh agents' characters: 60% of idle and 65% of walk answers right against gates of 90% and 80%. A hand-drawn eight-direction control reads at 81% with the same judges (cardinal views 24 of 24, three of the four diagonals 9 of 18), so 90% is not shown to be within reach of hand-drawn art. |
+| Animation benchmark, judge validation | A pooled panel of three models rates a reference above its degraded copy in 67% (fluidity), 33% (secondary motion), 33% (environment) and 50% (anticipation) of answers against an 80% gate; the largest model alone does so in every answer. Controls are stable with no position bias. |
+
+### The owner's blind reviews
+
+Eight pairs, each a hand-animated CC0 reference against Piñata's animation of the same move at the same scale, sides
+shuffled, rated by the project owner: which would you ship.
+
+| Pair | Round one | Round two | Said about Piñata |
+|---|---|---|---|
+| Idle, warrior against knight | reference | reference | procedural, pose unclear; then: cloth looks dead, "just doesn't look like a resting pose" |
+| Run, warrior against knight | reference | about the same | round one: "leans backward weirdly when running" |
+| Attack, warrior against knight | Piñata (a punch) | reference | the swing "looks like an old man supporting himself with a stick" |
+| Idle, evil wizard against wizard | reference | reference | stiff; then: "too static, looks like he's picking his nose" |
+| Walk, evil wizard against wizard | Piñata | Piñata | "looks more like walking, but the style of the other is better" |
+| Attack, evil wizard against wizard | reference | reference | "doesn't do wizardy stuff"; then: "shouldn't look like punching with two hands" |
+| Run, huntress against wizard | reference | about the same | round one: "looks like he's got a limp" |
+| Jump, warrior against knight | Piñata | about the same | "looks like skipping over a puddle" |
+
+Round one: Piñata picked in 3 of 8. Between the rounds runs were made to lean forward and loop on one stride, speeds
+were set from leg length, idles were given breath and a weight shift, and each character its own attack (a capture
+take of chopping wood for the swing, a composed cast). Round two: 1 of 8 with 3 ties, against a gate of 5.
+
+- **Fixed:** the backward lean and the limp were not named again; both runs moved from a loss to a tie.
+- **Idles:** a breathing layer on a capture take is not enough. The take's hand fidget reads as a gesture, the pose
+  does not read as resting, and the cloth hangs still.
+- **Attacks and jumps:** capture of everyday actions does not read as a game move. An attack needs anticipation, a
+  fast strike, follow-through and a held end; a cast a gesture of its own; a jump height, a crouch before and a
+  landing after.
+- **Measures kept** in `npm run motion-measure`: torso pitch over a run cycle, stride symmetry, idle motion energy,
+  the share of walk frames playing walk takes.
+
 ## What was built along the way
 
 - A deterministic, headless TypeScript engine: formats with actionable validation, rasterizer and stylizer, XPBD
@@ -123,8 +169,9 @@ The motion engine works: scripted locomotion, IK and physics-driven secondary mo
 formats and a single check command with actionable hints, with style independent of motion. The procedural visual
 layer does not pass as hand-made; per-part sprites drawn by an AI artist are the most promising replacement. They beat
 modest references, but later attempts to close the gap to hand-drawn game sprites (a beat-and-pose stage, hand-drawn
-walk frames, a restyle of the knight) missed their judge gates, so human-drawn skins remain the way past that bar. The
-next steps are in [`docs/ROADMAP.md`](ROADMAP.md).
+walk frames, a restyle of the knight) missed their judge gates, so existing, human-drawn art is the way past that
+bar. Against hand-animated sprites the locomotion holds up and the idles, attacks and jumps do not: game feel is the
+open problem. The next steps are in [`docs/ROADMAP.md`](ROADMAP.md).
 
 ## Open questions
 

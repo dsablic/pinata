@@ -1,7 +1,6 @@
 # P5 Findings
 
-Gates fixed in [`docs/plans/done/2026-10-30-p5-authoring-loop.md`](2026-10-30-p5-authoring-loop.md) before
-implementation.
+Gates fixed in the P5 authoring-loop plan before implementation.
 
 ## Before the experiment
 

@@ -1,184 +1,168 @@
 # Piñata Roadmap
 
-This roadmap turns the proof-of-concept results into a plan for building the tool. The results are summarised in
-[`docs/FINDINGS.md`](FINDINGS.md). Open plans are in [`docs/plans/`](plans); finished ones, with every proof's gates,
-findings and judge artefacts, in [`docs/plans/done/`](plans/done). [`docs/TODO.md`](TODO.md) says what is next.
+The goal, what the evidence says about the distance to it, and the order of work that closes the distance.
+[`docs/TODO.md`](TODO.md) says what is next in detail, [`docs/FINDINGS.md`](FINDINGS.md) what the proofs established.
+Open plans are in [`docs/plans/`](plans). A finished plan is removed once its results are in the findings; the
+proofs' findings and judge artefacts stay in [`docs/plans/done/`](plans/done).
 
-## What the proofs showed
+## Goal
 
-| Proof | Question | Verdict |
+An AI agent points Piñata at character art (one view or several; drawn by a person, by the agent or by an image
+model) and the tool helps it reach fluid, game-worthy animation: sprites that stand beside hand-animated game
+characters, exported for game engines and playable live on a web page.
+
+Three things follow from it, and every item below is ordered by them:
+
+- **Any art.** The way in is existing artwork with points placed on it, not only a mannequin written from nothing.
+  Nothing in the engine depends on named body parts: a point is a point, and what moves it is configuration.
+  Templates (biped, quadruped, hexapod, octopod) are starting points to refine.
+- **Game-worthy is the bar.** Animation is compared with hand-animated game sprites, not with earlier versions of
+  itself. Correct motion is not enough; it has to read as a game character's.
+- **A general tool.** Quality comes from mechanisms that help any author's character (checks, guidance, the renderer,
+  the motion library). The example characters are test cases, fixed only as far as the general checks fail them.
+
+## Where it stands against the goal
+
+| Part of the goal | Evidence | Standing |
 |---|---|---|
-| P1 static style | Can a procedural renderer pass as hand-made pixel art at 32-64 px? | No: detected in 36 of 36 blind comparisons, before and after a targeted revision. Readable and consistent across 8 directions. |
-| P2 pixel stability | Does the renderer stay stable in motion? | Yes, with temporal hysteresis: flicker under 1% on a slow turntable; an unsnapped camera control flickers 25-34%. One area-jump gate failed because it counted occlusion as instability. |
-| P3 secondary motion | Does simulated cloth read as inertia, with materials and wind distinguishable by motion alone? | Yes: all gates pass, a rigid control fails them, judges ranked silk, wool and leather and read the wind correctly every time. |
-| P4 locomotion | Does a behaviour script compile into planted, non-sliding footsteps with IK? | Yes for the motion (all gates, foot grip and turns read by judges 12 of 12). No for readability as 48 px procedural strips: judges could not tell it from a sliding control. |
-| P5 AI authoring loop | Can a fresh AI agent author a character from a one-line prompt with only a guide and one command? | Yes: three characters passed every gate in 1, 4 and 6 runs with no format errors, and judges matched all three to their prompts. |
-| P6 style swap | Is style independent of motion? | Yes: one character in three styles, motion byte-identical, judges grouped by character and by style without error. |
-| Skins spike | Do AI-drawn per-part sprites driven by the rig look better than procedural rendering? | Promising: an AI artist produced a valid skin first try; judges preferred the skinned walk over the procedural one; on stills, 44 of 54 comparisons rated it more hand-made than CC0 references, but the panel's control rule failed, so formally inconclusive. |
+| An agent authors a character with the tool | Phase 1's exit test: three of three fresh agents reached an exported, skinned, eight-direction character within 10 `check` runs; judges matched every character to its prompt | Met |
+| The engine moves it correctly | Planted feet, IK, simulated cloth, retargeted capture with motion matching, style independent of motion, deterministic per JavaScript engine | Met |
+| The agent points the tool at existing art | No import path exists; the [import plan](plans/2026-11-05-import-existing-art.md) has its gates and no code | Not started |
+| Any shape, not only bodies with named parts | The point hierarchy and drivers are built ([image and points](plans/2026-10-30-image-points.md), batch A); the points format, the warp renderer and the point helper are open | Started |
+| Motion reads as game animation | The owner's blind review against hand-animated sprites: 3 of 8 pairs, then 1 of 8 with 3 ties (the gate asks 5). The walk is preferred and the runs tie; idles, attacks and the jump lose | Missed |
+| Art reads as game art | AI-drawn skins beat modest CC0 references; three attempts against hand-drawn game sprites missed their gates | Settled where it is |
+| Directions read | Fresh agents' characters: 60% idle and 65% walk against gates of 90% and 80%; a hand-drawn control reaches 81% with the same judges. Three-quarter views carry the misses | Missed |
+| Motion can be measured without the owner | A pooled AI panel sees none of four degraded dimensions; one model alone sees all four | Open |
 
-**Conclusion.** The motion engine works: scripted locomotion, IK and physics-driven secondary motion, authored by AI
-through text formats and a single check command with actionable hints. The procedural visual layer does not pass as
-hand-made; per-part sprites ("skins") drawn by an AI artist are the most promising replacement. The tool to build is
-an AI-native motion engine for 2D pixel characters, with skins as the visual layer and the procedural renderer kept
-for previews, collision geometry and checks.
+What the table says:
+
+- **The engine and the authoring loop work.** The distance to the goal is in two places: the way in (existing art)
+  and game feel.
+- **Capture gives locomotion, not performances.** Retargeted capture holds up for walks and runs. Idles, attacks and
+  jumps taken from capture of everyday actions do not read as a game character's: a game animation is a few chosen
+  poses with timing (anticipation, a fast strike, follow-through, a held end), and that layer is not built. P4 found
+  the same for walks at 48 px, and the beat-and-pose stage that tried it on drawn frames missed its gate, so this is
+  the oldest open finding and the one nearest the goal.
+- **Every motion verdict so far also judges the art.** The review pairs Piñata's AI-drawn skins with another artist's
+  sprites. Imported art animated against its own hand animation (the LPC sheets: walk, slash, thrust, cast) is the
+  first comparison where only the motion differs.
+- **The live page has drawn much of the recent effort** (standing, flicker and count gates within a percent of their
+  thresholds). It serves the goal as a delivery target and a demo; closing its last gates does not move the goal.
 
 ## Product definition
 
-- **Users:** AI agents first (via MCP and a CLI), and the people directing them: indie developers and small studios
-  who need many animated characters without an animator, and web developers who want small reactive characters
-  ("little computer people") in their UIs for comic relief or assistance.
-- **Inputs:** a character package (text files: body, rig, materials, motion, skin, style), written by an agent.
-- **Outputs:** two delivery targets from the same engine and character files:
-  - game assets: animated sprites for 4 or 8 directions (sprite sheets with JSON, Aseprite files);
-  - a live web runtime: a small JavaScript component that animates a character in real time and reacts to page or
-    agent events (see P8).
-  Both carry the same visual bar: characters must stand up to game art. Diagnostics come with both.
-- **Core promise:** the agent says what should happen ("walk, turn, stop; the cape is heavy wool; wind from the
-  left"); the tool makes it physically right and tells the agent precisely what to fix when it is not.
-- **Not in scope:** an editor GUI, 3D output, and a full game-engine runtime (game exports target existing engines;
-  the web runtime is for small UI characters, not games).
+- **Users:** AI agents first (through MCP and the command line), and the people directing them: indie developers and
+  small studios who need many animated characters without an animator, and web developers who want small reactive
+  characters on their pages.
+- **Inputs:** character art with points (imported from a sprite, an illustration or an image model's output), or a
+  character package written by an agent from a prompt. Both become the same text package: rig, points, materials,
+  motion, skin, style.
+- **Outputs:** two delivery targets from the same engine and files, held to the same bar:
+  - game assets: animated sprites in four or eight directions (sprite sheets with JSON, Aseprite files);
+  - the live web runtime: `<pinata-character>` and the page as the world.
+- **Core promise:** the agent says what should happen; the tool makes it physically right, gives it game feel, and
+  tells the agent precisely what to fix when it is not.
+- **Not in scope:** an editor GUI and a full game-engine runtime (game exports target existing engines). No model in
+  the export path: model output enters as stored files ([ML proposal](proposals/ml-augmentation.md)). The motion core
+  stays 3D so a 3D renderer and glTF export stay possible; neither is planned.
 
-## Body plans and rigid-body behaviours (in progress)
+## How progress is judged
 
-- **General limbs** (done; [plan](plans/done/2026-10-30-general-limbs.md)): any number of legs with any segment count,
-  arms, and appendages (tails, ears, antennae, wings) with spring and oscillator dynamics; biped, quadruped, hexapod and
-  octopod templates; a starter command. Proportion guidance from the quadruped piñatas: keep the stride well under the
-  front-to-back hip spacing (about 0.6x), or front and hind legs cross in 3/4 views.
-- **Effects and weather:** a particle effects layer for the runtime component (emitters attached to joints or events:
-  dust at footsteps, confetti on a hit, rain, snow, sparks), drawn in the active style and deterministic; weather and
-  world events (wind, rain, earthquakes) that characters react to through behaviours. First in the world showcase
-  ([plan](plans/2026-10-30-world-showcase.md), batch F).
-- **Rigid-body behaviours:** a prototype hung the unicorn piñata from a rope, whacked it, and let it swing and twist
-  with limp legs, mane and tail (simulated as cloth on the moving body). To make that a motion script like walking:
-  a root with full 3D orientation (today it can only yaw), a `hang` behaviour (rope or spring from an anchor), scripted
-  `hit` events (impulse and spin at a point), and limp limbs as low-stiffness appendages.
+- **Motion quality:** the owner's blind review page (pairs against hand-animated references, sides shuffled, "which
+  would you ship"). It is the gate of every motion plan. Eight pairs from one reviewer move by two or three on
+  chance, so a round carries enough pairs to tell a change from noise, and same-art pairs wherever a reference has
+  them.
+- **Between rounds:** numbers the tool computes on both sides (frames per cycle, distinct poses, the share of held
+  frames, pops, cloth lag, foot slide on drawn pixels) and an AI judge only on dimensions it is shown to see.
+- **Ground truth** (directions, prompt matching, materials): blind AI panels, calibrated on hand-drawn controls.
+- **Everything else:** gates fixed in a plan before building, a control that must fail, an independent review of
+  each batch, `npm run verify`.
 
-## Built since the proofs
+## What counts as progress
 
-- **The live runtime (P8)** ([spike](plans/done/2026-10-30-runtime-spike.md)): characters animate live in the browser
-  (`<pinata-character>`, the hanging piñata, the Claude Code mod), with behaviours composed from simple primitives
-  ([composable behaviours](plans/2026-10-30-composable-behaviours.md)).
-- **The page as the world** ([plan](plans/2026-10-31-page-world.md)): characters live on an ordinary web page; marked
-  elements are ground and walls; characters walk, step up, drop, jump and react to the page over a click-through
-  overlay, and the front page is built on it.
-- **Natural motion:** humanoids move by retargeted motion capture with motion matching and a light physical body
-  ([motion data](plans/done/2026-10-30-motion-data.md)); capes, cloaks and robes are simulated cloth drawn in the
-  skins; falls dip and absorb; jumps play capture take-offs and landings
-  ([natural page motion](plans/done/2026-11-02-natural-page-motion.md),
-  [jump takes](plans/done/2026-11-04-jump-takes.md)).
-- **The visual bar is settled** where it is: after P7, a beat-and-pose stage, hand-drawn walk frames and a restyle
-  each missed their gates against hand-drawn game sprites (see P7 below and [`TODO.md`](TODO.md)).
+The effort since Phase 1 went into narrow gates, judging instruments and tweaks to capture takes, and the owner's
+review moved from 3 of 8 to 1 of 8. To keep the work on the goal:
 
-## Phase 0: consolidate (about 1-2 weeks)
+- **A milestone is something the owner can watch:** art that went in, an animation that came out, on the review page
+  beside a hand-animated reference. A batch that ends in a number alone is a step, not a milestone.
+- **Work comes from the order below.** A parked item is picked up only when an item in the order is blocked on it.
+- **A narrow miss is recorded and left.** A gate missed within a few percent on something off the path gets a line
+  in [`TODO.md`](TODO.md), not a batch.
+- **Mechanisms, not adjustments.** A defect named in a review is answered by a capability every character gets (a
+  pose layer, a check, an import step), not by another take or another constant for the example it showed on.
+- **Instruments are built when an item needs one,** and only as far as it needs.
 
-Turn proof-of-concept code into a coherent library. No new capabilities.
+## Order of work
 
-1. Merge the P1-P6 runners into one library of reusable pieces with a stable API; keep the proof runners as
-   regression suites (each runner's gates become tests that must keep passing).
-2. ~~Render simulated cloth and chains into the pixel output.~~ Done: chains and capes with a `render` entry are drawn
-   as thin capsule parts, in the demo and in the `check` contact sheet and walk strip.
-3. ~~Judge tooling in TypeScript.~~ Done: `npm run judge` builds packets (neutral, both orders, stacked or side by
-   side), keeps keys out of them and scores answers with controls; see [`docs/judging.md`](judging.md).
-4. Fix gate definitions the proofs found weak: area jumps that count occlusion (P2), speed windows that return
-   Infinity with few plants (P4), the thin-part metric's non-monotonic behaviour, and the borderline knight values
-   (thin fraction at 0.25, stray pixels at 2).
-5. ~~Performance.~~ Done, with byte-identical output: scalar ray maths and per-pixel culling made rendering 6-14x
-   faster (P2 5.6 min to 7 s, demo 1.7 s to 0.12 s per frame); the determinism re-run is behind `--verify`. Next
-   options that keep pixels: faster PNG compression and sheet assembly. Options that change pixels: analytic ray
-   intersection, fewer sub-samples.
-6. Stray pixels (done for outlines): almost all strays in selective-outline characters (182 of 197 across the ten
-   examples) were outline pixels coloured by a different bordering part than their outline neighbours. The renderer
-   smooths those after drawing the outline, leaving 8; the rest are single pixels of `allowThin` parts.
-7. Quadruped gaits are fragile: short legs exceed the knee-speed gate at ordinary speeds (the unicorn), and turning
-   broke the dragon's walk until it slowed to 0.1 m/s. Tune the planner for short-legged and many-legged bodies as
-   part of the general limbs work.
+Each item is a plan with its gates fixed first. The order is by distance to the goal.
 
-Exit: all proof suites pass from the library; cloth is visible in rendered frames; one command per proof.
+1. **Import existing art** ([plan](plans/2026-11-05-import-existing-art.md), batch A first): normalisation, points,
+   the cut along the bones, the rig fit, hidden-area lists and view guides, on LPC, CC0, image-model and illustration
+   inputs. It is the goal's first verb and the tool cannot do it yet; it also supplies the same-art pairs for every
+   motion review after it. The plan's motion gate is read on walk strips by an AI panel, an instrument since found
+   weak for motion, so the same pairs also go on the owner's page.
+2. **Game feel** (the next plan, built on the two review rounds): performances as chosen poses
+   with timing, for any character.
+   - A pose-to-pose layer for idles, attacks, jumps and reactions: named phases (anticipation, strike,
+     follow-through, hold, recover) with durations, authored as text by the agent or picked from a library, with
+     capture kept for locomotion and as the source of in-between motion.
+   - A resting pose as the base of every idle (weight on one leg, arms at rest or on what is carried), with the
+     breath and weight shift on top and cloth that answers them.
+   - Timing for export: holds at extremes and stepping on twos as a setting, and the classic feel filter
+     (anticipation and follow-through from a smoothed second derivative), off by default.
+   - `check` reads the phases (an attack with no anticipation, a strike no faster than its wind-up, an idle with a
+     gesture in it, a jump with no crouch or landing) and says what to fix.
+   - Judged by round three of the owner's page: the earlier pairs and the same-art LPC pairs from item 1.
+3. **A motion measure between rounds** ([benchmark](plans/2026-11-05-animation-benchmark.md), batch B): the
+   scorecard's computed numbers on both sides, and a single-model judge as a new gate fixed before its run. Small,
+   and it runs beside items 1 and 2 because it shortens their loop.
+4. **Views that read:** import batches B and C (missing views drawn over guides, hidden areas, the fresh-agent
+   imports from all views and from one), with view providers tried against the agent as the proposal's experiment 2.
+   The direction gates stay as fixed; the hand-drawn calibration says what they can show.
+5. **More takes where game feel names a gap:** styled locomotion and generated attack takes entering as files (the
+   proposal's experiment 4), retargeted and gated like the capture library.
+6. **Any shape** ([image and points](plans/2026-10-30-image-points.md), batches B to D): `points.json`, the mesh
+   warp renderer and the point helper, proved on a biped, a quadruped and something with no legs; then the decision
+   on making image and points the default authoring path. After import, because import reaches the goal for bodies
+   the templates cover with the renderer, export and gates that exist; the warp is what reaches the rest.
+7. **Reach:** importers for Godot and Unity, Spine and Rigby2D interop, per-size skins (P7's size gate), effects
+   and weather on the page.
 
-## Phase 1: minimum viable tool (done, v0.7.0)
+Per-character motion settings (arm space, stride scale, playback speed) belong to item 2 where a review names them.
 
-The exit test is met (third run: three of three authors passed every gate within 10 `check` runs, and the judge panel
-matched all three characters).
+## Parked
 
-1. ~~**Skins v1.**~~ Done through P7: per-part sprites for eight directions with view buckets and pivots, RotSprite
-   rotation, skin validation, the fit check, and an AI artist guide alongside [`docs/authoring.md`](authoring.md).
-2. **Interfaces.** `pinata check`, `pinata render` and `pinata export` as a CLI, and an MCP server wrapping them, so
-   agents in Claude Code and other clients use the tool directly.
-3. **Export.** Sprite sheets with JSON frame data, Aseprite files; Spine/Rigby export later.
-4. **Behaviour library.** Walk, run, idle, turn, pivot and jump (built), plus crouch and a simple attack, each with
-   gates in the P4 style.
-5. **Authoring hints.** Act on the P5 authors' notes: decals for small features, stride-to-leg-length guidance and
-   diagnosis, palette budgeting, radius vs diameter wording, a reliable edit path for agents.
+Open and recorded in [`TODO.md`](TODO.md), not worked until an item above needs them or a user of the runtime does:
 
-Exit: an agent, from a prompt, produces an 8-direction walking, idling and jumping character with a cape, skinned,
-exported as a sprite sheet, and it passes every gate.
+- the page world's narrow misses (frames mid-air, planted feet over a pixel, cloth flicker, jump and super-jump
+  counts) and the restatement of its count gates per distance travelled;
+- weather, particles and the physics-engine spike of the world showcase;
+- rigid-body behaviours in the engine (`hang`, scripted `hit`, a root with full 3D orientation) beyond what the
+  hanging piñata already does in the runtime;
+- quadruped gait tuning for short legs and turns, stray pixels of thin parts, renderer speedups;
+- further attempts to make AI-drawn skins pass as hand-drawn game sprites. Existing art is the way past that bar.
 
-### P7: skins to a game-art bar
+## Risks
 
-**Visual bar:** characters must stand up to game art, wherever they are used (game sprites or characters in a web
-UI). A mascot that looks hand-made beats one that looks procedural in any context, so this bar applies to the whole
-product. P8 settles delivery and performance; P7 settles visual quality; neither waits on the other, and the skins
-compositor is also the fastest real-time renderer, so a P7 pass helps P8.
+- **Game feel may not come from a layer.** If poses with timing on rotated part sprites still lose to hand
+  animation on the same art, the limit is the part-sprite renderer (the rotation and readability gates of P7
+  missed), and the answer moves towards drawn key frames per pose or the mesh warp. Item 1's same-art pairs show
+  which it is before much is built on either.
+- **Cut sprites at small sizes.** A 48 to 64 px sprite cut into parts and rotated may lose the drawing's quality;
+  the import round-trip gate sees the rest pose only. The motion gate on imported art is the check.
+- **One reviewer.** The owner's eye is the bar for motion, and one human expert review is still owed before any
+  public claim about art quality.
+- **Judge reliability.** AI judges are reliable for ground truth, weak for motion in strips and for three-quarter
+  views; no gate rests on a dimension the judges are not shown to see.
+- **Competition.** For game assets: Rigby2D, Keyframe.it, Sprite Studio and the frame generators (PixelLab, Retro
+  Diffusion). For web characters: Rive and Lottie. Piñata's difference is a fixed grid and palette, consistent
+  directions, planted feet, physics-driven cloth and checked, composable behaviours; frame generators drift on all
+  of these, and the benchmark's computed measures can show it.
+- **Annoyance.** Page companions have a history of irritating users. The web component stays quiet by default, easy
+  to dismiss, respects `prefers-reduced-motion` and never blocks the page.
+- **Small sizes.** 32 px is at the edge of what parts-based rendering carries; 48 px is the default.
 
-Prove that an AI artist can draw skins for 8 directions (or 4 plus mirroring) that stay consistent across views,
-survive walking and reactions, and read at 32, 48 and 64 px. Scope beyond the skins spike: clean rotation (pre-drawn
-angle variants for limbs, or a RotSprite-style algorithm instead of nearest-neighbour 22.5 degree steps) and a first
-readability layer (exaggerated contact and passing poses, holds). Gates to fix before building it:
-- Artist finishes a full directional skin set within a small budget of runs.
-- Blind judges, using references of known high quality and both a detection and a 1-5 quality-rating question
-  (the detection-only control rule broke down once the candidate was competitive), rate the skinned character at
-  least as high as the references on average.
-- A walk strip in every direction is preferred over the procedural renderer by a majority.
-- One human pixel artist reviews the results (the only human check kept in the plan).
+## Public claims
 
-**Status:** built and released (v0.3.0): RotSprite rotation (off by default), eight-direction skins for the four
-humanoids, a readability layer, skins in the world. Passed: artist, view consistency, real-time, quality against
-references (second round). Failed: rotation preference, readability. Open: the size gate (needs per-size skins),
-the human review. Live capes on skinned characters are built on the page: the artist's cape, cloak, robe and scarf
-sprites are drawn along their simulated cloth ([natural-motion plan](plans/done/2026-11-02-natural-page-motion.md)).
-Details in the [P7 plan](plans/2026-10-31-p7-skins.md). Later attempts to close the gap to hand-drawn game sprites
-(a beat-and-pose stage, hand-drawn walk frames, a restyle with bigger heads and stronger shading) missed their gates,
-so the bar is settled where it is and human-drawn skins remain the way past it.
-
-**Honest risk:** game-quality art is where the evidence is thinnest. If P7 cannot reach strong references even with
-clean rotation and pose exaggeration, serious game work needs human-drawn skins, and Piñata supplies motion, physics
-and composition rather than the art. That is still a useful product; the import path below makes it work either way.
-
-## Phase 2: depth (in progress)
-
-Under way: facing readability, an animation benchmark against hand-animated CC0 characters, and motion fixes from
-the owner's blind reviews; next, resting idles, game attacks and game jumps, then importing existing art from
-people or image models. Current state in [`TODO.md`](TODO.md).
-
-- **Animation readability.** P4 showed a kinematically correct walk is not automatically readable at 48 px; skins
-  helped, but animators also exaggerate contact and passing poses, hold key frames and draw smears. Add an
-  exaggeration and timing layer on top of the physics, with judge-checked readability.
-- **Environment.** Slopes and stairs (foot IK to terrain), wind fields and obstacles for cloth, water drag.
-- **Body variety.** Non-humanoid rigs (quadrupeds, tails, wings) and props with constraints (two-handed weapons).
-- **Import.** Bring in hand-made part sprites from Aseprite so human artists can supply skins directly, plugging into
-  the same rig. AI skins become a starting point, not a ceiling. Pull this forward if P7 falls short of the bar.
-- **Runtime exports.** Godot and Unity importers; Rigby2D/Spine interop.
-
-## Risks and open questions
-
-- **Visual quality is the main risk.** Skins are promising but proven only for one character, one view, against
-  modest references. P7 decides whether the visual layer is AI-drawn skins or human-supplied art.
-- **Judge reliability.** AI judges were reliable for ground-truth questions (materials, wind, facing in 3/4 view,
-  prompt matching) and for detecting obviously procedural art, but unreliable for facing from a pure side view and
-  once the candidate became competitive. Keep ground-truth questions, add quality ratings with strong references,
-  and keep one human expert review before any public claim of quality.
-- **Competition.** For game assets: Rigby2D, Keyframe.it and Sprite Studio all gained MCP support in 2026. For web UI
-  characters: Rive (designer-authored interactive state machines with a web runtime) and Lottie (canned animation).
-  The differentiators (characters generated from a prompt, physics-driven reactions, composable checked behaviours,
-  style-independent motion) need to ship before these converge.
-- **Annoyance.** UI companions have a history of irritating users (Clippy, Bonzi). The web component must be quiet by
-  default, easy to dismiss, respect `prefers-reduced-motion`, and never block the page; assistance (speech bubbles,
-  hints) is an opt-in layer whose content the host app supplies.
-- **Small sizes.** 32 px is at the edge of what parts-based rendering can carry; many gates sit at their limits for
-  the knight. Treat 48 px as the default and 32 px as a stretch target.
-
-## Going public
-
-Make the repository public when Phase 1 exits and P7 passes, with a README that states the results honestly, a demo
-(an agent creating a character from a prompt, then the same character walking in several directions as game sprites
-and reacting live in a web page), the authoring guide, and examples.
+The repository is public and the README states results as measured. It makes no claim of game-quality animation
+until the owner's review gate is met on imported art, and none of game-quality art from AI-drawn skins.

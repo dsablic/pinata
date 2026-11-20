@@ -60,5 +60,4 @@ sheets of the same art (LPC walks) make the cleanest motion comparison yet: the 
 - **C. Judged:** the pairwise panel against the LPC hand-animated walks; the fresh-agent import, from all views and
   from one view. Review.
 
-Order: after [facing readability](2026-11-05-facing-readability.md) batch B, so imported characters meet the
-direction checks.
+Order: after the direction checks in `pinata check` (built), so imported characters meet them.

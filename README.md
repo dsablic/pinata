@@ -40,9 +40,10 @@ check its own work.
 
 ## Next
 
-- **The minimum viable tool:** one CLI (`check`, `render`, `export`) and an MCP server, sprite-sheet export, and a
-  behaviour library (idle, crouch, a simple attack beside walk, turn and jump), so an agent can go from a prompt to
-  an exported, skinned character ([plan](docs/plans/2026-11-04-phase-1-tool.md)).
+- **Any art, animated well:** an agent points the tool at existing character art and reaches fluid, game-worthy
+  animation. First `pinata import` ([plan](docs/plans/2026-11-05-import-existing-art.md)), then game feel: idles,
+  attacks and jumps as chosen poses with timing, judged against hand-animated sprites. See the
+  [roadmap](docs/ROADMAP.md).
 
 ## Running it
 
@@ -107,8 +108,8 @@ being built. [`docs/FINDINGS.md`](docs/FINDINGS.md) has the details.
 - [`refs/`](refs): CC0 reference sprites from the P1 judge panel, with sources in
   [`refs/LICENSES.md`](refs/LICENSES.md).
 - [`docs/`](docs): the [roadmap](docs/ROADMAP.md), [TODO](docs/TODO.md), [findings](docs/FINDINGS.md),
-  [authoring guide](docs/authoring.md), [judging guide](docs/judging.md), and [plans](docs/plans) with their gates and
-  findings logs (finished ones in [`docs/plans/done/`](docs/plans/done)).
+  [authoring guide](docs/authoring.md), [judging guide](docs/judging.md), and the open [plans](docs/plans) with their
+  gates (the proofs' findings and judge artefacts are in [`docs/plans/done/`](docs/plans/done)).
 
 ## Licence
 

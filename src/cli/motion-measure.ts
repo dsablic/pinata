@@ -126,7 +126,7 @@ function attackTable (subjects: Subject[], reports: Attack[]): void {
 
 function gatesTable (measured: Measured[]): void {
   const rows = measured.flatMap(gateRows)
-  section('gates (docs/plans/2026-11-06-motion-from-review.md)', ['gate', 'example', 'measured', 'result'],
+  section('gates', ['gate', 'example', 'measured', 'result'],
     rows.map(row => [row.gate, row.example, row.value, row.pass ? 'pass' : 'FAIL']))
   const failed = rows.filter(row => !row.pass).length
   console.log(`\n${failed === 0 ? 'every gate passes' : `${failed} of ${rows.length} gate checks fail`}`)

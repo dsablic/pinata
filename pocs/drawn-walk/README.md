@@ -1,8 +1,7 @@
 # Drawn walk frames: the knight's side walk
 
 Eight whole-body frames of the knight walking right, at the page's sprite scale, for
-[the drawn walk frames plan](../../docs/plans/done/2026-11-03-drawn-walk-frames.md), batch B. Judged twice and not
-kept (see the plan).
+the drawn walk frames attempt. Judged twice and not kept (see [`docs/FINDINGS.md`](../../docs/FINDINGS.md)).
 
 - `knight-side-walk.json`: the frames (palette keys of `examples/knight/skin.json`), each with `soles` (the ground pixel
   under the near and the far foot) and `planted` (0 near, 1 far). The planted sole steps back 3 px a frame, so a
